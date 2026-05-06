@@ -7,27 +7,17 @@ from datetime import datetime, date
 class PlayersTableModel(QAbstractTableModel):
     """Модель для отображения игроков"""
     
-    def __init__(self, title_id=None, sex=None, parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
         self._data = []
-        self.title_id = title_id
-        self.sex = sex
         self._headers = ['ID', 'ФИО', 'Отчество', 'Дата рождения', 'Рейтинг', 
                         'Город', 'Регион', 'Разряд', 'Тренер']
-        self.load_data()
     
-    def load_data(self):
-        try:
-            query = Player.select().order_by(Player.rank)
-            if self.title_id:
-                query = query.where(Player.title_id == self.title_id)
-            if self.sex:
-                query = query.where(Player.sex == self.sex)
-            self._data = list(query)
-            self.layoutChanged.emit()
-        except Exception as e:
-            print(f"Ошибка загрузки: {e}")
-            self._data = []
+    def setData(self, data):
+        """Установка данных для отображения"""
+        self.beginResetModel()
+        self._data = data
+        self.endResetModel()
     
     def rowCount(self, parent=QModelIndex()):
         return len(self._data)
@@ -36,6 +26,7 @@ class PlayersTableModel(QAbstractTableModel):
         return len(self._headers)
     
     def _format_date(self, date_value):
+        """Безопасное форматирование даты"""
         if not date_value:
             return ""
         if isinstance(date_value, str):
@@ -50,15 +41,6 @@ class PlayersTableModel(QAbstractTableModel):
             return date_value.strftime("%d.%m.%Y")
         return str(date_value)
     
-    def _get_patronymic_text(self, patronymic_id):
-        if not patronymic_id:
-            return ""
-        try:
-            patronymic = Patronymic.get_or_none(Patronymic.id == patronymic_id)
-            return patronymic.patronymic if patronymic else ""
-        except:
-            return ""
-    
     def data(self, index, role=Qt.DisplayRole):
         if not index.isValid():
             return None
@@ -66,30 +48,31 @@ class PlayersTableModel(QAbstractTableModel):
         col = index.column()
         row = index.row()
         
-        # Для отображения номера строки (заменяем ID)
         if role == Qt.DisplayRole:
+            if row >= len(self._data):
+                return None
+            
+            player = self._data[row]
+            
             if col == 0:
-                return str(row + 1)  # Нумерация строк с 1
+                return str(row + 1)  # Нумерация строк
             elif col == 1:
-                return self._data[row].player or ""
+                return player.get('fio', '') or player.get('player', '')
             elif col == 2:
-                return self._get_patronymic_text(self._data[row].patronymic_id)
+                return player.get('patronymic', '')
             elif col == 3:
-                return self._format_date(self._data[row].bday)
+                return self._format_date(player.get('birth_date', ''))
             elif col == 4:
-                return str(self._data[row].rank) if self._data[row].rank else "0"
+                return str(player.get('rank', 0))
             elif col == 5:
-                return self._data[row].city or ""
+                return player.get('city', '')
             elif col == 6:
-                return self._data[row].region or ""
+                return player.get('region', '')
             elif col == 7:
-                return self._data[row].razryad or ""
+                return player.get('razryad', '')
             elif col == 8:
-                if self._data[row].coach_id:
-                    return self._data[row].coach_id.coach or ""
-                return ""
+                return player.get('coach', '')
         
-        # Для выравнивания по центру номеров строк
         if role == Qt.TextAlignmentRole and col == 0:
             return Qt.AlignCenter
         
@@ -97,36 +80,21 @@ class PlayersTableModel(QAbstractTableModel):
     
     def headerData(self, section, orientation, role=Qt.DisplayRole):
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
-            headers = ['№', 'ФИО', 'Отчество', 'Дата рождения', 'Рейтинг', 
-                      'Город', 'Регион', 'Разряд', 'Тренер']
-            if section < len(headers):
-                return headers[section]
+            if section < len(self._headers):
+                return self._headers[section]
         return None
     
-    def get_player(self, row):
+    def get_id(self, row):
+        """Получение ID участника по строке"""
         if 0 <= row < len(self._data):
-            return self._data[row]
+            return self._data[row].get('id')
         return None
     
-    def add_player(self, data):
-        try:
-            if 'bday' in data and hasattr(data['bday'], 'toPyDate'):
-                data['bday'] = data['bday'].toPyDate()
-            player = Player.create(**data)
-            self.load_data()
-            return player.id
-        except Exception as e:
-            print(f"Ошибка добавления: {e}")
-            return None
-    
-    def delete_player(self, player_id):
-        try:
-            Player.delete().where(Player.id == player_id).execute()
-            self.load_data()
-            return True
-        except Exception as e:
-            print(f"Ошибка удаления: {e}")
-            return False
+    def get_fio(self, row):
+        """Получение ФИО участника по строке"""
+        if 0 <= row < len(self._data):
+            return self._data[row].get('fio', '') or self._data[row].get('player', '')
+        return None
 
 class TeamsTableModel(QAbstractTableModel):
     """Модель для отображения команд"""

@@ -6,7 +6,7 @@ import sys
 import traceback
 import os
 import logging
-from datetime import datetime
+
 
  
 def setup_logging(log_directory="log"):

@@ -349,3 +349,13 @@ class Choice_double_player(BaseModel):
     class Meta:
         db_table = "choice_double_players"
         order_by = "r_sum"
+
+# Функция для подключения к БД
+def connect_db():
+    if db.is_closed():
+        db.connect()
+    return db
+
+def close_db():
+    if not db.is_closed():
+        db.close()

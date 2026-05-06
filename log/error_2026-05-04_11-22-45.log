@@ -1,0 +1,10 @@
+2026-05-04 11:23:29,963 - ERROR - Необработанное исключение: AttributeError: 'ChoiceGroupManual' object has no attribute 'min_groups'
+2026-05-04 11:23:29,964 - ERROR - Трассировка стека:
+Traceback (most recent call last):
+  File "c:\Users\Alex\Competitions_TT_team\manual_choice.py", line 881, in auto_fill_first
+    self.current_group_for_seed = self.find_next_group_for_seed()
+                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "c:\Users\Alex\Competitions_TT_team\manual_choice.py", line 239, in find_next_group_for_seed
+    count_min_groups = len(self.min_groups)
+                           ^^^^^^^^^^^^^^^
+AttributeError: 'ChoiceGroupManual' object has no attribute 'min_groups'. Did you mean: 'init_groups'?

@@ -1,0 +1,28 @@
+2026-05-04 14:32:10,041 - ERROR - Необработанное исключение: IndexError: list assignment index out of range
+2026-05-04 14:32:10,042 - ERROR - Трассировка стека:
+Traceback (most recent call last):
+  File "c:\Users\Alex\Competitions_TT_team\manual_choice.py", line 871, in do_move
+    self.groups[g1][row1] = None
+    ~~~~~~~~~~~~~~~^^^^^^
+IndexError: list assignment index out of range
+2026-05-04 14:32:14,223 - ERROR - Необработанное исключение: IndexError: list assignment index out of range
+2026-05-04 14:32:14,226 - ERROR - Трассировка стека:
+Traceback (most recent call last):
+  File "c:\Users\Alex\Competitions_TT_team\manual_choice.py", line 871, in do_move
+    self.groups[g1][row1] = None
+    ~~~~~~~~~~~~~~~^^^^^^
+IndexError: list assignment index out of range
+2026-05-04 14:32:20,516 - ERROR - Необработанное исключение: IndexError: list assignment index out of range
+2026-05-04 14:32:20,517 - ERROR - Трассировка стека:
+Traceback (most recent call last):
+  File "c:\Users\Alex\Competitions_TT_team\manual_choice.py", line 871, in do_move
+    self.groups[g1][row1] = None
+    ~~~~~~~~~~~~~~~^^^^^^
+IndexError: list assignment index out of range
+2026-05-04 14:32:27,961 - ERROR - Необработанное исключение: IndexError: list assignment index out of range
+2026-05-04 14:32:27,962 - ERROR - Трассировка стека:
+Traceback (most recent call last):
+  File "c:\Users\Alex\Competitions_TT_team\manual_choice.py", line 871, in do_move
+    self.groups[g1][row1] = None
+    ~~~~~~~~~~~~~~~^^^^^^
+IndexError: list assignment index out of range

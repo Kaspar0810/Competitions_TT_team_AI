@@ -1,0 +1,41 @@
+2026-05-05 14:43:56,571 - ERROR - Необработанное исключение: IndexError: list assignment index out of range
+2026-05-05 14:43:56,572 - ERROR - Трассировка стека:
+Traceback (most recent call last):
+  File "c:\Users\Alex\Competitions_TT_team\manual_choice.py", line 1013, in do_move
+    self.groups[g1][row1] = None
+    ~~~~~~~~~~~~~~~^^^^^^
+IndexError: list assignment index out of range
+2026-05-05 14:45:03,091 - ERROR - Необработанное исключение: IndexError: list assignment index out of range
+2026-05-05 14:45:03,091 - ERROR - Трассировка стека:
+Traceback (most recent call last):
+  File "c:\Users\Alex\Competitions_TT_team\manual_choice.py", line 1013, in do_move
+    self.groups[g1][row1] = None
+    ~~~~~~~~~~~~~~~^^^^^^
+IndexError: list assignment index out of range
+2026-05-05 14:45:07,129 - ERROR - Необработанное исключение: IndexError: list assignment index out of range
+2026-05-05 14:45:07,130 - ERROR - Трассировка стека:
+Traceback (most recent call last):
+  File "c:\Users\Alex\Competitions_TT_team\manual_choice.py", line 1013, in do_move
+    self.groups[g1][row1] = None
+    ~~~~~~~~~~~~~~~^^^^^^
+IndexError: list assignment index out of range
+2026-05-05 14:46:06,166 - ERROR - Необработанное исключение: IndexError: list assignment index out of range
+2026-05-05 14:46:06,170 - ERROR - Трассировка стека:
+Traceback (most recent call last):
+  File "c:\Users\Alex\Competitions_TT_team\manual_choice.py", line 1013, in do_move
+    self.groups[g1][row1] = None
+    ~~~~~~~~~~~~~~~^^^^^^
+IndexError: list assignment index out of range
+2026-05-05 14:46:13,169 - ERROR - Необработанное исключение: TypeError: 'NoneType' object is not iterable
+2026-05-05 14:46:13,198 - ERROR - Трассировка стека:
+Traceback (most recent call last):
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 1029, in choice
+    choice_gr_automat(check_flag)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 9985, in choice_gr_automat
+    choice_save_manual_group(results)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 10005, in choice_save_manual_group
+    for player in results:
+                  ^^^^^^^
+TypeError: 'NoneType' object is not iterable

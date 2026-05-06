@@ -1,0 +1,35 @@
+2026-05-05 21:33:35,790 - ERROR - Необработанное исключение: IndexError: list index out of range
+2026-05-05 21:33:35,791 - ERROR - Трассировка стека:
+Traceback (most recent call last):
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 1029, in choice
+    choice_gr_automat(check_flag)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 9988, in choice_gr_automat
+    player_in_table_group_and_write_Game_list_Result(stage)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 6898, in player_in_table_group_and_write_Game_list_Result
+    table_made(pv, stage)
+    ~~~~~~~~~~^^^^^^^^^^^
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 16823, in table_made
+    dict_table = tbl(stage, kg, ts, zagolovok, cW, rH)
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 16043, in tbl
+    tdt_all = table_data(stage, kg)  # данные результатов в группах
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 20470, in table_data
+    tdt_tmp = tdt_news(max_gamer, posev_data, count_player_group, tr, num_gr)
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 20563, in tdt_news
+    tbl_tmp[i - 1][1] = fam
+    ~~~~~~~^^^^^^^
+IndexError: list index out of range
+2026-05-05 21:34:20,960 - ERROR - Необработанное исключение: TypeError: 'NoneType' object is not iterable
+2026-05-05 21:34:20,977 - ERROR - Трассировка стека:
+Traceback (most recent call last):
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 1029, in choice
+    choice_gr_automat(check_flag)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 9985, in choice_gr_automat
+    choice_save_manual_group(results)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 9994, in choice_save_manual_group
+    for player in results:
+                  ^^^^^^^
+TypeError: 'NoneType' object is not iterable

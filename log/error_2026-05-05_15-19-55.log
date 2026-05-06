@@ -1,0 +1,14 @@
+2026-05-05 15:20:26,152 - ERROR - Необработанное исключение: AttributeError: 'ChoiceGroupManual' object has no attribute 'load_existing_draw'
+2026-05-05 15:20:26,153 - ERROR - Трассировка стека:
+Traceback (most recent call last):
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 1029, in choice
+    choice_gr_automat(check_flag)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 9982, in choice_gr_automat
+    results = choice_group_manual(player_list, group, id_title)
+  File "c:\Users\Alex\Competitions_TT_team\manual_choice.py", line 1248, in choice_group_manual
+    dialog = ChoiceGroupManual(athletes, num_groups, id_title, parent, existing_data)
+  File "c:\Users\Alex\Competitions_TT_team\manual_choice.py", line 109, in __init__
+    self.load_existing_draw()
+    ^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChoiceGroupManual' object has no attribute 'load_existing_draw'

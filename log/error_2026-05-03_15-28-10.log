@@ -1,0 +1,10 @@
+2026-05-03 15:28:59,461 - ERROR - Необработанное исключение: TypeError: choice_save_manual_group() takes 1 positional argument but 2 were given
+2026-05-03 15:28:59,461 - ERROR - Трассировка стека:
+Traceback (most recent call last):
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 1027, in choice
+    choice_gr_automat()
+    ~~~~~~~~~~~~~~~~~^^
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 9987, in choice_gr_automat
+    choice_save_manual_group(results,group)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+TypeError: choice_save_manual_group() takes 1 positional argument but 2 were given

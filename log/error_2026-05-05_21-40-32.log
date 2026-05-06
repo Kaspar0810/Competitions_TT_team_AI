@@ -1,0 +1,10 @@
+2026-05-05 21:41:47,929 - ERROR - Необработанное исключение: TypeError: '<=' not supported between instances of 'int' and 'NoneType'
+2026-05-05 21:41:47,930 - ERROR - Трассировка стека:
+Traceback (most recent call last):
+  File "c:\Users\Alex\Competitions_TT_team\manual_choice.py", line 1119, in save_changes
+    self.current_group_for_seed = self.find_next_group_for_seed()
+                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "c:\Users\Alex\Competitions_TT_team\manual_choice.py", line 401, in find_next_group_for_seed
+    if g <= self.current_group_for_seed:
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: '<=' not supported between instances of 'int' and 'NoneType'

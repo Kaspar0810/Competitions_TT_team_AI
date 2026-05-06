@@ -1,0 +1,13 @@
+2026-05-04 09:39:10,544 - ERROR - Необработанное исключение: TypeError: 'NoneType' object is not iterable
+2026-05-04 09:39:10,545 - ERROR - Трассировка стека:
+Traceback (most recent call last):
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 1027, in choice
+    choice_gr_automat()
+    ~~~~~~~~~~~~~~~~~^^
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 9983, in choice_gr_automat
+    choice_save_manual_group(results)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 9992, in choice_save_manual_group
+    for player in results:
+                  ^^^^^^^
+TypeError: 'NoneType' object is not iterable

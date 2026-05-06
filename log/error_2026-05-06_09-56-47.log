@@ -1,0 +1,46 @@
+2026-05-06 09:58:56,334 - ERROR - Необработанное исключение: TypeError: 'NoneType' object is not iterable
+2026-05-06 09:58:56,380 - ERROR - Трассировка стека:
+Traceback (most recent call last):
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 1029, in choice
+    choice_gr_automat(check_flag)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 9985, in choice_gr_automat
+    choice_save_manual_group(results)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 9994, in choice_save_manual_group
+    for player in results:
+                  ^^^^^^^
+TypeError: 'NoneType' object is not iterable
+2026-05-06 10:00:28,052 - ERROR - Необработанное исключение: TypeError: '<=' not supported between instances of 'int' and 'NoneType'
+2026-05-06 10:00:28,052 - ERROR - Трассировка стека:
+Traceback (most recent call last):
+  File "c:\Users\Alex\Competitions_TT_team\manual_choice.py", line 1148, in save_changes
+    self.current_group_for_seed = self.find_next_group_for_seed()
+                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "c:\Users\Alex\Competitions_TT_team\manual_choice.py", line 401, in find_next_group_for_seed
+    if g <= self.current_group_for_seed:
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: '<=' not supported between instances of 'int' and 'NoneType'
+2026-05-06 10:01:59,030 - ERROR - Необработанное исключение: TypeError: '<=' not supported between instances of 'int' and 'NoneType'
+2026-05-06 10:01:59,031 - ERROR - Трассировка стека:
+Traceback (most recent call last):
+  File "c:\Users\Alex\Competitions_TT_team\manual_choice.py", line 1148, in save_changes
+    self.current_group_for_seed = self.find_next_group_for_seed()
+                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "c:\Users\Alex\Competitions_TT_team\manual_choice.py", line 401, in find_next_group_for_seed
+    if g <= self.current_group_for_seed:
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: '<=' not supported between instances of 'int' and 'NoneType'
+2026-05-06 10:03:20,916 - ERROR - Необработанное исключение: TypeError: 'NoneType' object is not iterable
+2026-05-06 10:03:20,953 - ERROR - Трассировка стека:
+Traceback (most recent call last):
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 1029, in choice
+    choice_gr_automat(check_flag)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 9985, in choice_gr_automat
+    choice_save_manual_group(results)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 9994, in choice_save_manual_group
+    for player in results:
+                  ^^^^^^^
+TypeError: 'NoneType' object is not iterable

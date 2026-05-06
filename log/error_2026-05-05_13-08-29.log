@@ -1,0 +1,76 @@
+2026-05-05 13:09:28,863 - ERROR - Необработанное исключение: TypeError: int() argument must be a string, a bytes-like object or a real number, not 'ChoiceGroupManual'
+2026-05-05 13:09:28,863 - ERROR - Трассировка стека:
+Traceback (most recent call last):
+  File "c:\Users\Alex\Competitions_TT_team\manual_choice.py", line 1056, in auto_fill_first
+    self.reset_draw()
+    ~~~~~~~~~~~~~~~^^
+  File "c:\Users\Alex\Competitions_TT_team\manual_choice.py", line 1052, in reset_draw
+    clear_db_before_choice(self)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "c:\Users\Alex\Competitions_TT_team\manual_choice.py", line 1188, in clear_db_before_choice
+    systems = System.select().where((System.stage == "Предварительный") & (System.title_id == self)).get()
+              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Alex\Competitions_TT_team\venv\Lib\site-packages\peewee.py", line 7297, in get
+    return clone.execute(database)[0]
+           ~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\Alex\Competitions_TT_team\venv\Lib\site-packages\peewee.py", line 2036, in inner
+    return method(self, database, *args, **kwargs)
+  File "C:\Users\Alex\Competitions_TT_team\venv\Lib\site-packages\peewee.py", line 2107, in execute
+    return self._execute(database)
+           ~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\Alex\Competitions_TT_team\venv\Lib\site-packages\peewee.py", line 2280, in _execute
+    cursor = database.execute(self)
+  File "C:\Users\Alex\Competitions_TT_team\venv\Lib\site-packages\peewee.py", line 3329, in execute
+    sql, params = ctx.sql(query).query()
+                  ~~~~~~~^^^^^^^
+  File "C:\Users\Alex\Competitions_TT_team\venv\Lib\site-packages\peewee.py", line 664, in sql
+    return obj.__sql__(self)
+           ~~~~~~~~~~~^^^^^^
+  File "C:\Users\Alex\Competitions_TT_team\venv\Lib\site-packages\peewee.py", line 2566, in __sql__
+    ctx.literal(' WHERE ').sql(self._where)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "C:\Users\Alex\Competitions_TT_team\venv\Lib\site-packages\peewee.py", line 664, in sql
+    return obj.__sql__(self)
+           ~~~~~~~~~~~^^^^^^
+  File "C:\Users\Alex\Competitions_TT_team\venv\Lib\site-packages\peewee.py", line 1588, in __sql__
+    .sql(rhs))
+     ~~~^^^^^
+  File "C:\Users\Alex\Competitions_TT_team\venv\Lib\site-packages\peewee.py", line 664, in sql
+    return obj.__sql__(self)
+           ~~~~~~~~~~~^^^^^^
+  File "C:\Users\Alex\Competitions_TT_team\venv\Lib\site-packages\peewee.py", line 1588, in __sql__
+    .sql(rhs))
+     ~~~^^^^^
+  File "C:\Users\Alex\Competitions_TT_team\venv\Lib\site-packages\peewee.py", line 668, in sql
+    return self.sql(Value(obj))
+           ~~~~~~~~^^^^^^^^^^^^
+  File "C:\Users\Alex\Competitions_TT_team\venv\Lib\site-packages\peewee.py", line 664, in sql
+    return obj.__sql__(self)
+           ~~~~~~~~~~~^^^^^^
+  File "C:\Users\Alex\Competitions_TT_team\venv\Lib\site-packages\peewee.py", line 1479, in __sql__
+    return ctx.value(self.value, self.converter)
+           ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Alex\Competitions_TT_team\venv\Lib\site-packages\peewee.py", line 680, in value
+    value = self.state.converter(value)
+  File "C:\Users\Alex\Competitions_TT_team\venv\Lib\site-packages\peewee.py", line 5581, in db_value
+    return self.rel_field.db_value(value)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\Alex\Competitions_TT_team\venv\Lib\site-packages\peewee.py", line 4846, in db_value
+    return value if value is None else self.adapt(value)
+                                       ~~~~~~~~~~^^^^^^^
+  File "C:\Users\Alex\Competitions_TT_team\venv\Lib\site-packages\peewee.py", line 4906, in adapt
+    return int(value)
+TypeError: int() argument must be a string, a bytes-like object or a real number, not 'ChoiceGroupManual'
+2026-05-05 13:11:51,921 - ERROR - Необработанное исключение: TypeError: 'NoneType' object is not iterable
+2026-05-05 13:11:51,989 - ERROR - Трассировка стека:
+Traceback (most recent call last):
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 1029, in choice
+    choice_gr_automat(check_flag)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 9985, in choice_gr_automat
+    choice_save_manual_group(results)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 10005, in choice_save_manual_group
+    for player in results:
+                  ^^^^^^^
+TypeError: 'NoneType' object is not iterable

@@ -1,0 +1,17 @@
+2026-05-04 19:43:35,692 - ERROR - Необработанное исключение: AttributeError: 'ChoiceGroupManual' object has no attribute 'save_to_database'
+2026-05-04 19:43:35,694 - ERROR - Трассировка стека:
+Traceback (most recent call last):
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 1029, in choice
+    choice_gr_automat(existing_data)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 9981, in choice_gr_automat
+    results = choice_group_manual(player_list, group, existing_data)
+  File "c:\Users\Alex\Competitions_TT_team\manual_choice.py", line 1164, in choice_group_manual
+    dialog = ChoiceGroupManual(athletes, num_groups, parent, existing_data)
+  File "c:\Users\Alex\Competitions_TT_team\manual_choice.py", line 22, in __init__
+    self.initUI()
+    ~~~~~~~~~~~^^
+  File "c:\Users\Alex\Competitions_TT_team\manual_choice.py", line 241, in initUI
+    self.btn_save.clicked.connect(self.save_to_database)
+                                  ^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChoiceGroupManual' object has no attribute 'save_to_database'

@@ -1,0 +1,13 @@
+2026-05-05 16:47:03,344 - ERROR - Необработанное исключение: KeyError: 1
+2026-05-05 16:47:03,390 - ERROR - Трассировка стека:
+Traceback (most recent call last):
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 1029, in choice
+    choice_gr_automat(check_flag)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 9985, in choice_gr_automat
+    choice_save_manual_group(results)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "c:\Users\Alex\Competitions_TT_team\main.py", line 10006, in choice_save_manual_group
+    id_pl = player[1]
+            ~~~~~~^^^
+KeyError: 1

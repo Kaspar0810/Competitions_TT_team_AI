@@ -5,12 +5,12 @@ from models import *
 from datetime import datetime, date
 
 class PlayersTableModel(QAbstractTableModel):
-    """Модель для отображения игроков"""
+    """Модель для отображения игроков с нумерацией строк"""
     
     def __init__(self, parent=None):
         super().__init__(parent)
         self._data = []
-        self._headers = ['ID', 'ФИО', 'Дата рождения', 'Рейтинг', 
+        self._headers = ['№', 'ФИО', 'Дата рождения', 'Рейтинг', 
                         'Город', 'Регион', 'Разряд', 'Тренер']
     
     def setData(self, data):
@@ -48,16 +48,17 @@ class PlayersTableModel(QAbstractTableModel):
         col = index.column()
         row = index.row()
         
+        # Номер строки
+        if role == Qt.DisplayRole and col == 0:
+            return str(row + 1)
+        
         if role == Qt.DisplayRole:
             if row >= len(self._data):
                 return None
             
             player = self._data[row]
             
-            # Изменяем соответствие колонок (без отчества)
-            if col == 0:  # ID (скрыт)
-                return str(player.get('id', ''))
-            elif col == 1:  # ФИО
+            if col == 1:  # ФИО
                 return player.get('fio', '') or player.get('player', '')
             elif col == 2:  # Дата рождения
                 return self._format_date(player.get('birth_date', ''))
@@ -72,6 +73,7 @@ class PlayersTableModel(QAbstractTableModel):
             elif col == 7:  # Тренер
                 return player.get('coach', '')
         
+        # Выравнивание номера строки по центру
         if role == Qt.TextAlignmentRole and col == 0:
             return Qt.AlignCenter
         
@@ -79,10 +81,8 @@ class PlayersTableModel(QAbstractTableModel):
     
     def headerData(self, section, orientation, role=Qt.DisplayRole):
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
-            headers = ['ID', 'ФИО', 'Дата рождения', 'Рейтинг', 
-                    'Город', 'Регион', 'Разряд', 'Тренер']
-            if section < len(headers):
-                return headers[section]
+            if section < len(self._headers):
+                return self._headers[section]
         return None
     
     def get_id(self, row):
@@ -96,7 +96,7 @@ class PlayersTableModel(QAbstractTableModel):
         if 0 <= row < len(self._data):
             return self._data[row].get('fio', '') or self._data[row].get('player', '')
         return None
-
+    
 class TeamsTableModel(QAbstractTableModel):
     """Модель для отображения команд"""
     

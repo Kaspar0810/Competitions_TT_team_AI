@@ -47,11 +47,11 @@ class MainWindow(QMainWindow):
         
         # Контекст левой панели с действиями для каждой вкладки
         self.tab_context = {
-            0: {"title": "Титул", "description": "Управление информацией о соревновании",
-                "buttons": ["💾 Сохранить", "🗑️ Очистить", "📋 Создать новое"]},
+             0: {"title": "Титул", "description": "Управление информацией о соревновании",
+                "buttons": ["📋 Создать новое"]},  # Убрали кнопки Сохранить и Очистить
             1: {"title": "Участники", "description": "Управление списком участников",
                 "buttons": ["➕ Добавить", "✏️ Редактировать", "🗑️ Удалить", "🔍 Поиск", "📤 Экспорт"],
-                "filters": ["Сортировка", "Фильтры"]},  # Добавляем фильтры
+                "filters": ["Сортировка", "Фильтры"]},
             2: {"title": "Команды", "description": "Управление командами",
                 "buttons": ["➕ Добавить", "✏️ Редактировать", "🗑️ Удалить", "⭐ Рейтинг"]},
             3: {"title": "Пары", "description": "Формирование пар",
@@ -213,18 +213,39 @@ class MainWindow(QMainWindow):
     def load_titles_list(self):
         """Загрузка списка соревнований в QListWidget"""
         self.list_widget.clear()
-        titles = Title.select().order_by(Title.data_start.desc())
-        for title in titles:
-            start_date = title.data_start.strftime("%d.%m.%Y") if title.data_start else "---"
+        
+        try:
+            titles = Title.select().order_by(Title.data_start.desc())
             
-            item_text = f"""🏆 {title.name}
-   📅 {start_date} | {title.mesto}
-   👥 {title.sredi} | {title.vozrast}
-   🏷️ {title.vid_turnira}"""
+            # Загружаем годы для фильтра (только один раз)
+            if self.year_combo.count() <= 1:
+                self.load_years_from_titles()
             
-            item = QListWidgetItem(item_text)
-            item.setData(Qt.UserRole, title.id)
-            item.setSizeHint(QSize(0, 65))
+            if titles.count() == 0:
+                item = QListWidgetItem("Нет доступных соревнований")
+                item.setFlags(Qt.NoItemFlags)
+                self.list_widget.addItem(item)
+                return
+            
+            for title in titles:
+                start_date = title.data_start.strftime("%d.%m.%Y") if title.data_start else "---"
+                
+                item_text = f"""🏆 {title.name}
+    📅 {start_date} | {title.mesto}
+    👥 {title.sredi} | {title.vozrast}
+    🏷️ {title.vid_turnira}"""
+                
+                item = QListWidgetItem(item_text)
+                item.setData(Qt.UserRole, title.id)
+                item.setSizeHint(QSize(0, 65))
+                self.list_widget.addItem(item)
+            
+            self.competitions_label.setText(f"🏆 Прошедшие соревнования ({titles.count()})")
+            
+        except Exception as e:
+            print(f"Ошибка загрузки соревнований: {e}")
+            item = QListWidgetItem(f"Ошибка загрузки: {e}")
+            item.setFlags(Qt.NoItemFlags)
             self.list_widget.addItem(item)
 
     def init_ui(self):
@@ -239,38 +260,38 @@ class MainWindow(QMainWindow):
         # ========== Левая панель ==========
         self.left_panel = QFrame()
         self.left_panel.setFrameShape(QFrame.StyledPanel)
-        self.left_panel.setMinimumWidth(280)
-        self.left_panel.setMaximumWidth(350)
+        self.left_panel.setMinimumWidth(320)
+        self.left_panel.setMaximumWidth(400)
         self.left_panel.setStyleSheet("background-color: #f5f5f5;")
         left_layout = QVBoxLayout(self.left_panel)
         left_layout.setAlignment(Qt.AlignTop)
-        left_layout.setSpacing(8)
-        left_layout.setContentsMargins(8, 8, 8, 8)
+        left_layout.setSpacing(10)
+        left_layout.setContentsMargins(10, 10, 10, 10)
         
-        # Кнопки соревнований
+        # Кнопки соревнований (девушки/юноши)
         comp_label = QLabel("🏅 Тип соревнования:")
-        comp_label.setStyleSheet("font-weight: bold; font-size: 11px; color: #333;")
+        comp_label.setStyleSheet("font-weight: bold; font-size: 13px; color: #333; margin-top: 5px;")
         left_layout.addWidget(comp_label)
         
         self.competition_buttons_layout = QHBoxLayout()
         self.competition_buttons_layout.setAlignment(Qt.AlignLeft)
-        self.competition_buttons_layout.setSpacing(5)
+        self.competition_buttons_layout.setSpacing(8)
         left_layout.addLayout(self.competition_buttons_layout)
         
         # Разделитель
         line = QFrame()
         line.setFrameShape(QFrame.HLine)
         line.setFrameShadow(QFrame.Sunken)
-        line.setStyleSheet("background-color: #ccc; max-height: 1px;")
+        line.setStyleSheet("background-color: #ccc; max-height: 2px; margin: 10px 0;")
         left_layout.addWidget(line)
         
         # Заголовок текущего действия
         self.action_title = QLabel("🔧 Действия")
-        self.action_title.setStyleSheet("font-weight: bold; font-size: 12px; color: #4CAF50; margin-top: 5px;")
+        self.action_title.setStyleSheet("font-weight: bold; font-size: 14px; color: #4CAF50; margin-top: 5px;")
         left_layout.addWidget(self.action_title)
         
         self.action_description = QLabel("Выберите вкладку для отображения действий")
-        self.action_description.setStyleSheet("font-size: 10px; color: #666; margin-bottom: 10px;")
+        self.action_description.setStyleSheet("font-size: 11px; color: #666; margin-bottom: 10px;")
         self.action_description.setWordWrap(True)
         left_layout.addWidget(self.action_description)
         
@@ -278,11 +299,289 @@ class MainWindow(QMainWindow):
         self.dynamic_filters_widget = QWidget()
         self.dynamic_filters_layout = QVBoxLayout(self.dynamic_filters_widget)
         self.dynamic_filters_layout.setAlignment(Qt.AlignTop)
-        self.dynamic_filters_layout.setSpacing(6)
+        self.dynamic_filters_layout.setSpacing(8)
         self.dynamic_filters_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.addWidget(self.dynamic_filters_widget)
-        left_layout.addStretch()
+        left_layout.addWidget(self.dynamic_filters_widget)        
+        # ===== Контейнер для фильтров =====
+        self.filters_widget = QWidget()
+        filters_layout = QVBoxLayout(self.filters_widget)
+        filters_layout.setSpacing(10)
+        filters_layout.setContentsMargins(0, 10, 0, 0)
         
+        # Заголовок фильтров
+        filter_header = QLabel("🔍 Фильтры соревнований")
+        filter_header.setStyleSheet("font-weight: bold; font-size: 13px; color: #2196F3;")
+        filters_layout.addWidget(filter_header)
+        
+        # Поиск по названию
+        search_label = QLabel("Поиск по названию:")
+        search_label.setStyleSheet("font-size: 11px; font-weight: bold; margin-top: 5px;")
+        filters_layout.addWidget(search_label)
+        self.search_name_edit = QLineEdit()
+        self.search_name_edit.setPlaceholderText("Введите название...")
+        self.search_name_edit.setStyleSheet("""
+            max-height: 32px; 
+            min-height: 30px;
+            padding: 5px; 
+            font-size: 11px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        """)
+        self.search_name_edit.textChanged.connect(self.filter_competitions)
+        filters_layout.addWidget(self.search_name_edit)
+        
+        # Фильтр по году
+        year_label = QLabel("Год:")
+        year_label.setStyleSheet("font-size: 11px; font-weight: bold; margin-top: 5px;")
+        filters_layout.addWidget(year_label)
+        self.year_combo = QComboBox()
+        # Заполним года позже, после загрузки данных
+        self.year_combo.setStyleSheet("""
+            max-height: 32px; 
+            min-height: 30px;
+            font-size: 11px;
+            padding: 3px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        """)
+        self.year_combo.currentTextChanged.connect(self.filter_competitions)
+        filters_layout.addWidget(self.year_combo)
+        
+        # Фильтр по месяцу
+        month_label = QLabel("Месяц:")
+        month_label.setStyleSheet("font-size: 11px; font-weight: bold; margin-top: 5px;")
+        filters_layout.addWidget(month_label)
+        self.month_combo = QComboBox()
+        self.month_combo.addItem("Все месяцы")
+        months = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+                "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"]
+        for month in months:
+            self.month_combo.addItem(month)
+        self.month_combo.setStyleSheet("""
+            max-height: 32px; 
+            min-height: 30px;
+            font-size: 11px;
+            padding: 3px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        """)
+        self.month_combo.currentTextChanged.connect(self.filter_competitions)
+        filters_layout.addWidget(self.month_combo)
+        
+        # Фильтр по категории "Среди"
+        sredi_label = QLabel("Категория участников:")
+        sredi_label.setStyleSheet("font-size: 11px; font-weight: bold; margin-top: 5px;")
+        filters_layout.addWidget(sredi_label)
+        self.sredi_combo = QComboBox()
+        self.sredi_combo.addItem("Все категории")
+        self.sredi_combo.addItems(["мальчики и девочки", "юноши и девушки", "юниоры и юниорки", "мужчины и женщины"])
+        self.sredi_combo.setStyleSheet("""
+            max-height: 32px; 
+            min-height: 30px;
+            font-size: 11px;
+            padding: 3px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        """)
+        self.sredi_combo.currentTextChanged.connect(self.filter_competitions)
+        filters_layout.addWidget(self.sredi_combo)
+        
+        # Кнопка сброса фильтров
+        reset_btn = QPushButton("🔄 Сбросить фильтры")
+        reset_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #FF9800;
+                color: white;
+                padding: 8px;
+                border-radius: 4px;
+                font-size: 11px;
+                font-weight: bold;
+                margin-top: 10px;
+            }
+            QPushButton:hover { background-color: #F57C00; }
+        """)
+        reset_btn.clicked.connect(self.reset_filters_on_title_tab)
+        filters_layout.addWidget(reset_btn)
+        
+        left_layout.addWidget(self.filters_widget)
+#=============================================        
+        # ===== Контейнер для формы создания соревнования =====
+        self.new_comp_widget = QWidget()
+        self.new_comp_widget.setVisible(False)
+        new_comp_layout = QVBoxLayout(self.new_comp_widget)
+        new_comp_layout.setSpacing(10)
+        new_comp_layout.setContentsMargins(0, 10, 0, 0)
+        
+        new_comp_header = QLabel("📝 Новое соревнование")
+        new_comp_header.setStyleSheet("font-weight: bold; font-size: 13px; color: #4CAF50;")
+        new_comp_layout.addWidget(new_comp_header)
+        
+        # Поля для нового соревнования
+        new_comp_layout.addWidget(QLabel("Название:"))
+        self.new_comp_name = QLineEdit()
+        self.new_comp_name.setPlaceholderText("Введите название")
+        self.new_comp_name.setStyleSheet("""
+            max-height: 32px; 
+            min-height: 30px;
+            padding: 5px; 
+            font-size: 11px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        """)
+        new_comp_layout.addWidget(self.new_comp_name)
+        
+        new_comp_layout.addWidget(QLabel("Категория участников:"))
+        self.new_comp_sredi = QComboBox()
+        self.new_comp_sredi.addItems(["мальчики и девочки", "юноши и девушки", "юниоры и юниорки", "мужчины и женщины"])
+        self.new_comp_sredi.setStyleSheet("""
+            max-height: 32px; 
+            min-height: 30px;
+            font-size: 11px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        """)
+        new_comp_layout.addWidget(self.new_comp_sredi)
+        
+        new_comp_layout.addWidget(QLabel("Возраст:"))
+        self.new_comp_vozrast = QComboBox()
+        self.new_comp_vozrast.addItems(["до 12 лет", "до 14 лет", "до 16 лет", "до 18 лет", "до 20 лет", "до 22 лет", "22 года и старше"])
+        self.new_comp_vozrast.setStyleSheet("""
+            max-height: 32px; 
+            min-height: 30px;
+            font-size: 11px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        """)
+        new_comp_layout.addWidget(self.new_comp_vozrast)
+        
+        new_comp_layout.addWidget(QLabel("Дата начала:"))
+        self.new_comp_start = QDateEdit()
+        self.new_comp_start.setDate(QDate.currentDate())
+        self.new_comp_start.setCalendarPopup(True)
+        self.new_comp_start.setDisplayFormat("dd.MM.yyyy")
+        self.new_comp_start.setStyleSheet("""
+            max-height: 32px; 
+            min-height: 30px;
+            font-size: 11px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        """)
+        new_comp_layout.addWidget(self.new_comp_start)
+        
+        new_comp_layout.addWidget(QLabel("Дата окончания:"))
+        self.new_comp_end = QDateEdit()
+        self.new_comp_end.setDate(QDate.currentDate().addDays(7))
+        self.new_comp_end.setCalendarPopup(True)
+        self.new_comp_end.setDisplayFormat("dd.MM.yyyy")
+        self.new_comp_end.setStyleSheet("""
+            max-height: 32px; 
+            min-height: 30px;
+            font-size: 11px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        """)
+        new_comp_layout.addWidget(self.new_comp_end)
+        
+        new_comp_layout.addWidget(QLabel("Место проведения:"))
+        self.new_comp_mesto = QLineEdit()
+        self.new_comp_mesto.setPlaceholderText("Город, спорткомплекс")
+        self.new_comp_mesto.setStyleSheet("""
+            max-height: 32px; 
+            min-height: 30px;
+            padding: 5px; 
+            font-size: 11px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        """)
+        new_comp_layout.addWidget(self.new_comp_mesto)
+        
+        # Поля для судей
+        new_comp_layout.addWidget(QLabel("Главный судья:"))
+        self.new_comp_referee = QLineEdit()
+        self.new_comp_referee.setPlaceholderText("Фамилия И.О.")
+        self.new_comp_referee.setStyleSheet("""
+            max-height: 32px; 
+            min-height: 30px;
+            padding: 5px; 
+            font-size: 11px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        """)
+        new_comp_layout.addWidget(self.new_comp_referee)
+        
+        new_comp_layout.addWidget(QLabel("Категория судьи:"))
+        self.new_comp_referee_cat = QComboBox()
+        self.new_comp_referee_cat.addItems(["ВК", "1К", "2К", "3К"])
+        self.new_comp_referee_cat.setStyleSheet("""
+            max-height: 32px; 
+            min-height: 30px;
+            font-size: 11px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        """)
+        new_comp_layout.addWidget(self.new_comp_referee_cat)
+        
+        new_comp_layout.addWidget(QLabel("Главный секретарь:"))
+        self.new_comp_secretary = QLineEdit()
+        self.new_comp_secretary.setPlaceholderText("Фамилия И.О.")
+        self.new_comp_secretary.setStyleSheet("""
+            max-height: 32px; 
+            min-height: 30px;
+            padding: 5px; 
+            font-size: 11px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        """)
+        new_comp_layout.addWidget(self.new_comp_secretary)
+        
+        new_comp_layout.addWidget(QLabel("Категория секретаря:"))
+        self.new_comp_secretary_cat = QComboBox()
+        self.new_comp_secretary_cat.addItems(["ВК", "1К", "2К", "3К"])
+        self.new_comp_secretary_cat.setStyleSheet("""
+            max-height: 32px; 
+            min-height: 30px;
+            font-size: 11px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        """)
+        new_comp_layout.addWidget(self.new_comp_secretary_cat)
+        
+        # Кнопки
+        btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(10)
+        save_new_btn = QPushButton("💾 Сохранить")
+        save_new_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50; 
+                color: white; 
+                padding: 8px;
+                font-size: 11px;
+                font-weight: bold;
+                border-radius: 4px;
+            }
+            QPushButton:hover { background-color: #45a049; }
+        """)
+        save_new_btn.clicked.connect(self.save_new_competition)
+        cancel_new_btn = QPushButton("❌ Отмена")
+        cancel_new_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #f44336; 
+                color: white; 
+                padding: 8px;
+                font-size: 11px;
+                font-weight: bold;
+                border-radius: 4px;
+            }
+            QPushButton:hover { background-color: #d32f2f; }
+        """)
+        cancel_new_btn.clicked.connect(self.cancel_new_competition)
+        btn_layout.addWidget(save_new_btn)
+        btn_layout.addWidget(cancel_new_btn)
+        new_comp_layout.addLayout(btn_layout)
+        
+        left_layout.addWidget(self.new_comp_widget)
+        left_layout.addStretch()
+# ========================================       
         # ========== Правая область ==========
         right_area = QWidget()
         right_layout = QVBoxLayout(right_area)
@@ -348,7 +647,7 @@ class MainWindow(QMainWindow):
         right_panel_layout.setContentsMargins(0, 0, 0, 0)
         right_panel_layout.setSpacing(3)
         
-        # Заголовок для списка соревнований (вкладка Титул)
+        # В методе init_ui, после создания правой панели:
         self.competitions_label = QLabel("🏆 Прошедшие соревнования")
         self.competitions_label.setStyleSheet("""
             background-color: #4CAF50;
@@ -360,7 +659,7 @@ class MainWindow(QMainWindow):
         """)
         self.competitions_label.setAlignment(Qt.AlignCenter)
         right_panel_layout.addWidget(self.competitions_label)
-        
+
         # Список соревнований
         self.list_widget = QListWidget()
         self.list_widget.setStyleSheet("""
@@ -469,14 +768,14 @@ class MainWindow(QMainWindow):
         self.table_view.verticalHeader().setDefaultSectionSize(22)
         self.table_view.verticalHeader().setMinimumSectionSize(18)
         
-        # Устанавливаем модель
+        # В методе init_ui, после установки модели:
         self.table_view.setModel(self.players_model)
-        
-        # Настройка колонок
-        self.table_view.setColumnHidden(0, True)
-        self.table_view.horizontalHeader().setStretchLastSection(True)
-        
-        # Устанавливаем ширину колонок
+
+        # Показываем первую колонку (№) и настраиваем её ширину
+        self.table_view.setColumnHidden(0, False)  # Показываем колонку с номером
+        self.table_view.setColumnWidth(0, 40)      # Ширина колонки №
+
+        # Настройка остальных колонок
         self.table_view.setColumnWidth(1, 180)  # ФИО
         self.table_view.setColumnWidth(2, 90)   # Дата рождения
         self.table_view.setColumnWidth(3, 60)   # Рейтинг
@@ -484,7 +783,10 @@ class MainWindow(QMainWindow):
         self.table_view.setColumnWidth(5, 120)  # Регион
         self.table_view.setColumnWidth(6, 90)   # Разряд
         self.table_view.setColumnWidth(7, 150)  # Тренер
-        
+
+        # Растягиваем последнюю колонку
+        self.table_view.horizontalHeader().setStretchLastSection(True)
+                
         bottom_layout.addWidget(self.table_view)
         
         # Добавляем виджеты в правую область
@@ -514,196 +816,106 @@ class MainWindow(QMainWindow):
         
         # Загружаем список соревнований для вкладки Титул
         self.load_titles_list()
-
+        # В конце метода, после создания всех виджетов, показываем фильтры
+        self.filters_widget.setVisible(True)
+        self.new_comp_widget.setVisible(False)
+# ================================
     def create_title_tab(self):
-        """Вкладка Титул с полной информацией о соревновании"""
+        """Вкладка Титул - информация о выбранном соревновании"""
         tab_widget = QWidget()
-        main_layout = QVBoxLayout(tab_widget)
-        main_layout.setSpacing(10)
-        main_layout.setContentsMargins(10, 10, 10, 10)
+        layout = QVBoxLayout(tab_widget)
+        layout.setSpacing(15)
+        layout.setContentsMargins(15, 15, 15, 15)
         
-        # Стиль для полей
-        input_style = """
-            QLineEdit, QComboBox, QDateEdit {
-                max-height: 28px;
-                padding: 3px 5px;
-                font-size: 10px;
-                border: 1px solid #ccc;
-                border-radius: 3px;
-            }
-            QLineEdit:focus, QComboBox:focus, QDateEdit:focus {
-                border: 1px solid #4CAF50;
-            }
-        """
-        
-        # Группа 1: Основная информация
-        main_group = QGroupBox()
-        main_group.setStyleSheet("""
+        # Группа информации о соревновании
+        info_group = QGroupBox("📋 Информация о соревновании")
+        info_group.setStyleSheet("""
             QGroupBox {
                 font-weight: bold;
-                font-size: 13px;
-                border: 1px solid #4CAF50;
-                border-radius: 5px;
-                margin-top: 12px;
-                background-color: #f9f9f9;
+                font-size: 14px;
+                border: 2px solid #4CAF50;
+                border-radius: 8px;
+                margin-top: 15px;
             }
             QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 8px 0 8px;
                 color: #4CAF50;
-            }
-        """)
-        main_group.setTitle("📋 Основная информация")
-        main_group_layout = QFormLayout(main_group)
-        main_group_layout.setSpacing(8)
-        main_group_layout.setContentsMargins(10, 15, 10, 10)
-        
-        self.comp_name_edit = QLineEdit()
-        self.comp_name_edit.setPlaceholderText("Введите название соревнования")
-        self.comp_name_edit.setStyleSheet(input_style)
-        main_group_layout.addRow("Название соревнования:", self.comp_name_edit)
-        
-        self.comp_sredi_combo = QComboBox()
-        self.comp_sredi_combo.addItems(["мальчики и девочки", "юноши и девушки", "юниоры и юниорки", "мужчины и женщины"])
-        self.comp_sredi_combo.setStyleSheet(input_style)
-        main_group_layout.addRow("Среди:", self.comp_sredi_combo)
-        
-        self.comp_vozrast_combo = QComboBox()
-        self.comp_vozrast_combo.addItems(["до 12 лет", "до 14 лет", "до 16 лет", "до 18 лет", "до 20 лет", "до 22 лет", "22 года и старше"])
-        self.comp_vozrast_combo.setStyleSheet(input_style)
-        main_group_layout.addRow("Возраст участников:", self.comp_vozrast_combo)
-        
-        main_layout.addWidget(main_group)
-        
-        # Группа 2: Сроки проведения
-        dates_group = QGroupBox()
-        dates_group.setStyleSheet("""
-            QGroupBox {
-                font-weight: bold;
-                font-size: 13px;
-                border: 1px solid #FF9800;
-                border-radius: 5px;
-                margin-top: 12px;
-                background-color: #f9f9f9;
-            }
-            QGroupBox::title {
                 subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 8px 0 8px;
-                color: #FF9800;
+                left: 15px;
+                padding: 0 10px 0 10px;
             }
         """)
-        dates_group.setTitle("📅 Сроки проведения")
-        dates_group_layout = QFormLayout(dates_group)
-        dates_group_layout.setSpacing(8)
-        dates_group_layout.setContentsMargins(10, 15, 10, 10)
+        info_layout = QFormLayout(info_group)
+        info_layout.setSpacing(15)
+        info_layout.setContentsMargins(15, 20, 15, 15)
         
-        self.comp_start_date = QDateEdit()
-        self.comp_start_date.setDate(QDate.currentDate())
-        self.comp_start_date.setCalendarPopup(True)
-        self.comp_start_date.setDisplayFormat("dd.MM.yyyy")
-        self.comp_start_date.setStyleSheet(input_style)
-        dates_group_layout.addRow("Дата начала:", self.comp_start_date)
+        # Основные поля
+        self.comp_name_label = QLabel("-")
+        self.comp_sredi_label = QLabel("-")
+        self.comp_vozrast_label = QLabel("-")
+        self.comp_dates_label = QLabel("-")
+        self.comp_mesto_label = QLabel("-")
         
-        self.comp_end_date = QDateEdit()
-        self.comp_end_date.setDate(QDate.currentDate().addDays(7))
-        self.comp_end_date.setCalendarPopup(True)
-        self.comp_end_date.setDisplayFormat("dd.MM.yyyy")
-        self.comp_end_date.setStyleSheet(input_style)
-        dates_group_layout.addRow("Дата окончания:", self.comp_end_date)
+        # Поля для судей
+        self.comp_referee_label = QLabel("-")
+        self.comp_referee_category_label = QLabel("-")
+        self.comp_secretary_label = QLabel("-")
+        self.comp_secretary_category_label = QLabel("-")
         
-        main_layout.addWidget(dates_group)
-        
-        # Группа 3: Место проведения
-        place_group = QGroupBox()
-        place_group.setStyleSheet("""
-            QGroupBox {
-                font-weight: bold;
-                font-size: 13px;
-                border: 1px solid #2196F3;
+        for label in [self.comp_name_label, self.comp_sredi_label, self.comp_vozrast_label,
+                    self.comp_dates_label, self.comp_mesto_label,
+                    self.comp_referee_label, self.comp_referee_category_label,
+                    self.comp_secretary_label, self.comp_secretary_category_label]:
+            label.setStyleSheet("""
+                font-size: 12px; 
+                padding: 8px; 
+                background-color: #f9f9f9; 
                 border-radius: 5px;
-                margin-top: 12px;
-                background-color: #f9f9f9;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 8px 0 8px;
-                color: #2196F3;
-            }
-        """)
-        place_group.setTitle("📍 Место проведения")
-        place_group_layout = QFormLayout(place_group)
-        place_group_layout.setSpacing(8)
-        place_group_layout.setContentsMargins(10, 15, 10, 10)
+                border: 1px solid #e0e0e0;
+            """)
+            label.setWordWrap(True)
         
-        self.comp_city_edit = QLineEdit()
-        self.comp_city_edit.setPlaceholderText("Введите город")
-        self.comp_city_edit.setStyleSheet(input_style)
-        place_group_layout.addRow("Город:", self.comp_city_edit)
+        # Добавляем строки в форму
+        title_name = QLabel("Название:")
+        title_name.setStyleSheet("font-size: 12px; font-weight: bold;")
+        info_layout.addRow(title_name, self.comp_name_label)
         
-        self.comp_mesto_edit = QLineEdit()
-        self.comp_mesto_edit.setPlaceholderText("Название спорткомплекса / зала")
-        self.comp_mesto_edit.setStyleSheet(input_style)
-        place_group_layout.addRow("Место проведения:", self.comp_mesto_edit)
+        title_sredi = QLabel("Категория:")
+        title_sredi.setStyleSheet("font-size: 12px; font-weight: bold;")
+        info_layout.addRow(title_sredi, self.comp_sredi_label)
         
-        main_layout.addWidget(place_group)
+        title_vozrast = QLabel("Возраст:")
+        title_vozrast.setStyleSheet("font-size: 12px; font-weight: bold;")
+        info_layout.addRow(title_vozrast, self.comp_vozrast_label)
         
-        # Группа 4: Судейская коллегия
-        referees_group = QGroupBox()
-        referees_group.setStyleSheet("""
-            QGroupBox {
-                font-weight: bold;
-                font-size: 13px;
-                border: 1px solid #9C27B0;
-                border-radius: 5px;
-                margin-top: 12px;
-                background-color: #f9f9f9;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 8px 0 8px;
-                color: #9C27B0;
-            }
-        """)
-        referees_group.setTitle("⚖️ Главная судейская коллегия")
-        referees_group_layout = QFormLayout(referees_group)
-        referees_group_layout.setSpacing(8)
-        referees_group_layout.setContentsMargins(10, 15, 10, 10)
+        title_dates = QLabel("Даты:")
+        title_dates.setStyleSheet("font-size: 12px; font-weight: bold;")
+        info_layout.addRow(title_dates, self.comp_dates_label)
         
-        # Главный судья - QLineEdit с автоподстановкой
-        self.main_referee_edit = QLineEdit()
-        self.main_referee_edit.setPlaceholderText("Введите фамилию и инициалы главного судьи")
-        self.main_referee_edit.setStyleSheet(input_style)
-        self.main_referee_edit.textChanged.connect(self.on_referee_text_changed)
-        referees_group_layout.addRow("Главный судья:", self.main_referee_edit)
+        title_mesto = QLabel("Место:")
+        title_mesto.setStyleSheet("font-size: 12px; font-weight: bold;")
+        info_layout.addRow(title_mesto, self.comp_mesto_label)
         
-        # Категория судьи (автоматически подставляется)
-        self.referee_category_combo = QComboBox()
-        self.referee_category_combo.addItems(["ВК (Всероссийская категория)", "1К (Первая категория)", "2К (Вторая категория)", "3К (Третья категория)"])
-        self.referee_category_combo.setStyleSheet(input_style)
-        referees_group_layout.addRow("Категория судьи:", self.referee_category_combo)
+        title_referee = QLabel("Главный судья:")
+        title_referee.setStyleSheet("font-size: 12px; font-weight: bold;")
+        info_layout.addRow(title_referee, self.comp_referee_label)
         
-        # Главный секретарь - QLineEdit с автоподстановкой
-        self.main_secretary_edit = QLineEdit()
-        self.main_secretary_edit.setPlaceholderText("Введите фамилию и инициалы главного секретаря")
-        self.main_secretary_edit.setStyleSheet(input_style)
-        self.main_secretary_edit.textChanged.connect(self.on_secretary_text_changed)
-        referees_group_layout.addRow("Главный секретарь:", self.main_secretary_edit)
+        title_referee_cat = QLabel("Категория судьи:")
+        title_referee_cat.setStyleSheet("font-size: 12px; font-weight: bold;")
+        info_layout.addRow(title_referee_cat, self.comp_referee_category_label)
         
-        # Категория секретаря (автоматически подставляется)
-        self.secretary_category_combo = QComboBox()
-        self.secretary_category_combo.addItems(["ВК (Всероссийская категория)", "1К (Первая категория)", "2К (Вторая категория)", "3К (Третья категория)"])
-        self.secretary_category_combo.setStyleSheet(input_style)
-        referees_group_layout.addRow("Категория секретаря:", self.secretary_category_combo)
+        title_secretary = QLabel("Главный секретарь:")
+        title_secretary.setStyleSheet("font-size: 12px; font-weight: bold;")
+        info_layout.addRow(title_secretary, self.comp_secretary_label)
         
-        main_layout.addWidget(referees_group)
-        main_layout.addStretch()
+        title_secretary_cat = QLabel("Категория секретаря:")
+        title_secretary_cat.setStyleSheet("font-size: 12px; font-weight: bold;")
+        info_layout.addRow(title_secretary_cat, self.comp_secretary_category_label)
+        
+        layout.addWidget(info_group)
+        layout.addStretch()
         
         return tab_widget
-
+# ==========================
     def on_referee_text_changed(self, text):
         """Поиск судьи в БД при вводе текста"""
         if len(text) >= 3:  # Начинаем поиск после 3 символов
@@ -1543,9 +1755,23 @@ class MainWindow(QMainWindow):
             self.current_title_id = title_id
             title = Title.get_or_none(Title.id == title_id)
             if title:
-                self.load_title_data()
+                # Обновляем информацию на вкладке Титул
+                self.comp_name_label.setText(title.name or "-")
+                self.comp_sredi_label.setText(title.sredi or "-")
+                self.comp_vozrast_label.setText(title.vozrast or "-")
                 
-                # Определяем цвет
+                start = title.data_start.strftime("%d.%m.%Y") if title.data_start else "---"
+                end = title.data_end.strftime("%d.%m.%Y") if title.data_end else "---"
+                self.comp_dates_label.setText(f"{start} - {end}")
+                self.comp_mesto_label.setText(title.mesto or "-")
+                
+                # Отображаем судей
+                self.comp_referee_label.setText(title.referee or "-")
+                self.comp_referee_category_label.setText(title.kat_ref or "-")
+                self.comp_secretary_label.setText(title.secretary or "-")
+                self.comp_secretary_category_label.setText(title.kat_sec or "-")
+                
+                # Определяем цвет в зависимости от типа соревнования
                 if "девушки" in title.name.lower():
                     self.current_sex = "Ж"
                     self.left_panel.setStyleSheet("background-color: #FFF0F5;")
@@ -1553,24 +1779,35 @@ class MainWindow(QMainWindow):
                     self.current_sex = "М"
                     self.left_panel.setStyleSheet("background-color: #F0F8FF;")
                 
-                # Если текущая вкладка - Участники, загружаем участников
+                # Загружаем участников для вкладки Участники
                 if hasattr(self, 'current_tab_index') and self.current_tab_index == 1:
                     self.load_participants_for_title()
-                    self.set_tab_height(1)
                 
-                # Обновляем заголовок
-                self.competitions_label.setText(f"🏆 {title.name[:30]}...")
+                # Обновляем заголовок списка
+                self.competitions_label.setText(f"🏆 Текущее: {title.name[:40]}...")
                 self.competitions_label.setStyleSheet("""
                     background-color: #2196F3;
                     color: white;
-                    padding: 6px;
+                    padding: 8px;
                     font-weight: bold;
-                    font-size: 11px;
+                    font-size: 12px;
                     border-radius: 3px;
                 """)
                 
-                # Переключаемся на вкладку Участники
-                self.tab_widget.setCurrentIndex(1)
+                # Сбрасываем цвет заголовка через 2 секунды
+                from PyQt5.QtCore import QTimer
+                def reset_label():
+                    count = self.list_widget.count()
+                    self.competitions_label.setText(f"🏆 Прошедшие соревнования ({count})")
+                    self.competitions_label.setStyleSheet("""
+                        background-color: #4CAF50;
+                        color: white;
+                        padding: 8px;
+                        font-weight: bold;
+                        font-size: 12px;
+                        border-radius: 3px;
+                    """)
+                QTimer.singleShot(2000, reset_label)
 
     def on_tab_changed(self, index):
         """Смена вкладки"""
@@ -1578,55 +1815,60 @@ class MainWindow(QMainWindow):
         self.update_left_panel_for_tab(index)
         
         # Управление отображением правой панели
-        if index == 1:  # Вкладка Участники - показываем поиск
+        if index == 0:  # Вкладка Титул
+            self.competitions_label.setVisible(True)
+            self.list_widget.setVisible(True)
+            self.search_label.setVisible(False)
+            self.search_results_list.setVisible(False)
+            self.competitions_label.setText("🏆 Прошедшие соревнования")
+            
+            # Показываем фильтры на левой панели, скрываем форму нового соревнования
+            self.filters_widget.setVisible(True)
+            self.new_comp_widget.setVisible(False)
+            
+            # Загружаем список соревнований
+            self.load_titles_list()
+            
+        elif index == 1:  # Вкладка Участники
             self.competitions_label.setVisible(False)
             self.list_widget.setVisible(False)
             self.search_label.setVisible(True)
             self.search_results_list.setVisible(True)
             
+            # Скрываем фильтры и форму на левой панели
+            self.filters_widget.setVisible(False)
+            self.new_comp_widget.setVisible(False)
+            
             # Очищаем результаты поиска
             self.search_results_list.clear()
-            self.search_label.setText("🔍 Поиск игроков в рейтингах")
-            self.search_label.setStyleSheet("""
-                background-color: #FF9800;
-                color: white;
-                padding: 6px;
-                font-weight: bold;
-                font-size: 11px;
-                border-radius: 3px;
-            """)
             
-            # Загружаем участников для текущего соревнования
+            # Загружаем участников
             if self.current_title_id:
                 self.load_participants_for_title()
             else:
                 self.players_model.setData([])
                 self.table_header.setText("👥 Список участников - выберите соревнование на вкладке Титул")
         
-        else:  # Другие вкладки - показываем список соревнований
+        else:  # Другие вкладки
             self.competitions_label.setVisible(True)
             self.list_widget.setVisible(True)
             self.search_label.setVisible(False)
             self.search_results_list.setVisible(False)
+            self.filters_widget.setVisible(False)
+            self.new_comp_widget.setVisible(False)
             
-            # Обновляем заголовок для разных вкладок
-            if index == 0:
-                self.competitions_label.setText("🏆 Прошедшие соревнования")
-                self.load_titles_list()
-            elif index == 2:
-                self.competitions_label.setText("🏆 Команды")
-                if self.current_title_id:
-                    self.load_teams_for_title()
-            elif index == 3:
-                self.competitions_label.setText("🤝 Пары")
-                if self.current_title_id:
-                    self.load_doubles_for_title()
-            elif index == 5:
-                self.competitions_label.setText("📊 Результаты")
-                if self.current_title_id:
-                    self.load_results_for_title()
+            tab_names = ["", "Команды", "Пары", "Система", "Результаты", "Рейтинг", "Дополнительно"]
+            if index - 1 < len(tab_names):
+                self.competitions_label.setText(f"🏆 {tab_names[index - 1]}")
+            
+            # Загружаем соответствующие данные
+            if index == 2 and self.current_title_id:
+                self.load_teams_for_title()
+            elif index == 3 and self.current_title_id:
+                self.load_doubles_for_title()
+            elif index == 5 and self.current_title_id:
+                self.load_results_for_title()
             else:
-                self.competitions_label.setText("🏆 Информация")
                 self.list_widget.clear()
         
         # Устанавливаем высоту для текущей вкладки
@@ -1683,9 +1925,10 @@ class MainWindow(QMainWindow):
         """Редактирование выбранного участника"""
         selection = self.table_view.selectedIndexes()
         if not selection:
-            QMessageBox.warning(self, "Ошибка", "Выберите участника")
+            QMessageBox.warning(self, "Ошибка", "Выберите участника для редактирования")
             return
         
+        # Получаем строку из модели (индекс строки в модели)
         row = selection[0].row()
         player_id = self.players_model.get_id(row)
         if not player_id:
@@ -1693,17 +1936,14 @@ class MainWindow(QMainWindow):
         
         try:
             player = Player.get_by_id(player_id)
-            # получает отчество
-            patronymics = Patronymic.select().where(Patronymic.id == player.patronymic_id_id).get()
-            patronymic = patronymics.patronymic
-
+            
             self.fio_edit.setText(player.player or "")
-            self.patronymic_edit.setText(patronymic or "")
+            self.patronymic_edit.setText("")
             self.rank_edit.setText(str(player.rank) if player.rank else "")
             self.city_edit.setText(player.city or "")
             self.region_edit.setText(player.region or "")
             
-            # Устанавливаем разряд из comboBox
+            # Устанавливаем разряд
             index = self.razryad_combo.findText(player.razryad or "без разряда")
             if index >= 0:
                 self.razryad_combo.setCurrentIndex(index)
@@ -1890,9 +2130,10 @@ class MainWindow(QMainWindow):
                         
                 except Exception as e:
                     QMessageBox.critical(self, "Ошибка", f"Ошибка поиска: {str(e)}")
-  
+
     def update_left_panel_for_tab(self, tab_index):
         """Обновление левой панели в зависимости от вкладки"""
+        #=================================
         for i in reversed(range(self.dynamic_filters_layout.count())):
             widget = self.dynamic_filters_layout.itemAt(i).widget()
             if widget:
@@ -1914,25 +2155,20 @@ class MainWindow(QMainWindow):
                     color: white;
                     border: none;
                     border-radius: 4px;
-                    padding: 6px;
-                    font-size: 10px;
+                    padding: 8px;
+                    font-size: 11px;
                     font-weight: bold;
                     text-align: left;
-                    padding-left: 10px;
+                    padding-left: 12px;
                 }
-                QPushButton:hover { 
-                    background-color: #45a049; 
-                }
+                QPushButton:hover { background-color: #45a049; }
             """)
             
-            if tab_index == 0:
-                if btn_text == "💾 Сохранить":
-                    btn.clicked.connect(self.save_title_info)
-                elif btn_text == "🗑️ Очистить":
-                    btn.clicked.connect(self.clear_title_form)
-                elif btn_text == "📋 Создать новое":
+            if tab_index == 0:  # Титул
+                if btn_text == "📋 Создать новое":
                     btn.clicked.connect(self.new_competition)
-            elif tab_index == 1:
+                    print("Кнопка 'Создать новое' привязана")  # Для отладки
+            elif tab_index == 1:  # Участники
                 if btn_text == "➕ Добавить":
                     btn.clicked.connect(self.add_player_from_form)
                 elif btn_text == "✏️ Редактировать":
@@ -1946,6 +2182,57 @@ class MainWindow(QMainWindow):
             
             self.dynamic_filters_layout.addWidget(btn)
         
+        self.dynamic_filters_layout.addStretch()
+        #==================================
+        # for i in reversed(range(self.dynamic_filters_layout.count())):
+        #     widget = self.dynamic_filters_layout.itemAt(i).widget()
+        #     if widget:
+        #         widget.deleteLater()
+        
+        # context = self.tab_context.get(tab_index, self.tab_context[0])
+        # # ===========================      
+        # # Обновляем заголовок и описание
+        # self.action_title.setText(f"🔧 {context['title']}")
+        # self.action_description.setText(context['description'])
+        
+        # # Кнопки действий
+        # for btn_text in context["buttons"]:
+        #     btn = QPushButton(btn_text)
+        #     btn.setMinimumHeight(32)
+        #     btn.setStyleSheet("""
+        #         QPushButton {
+        #             background-color: #4CAF50;
+        #             color: white;
+        #             border: none;
+        #             border-radius: 4px;
+        #             padding: 6px;
+        #             font-size: 10px;
+        #             font-weight: bold;
+        #             text-align: left;
+        #             padding-left: 10px;
+        #         }
+        #         QPushButton:hover { background-color: #45a049; }
+        #     """)
+            
+        #     if tab_index == 0:  # Титул
+        #         if btn_text == "📋 Создать новое":
+        #             btn.clicked.connect(self.new_competition)
+        #     elif tab_index == 1:  # Участники
+        #         if btn_text == "➕ Добавить":
+        #             btn.clicked.connect(self.add_player_from_form)
+        #         elif btn_text == "✏️ Редактировать":
+        #             btn.clicked.connect(self.edit_player)
+        #         elif btn_text == "🗑️ Удалить":
+        #             btn.clicked.connect(self.delete_player_from_table)
+        #         elif btn_text == "🔍 Поиск":
+        #             btn.clicked.connect(self.search_players)
+        #         elif btn_text == "📤 Экспорт":
+        #             btn.clicked.connect(self.export_players)
+            
+        #     self.dynamic_filters_layout.addWidget(btn)
+        
+        # self.dynamic_filters_layout.addStretch()
+
         # Добавляем фильтры для вкладки Участники
         if tab_index == 1:
             # Разделитель
@@ -2087,7 +2374,7 @@ class MainWindow(QMainWindow):
             self.dynamic_filters_layout.addWidget(btn_reset)
         
         self.dynamic_filters_layout.addStretch()
-
+# ===============================================
     def add_player_from_form(self):
         """Добавление участника из формы"""
         if not self.current_title_id:
@@ -2182,7 +2469,7 @@ class MainWindow(QMainWindow):
         if not player_id:
             return
         
-        # Подтверждение удаления
+        # Получаем ФИО для подтверждения
         fio = self.players_model.get_fio(row)
         reply = QMessageBox.question(self, "Подтверждение", 
                                     f"Удалить участника {fio}?",
@@ -2194,7 +2481,7 @@ class MainWindow(QMainWindow):
                 self.load_participants_for_title()
                 QMessageBox.information(self, "Успех", "Участник удалён")
             except Exception as e:
-                QMessageBox.critical(self, "Ошибка", f"Не удалось удалить участника: {str(e)}")
+                QMessageBox.critical(self, "Ошибка", f"Ошибка: {str(e)}")
 
     def load_participants_for_title(self):
         """Загрузка участников для выбранного соревнования"""
@@ -2451,9 +2738,18 @@ class MainWindow(QMainWindow):
     
     def new_competition(self):
         """Создание нового соревнования"""
-        self.current_title_id = None
-        self.clear_title_form()
-        QMessageBox.information(self, "Новое соревнование", "Введите данные и нажмите Сохранить")
+        print("new_competition вызван")  # Для отладки
+        # Скрываем фильтры, показываем форму
+        self.filters_widget.setVisible(False)
+        self.new_comp_widget.setVisible(True)
+        
+        # Очищаем форму
+        self.new_comp_name.clear()
+        self.new_comp_sredi.setCurrentIndex(0)
+        self.new_comp_vozrast.setCurrentIndex(0)
+        self.new_comp_start.setDate(QDate.currentDate())
+        self.new_comp_end.setDate(QDate.currentDate().addDays(7))
+        self.new_comp_mesto.clear()
     
     def create_menu_bar(self):
         """Создание меню"""
@@ -3019,7 +3315,185 @@ class MainWindow(QMainWindow):
                     font-size: 11px;
                     border-radius: 3px;
                 """)
+
+    def filter_competitions(self):
+        """Фильтрация списка соревнований по критериям"""
+        if not hasattr(self, 'search_name_edit'):
+            return
+        
+        search_text = self.search_name_edit.text().strip().lower()
+        year_filter = self.year_combo.currentText()
+        month_filter = self.month_combo.currentText()
+        sredi_filter = self.sredi_combo.currentText()
+        
+        self.list_widget.clear()
+        
+        try:
+            titles = Title.select().order_by(Title.data_start.desc())
             
+            filtered_titles = []
+            
+            for title in titles:
+                # Фильтр по названию
+                if search_text and search_text not in title.name.lower():
+                    continue
+                
+                # Фильтр по категории "Среди"
+                if sredi_filter != "Все категории" and title.sredi != sredi_filter:
+                    continue
+                
+                # Фильтр по году и месяцу
+                if title.data_start:
+                    if year_filter != "Все годы" and str(title.data_start.year) != year_filter:
+                        continue
+                    if month_filter != "Все месяцы":
+                        month_num = self.get_month_number(month_filter)
+                        if title.data_start.month != month_num:
+                            continue
+                else:
+                    if year_filter != "Все годы" or month_filter != "Все месяцы":
+                        continue
+                
+                filtered_titles.append(title)
+            
+            # Отображаем отфильтрованные соревнования
+            for title in filtered_titles:
+                start_date = title.data_start.strftime("%d.%m.%Y") if title.data_start else "---"
+                
+                item_text = f"""🏆 {title.name}
+    📅 {start_date} | {title.mesto}
+    👥 {title.sredi} | {title.vozrast}
+    🏷️ {title.vid_turnira}"""
+                
+                item = QListWidgetItem(item_text)
+                item.setData(Qt.UserRole, title.id)
+                item.setSizeHint(QSize(0, 65))
+                self.list_widget.addItem(item)
+            
+            # Показываем количество найденных
+            count = len(filtered_titles)
+            self.competitions_label.setText(f"🏆 Прошедшие соревнования ({count})")
+            
+        except Exception as e:
+            print(f"Ошибка фильтрации: {e}")
+            self.load_titles_list()
+
+    def get_month_number(self, month_name):
+        """Преобразование названия месяца в номер"""
+        months = {
+            "Январь": 1, "Февраль": 2, "Март": 3, "Апрель": 4,
+            "Май": 5, "Июнь": 6, "Июль": 7, "Август": 8,
+            "Сентябрь": 9, "Октябрь": 10, "Ноябрь": 11, "Декабрь": 12
+        }
+        return months.get(month_name, 0)
+
+    def reset_filters_on_title_tab(self):
+        """Сброс всех фильтров на вкладке Титул"""
+        self.search_name_edit.clear()
+        self.year_combo.setCurrentIndex(0)
+        self.month_combo.setCurrentIndex(0)
+        self.sredi_combo.setCurrentIndex(0)
+        self.load_titles_list()
+
+    def save_new_competition(self):
+        """Сохранение нового соревнования"""
+        name = self.new_comp_name.text().strip()
+        if not name:
+            QMessageBox.warning(self, "Ошибка", "Введите название соревнования")
+            return
+        
+        try:
+            title_data = {
+                'name': name,
+                'sredi': self.new_comp_sredi.currentText(),
+                'vozrast': self.new_comp_vozrast.currentText(),
+                'data_start': self.new_comp_start.date().toPyDate(),
+                'data_end': self.new_comp_end.date().toPyDate(),
+                'mesto': self.new_comp_mesto.text().strip(),
+                'city': "",
+                'referee': self.new_comp_referee.text().strip(),
+                'kat_ref': self.new_comp_referee_cat.currentText(),
+                'secretary': self.new_comp_secretary.text().strip(),
+                'kat_sec': self.new_comp_secretary_cat.currentText(),
+                'vid_turnira': "Личное",
+                'full_name_comp': name,
+                'short_name_comp': name[:50],
+                'tab_enabled': "1",
+                'multiregion': 0,
+                'perenos': 0,
+                'otchestvo': 0,
+                'r_date': ""
+            }
+            
+            title = Title.create(**title_data)
+            self.current_title_id = title.id
+            
+            # Скрываем форму и показываем фильтры
+            self.new_comp_widget.setVisible(False)
+            self.filters_widget.setVisible(True)
+            
+            # Обновляем список годов и соревнований
+            self.load_years_from_titles()
+            self.filter_competitions()
+            
+            QMessageBox.information(self, "Успех", f"Соревнование '{name}' создано")
+            
+            # Очищаем форму
+            self.cancel_new_competition()
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось создать соревнование: {str(e)}")
+
+    def cancel_new_competition(self):
+        """Отмена создания нового соревнования"""
+        self.new_comp_name.clear()
+        self.new_comp_sredi.setCurrentIndex(0)
+        self.new_comp_vozrast.setCurrentIndex(0)
+        self.new_comp_start.setDate(QDate.currentDate())
+        self.new_comp_end.setDate(QDate.currentDate().addDays(7))
+        self.new_comp_mesto.clear()
+        self.new_comp_referee.clear()
+        self.new_comp_referee_cat.setCurrentIndex(0)
+        self.new_comp_secretary.clear()
+        self.new_comp_secretary_cat.setCurrentIndex(0)
+        
+        # Скрываем форму и показываем фильтры
+        self.new_comp_widget.setVisible(False)
+        self.filters_widget.setVisible(True)
+
+    def load_years_from_titles(self):
+        """Загрузка годов из существующих соревнований для фильтра"""
+        try:
+            # Получаем уникальные годы из таблицы Title
+            years = set()
+            
+            titles = Title.select(Title.data_start).where(Title.data_start.is_null(False))
+            for title in titles:
+                if title.data_start:
+                    years.add(str(title.data_start.year))
+            
+            # Сортируем годы
+            sorted_years = sorted(list(years), key=lambda x: int(x) if x.isdigit() else 0)
+            
+            # Обновляем comboBox
+            self.year_combo.clear()
+            self.year_combo.addItem("Все годы")
+            for year in sorted_years:
+                self.year_combo.addItem(year)
+            
+            # Устанавливаем первый год из списка (самый ранний)
+            if sorted_years:
+                self.year_combo.setCurrentText(sorted_years[0])
+                
+        except Exception as e:
+            print(f"Ошибка загрузки годов: {e}")
+            # Если ошибка, добавляем стандартные годы
+            self.year_combo.clear()
+            self.year_combo.addItem("Все годы")
+            current_year = QDate.currentDate().year()
+            for year in range(current_year - 5, current_year + 2):
+                self.year_combo.addItem(str(year))
+
 def main():
     app = QApplication(sys.argv)
     window = MainWindow()

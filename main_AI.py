@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (
     QPushButton, QTabWidget, QTableView, QMenuBar, QAction, QLabel,
     QFrame, QSizePolicy, QMessageBox, QListWidget, QListWidgetItem,
     QLineEdit, QDateEdit, QComboBox, QGroupBox, QFormLayout,
-    QScrollArea, QSplitter, QInputDialog, QHeaderView, QAbstractItemView
+    QScrollArea, QSplitter, QInputDialog, QHeaderView, QAbstractItemView, QDialog
 )
 from PyQt5.QtWidgets import QGridLayout  # Добавьте в импорт
 from PyQt5.QtCore import Qt, QDate, QSize
@@ -82,7 +82,7 @@ class MainWindow(QMainWindow):
         """Событие при первом отображении окна"""
         super().showEvent(event)
         QTimer.singleShot(100, lambda: self.set_tab_height(0))
-# ====================
+
     def set_tab_height(self, tab_index):
         """Устанавливает фиксированную высоту верхнего виджета в зависимости от вкладки"""
         if hasattr(self, 'top_widget') and hasattr(self, 'tab_heights'):
@@ -909,7 +909,7 @@ class MainWindow(QMainWindow):
         self.main_secretary_edit.clear()
         self.referee_category_combo.setCurrentIndex(0)
         self.secretary_category_combo.setCurrentIndex(0) 
-# ================
+
     def create_participants_tab(self):
         """Вкладка участников - оптимизированные размеры полей"""
         tab_widget = QWidget()
@@ -941,7 +941,7 @@ class MainWindow(QMainWindow):
         
         # Ряд 1: ФИО (уменьшено), Отчество (увеличено), Дата рождения
         label_fio = QLabel("ФИО:")
-        label_fio.setStyleSheet("font-weight: bold; font-size: 10px;")
+        label_fio.setStyleSheet("font-weight: bold; font-size: 11px;")
         form_layout.addWidget(label_fio, 0, 0)
         self.fio_edit = QLineEdit()
         self.fio_edit.setPlaceholderText("Иванов Иван")
@@ -949,7 +949,7 @@ class MainWindow(QMainWindow):
         form_layout.addWidget(self.fio_edit, 0, 1, 1, 3)  # Уменьшено до 3 колонок
         
         label_patronymic = QLabel("Отчество:")
-        label_patronymic.setStyleSheet("font-weight: bold; font-size: 10px;")
+        label_patronymic.setStyleSheet("font-weight: bold; font-size: 11px;")
         form_layout.addWidget(label_patronymic, 0, 4)
         self.patronymic_edit = QLineEdit()
         self.patronymic_edit.setPlaceholderText("Иванович")
@@ -957,7 +957,7 @@ class MainWindow(QMainWindow):
         form_layout.addWidget(self.patronymic_edit, 0, 5, 1, 3)  # Увеличено до 3 колонок
         
         label_birth = QLabel("Дата рожд.:")
-        label_birth.setStyleSheet("font-weight: bold; font-size: 10px;")
+        label_birth.setStyleSheet("font-weight: bold; font-size: 11px;")
         form_layout.addWidget(label_birth, 0, 8)
         self.birth_date = QDateEdit()
         self.birth_date.setDate(QDate.currentDate().addYears(-18))
@@ -967,8 +967,10 @@ class MainWindow(QMainWindow):
         form_layout.addWidget(self.birth_date, 0, 9, 1, 2)
         
         # Ряд 2: Рейтинг (маленький), Город, Регион
-        label_rank = QLabel("Рейт.:")
-        label_rank.setStyleSheet("font-weight: bold; font-size: 10px;")
+        razryad_list = ["б/р", "3-юн", "2-юн", "1-юн", 
+                                    "3-р", "2-р", "1-р", "КМС", "МС", "МСМК"]
+        label_rank = QLabel("Рейтинг:")
+        label_rank.setStyleSheet("font-weight: bold; font-size: 11px;")
         form_layout.addWidget(label_rank, 1, 0)
         self.rank_edit = QLineEdit()
         self.rank_edit.setPlaceholderText("0")
@@ -977,7 +979,7 @@ class MainWindow(QMainWindow):
         form_layout.addWidget(self.rank_edit, 1, 1)
         
         label_city = QLabel("Город:")
-        label_city.setStyleSheet("font-weight: bold; font-size: 10px;")
+        label_city.setStyleSheet("font-weight: bold; font-size: 11px;")
         form_layout.addWidget(label_city, 1, 2)
         self.city_edit = QLineEdit()
         self.city_edit.setPlaceholderText("Москва")
@@ -985,7 +987,7 @@ class MainWindow(QMainWindow):
         form_layout.addWidget(self.city_edit, 1, 3, 1, 3)
         
         label_region = QLabel("Регион:")
-        label_region.setStyleSheet("font-weight: bold; font-size: 10px;")
+        label_region.setStyleSheet("font-weight: bold; font-size: 11px;")
         form_layout.addWidget(label_region, 1, 6)
         self.region_edit = QLineEdit()
         self.region_edit.setPlaceholderText("Московская область")
@@ -994,19 +996,18 @@ class MainWindow(QMainWindow):
         
         # Ряд 3: Разряд (comboBox), Тренеры (большое поле), Пол
         label_razryad = QLabel("Разряд:")
-        label_razryad.setStyleSheet("font-weight: bold; font-size: 10px;")
+        label_razryad.setStyleSheet("font-weight: bold; font-size: 11px;")
         form_layout.addWidget(label_razryad, 2, 0)
         
         # Заменяем QLineEdit на QComboBox для разряда
         self.razryad_combo = QComboBox()
-        self.razryad_combo.addItems(["без разряда", "3 юношеский", "2 юношеский", "1 юношеский", 
-                                    "3 разряд", "2 разряд", "1 разряд", "КМС", "МС", "МСМК"])
+        self.razryad_combo.addItems(razryad_list)
         self.razryad_combo.setStyleSheet(input_style)
         self.razryad_combo.setMaximumWidth(100)
         form_layout.addWidget(self.razryad_combo, 2, 1)
         
         label_coach = QLabel("Тренеры:")
-        label_coach.setStyleSheet("font-weight: bold; font-size: 10px;")
+        label_coach.setStyleSheet("font-weight: bold; font-size: 11px;")
         form_layout.addWidget(label_coach, 2, 2)
         self.coach_edit = QLineEdit()
         self.coach_edit.setPlaceholderText("Иванов И.И., Петров П.П.")
@@ -1014,7 +1015,7 @@ class MainWindow(QMainWindow):
         form_layout.addWidget(self.coach_edit, 2, 3, 1, 5)  # Увеличено до 5 колонок
         
         label_sex = QLabel("Пол:")
-        label_sex.setStyleSheet("font-weight: bold; font-size: 10px;")
+        label_sex.setStyleSheet("font-weight: bold; font-size: 11px;")
         form_layout.addWidget(label_sex, 2, 8)
         self.sex_combo = QComboBox()
         self.sex_combo.addItems(["Мужской", "Женский"])
@@ -1026,7 +1027,7 @@ class MainWindow(QMainWindow):
         main_layout.addStretch()
         
         return tab_widget
-# =======================
+
     def create_teams_tab(self):
         """Вкладка команд"""
         tab_widget = QWidget()
@@ -1440,13 +1441,6 @@ class MainWindow(QMainWindow):
                 self.main_referee_combo.setCurrentText(main_referee)
                 self.referee_category_combo.setCurrentText(main_secretary)
                 # =============
-                # index = self.main_referee_combo.findText(title.referee or "")
-                # if index >= 0:
-                #     self.main_referee_combo.setCurrentIndex(index)
-                
-                # index = self.main_secretary_combo.findText(title.secretary or "")
-                # if index >= 0:
-                #     self.main_secretary_combo.setCurrentIndex(index)
                 
                 index = self.referee_category_combo.findText(title.kat_ref or "")
                 if index >= 0:
@@ -1614,9 +1608,12 @@ class MainWindow(QMainWindow):
         
         try:
             player = Player.get_by_id(player_id)
-            
+            # получает отчество
+            patronymics = Patronymic.select().where(Patronymic.id == player.patronymic_id_id).get()
+            patronymic = patronymics.patronymic
+
             self.fio_edit.setText(player.player or "")
-            self.patronymic_edit.setText("")
+            self.patronymic_edit.setText(patronymic or "")
             self.rank_edit.setText(str(player.rank) if player.rank else "")
             self.city_edit.setText(player.city or "")
             self.region_edit.setText(player.region or "")
@@ -2166,10 +2163,191 @@ class MainWindow(QMainWindow):
             self.players_model.setData([])
 
     def search_players(self):
-        """Поиск игрока"""
-        text, ok = QInputDialog.getText(self, "Поиск", "Введите ФИО или город:")
-        if ok and text:
-            QMessageBox.information(self, "Результат", f"Поиск: {text}")
+        """Поиск участников по ФИО, городу, региону или тренеру"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Выберите соревнование")
+            return
+        
+        # Создаем диалог поиска
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Поиск участников")
+        dialog.setModal(True)
+        dialog.setMinimumWidth(400)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # Поле для ввода поискового запроса
+        label = QLabel("Введите текст для поиска (ФИО, город, регион, тренер):")
+        layout.addWidget(label)
+        
+        search_edit = QLineEdit()
+        search_edit.setPlaceholderText("Например: Иванов или Москва")
+        layout.addWidget(search_edit)
+        
+        # Выбор типа поиска
+        search_type_label = QLabel("Тип поиска:")
+        layout.addWidget(search_type_label)
+        
+        search_type_combo = QComboBox()
+        search_type_combo.addItems(["Везде", "По ФИО", "По городу", "По региону", "По тренеру"])
+        layout.addWidget(search_type_combo)
+        
+        # Кнопки
+        buttons_layout = QHBoxLayout()
+        search_btn = QPushButton("🔍 Найти")
+        search_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 5px;")
+        cancel_btn = QPushButton("Отмена")
+        cancel_btn.setStyleSheet("background-color: #f44336; color: white; padding: 5px;")
+        buttons_layout.addWidget(search_btn)
+        buttons_layout.addWidget(cancel_btn)
+        layout.addLayout(buttons_layout)
+        
+        # Результаты поиска
+        result_label = QLabel("Результаты поиска:")
+        result_label.setStyleSheet("font-weight: bold; margin-top: 10px;")
+        layout.addWidget(result_label)
+        
+        result_list = QListWidget()
+        result_list.setStyleSheet("""
+            QListWidget {
+                min-height: 200px;
+                border: 1px solid #ccc;
+                border-radius: 3px;
+            }
+            QListWidget::item {
+                padding: 5px;
+                border-bottom: 1px solid #eee;
+            }
+            QListWidget::item:selected {
+                background-color: #4CAF50;
+                color: white;
+            }
+        """)
+        layout.addWidget(result_list)
+        
+        # Кнопка перехода к выбранному участнику
+        go_to_btn = QPushButton("📌 Перейти к выбранному участнику")
+        go_to_btn.setEnabled(False)
+        go_to_btn.setStyleSheet("background-color: #2196F3; color: white; padding: 5px;")
+        layout.addWidget(go_to_btn)
+        
+        def perform_search():
+            search_text = search_edit.text().strip()
+            if not search_text:
+                QMessageBox.warning(dialog, "Ошибка", "Введите текст для поиска")
+                return
+            
+            search_type = search_type_combo.currentText()
+            result_list.clear()
+            
+            try:
+                query = Player.select().where(Player.title_id == self.current_title_id)
+                
+                if self.current_sex:
+                    query = query.where(Player.sex == self.current_sex)
+                
+                results = []
+                for player in query:
+                    # Получаем тренера
+                    coach_name = ""
+                    if player.coach_id:
+                        coach = Coach.get_or_none(Coach.id == player.coach_id)
+                        if coach:
+                            coach_name = coach.coach
+                    
+                    match = False
+                    highlight_text = ""
+                    
+                    if search_type == "Везде":
+                        if (search_text.lower() in player.player.lower() or
+                            search_text.lower() in (player.city or "").lower() or
+                            search_text.lower() in (player.region or "").lower() or
+                            search_text.lower() in coach_name.lower()):
+                            match = True
+                            # Определяем что найдено
+                            if search_text.lower() in player.player.lower():
+                                highlight_text = f"ФИО: {player.player}"
+                            elif search_text.lower() in (player.city or "").lower():
+                                highlight_text = f"Город: {player.city}"
+                            elif search_text.lower() in (player.region or "").lower():
+                                highlight_text = f"Регион: {player.region}"
+                            elif search_text.lower() in coach_name.lower():
+                                highlight_text = f"Тренер: {coach_name}"
+                    
+                    elif search_type == "По ФИО":
+                        if search_text.lower() in player.player.lower():
+                            match = True
+                            highlight_text = f"ФИО: {player.player}"
+                    
+                    elif search_type == "По городу":
+                        if search_text.lower() in (player.city or "").lower():
+                            match = True
+                            highlight_text = f"Город: {player.city}"
+                    
+                    elif search_type == "По региону":
+                        if search_text.lower() in (player.region or "").lower():
+                            match = True
+                            highlight_text = f"Регион: {player.region}"
+                    
+                    elif search_type == "По тренеру":
+                        if search_text.lower() in coach_name.lower():
+                            match = True
+                            highlight_text = f"Тренер: {coach_name}"
+                    
+                    if match:
+                        results.append({
+                            'id': player.id,
+                            'fio': player.player,
+                            'city': player.city or "",
+                            'region': player.region or "",
+                            'coach': coach_name,
+                            'rank': player.rank or 0,
+                            'razryad': player.razryad or "",
+                            'highlight': highlight_text
+                        })
+                
+                if results:
+                    for r in results:
+                        item_text = f"🏅 {r['fio']}\n   📍 {r['city']} | {r['region']}\n   🎽 {r['razryad']} | Рейтинг: {r['rank']}\n   👨‍🏫 {r['coach']}\n   🔍 Найдено по: {r['highlight']}"
+                        item = QListWidgetItem(item_text)
+                        item.setData(Qt.UserRole, r['id'])
+                        result_list.addItem(item)
+                    
+                    result_label.setText(f"Результаты поиска: найдено {len(results)} участников")
+                    go_to_btn.setEnabled(True)
+                else:
+                    result_list.addItem("Ничего не найдено")
+                    result_label.setText("Результаты поиска: ничего не найдено")
+                    go_to_btn.setEnabled(False)
+                    
+            except Exception as e:
+                QMessageBox.critical(dialog, "Ошибка", f"Ошибка поиска: {str(e)}")
+        
+        def go_to_player():
+            current_item = result_list.currentItem()
+            if current_item:
+                player_id = current_item.data(Qt.UserRole)
+                if player_id:
+                    # Находим строку в таблице с этим ID
+                    for row in range(self.players_model.rowCount()):
+                        if self.players_model.get_id(row) == player_id:
+                            # Выделяем строку
+                            self.table_view.selectRow(row)
+                            self.table_view.scrollTo(self.table_view.model().index(row, 0))
+                            dialog.accept()
+                            QMessageBox.information(self, "Успех", "Участник найден и выделен в таблице")
+                            return
+                    
+                    QMessageBox.warning(self, "Ошибка", "Участник не найден в текущем списке")
+        
+        # Подключаем сигналы
+        search_btn.clicked.connect(perform_search)
+        cancel_btn.clicked.connect(dialog.reject)
+        go_to_btn.clicked.connect(go_to_player)
+        result_list.itemDoubleClicked.connect(go_to_player)
+        search_edit.returnPressed.connect(perform_search)
+        
+        dialog.exec_()
     
     def clear_participant_form(self):
         """Очистка формы участника"""
@@ -2330,50 +2508,6 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Сортировка", "Список отсортирован по рейтингу")
         except Exception as e:
             print(f"Ошибка сортировки: {e}")
-#=======================
-    # def filter_by_coach(self):
-    #     """Фильтр по тренерам"""
-    #     if not self.current_title_id:
-    #         return
-        
-    #     from PyQt5.QtWidgets import QInputDialog
-        
-    #     coach, ok = QInputDialog.getText(self, "Фильтр по тренеру", "Введите фамилию тренера:")
-    #     if ok and coach:
-    #         # Поиск по тренеру - в текущей реализации тренеры хранятся в отдельной таблице
-    #         # Нужно выполнить JOIN
-    #         try:
-    #             query = Player.select().where(
-    #                 (Player.title_id == self.current_title_id)
-    #             )
-                
-    #             # Фильтруем по тренеру
-    #             filtered = []
-    #             for player in query:
-    #                 if player.coach_id and coach.lower() in player.coach_id.coach.lower():
-    #                     filtered.append(player)
-    #                 elif not player.coach_id:
-    #                     pass
-                
-    #             if self.current_sex:
-    #                 filtered = [p for p in filtered if p.sex == self.current_sex]
-                
-    #             participants_data = []
-    #             for player in filtered:
-    #                 participants_data.append({
-    #                     'id': player.id,
-    #                     'fio': player.fio or "",
-    #                     'birth_date': player.bday,
-    #                     'rank': player.rank or 0,
-    #                     'city': player.city or "",
-    #                     'region': player.region or "",
-    #                     'razryad': player.razryad or "",
-    #                     'sex': player.sex or ""
-    #                 })
-    #             self.players_model.setData(participants_data)
-    #             QMessageBox.information(self, "Фильтр", f"Найдено {len(participants_data)} участников у тренера: {coach}")
-    #         except Exception as e:
-    #             print(f"Ошибка фильтрации: {e}")
 
     def filter_by_region(self):
         """Фильтр по регионам"""

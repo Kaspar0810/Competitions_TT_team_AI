@@ -10,7 +10,7 @@ class PlayersTableModel(QAbstractTableModel):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._data = []
-        self._headers = ['ID', 'ФИО', 'Отчество', 'Дата рождения', 'Рейтинг', 
+        self._headers = ['ID', 'ФИО', 'Дата рождения', 'Рейтинг', 
                         'Город', 'Регион', 'Разряд', 'Тренер']
     
     def setData(self, data):
@@ -54,23 +54,22 @@ class PlayersTableModel(QAbstractTableModel):
             
             player = self._data[row]
             
-            if col == 0:
-                return str(row + 1)  # Нумерация строк
-            elif col == 1:
+            # Изменяем соответствие колонок (без отчества)
+            if col == 0:  # ID (скрыт)
+                return str(player.get('id', ''))
+            elif col == 1:  # ФИО
                 return player.get('fio', '') or player.get('player', '')
-            elif col == 2:
-                return player.get('patronymic', '')
-            elif col == 3:
+            elif col == 2:  # Дата рождения
                 return self._format_date(player.get('birth_date', ''))
-            elif col == 4:
+            elif col == 3:  # Рейтинг
                 return str(player.get('rank', 0))
-            elif col == 5:
+            elif col == 4:  # Город
                 return player.get('city', '')
-            elif col == 6:
+            elif col == 5:  # Регион
                 return player.get('region', '')
-            elif col == 7:
+            elif col == 6:  # Разряд
                 return player.get('razryad', '')
-            elif col == 8:
+            elif col == 7:  # Тренер
                 return player.get('coach', '')
         
         if role == Qt.TextAlignmentRole and col == 0:
@@ -80,8 +79,10 @@ class PlayersTableModel(QAbstractTableModel):
     
     def headerData(self, section, orientation, role=Qt.DisplayRole):
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
-            if section < len(self._headers):
-                return self._headers[section]
+            headers = ['ID', 'ФИО', 'Дата рождения', 'Рейтинг', 
+                    'Город', 'Регион', 'Разряд', 'Тренер']
+            if section < len(headers):
+                return headers[section]
         return None
     
     def get_id(self, row):

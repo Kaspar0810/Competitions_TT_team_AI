@@ -1048,6 +1048,8 @@ class MainWindow(QMainWindow):
         form_layout.addWidget(self.rank_edit, 1, 8)
         
         # Ряд 2
+        razryad_list = ["б/р", "3-юн", "2-юн", "1-юн", 
+                                    "3-р", "2-р", "1-р", "КМС", "МС", "МСМК"]
         label_city = QLabel("Город:")
         label_city.setStyleSheet("font-weight: bold; font-size: 10px;")
         form_layout.addWidget(label_city, 2, 0)
@@ -1069,8 +1071,7 @@ class MainWindow(QMainWindow):
         label_razryad.setStyleSheet("font-weight: bold; font-size: 10px;")
         form_layout.addWidget(label_razryad, 3, 0)
         self.razryad_combo = QComboBox()
-        self.razryad_combo.addItems(["без разряда", "3 юношеский", "2 юношеский", "1 юношеский", 
-                                    "3 разряд", "2 разряд", "1 разряд", "КМС", "МС", "МСМК"])
+        self.razryad_combo.addItems(razryad_list)
         self.razryad_combo.setStyleSheet(input_style)
         self.razryad_combo.setMaximumWidth(100)
         form_layout.addWidget(self.razryad_combo, 3, 1)
@@ -2725,9 +2726,11 @@ class MainWindow(QMainWindow):
         if len(text) >= 2:
             self.search_in_r_lists(text)
         else:
-            self.search_results_list.clear()
-            self.search_results_list.setVisible(False)
-            self.show_competitions_list()
+            # Очищаем результаты поиска, но не переключаем списки
+            if hasattr(self, 'search_results_list'):
+                self.search_results_list.clear()
+            if hasattr(self, 'search_label'):
+                self.reset_search_label()
 
     def search_in_r_lists(self, search_text):
         """Поиск в таблицах r_list_m, r_list_d, r1_list_m, r1_list_d"""
@@ -2739,7 +2742,7 @@ class MainWindow(QMainWindow):
         results = []
         current_source = None
         
-        # Поиск в текущем рейтинге
+        # Поиск в текущем рейтинге (r_list_m, r_list_d)
         try:
             from models import R_list_m, R_list_d, R1_list_m, R1_list_d
             
@@ -2784,7 +2787,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Ошибка поиска в r_list_d: {e}")
         
-        # Если не найдено, ищем в январском
+        # Если не найдено в текущем рейтинге, ищем в январском (r1_list_m, r1_list_d)
         if not results:
             try:
                 query_r1m = R1_list_m.select().where(
@@ -2829,7 +2832,7 @@ class MainWindow(QMainWindow):
                 print(f"Ошибка поиска в r1_list_d: {e}")
         
         if results and hasattr(self, 'search_label'):
-            # Меняем заголовок
+            # Меняем заголовок в зависимости от источника
             if current_source == 'current':
                 self.search_label.setText("🔍 Текущий рейтинг")
                 self.search_label.setStyleSheet("""
@@ -2851,6 +2854,7 @@ class MainWindow(QMainWindow):
                     border-radius: 3px;
                 """)
             
+            # Показываем результаты (правый список уже виден на вкладке Участники)
             for r in results:
                 birthday_str = r['birthday'].strftime("%d.%m.%Y") if r['birthday'] else "---"
                 position = f"№{r['number']}" if r['number'] else "---"
@@ -2866,6 +2870,7 @@ class MainWindow(QMainWindow):
                 item = QListWidgetItem(item_text)
                 item.setData(Qt.UserRole, r)
                 self.search_results_list.addItem(item)
+                
         elif hasattr(self, 'search_label'):
             self.search_results_list.clear()
             self.search_label.setText("🔍 Ничего не найдено")
@@ -2937,30 +2942,6 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'suggestions_list'):
             QTimer.singleShot(200, lambda: self.suggestions_list.setVisible(False))
 
-    def show_competitions_list(self):
-        """Показать список соревнований"""
-        self.show_competitions_btn.setChecked(True)
-        self.show_search_btn.setChecked(False)
-        self.list_widget.setVisible(True)
-        self.search_results_list.setVisible(False)
-        self.competitions_label.setText("🏆 Прошедшие соревнования")
-        self.competitions_label.setStyleSheet("""
-            background-color: #4CAF50;
-            color: white;
-            padding: 6px;
-            font-weight: bold;
-            font-size: 11px;
-            border-radius: 3px;
-        """)
-        self.load_titles_list()
-
-    def show_search_results(self):
-        """Показать результаты поиска"""
-        self.show_competitions_btn.setChecked(False)
-        self.show_search_btn.setChecked(True)
-        self.list_widget.setVisible(False)
-        self.search_results_list.setVisible(True)
-
     def on_search_result_selected(self, item):
         """Выбор результата поиска - заполнение формы"""
         data = item.data(Qt.UserRole)
@@ -3027,16 +3008,17 @@ class MainWindow(QMainWindow):
 
     def reset_search_label(self):
         """Сброс заголовка поиска"""
-        if self.current_tab_index == 1 and hasattr(self, 'search_label'):
-            self.search_label.setText("🔍 Поиск игроков в рейтингах")
-            self.search_label.setStyleSheet("""
-                background-color: #FF9800;
-                color: white;
-                padding: 6px;
-                font-weight: bold;
-                font-size: 11px;
-                border-radius: 3px;
-            """)
+        if hasattr(self, 'current_tab_index') and self.current_tab_index == 1:
+            if hasattr(self, 'search_label'):
+                self.search_label.setText("🔍 Поиск игроков в рейтингах")
+                self.search_label.setStyleSheet("""
+                    background-color: #FF9800;
+                    color: white;
+                    padding: 6px;
+                    font-weight: bold;
+                    font-size: 11px;
+                    border-radius: 3px;
+                """)
             
 def main():
     app = QApplication(sys.argv)

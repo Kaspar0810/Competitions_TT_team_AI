@@ -91,10 +91,11 @@ class MainWindow(QMainWindow):
             
             # Принудительно обновляем геометрию
             self.top_widget.updateGeometry()
-            self.bottom_widget.updateGeometry()
+            if hasattr(self, 'bottom_widget'):
+                self.bottom_widget.updateGeometry()
             
             # Обновляем таблицу
-            if self.table_view:
+            if hasattr(self, 'table_view'):
                 self.table_view.updateGeometry()
 
     def resize_table_for_participants(self):
@@ -288,7 +289,7 @@ class MainWindow(QMainWindow):
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(0)
         
-        # Верхняя часть с вкладками и списком
+        # Верхняя часть с вкладками
         self.top_widget = QWidget()
         self.top_widget.setMinimumHeight(140)
         self.top_widget.setMaximumHeight(400)
@@ -339,17 +340,17 @@ class MainWindow(QMainWindow):
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
         top_layout.addWidget(self.tab_widget)
         
-        # Правая панель со списком соревнований
-        right_panel = QWidget()
-        right_panel.setMaximumWidth(380)
-        right_panel.setMinimumWidth(320)
-        right_panel_layout = QVBoxLayout(right_panel)
+        # Правая панель
+        self.right_panel = QWidget()
+        self.right_panel.setMaximumWidth(420)
+        self.right_panel.setMinimumWidth(350)
+        right_panel_layout = QVBoxLayout(self.right_panel)
         right_panel_layout.setContentsMargins(0, 0, 0, 0)
         right_panel_layout.setSpacing(3)
         
-        # Подпись к списку
-        self.list_label = QLabel("🏆 Прошедшие соревнования")
-        self.list_label.setStyleSheet("""
+        # Заголовок для списка соревнований (вкладка Титул)
+        self.competitions_label = QLabel("🏆 Прошедшие соревнования")
+        self.competitions_label.setStyleSheet("""
             background-color: #4CAF50;
             color: white;
             padding: 6px;
@@ -357,8 +358,8 @@ class MainWindow(QMainWindow):
             font-size: 11px;
             border-radius: 3px;
         """)
-        self.list_label.setAlignment(Qt.AlignCenter)
-        right_panel_layout.addWidget(self.list_label)
+        self.competitions_label.setAlignment(Qt.AlignCenter)
+        right_panel_layout.addWidget(self.competitions_label)
         
         # Список соревнований
         self.list_widget = QListWidget()
@@ -381,8 +382,44 @@ class MainWindow(QMainWindow):
         self.list_widget.itemClicked.connect(self.on_title_selected)
         right_panel_layout.addWidget(self.list_widget)
         
+        # Заголовок для поиска (вкладка Участники)
+        self.search_label = QLabel("🔍 Поиск игроков в рейтингах")
+        self.search_label.setStyleSheet("""
+            background-color: #FF9800;
+            color: white;
+            padding: 6px;
+            font-weight: bold;
+            font-size: 11px;
+            border-radius: 3px;
+        """)
+        self.search_label.setAlignment(Qt.AlignCenter)
+        self.search_label.setVisible(False)
+        right_panel_layout.addWidget(self.search_label)
+        
+        # Список результатов поиска
+        self.search_results_list = QListWidget()
+        self.search_results_list.setStyleSheet("""
+            QListWidget {
+                font-size: 10px;
+                background-color: #fafafa;
+                border: 1px solid #ddd;
+                border-radius: 3px;
+            }
+            QListWidget::item {
+                padding: 8px;
+                border-bottom: 1px solid #e0e0e0;
+            }
+            QListWidget::item:selected {
+                background-color: #FF9800;
+                color: white;
+            }
+        """)
+        self.search_results_list.setVisible(False)
+        self.search_results_list.itemClicked.connect(self.on_search_result_selected)
+        right_panel_layout.addWidget(self.search_results_list)
+        
         top_layout.addWidget(self.tab_widget)
-        top_layout.addWidget(right_panel)
+        top_layout.addWidget(self.right_panel)
         top_layout.setStretch(0, 2)
         top_layout.setStretch(1, 1)
         
@@ -439,16 +476,15 @@ class MainWindow(QMainWindow):
         self.table_view.setColumnHidden(0, True)
         self.table_view.horizontalHeader().setStretchLastSection(True)
         
-        # Настройка колонок таблицы (без отчества)
-        self.table_view.setColumnHidden(0, True)  # Скрываем ID
-        self.table_view.setColumnWidth(1, 180)    # ФИО
-        self.table_view.setColumnWidth(2, 90)     # Дата рождения
-        self.table_view.setColumnWidth(3, 60)     # Рейтинг
-        self.table_view.setColumnWidth(4, 120)    # Город
-        self.table_view.setColumnWidth(5, 120)    # Регион
-        self.table_view.setColumnWidth(6, 90)     # Разряд
-        self.table_view.setColumnWidth(7, 150)    # Тренер
-
+        # Устанавливаем ширину колонок
+        self.table_view.setColumnWidth(1, 180)  # ФИО
+        self.table_view.setColumnWidth(2, 90)   # Дата рождения
+        self.table_view.setColumnWidth(3, 60)   # Рейтинг
+        self.table_view.setColumnWidth(4, 120)  # Город
+        self.table_view.setColumnWidth(5, 120)  # Регион
+        self.table_view.setColumnWidth(6, 90)   # Разряд
+        self.table_view.setColumnWidth(7, 150)  # Тренер
+        
         bottom_layout.addWidget(self.table_view)
         
         # Добавляем виджеты в правую область
@@ -463,8 +499,8 @@ class MainWindow(QMainWindow):
         
         # Словарь для хранения высот верхней части для каждой вкладки
         self.tab_heights = {
-            0: 550,  # Титул - высокая форма
-            1: 160,  # Участники - компактная форма
+            0: 550,  # Титул
+            1: 180,  # Участники
             2: 180,  # Команды
             3: 180,  # Пары
             4: 220,  # Система
@@ -475,6 +511,9 @@ class MainWindow(QMainWindow):
         
         # Устанавливаем начальную высоту
         self.set_tab_height(0)
+        
+        # Загружаем список соревнований для вкладки Титул
+        self.load_titles_list()
 
     def create_title_tab(self):
         """Вкладка Титул с полной информацией о соревновании"""
@@ -790,8 +829,8 @@ class MainWindow(QMainWindow):
             self.load_titles_list()
             
             # Обновляем отображение в списке
-            self.list_label.setText(f"🏆 Текущее соревнование: {title_data['name'][:30]}...")
-            self.list_label.setStyleSheet("""
+            self.competitions_label.setText(f"🏆 Текущее соревнование: {title_data['name'][:30]}...")
+            self.competitions_label.setStyleSheet("""
                 background-color: #2196F3;
                 color: white;
                 padding: 6px;
@@ -911,7 +950,7 @@ class MainWindow(QMainWindow):
         self.secretary_category_combo.setCurrentIndex(0) 
 
     def create_participants_tab(self):
-        """Вкладка участников - оптимизированные размеры полей"""
+        """Вкладка участников - с поиском по спискам"""
         tab_widget = QWidget()
         main_layout = QVBoxLayout(tab_widget)
         main_layout.setSpacing(3)
@@ -931,97 +970,127 @@ class MainWindow(QMainWindow):
                 font-size: 10px;
                 font-weight: bold;
             }
+            QListWidget {
+                max-height: 150px;
+                border: 1px solid #ccc;
+                border-radius: 3px;
+                font-size: 10px;
+            }
+            QListWidget::item {
+                padding: 4px;
+            }
+            QListWidget::item:selected {
+                background-color: #4CAF50;
+                color: white;
+            }
         """
         
+        # Форма ввода
         form_widget = QWidget()
-        form_widget.setMaximumHeight(110)
+        form_widget.setMaximumHeight(260)  # Увеличиваем для списка предложений
         form_layout = QGridLayout(form_widget)
         form_layout.setSpacing(4)
         form_layout.setContentsMargins(4, 4, 4, 4)
         
-        # Ряд 1: ФИО (уменьшено), Отчество (увеличено), Дата рождения
+        # Ряд 1: ФИО с поиском
         label_fio = QLabel("ФИО:")
-        label_fio.setStyleSheet("font-weight: bold; font-size: 11px;")
+        label_fio.setStyleSheet("font-weight: bold; font-size: 10px;")
         form_layout.addWidget(label_fio, 0, 0)
-        self.fio_edit = QLineEdit()
-        self.fio_edit.setPlaceholderText("Иванов Иван")
-        self.fio_edit.setStyleSheet(input_style)
-        form_layout.addWidget(self.fio_edit, 0, 1, 1, 3)  # Уменьшено до 3 колонок
         
+        # Контейнер для поля ФИО и списка предложений
+        fio_container = QWidget()
+        fio_container_layout = QVBoxLayout(fio_container)
+        fio_container_layout.setSpacing(2)
+        fio_container_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.fio_edit = QLineEdit()
+        self.fio_edit.setPlaceholderText("Введите фамилию для поиска...")
+        self.fio_edit.setStyleSheet(input_style)
+        self.fio_edit.textChanged.connect(self.on_fio_text_changed)
+        fio_container_layout.addWidget(self.fio_edit)
+        
+        # Список предложений из r_list
+        self.suggestions_list = QListWidget()
+        self.suggestions_list.setVisible(False)
+        self.suggestions_list.setMaximumHeight(120)
+        self.suggestions_list.setStyleSheet(input_style)
+        self.suggestions_list.itemClicked.connect(self.on_suggestion_selected)
+        fio_container_layout.addWidget(self.suggestions_list)
+        
+        form_layout.addWidget(fio_container, 0, 1, 1, 9)
+        
+        # Остальные поля
         label_patronymic = QLabel("Отчество:")
-        label_patronymic.setStyleSheet("font-weight: bold; font-size: 11px;")
-        form_layout.addWidget(label_patronymic, 0, 4)
+        label_patronymic.setStyleSheet("font-weight: bold; font-size: 10px;")
+        form_layout.addWidget(label_patronymic, 1, 0)
         self.patronymic_edit = QLineEdit()
         self.patronymic_edit.setPlaceholderText("Иванович")
         self.patronymic_edit.setStyleSheet(input_style)
-        form_layout.addWidget(self.patronymic_edit, 0, 5, 1, 3)  # Увеличено до 3 колонок
+        form_layout.addWidget(self.patronymic_edit, 1, 1, 1, 3)
         
         label_birth = QLabel("Дата рожд.:")
-        label_birth.setStyleSheet("font-weight: bold; font-size: 11px;")
-        form_layout.addWidget(label_birth, 0, 8)
+        label_birth.setStyleSheet("font-weight: bold; font-size: 10px;")
+        form_layout.addWidget(label_birth, 1, 4)
         self.birth_date = QDateEdit()
         self.birth_date.setDate(QDate.currentDate().addYears(-18))
         self.birth_date.setCalendarPopup(True)
         self.birth_date.setDisplayFormat("dd.MM.yyyy")
         self.birth_date.setStyleSheet(input_style)
-        form_layout.addWidget(self.birth_date, 0, 9, 1, 2)
+        form_layout.addWidget(self.birth_date, 1, 5, 1, 2)
         
-        # Ряд 2: Рейтинг (маленький), Город, Регион
-        razryad_list = ["б/р", "3-юн", "2-юн", "1-юн", 
-                                    "3-р", "2-р", "1-р", "КМС", "МС", "МСМК"]
-        label_rank = QLabel("Рейтинг:")
-        label_rank.setStyleSheet("font-weight: bold; font-size: 11px;")
-        form_layout.addWidget(label_rank, 1, 0)
+        label_rank = QLabel("Рейт.:")
+        label_rank.setStyleSheet("font-weight: bold; font-size: 10px;")
+        form_layout.addWidget(label_rank, 1, 7)
         self.rank_edit = QLineEdit()
         self.rank_edit.setPlaceholderText("0")
         self.rank_edit.setMaximumWidth(60)
         self.rank_edit.setStyleSheet(input_style)
-        form_layout.addWidget(self.rank_edit, 1, 1)
+        form_layout.addWidget(self.rank_edit, 1, 8)
         
+        # Ряд 2
         label_city = QLabel("Город:")
-        label_city.setStyleSheet("font-weight: bold; font-size: 11px;")
-        form_layout.addWidget(label_city, 1, 2)
+        label_city.setStyleSheet("font-weight: bold; font-size: 10px;")
+        form_layout.addWidget(label_city, 2, 0)
         self.city_edit = QLineEdit()
         self.city_edit.setPlaceholderText("Москва")
         self.city_edit.setStyleSheet(input_style)
-        form_layout.addWidget(self.city_edit, 1, 3, 1, 3)
+        form_layout.addWidget(self.city_edit, 2, 1, 1, 4)
         
         label_region = QLabel("Регион:")
-        label_region.setStyleSheet("font-weight: bold; font-size: 11px;")
-        form_layout.addWidget(label_region, 1, 6)
+        label_region.setStyleSheet("font-weight: bold; font-size: 10px;")
+        form_layout.addWidget(label_region, 2, 5)
         self.region_edit = QLineEdit()
         self.region_edit.setPlaceholderText("Московская область")
         self.region_edit.setStyleSheet(input_style)
-        form_layout.addWidget(self.region_edit, 1, 7, 1, 4)
+        form_layout.addWidget(self.region_edit, 2, 6, 1, 4)
         
-        # Ряд 3: Разряд (comboBox), Тренеры (большое поле), Пол
+        # Ряд 3
         label_razryad = QLabel("Разряд:")
-        label_razryad.setStyleSheet("font-weight: bold; font-size: 11px;")
-        form_layout.addWidget(label_razryad, 2, 0)
-        
-        # Заменяем QLineEdit на QComboBox для разряда
+        label_razryad.setStyleSheet("font-weight: bold; font-size: 10px;")
+        form_layout.addWidget(label_razryad, 3, 0)
         self.razryad_combo = QComboBox()
-        self.razryad_combo.addItems(razryad_list)
+        self.razryad_combo.addItems(["без разряда", "3 юношеский", "2 юношеский", "1 юношеский", 
+                                    "3 разряд", "2 разряд", "1 разряд", "КМС", "МС", "МСМК"])
         self.razryad_combo.setStyleSheet(input_style)
         self.razryad_combo.setMaximumWidth(100)
-        form_layout.addWidget(self.razryad_combo, 2, 1)
+        form_layout.addWidget(self.razryad_combo, 3, 1)
         
         label_coach = QLabel("Тренеры:")
-        label_coach.setStyleSheet("font-weight: bold; font-size: 11px;")
-        form_layout.addWidget(label_coach, 2, 2)
+        label_coach.setStyleSheet("font-weight: bold; font-size: 10px;")
+        form_layout.addWidget(label_coach, 3, 2)
         self.coach_edit = QLineEdit()
         self.coach_edit.setPlaceholderText("Иванов И.И., Петров П.П.")
         self.coach_edit.setStyleSheet(input_style)
-        form_layout.addWidget(self.coach_edit, 2, 3, 1, 5)  # Увеличено до 5 колонок
+        form_layout.addWidget(self.coach_edit, 3, 3, 1, 5)
         
         label_sex = QLabel("Пол:")
-        label_sex.setStyleSheet("font-weight: bold; font-size: 11px;")
-        form_layout.addWidget(label_sex, 2, 8)
+        label_sex.setStyleSheet("font-weight: bold; font-size: 10px;")
+        form_layout.addWidget(label_sex, 3, 8)
         self.sex_combo = QComboBox()
         self.sex_combo.addItems(["Мужской", "Женский"])
         self.sex_combo.setStyleSheet(input_style)
         self.sex_combo.setMaximumWidth(80)
-        form_layout.addWidget(self.sex_combo, 2, 9)
+        form_layout.addWidget(self.sex_combo, 3, 9)
         
         main_layout.addWidget(form_widget)
         main_layout.addStretch()
@@ -1489,8 +1558,8 @@ class MainWindow(QMainWindow):
                     self.set_tab_height(1)
                 
                 # Обновляем заголовок
-                self.list_label.setText(f"🏆 {title.name[:30]}...")
-                self.list_label.setStyleSheet("""
+                self.competitions_label.setText(f"🏆 {title.name[:30]}...")
+                self.competitions_label.setStyleSheet("""
                     background-color: #2196F3;
                     color: white;
                     padding: 6px;
@@ -1507,45 +1576,60 @@ class MainWindow(QMainWindow):
         self.current_tab_index = index
         self.update_left_panel_for_tab(index)
         
-        # Меняем заголовок списка
-        tab_titles = [
-            "🏆 Прошедшие соревнования",
-            "👥 Список участников",
-            "🏆 Список команд",
-            "🤝 Список пар",
-            "⚙️ Настройки системы",
-            "📊 Результаты соревнований",
-            "⭐ Рейтинг участников",
-            "ℹ️ Дополнительная информация"
-        ]
-        
-        if index < len(tab_titles):
-            self.list_label.setText(tab_titles[index])
-        
-        # Устанавливаем высоту для текущей вкладки
-        self.set_tab_height(index)
-        
-        # Специальная обработка для вкладки "Участники"
-        if index == 1:
-            self.list_widget.clear()
+        # Управление отображением правой панели
+        if index == 1:  # Вкладка Участники - показываем поиск
+            self.competitions_label.setVisible(False)
+            self.list_widget.setVisible(False)
+            self.search_label.setVisible(True)
+            self.search_results_list.setVisible(True)
+            
+            # Очищаем результаты поиска
+            self.search_results_list.clear()
+            self.search_label.setText("🔍 Поиск игроков в рейтингах")
+            self.search_label.setStyleSheet("""
+                background-color: #FF9800;
+                color: white;
+                padding: 6px;
+                font-weight: bold;
+                font-size: 11px;
+                border-radius: 3px;
+            """)
+            
+            # Загружаем участников для текущего соревнования
             if self.current_title_id:
                 self.load_participants_for_title()
             else:
                 self.players_model.setData([])
-                self.table_header.setText("👥 Список участников - выберите соревнование")
+                self.table_header.setText("👥 Список участников - выберите соревнование на вкладке Титул")
         
-        # Для вкладки "Титул"
-        elif index == 0:
-            self.load_titles_list()
+        else:  # Другие вкладки - показываем список соревнований
+            self.competitions_label.setVisible(True)
+            self.list_widget.setVisible(True)
+            self.search_label.setVisible(False)
+            self.search_results_list.setVisible(False)
+            
+            # Обновляем заголовок для разных вкладок
+            if index == 0:
+                self.competitions_label.setText("🏆 Прошедшие соревнования")
+                self.load_titles_list()
+            elif index == 2:
+                self.competitions_label.setText("🏆 Команды")
+                if self.current_title_id:
+                    self.load_teams_for_title()
+            elif index == 3:
+                self.competitions_label.setText("🤝 Пары")
+                if self.current_title_id:
+                    self.load_doubles_for_title()
+            elif index == 5:
+                self.competitions_label.setText("📊 Результаты")
+                if self.current_title_id:
+                    self.load_results_for_title()
+            else:
+                self.competitions_label.setText("🏆 Информация")
+                self.list_widget.clear()
         
-        # Для остальных вкладок
-        else:
-            if index == 2 and self.current_title_id:
-                self.load_teams_for_title()
-            elif index == 3 and self.current_title_id:
-                self.load_doubles_for_title()
-            elif index == 5 and self.current_title_id:
-                self.load_results_for_title()
+        # Устанавливаем высоту для текущей вкладки
+        self.set_tab_height(index)
 
     def set_competition_buttons(self, count):
         """Установка кнопок соревнований"""
@@ -2360,6 +2444,9 @@ class MainWindow(QMainWindow):
         self.coach_edit.clear()
         self.rank_edit.clear()
         self.sex_combo.setCurrentIndex(0)
+        # Очищаем результаты поиска и сбрасываем заголовок
+        self.search_results_list.clear()
+        self.reset_search_label()
     
     def new_competition(self):
         """Создание нового соревнования"""
@@ -2633,6 +2720,324 @@ class MainWindow(QMainWindow):
         self.load_participants_for_title()
         QMessageBox.information(self, "Сброс фильтров", "Все фильтры сброшены")
 
+    def on_fio_text_changed(self, text):
+        """Обработчик изменения текста в поле ФИО - поиск в списках"""
+        if len(text) >= 2:
+            self.search_in_r_lists(text)
+        else:
+            self.search_results_list.clear()
+            self.search_results_list.setVisible(False)
+            self.show_competitions_list()
+
+    def search_in_r_lists(self, search_text):
+        """Поиск в таблицах r_list_m, r_list_d, r1_list_m, r1_list_d"""
+        if not hasattr(self, 'search_results_list'):
+            return
+        
+        self.search_results_list.clear()
+        
+        results = []
+        current_source = None
+        
+        # Поиск в текущем рейтинге
+        try:
+            from models import R_list_m, R_list_d, R1_list_m, R1_list_d
+            
+            query_m = R_list_m.select().where(
+                (R_list_m.r_fname.contains(search_text))
+            ).limit(30)
+            for item in query_m:
+                results.append({
+                    'source': 'r_list_m',
+                    'source_name': '🏆 Текущий рейтинг (М)',
+                    'fio': item.r_fname,
+                    'birthday': item.r_bithday,
+                    'city': item.r_city,
+                    'region': item.r_region,
+                    'district': item.r_district,
+                    'number': item.r_number,
+                    'list': item.r_list,
+                    'sex': 'М'
+                })
+                current_source = 'current'
+        except Exception as e:
+            print(f"Ошибка поиска в r_list_m: {e}")
+        
+        try:
+            query_d = R_list_d.select().where(
+                (R_list_d.r_fname.contains(search_text))
+            ).limit(30)
+            for item in query_d:
+                results.append({
+                    'source': 'r_list_d',
+                    'source_name': '🏆 Текущий рейтинг (Ж)',
+                    'fio': item.r_fname,
+                    'birthday': item.r_bithday,
+                    'city': item.r_city,
+                    'region': item.r_region,
+                    'district': item.r_district,
+                    'number': item.r_number,
+                    'list': item.r_list,
+                    'sex': 'Ж'
+                })
+                current_source = 'current'
+        except Exception as e:
+            print(f"Ошибка поиска в r_list_d: {e}")
+        
+        # Если не найдено, ищем в январском
+        if not results:
+            try:
+                query_r1m = R1_list_m.select().where(
+                    (R1_list_m.r1_fname.contains(search_text))
+                ).limit(30)
+                for item in query_r1m:
+                    results.append({
+                        'source': 'r1_list_m',
+                        'source_name': '📅 Январский рейтинг (М)',
+                        'fio': item.r1_fname,
+                        'birthday': item.r1_bithday,
+                        'city': item.r1_city,
+                        'region': item.r1_region,
+                        'district': item.r1_district,
+                        'number': item.r1_number,
+                        'list': item.r1_list,
+                        'sex': 'М'
+                    })
+                    current_source = 'january'
+            except Exception as e:
+                print(f"Ошибка поиска в r1_list_m: {e}")
+            
+            try:
+                query_r1d = R1_list_d.select().where(
+                    (R1_list_d.r1_fname.contains(search_text))
+                ).limit(30)
+                for item in query_r1d:
+                    results.append({
+                        'source': 'r1_list_d',
+                        'source_name': '📅 Январский рейтинг (Ж)',
+                        'fio': item.r1_fname,
+                        'birthday': item.r1_bithday,
+                        'city': item.r1_city,
+                        'region': item.r1_region,
+                        'district': item.r1_district,
+                        'number': item.r1_number,
+                        'list': item.r1_list,
+                        'sex': 'Ж'
+                    })
+                    current_source = 'january'
+            except Exception as e:
+                print(f"Ошибка поиска в r1_list_d: {e}")
+        
+        if results and hasattr(self, 'search_label'):
+            # Меняем заголовок
+            if current_source == 'current':
+                self.search_label.setText("🔍 Текущий рейтинг")
+                self.search_label.setStyleSheet("""
+                    background-color: #2196F3;
+                    color: white;
+                    padding: 6px;
+                    font-weight: bold;
+                    font-size: 11px;
+                    border-radius: 3px;
+                """)
+            else:
+                self.search_label.setText("🔍 Январский рейтинг")
+                self.search_label.setStyleSheet("""
+                    background-color: #FF9800;
+                    color: white;
+                    padding: 6px;
+                    font-weight: bold;
+                    font-size: 11px;
+                    border-radius: 3px;
+                """)
+            
+            for r in results:
+                birthday_str = r['birthday'].strftime("%d.%m.%Y") if r['birthday'] else "---"
+                position = f"№{r['number']}" if r['number'] else "---"
+                
+                item_text = f"""{r['source_name']}
+    ┌─────────────────────────────────────
+    │ 🏅 {r['fio']}
+    │ 📅 {birthday_str} | 📍 {r['city']}, {r['region']}
+    │ 📋 Позиция: {position}
+    │ 🏷️ Район: {r['district'] or '---'}
+    └─────────────────────────────────────"""
+                
+                item = QListWidgetItem(item_text)
+                item.setData(Qt.UserRole, r)
+                self.search_results_list.addItem(item)
+        elif hasattr(self, 'search_label'):
+            self.search_results_list.clear()
+            self.search_label.setText("🔍 Ничего не найдено")
+            self.search_label.setStyleSheet("""
+                background-color: #f44336;
+                color: white;
+                padding: 6px;
+                font-weight: bold;
+                font-size: 11px;
+                border-radius: 3px;
+            """)
+            from PyQt5.QtCore import QTimer
+            QTimer.singleShot(2000, self.reset_search_label)
+
+    def on_suggestion_selected(self, item):
+        """Выбор предложения из списка - заполнение формы"""
+        data = item.data(Qt.UserRole)
+        if data:
+            # Заполняем поля формы
+            self.fio_edit.setText(data['fio'])
+            
+            # Устанавливаем дату рождения
+            if data['birthday']:
+                if isinstance(data['birthday'], date):
+                    self.birth_date.setDate(QDate(data['birthday'].year, data['birthday'].month, data['birthday'].day))
+                elif isinstance(data['birthday'], str):
+                    try:
+                        d = datetime.strptime(data['birthday'], "%Y-%m-%d").date()
+                        self.birth_date.setDate(QDate(d.year, d.month, d.day))
+                    except:
+                        pass
+            
+            # Устанавливаем город и регион
+            self.city_edit.setText(data['city'] or "")
+            self.region_edit.setText(data['region'] or "")
+            
+            # Устанавливаем пол
+            if data['sex'] == 'М':
+                self.sex_combo.setCurrentIndex(0)
+            else:
+                self.sex_combo.setCurrentIndex(1)
+            
+            # Автоматически устанавливаем разряд (можно настроить по номеру списка)
+            if data['list']:
+                if data['list'] <= 100:
+                    self.razryad_combo.setCurrentText("1 разряд")
+                elif data['list'] <= 200:
+                    self.razryad_combo.setCurrentText("2 разряд")
+                else:
+                    self.razryad_combo.setCurrentText("3 разряд")
+            
+            # Скрываем список предложений
+            self.suggestions_list.clear()
+            self.suggestions_list.setVisible(False)
+            
+            # Устанавливаем фокус на следующее поле
+            self.patronymic_edit.setFocus()
+            
+            QMessageBox.information(self, "Данные загружены", 
+                                f"Данные из {data['source']}\n"
+                                f"ФИО: {data['fio']}\n"
+                                f"Дата рождения: {data['birthday']}\n"
+                                f"Город: {data['city']}\n"
+                                f"Регион: {data['region']}")
+            
+    def focusOutEvent(self, event):
+        """Событие потери фокуса - скрываем список предложений"""
+        super().focusOutEvent(event)
+        if hasattr(self, 'suggestions_list'):
+            QTimer.singleShot(200, lambda: self.suggestions_list.setVisible(False))
+
+    def show_competitions_list(self):
+        """Показать список соревнований"""
+        self.show_competitions_btn.setChecked(True)
+        self.show_search_btn.setChecked(False)
+        self.list_widget.setVisible(True)
+        self.search_results_list.setVisible(False)
+        self.competitions_label.setText("🏆 Прошедшие соревнования")
+        self.competitions_label.setStyleSheet("""
+            background-color: #4CAF50;
+            color: white;
+            padding: 6px;
+            font-weight: bold;
+            font-size: 11px;
+            border-radius: 3px;
+        """)
+        self.load_titles_list()
+
+    def show_search_results(self):
+        """Показать результаты поиска"""
+        self.show_competitions_btn.setChecked(False)
+        self.show_search_btn.setChecked(True)
+        self.list_widget.setVisible(False)
+        self.search_results_list.setVisible(True)
+
+    def on_search_result_selected(self, item):
+        """Выбор результата поиска - заполнение формы"""
+        data = item.data(Qt.UserRole)
+        if data:
+            # Заполняем поля формы
+            self.fio_edit.setText(data['fio'])
+            
+            # Устанавливаем дату рождения
+            if data['birthday']:
+                if isinstance(data['birthday'], date):
+                    self.birth_date.setDate(QDate(data['birthday'].year, data['birthday'].month, data['birthday'].day))
+                elif isinstance(data['birthday'], str):
+                    try:
+                        d = datetime.strptime(data['birthday'], "%Y-%m-%d").date()
+                        self.birth_date.setDate(QDate(d.year, d.month, d.day))
+                    except:
+                        pass
+            
+            # Устанавливаем город и регион
+            self.city_edit.setText(data['city'] or "")
+            self.region_edit.setText(data['region'] or "")
+            
+            # Устанавливаем пол
+            if data['sex'] == 'М':
+                self.sex_combo.setCurrentIndex(0)
+            else:
+                self.sex_combo.setCurrentIndex(1)
+            
+            # Автоматически устанавливаем разряд по позиции в списке
+            if data['list']:
+                position = data['list']
+                if position <= 20:
+                    self.razryad_combo.setCurrentText("МСМК")
+                elif position <= 50:
+                    self.razryad_combo.setCurrentText("МС")
+                elif position <= 100:
+                    self.razryad_combo.setCurrentText("КМС")
+                elif position <= 200:
+                    self.razryad_combo.setCurrentText("1 разряд")
+                elif position <= 300:
+                    self.razryad_combo.setCurrentText("2 разряд")
+                else:
+                    self.razryad_combo.setCurrentText("3 разряд")
+            
+            # Устанавливаем рейтинг (для сортировки)
+            if data['list']:
+                # Чем меньше номер, тем выше рейтинг
+                self.rank_edit.setText(str(1000 - data['list']))
+            
+            # Показываем сообщение
+            QMessageBox.information(self, "Данные загружены", 
+                                f"Данные из {data['source_name']}\n"
+                                f"ФИО: {data['fio']}\n"
+                                f"Дата рождения: {data['birthday']}\n"
+                                f"Город: {data['city']}\n"
+                                f"Регион: {data['region']}\n"
+                                f"Позиция в рейтинге: {data['list']}")
+            
+            # Переключаемся обратно на список соревнований
+            self.show_competitions_list()
+            
+            # Устанавливаем фокус на поле "Отчество"
+            self.patronymic_edit.setFocus()
+
+    def reset_search_label(self):
+        """Сброс заголовка поиска"""
+        if self.current_tab_index == 1 and hasattr(self, 'search_label'):
+            self.search_label.setText("🔍 Поиск игроков в рейтингах")
+            self.search_label.setStyleSheet("""
+                background-color: #FF9800;
+                color: white;
+                padding: 6px;
+                font-weight: bold;
+                font-size: 11px;
+                border-radius: 3px;
+            """)
+            
 def main():
     app = QApplication(sys.argv)
     window = MainWindow()

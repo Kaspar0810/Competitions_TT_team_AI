@@ -18,13 +18,18 @@ from models_qt import (
     PlayersTableModel, TeamsTableModel, ResultsTableModel, 
     DoublePlayersTableModel, TitlesTableModel, CoachesTableModel
 )
-from datetime import datetime
+# from datetime import datetime
 from datetime import *
 import pandas as pd
 from PyQt5.QtWidgets import QProgressBar, QFileDialog, QDialog, QVBoxLayout, QLabel, QPushButton, QHBoxLayout
 from PyQt5.QtCore import QThread, pyqtSignal
 import os
 from datetime import datetime
+
+# from PyQt5.QtWidgets import QProgressBar, QFileDialog, QDialog, QVBoxLayout, QLabel, QPushButton, QHBoxLayout
+# from PyQt5.QtCore import QThread, pyqtSignal
+# import os
+# from datetime import datetime
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -77,8 +82,15 @@ class MainWindow(QMainWindow):
         
         # Для редактирования участников
         self.editing_player_id = None
+        
         # Инициализация интерфейса
         self.init_ui()
+        
+        # Загрузка списка соревнований
+        self.load_titles_list()
+        
+        # Обновляем активность вкладок (по умолчанию все отключены)
+        self.update_tabs_enabled()
         
         # Загрузка списка соревнований
         self.load_titles_list()
@@ -731,16 +743,12 @@ class MainWindow(QMainWindow):
     def get_category_display(self, category_code):
         """Преобразование кода категории в отображаемый текст"""
         category_map = {
-            'ВК': 'ВК (Всероссийская категория)',
-            '1К': '1К (Первая категория)',
-            '2К': '2К (Вторая категория)',
-            '3К': '3К (Третья категория)',
-            'Всероссийская': 'ВК (Всероссийская категория)',
-            'Первая': '1К (Первая категория)',
-            'Вторая': '2К (Вторая категория)',
-            'Третья': '3К (Третья категория)'
+            'ВК': 'ССВК',
+            '1К': '1 кат.',
+            '2К': '2 кат',
+            '3К': '3 кат',
         }
-        return category_map.get(category_code, 'ВК (Всероссийская категория)')
+        return category_map.get(category_code, 'ССВК')
 
     def get_category_code(self, display_text):
         """Преобразование отображаемого текста в код категории"""
@@ -1131,6 +1139,16 @@ class MainWindow(QMainWindow):
             """)
             label.setWordWrap(True)
         
+        self.comp_type_info_label = QLabel("-")
+        self.comp_type_info_label.setStyleSheet("""
+            font-size: 11px; 
+            padding: 6px; 
+            background-color: #f9f9f9; 
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+        """)
+        info_layout.addRow("Тип:", self.comp_type_info_label)
+
         info_layout.addRow("Название:", self.comp_name_label)
         info_layout.addRow("Категория:", self.comp_sredi_label)
         info_layout.addRow("Возраст:", self.comp_vozrast_label)
@@ -1743,21 +1761,23 @@ class MainWindow(QMainWindow):
             self.current_title_id = title_id
             title = Title.get_or_none(Title.id == title_id)
             if title:
-                # Обновляем информацию на вкладке Титул
+                # Обновляем информацию
                 self.comp_name_label.setText(title.name or "-")
                 self.comp_sredi_label.setText(title.sredi or "-")
                 self.comp_vozrast_label.setText(title.vozrast or "-")
+                self.comp_type_info_label.setText(title.vid_turnira or "-")
                 
                 start = title.data_start.strftime("%d.%m.%Y") if title.data_start else "---"
                 end = title.data_end.strftime("%d.%m.%Y") if title.data_end else "---"
                 self.comp_dates_label.setText(f"{start} - {end}")
                 self.comp_mesto_label.setText(title.mesto or "-")
-                
-                # Отображаем судей
                 self.comp_referee_label.setText(title.referee or "-")
                 self.comp_referee_category_label.setText(title.kat_ref or "-")
                 self.comp_secretary_label.setText(title.secretary or "-")
                 self.comp_secretary_category_label.setText(title.kat_sec or "-")
+                
+                # Обновляем активность вкладок в зависимости от tab_enabled
+                self.update_tabs_enabled()
                 
                 # Определяем цвет в зависимости от типа соревнования
                 if "девушки" in title.name.lower():
@@ -1767,8 +1787,8 @@ class MainWindow(QMainWindow):
                     self.current_sex = "М"
                     self.left_panel.setStyleSheet("background-color: #F0F8FF;")
                 
-                # Загружаем участников для вкладки Участники
-                if hasattr(self, 'current_tab_index') and self.current_tab_index == 1:
+                # Загружаем участников для вкладки Участники (если вкладка активна)
+                if self.tab_widget.isTabEnabled(1):
                     self.load_participants_for_title()
                 
                 # Обновляем заголовок списка
@@ -2667,10 +2687,45 @@ class MainWindow(QMainWindow):
         # Очищаем результаты поиска и сбрасываем заголовок
         self.search_results_list.clear()
         self.reset_search_label()
-   
+# ===========================   
     def new_competition(self):
-        """Создание нового соревнования с загрузкой рейтингов"""
-        # Открываем диалог выбора файлов
+        """Создание нового соревнования с выбором типа и загрузкой рейтингов"""
+        # Сначала спрашиваем тип соревнования
+        dialog_type = QDialog(self)
+        dialog_type.setWindowTitle("Выбор типа соревнования")
+        dialog_type.setModal(True)
+        dialog_type.setFixedSize(300, 120)
+        
+        layout = QVBoxLayout(dialog_type)
+        layout.addWidget(QLabel("Выберите тип соревнования:"))
+        
+        btn_layout = QHBoxLayout()
+        personal_btn = QPushButton("🏆 Личные")
+        personal_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 8px; font-size: 12px;")
+        team_btn = QPushButton("👥 Командные")
+        team_btn.setStyleSheet("background-color: #2196F3; color: white; padding: 8px; font-size: 12px;")
+        
+        self.selected_tournament_type = None
+        
+        def set_personal():
+            self.selected_tournament_type = "Личные"
+            dialog_type.accept()
+        
+        def set_team():
+            self.selected_tournament_type = "Командные"
+            dialog_type.accept()
+        
+        personal_btn.clicked.connect(set_personal)
+        team_btn.clicked.connect(set_team)
+        
+        btn_layout.addWidget(personal_btn)
+        btn_layout.addWidget(team_btn)
+        layout.addLayout(btn_layout)
+        
+        if dialog_type.exec_() != QDialog.Accepted or not self.selected_tournament_type:
+            return
+        
+        # Открываем диалог выбора файлов рейтинга
         dialog = RatingFileDialog(self)
         if dialog.exec_() == QDialog.Accepted:
             # Получаем дату из загруженных файлов
@@ -2681,11 +2736,34 @@ class MainWindow(QMainWindow):
             if not self.check_existing_rating(rating_date_str):
                 return
             
-            # Обновляем дату рейтинга в текущем соревновании
-            if self.current_title_id:
-                title = Title.get_by_id(self.current_title_id)
-                title.r_date = rating_date_str
-                title.save()
+            # Создаем запись в таблице Title с временными значениями
+            current_date = QDate.currentDate().toPyDate()
+            
+            title_data = {
+                'name': "",  # Пустое название, будет заполнено позже
+                'sredi': "",  # Пустое значение
+                'vozrast': "",  # Пустое значение
+                'data_start': current_date,
+                'data_end': current_date,
+                'mesto': "",  # Пустое значение
+                'city': "",
+                'referee': "",
+                'kat_ref': "",
+                'secretary': "",
+                'kat_sec': "",
+                'vid_turnira': self.selected_tournament_type,
+                'full_name_comp': "",
+                'short_name_comp': "",
+                'tab_enabled': "1",  # Только вкладка Титул активна
+                'multiregion': 0,
+                'perenos': 0,
+                'otchestvo': 0,
+                'r_date': rating_date_str
+            }
+            
+            # Создаем запись в БД
+            title = Title.create(**title_data)
+            self.current_title_id = title.id
             
             # Очищаем информацию о соревновании
             for label in [self.comp_name_label, self.comp_sredi_label, self.comp_vozrast_label,
@@ -2697,16 +2775,29 @@ class MainWindow(QMainWindow):
             
             # Скрываем информацию, показываем форму
             self.info_group.setVisible(False)
-            self.new_comp_frame.setVisible(True)
+            self.new_comp_frame.setVisible(True)  # <--- ФОРМА ДОЛЖНА БЫТЬ ВИДНА
             
-            # Очищаем форму
-            self.cancel_new_competition()
+            # Очищаем поля формы (но не скрываем её!)
+            self.new_comp_name.clear()
+            self.new_comp_sredi.setCurrentIndex(0)
+            self.new_comp_vozrast.setCurrentIndex(0)
+            self.new_comp_start.setDate(QDate.currentDate())
+            self.new_comp_end.setDate(QDate.currentDate().addDays(7))
+            self.new_comp_mesto.clear()
+            self.new_comp_referee.clear()
+            self.new_comp_referee_cat.setCurrentIndex(0)
+            self.new_comp_secretary.clear()
+            self.new_comp_secretary_cat.setCurrentIndex(0)
             
-            # УСТАНАВЛИВАЕМ ФОКУС НА ПОЛЕ НАЗВАНИЕ
+            # Устанавливаем фокус на поле название
             self.new_comp_name.setFocus()
             
-            QMessageBox.information(self, "Успех", f"Рейтинги загружены.\nДата рейтинга: {rating_date_str}")
-
+            QMessageBox.information(self, "Успех", 
+                                f"✅ Рейтинги успешно загружены!\n"
+                                f"📅 Дата рейтинга: {rating_date_str}\n"
+                                f"🏆 Тип соревнования: {self.selected_tournament_type}\n\n"
+                                f"Теперь заполните информацию о соревновании.")
+# ============================================        
     def create_menu_bar(self):
         """Создание меню"""
         menubar = self.menuBar()
@@ -3350,7 +3441,7 @@ class MainWindow(QMainWindow):
         self.month_combo.setCurrentIndex(0)
         self.sredi_combo.setCurrentIndex(0)
         self.load_titles_list()
-
+# =======================================
     def save_new_competition(self):
         """Сохранение нового соревнования"""
         name = self.new_comp_name.text().strip()
@@ -3367,7 +3458,7 @@ class MainWindow(QMainWindow):
                 referee, created = Referee.get_or_create(
                     family=referee_name,
                     defaults={
-                        'city': self.new_comp_referee_city.text().strip(),
+                        'city': '',
                         'category': self.new_comp_referee_cat.currentText(),
                         'signature': None
                     }
@@ -3379,39 +3470,60 @@ class MainWindow(QMainWindow):
                 secretary, created = Referee.get_or_create(
                     family=secretary_name,
                     defaults={
-                        'city': self.new_comp_secretary_city.text().strip(),
+                        'city': '',
                         'category': self.new_comp_secretary_cat.currentText(),
                         'signature': None
                     }
                 )
             
-            # Получаем дату рейтинга (текущая дата в формате yyyy_MM)
-            rating_date = QDate.currentDate().toString("yyyy_MM")
+            # Проверяем, существует ли запись
+            if not self.current_title_id:
+                # Если нет, создаем новую
+                current_date = QDate.currentDate().toPyDate()
+                rating_date_str = QDate.currentDate().toString("yyyy_MM")
+                
+                title = Title.create(
+                    name=name,
+                    sredi=self.new_comp_sredi.currentText(),
+                    vozrast=self.new_comp_vozrast.currentText(),
+                    data_start=self.new_comp_start.date().toPyDate(),
+                    data_end=self.new_comp_end.date().toPyDate(),
+                    mesto=self.new_comp_mesto.text().strip(),
+                    city="",
+                    referee=referee_name,
+                    kat_ref=self.new_comp_referee_cat.currentText(),
+                    secretary=secretary_name,
+                    kat_sec=self.new_comp_secretary_cat.currentText(),
+                    vid_turnira=self.selected_tournament_type if hasattr(self, 'selected_tournament_type') else "Личные",
+                    full_name_comp=name,
+                    short_name_comp=name[:50],
+                    tab_enabled="2",  # После создания активируем вкладку Участники
+                    multiregion=0,
+                    perenos=0,
+                    otchestvo=0,
+                    r_date=rating_date_str
+                )
+                self.current_title_id = title.id
+            else:
+                # Обновляем существующую запись
+                title = Title.get_by_id(self.current_title_id)
+                title.name = name
+                title.sredi = self.new_comp_sredi.currentText()
+                title.vozrast = self.new_comp_vozrast.currentText()
+                title.data_start = self.new_comp_start.date().toPyDate()
+                title.data_end = self.new_comp_end.date().toPyDate()
+                title.mesto = self.new_comp_mesto.text().strip()
+                title.referee = referee_name
+                title.kat_ref = self.new_comp_referee_cat.currentText()
+                title.secretary = secretary_name
+                title.kat_sec = self.new_comp_secretary_cat.currentText()
+                title.full_name_comp = name
+                title.short_name_comp = name[:50]
+                title.tab_enabled = "2"  # После сохранения активируем вкладку Участники
+                title.save()
             
-            title_data = {
-                'name': name,
-                'sredi': self.new_comp_sredi.currentText(),
-                'vozrast': self.new_comp_vozrast.currentText(),
-                'data_start': self.new_comp_start.date().toPyDate(),
-                'data_end': self.new_comp_end.date().toPyDate(),
-                'mesto': self.new_comp_mesto.text().strip(),
-                'city': "",
-                'referee': referee_name,
-                'kat_ref': self.new_comp_referee_cat.currentText(),
-                'secretary': secretary_name,
-                'kat_sec': self.new_comp_secretary_cat.currentText(),
-                'vid_turnira': "Личное",
-                'full_name_comp': name,
-                'short_name_comp': name[:50],
-                'tab_enabled': "1",
-                'multiregion': 0,
-                'perenos': 0,
-                'otchestvo': 0,
-                'r_date': rating_date
-            }
-            
-            title = Title.create(**title_data)
-            self.current_title_id = title.id
+            # Обновляем активность вкладок
+            self.update_tabs_enabled()
             
             # Скрываем форму и показываем информацию
             self.new_comp_frame.setVisible(False)
@@ -3419,29 +3531,50 @@ class MainWindow(QMainWindow):
             
             # Обновляем информацию
             self.comp_name_label.setText(name)
-            self.comp_sredi_label.setText(title_data['sredi'])
-            self.comp_vozrast_label.setText(title_data['vozrast'])
-            self.comp_dates_label.setText(f"{title_data['data_start'].strftime('%d.%m.%Y')} - {title_data['data_end'].strftime('%d.%m.%Y')}")
-            self.comp_mesto_label.setText(title_data['mesto'])
+            self.comp_sredi_label.setText(title.sredi)
+            self.comp_vozrast_label.setText(title.vozrast)
+            self.comp_dates_label.setText(f"{title.data_start.strftime('%d.%m.%Y')} - {title.data_end.strftime('%d.%m.%Y')}")
+            self.comp_mesto_label.setText(title.mesto)
             self.comp_referee_label.setText(referee_name or "-")
-            self.comp_referee_category_label.setText(title_data['kat_ref'])
+            self.comp_referee_category_label.setText(title.kat_ref)
             self.comp_secretary_label.setText(secretary_name or "-")
-            self.comp_secretary_category_label.setText(title_data['kat_sec'])
+            self.comp_secretary_category_label.setText(title.kat_sec)
             
             # Обновляем список годов и соревнований
             self.load_years_from_titles()
             self.filter_competitions()
             
-            QMessageBox.information(self, "Успех", f"Соревнование '{name}' создано\nДата рейтинга: {rating_date}")
+            # Переключаемся на вкладку Участники
+            self.tab_widget.setCurrentIndex(1)
             
-            # Очищаем форму
-            self.cancel_new_competition()
+            # Загружаем участников
+            self.load_participants_for_title()
+            
+            QMessageBox.information(self, "Успех", 
+                                f"✅ Соревнование '{name}' сохранено!\n"
+                                f"🏆 Тип: {title.vid_turnira}\n"
+                                f"📅 Дата рейтинга: {title.r_date}\n"
+                                f"📋 Теперь можно добавлять участников")
+            
+            # Очищаем форму (после сохранения можно очистить)
+            self.new_comp_name.clear()
+            self.new_comp_sredi.setCurrentIndex(0)
+            self.new_comp_vozrast.setCurrentIndex(0)
+            self.new_comp_start.setDate(QDate.currentDate())
+            self.new_comp_end.setDate(QDate.currentDate().addDays(7))
+            self.new_comp_mesto.clear()
+            self.new_comp_referee.clear()
+            self.new_comp_referee_cat.setCurrentIndex(0)
+            self.new_comp_secretary.clear()
+            self.new_comp_secretary_cat.setCurrentIndex(0)
             
         except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Не удалось создать соревнование: {str(e)}")
-
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить соревнование: {str(e)}")    
+# ========================================
     def cancel_new_competition(self):
-        """Отмена создания нового соревнования"""
+        """Отмена создания нового соревнования (только при нажатии кнопки Отмена)"""
         # Очищаем форму
         self.new_comp_name.clear()
         self.new_comp_sredi.setCurrentIndex(0)
@@ -3460,7 +3593,17 @@ class MainWindow(QMainWindow):
         
         # Сбрасываем фокус
         self.new_comp_name.clearFocus()
-
+        
+        # Если есть временная запись с пустым названием, удаляем её
+        if self.current_title_id:
+            try:
+                title = Title.get_by_id(self.current_title_id)
+                if not title.name or title.name == "":  # Временная запись
+                    title.delete_instance()
+                    self.current_title_id = None
+            except:
+                pass
+# ===================================
     def load_years_from_titles(self):
         """Загрузка годов из существующих соревнований для фильтра"""
         try:
@@ -3591,16 +3734,83 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Ошибка установки даты рейтинга: {e}")
 
+    def update_tabs_enabled(self):
+        """Обновление активности вкладок в зависимости от tab_enabled"""
+        if not self.current_title_id:
+            # Если нет выбранного соревнования, отключаем все вкладки кроме Титул
+            for i in range(1, self.tab_widget.count()):
+                self.tab_widget.setTabEnabled(i, False)
+            return
+        
+        try:
+            title = Title.get_by_id(self.current_title_id)
+            tab_enabled = title.tab_enabled if title.tab_enabled else "1"
+            
+            # Вкладка Титул всегда активна (индекс 0)
+            self.tab_widget.setTabEnabled(0, True)
+            
+            # Активируем остальные вкладки в зависимости от значения
+            if tab_enabled == "1":
+                # Только титул активен
+                for i in range(1, self.tab_widget.count()):
+                    self.tab_widget.setTabEnabled(i, False)
+            elif tab_enabled == "2":
+                # Титул и Участники активны
+                self.tab_widget.setTabEnabled(1, True)  # Участники
+                for i in range(2, self.tab_widget.count()):
+                    self.tab_widget.setTabEnabled(i, False)
+            elif tab_enabled == "3":
+                # Титул, Участники, Команды активны
+                self.tab_widget.setTabEnabled(1, True)  # Участники
+                self.tab_widget.setTabEnabled(2, True)  # Команды
+                for i in range(3, self.tab_widget.count()):
+                    self.tab_widget.setTabEnabled(i, False)
+            elif tab_enabled == "4":
+                # Титул, Участники, Команды, Пары активны
+                self.tab_widget.setTabEnabled(1, True)  # Участники
+                self.tab_widget.setTabEnabled(2, True)  # Команды
+                self.tab_widget.setTabEnabled(3, True)  # Пары
+                for i in range(4, self.tab_widget.count()):
+                    self.tab_widget.setTabEnabled(i, False)
+            elif tab_enabled == "5":
+                # Активны все вкладки до Системы
+                for i in range(1, 5):
+                    self.tab_widget.setTabEnabled(i, True)
+                for i in range(5, self.tab_widget.count()):
+                    self.tab_widget.setTabEnabled(i, False)
+            elif tab_enabled == "6":
+                # Активны все вкладки до Результатов
+                for i in range(1, 6):
+                    self.tab_widget.setTabEnabled(i, True)
+                for i in range(6, self.tab_widget.count()):
+                    self.tab_widget.setTabEnabled(i, False)
+            elif tab_enabled == "7":
+                # Активны все вкладки до Рейтинга
+                for i in range(1, 7):
+                    self.tab_widget.setTabEnabled(i, True)
+                for i in range(7, self.tab_widget.count()):
+                    self.tab_widget.setTabEnabled(i, False)
+            else:
+                # Все вкладки активны
+                for i in range(1, self.tab_widget.count()):
+                    self.tab_widget.setTabEnabled(i, True)
+                    
+        except Exception as e:
+            print(f"Ошибка обновления вкладок: {e}")
+
 class RatingLoaderThread(QThread):
     progress = pyqtSignal(int)
     status = pyqtSignal(str)
     finished = pyqtSignal(bool, str)
+    file_progress = pyqtSignal(int, str)  # (progress, filename)
     
-    def __init__(self, file_path, table_name, rating_date=None):
+    def __init__(self, file_path, table_name, file_index, total_files, rating_date=None):
         super().__init__()
         self.file_path = file_path
         self.table_name = table_name
         self.rating_date = rating_date
+        self.file_index = file_index
+        self.total_files = total_files
         self._is_running = True
     
     def stop(self):
@@ -3608,300 +3818,515 @@ class RatingLoaderThread(QThread):
     
     def run(self):
         try:
-            self.status.emit(f"Загрузка {self.table_name}...")
+            # Общий прогресс для всех файлов
+            base_progress = (self.file_index - 1) * (100 // self.total_files)
             
-            # Проверяем существование файла
+            self.status.emit(f"📥 Загрузка файла {self.file_index}/{self.total_files}: {os.path.basename(self.file_path)}")
+            
             if not os.path.exists(self.file_path):
                 self.finished.emit(False, f"Файл не найден: {self.file_path}")
                 return
             
+            # Читаем Excel файл
             df = pd.read_excel(self.file_path)
-            
-            # Определяем колонки в зависимости от таблицы
-            records = []
             total_rows = len(df)
             
+            # Определяем колонки
+            column_mapping = self.get_column_mapping(df)
+            
+            records = []
             for idx, row in df.iterrows():
                 if not self._is_running:
                     self.finished.emit(False, "Загрузка прервана")
                     return
                 
-                self.progress.emit(int((idx + 1) / total_rows * 100))
+                # Прогресс в пределах текущего файла
+                file_progress = int((idx + 1) / total_rows * 100)
+                # Общий прогресс
+                total_progress = base_progress + int(file_progress / self.total_files)
                 
-                # Определяем название колонок (разные варианты)
-                fio_col = None
-                for col in ['ФИО', 'Фамилия', 'Имя', 'FIO', 'Name']:
-                    if col in df.columns:
-                        fio_col = col
-                        break
+                self.progress.emit(total_progress)
+                self.file_progress.emit(file_progress, os.path.basename(self.file_path))
                 
-                city_col = None
-                for col in ['Город', 'City', 'city']:
-                    if col in df.columns:
-                        city_col = col
-                        break
-                
-                region_col = None
-                for col in ['Регион', 'Region', 'region']:
-                    if col in df.columns:
-                        region_col = col
-                        break
-                
-                # Парсим дату рождения
-                birth_date = None
-                for col in ['Дата рождения', 'BirthDate', 'birth_date']:
-                    if col in df.columns:
-                        try:
-                            birth_date = pd.to_datetime(row[col]).date()
-                            break
-                        except:
-                            continue
-                
-                record = {
-                    'r_number': idx + 1,
-                    'r_list': idx + 1,
-                    'r_fname': str(row[fio_col]) if fio_col else str(row.iloc[0]),
-                    'r_bithday': birth_date,
-                    'r_city': str(row[city_col]) if city_col else '',
-                    'r_region': str(row[region_col]) if region_col else '',
-                    'r_district': ''
-                }
+                # Парсим строку
+                record = self.parse_row(row, idx, column_mapping)
                 records.append(record)
             
-            # Загружаем данные в соответствующую таблицу
-            if self.table_name == 'r_list_m':
-                R_list_m.delete().execute()
-                for record in records:
-                    R_list_m.create(**record)
-            elif self.table_name == 'r_list_d':
-                R_list_d.delete().execute()
-                for record in records:
-                    R_list_d.create(**record)
-            elif self.table_name == 'r1_list_m':
-                R1_list_m.delete().execute()
-                for record in records:
-                    r1_record = {
-                        'r1_number': record['r_number'],
-                        'r1_list': record['r_list'],
-                        'r1_fname': record['r_fname'],
-                        'r1_bithday': record['r_bithday'],
-                        'r1_city': record['r_city'],
-                        'r1_region': record['r_region'],
-                        'r1_district': record['r_district']
-                    }
-                    R1_list_m.create(**r1_record)
-            elif self.table_name == 'r1_list_d':
-                R1_list_d.delete().execute()
-                for record in records:
-                    r1_record = {
-                        'r1_number': record['r_number'],
-                        'r1_list': record['r_list'],
-                        'r1_fname': record['r_fname'],
-                        'r1_bithday': record['r_bithday'],
-                        'r1_city': record['r_city'],
-                        'r1_region': record['r_region'],
-                        'r1_district': record['r_district']
-                    }
-                    R1_list_d.create(**r1_record)
+            # Загружаем данные в БД
+            self.load_to_database(records)
             
-            self.progress.emit(100)
-            self.finished.emit(True, f"Загружено {len(records)} записей")
+            # Завершаем загрузку файла
+            self.progress.emit(base_progress + (100 // self.total_files))
+            self.file_progress.emit(100, os.path.basename(self.file_path))
+            
+            self.finished.emit(True, f"✅ {os.path.basename(self.file_path)}: загружено {len(records)} записей")
             
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             self.finished.emit(False, f"Ошибка: {str(e)}")
         
-        # Очищаем после завершения
         self.quit()
         self.wait()
+    
+    def get_column_mapping(self, df):
+        """Определение соответствия колонок"""
+        column_mapping = {
+            'r_number': None,
+            'r_list': None,
+            'r_fname': None,
+            'r_bithday': None,
+            'r_city': None,
+            'r_region': None,
+            'r_district': None
+        }
+        
+        for col in df.columns:
+            col_lower = str(col).lower()
+            
+            if 'место' in col_lower or 'рейтинг' in col_lower or 'номер' in col_lower or '№' in col:
+                if column_mapping['r_number'] is None:
+                    column_mapping['r_number'] = col
+                    column_mapping['r_list'] = col
+            
+            if 'фио' in col_lower or 'фамилия' in col_lower or 'ф.и.о.' in col_lower or 'fio' in col_lower:
+                if column_mapping['r_fname'] is None:
+                    column_mapping['r_fname'] = col
+            
+            if 'дата рожд' in col_lower or 'дата' in col_lower and 'рожд' in col_lower:
+                if column_mapping['r_bithday'] is None:
+                    column_mapping['r_bithday'] = col
+            
+            if 'город' in col_lower or 'населенный пункт' in col_lower:
+                if column_mapping['r_city'] is None:
+                    column_mapping['r_city'] = col
+            
+            if 'субъект' in col_lower or 'регион' in col_lower:
+                if column_mapping['r_region'] is None:
+                    column_mapping['r_region'] = col
+            
+            if 'округ' in col_lower or 'федеральный' in col_lower:
+                if column_mapping['r_district'] is None:
+                    column_mapping['r_district'] = col
+        
+        return column_mapping
+    
+    def parse_row(self, row, idx, column_mapping):
+        """Парсинг строки Excel"""
+        # Номер (место/рейтинг)
+        r_number = idx + 1
+        if column_mapping['r_number'] is not None:
+            try:
+                val = row[column_mapping['r_number']]
+                if pd.notna(val):
+                    r_number = int(float(val)) if isinstance(val, (int, float)) else idx + 1
+            except:
+                r_number = idx + 1
+        
+        # ФИО
+        fio = ""
+        if column_mapping['r_fname'] is not None:
+            fio = str(row[column_mapping['r_fname']]) if pd.notna(row[column_mapping['r_fname']]) else ""
+            fio = fio.replace('nan', '').replace('None', '').strip()
+            if not fio:
+                fio = f"Игрок {idx + 1}"
+        
+        # Дата рождения
+        birth_date = None
+        if column_mapping['r_bithday'] is not None:
+            try:
+                val = row[column_mapping['r_bithday']]
+                if pd.notna(val):
+                    if isinstance(val, (pd.Timestamp, datetime)):
+                        birth_date = val.date()
+                    else:
+                        birth_date = pd.to_datetime(val).date()
+            except:
+                birth_date = None
+        
+        # Город
+        city = ""
+        if column_mapping['r_city'] is not None:
+            city = str(row[column_mapping['r_city']]) if pd.notna(row[column_mapping['r_city']]) else ""
+            city = city.replace('nan', '').replace('None', '').strip()
+        
+        # Регион
+        region = ""
+        if column_mapping['r_region'] is not None:
+            region = str(row[column_mapping['r_region']]) if pd.notna(row[column_mapping['r_region']]) else ""
+            region = region.replace('nan', '').replace('None', '').strip()
+        
+        # Округ
+        district = ""
+        if column_mapping['r_district'] is not None:
+            district = str(row[column_mapping['r_district']]) if pd.notna(row[column_mapping['r_district']]) else ""
+            district = district.replace('nan', '').replace('None', '').strip()
+        
+        return {
+            'r_number': r_number,
+            'r_list': r_number,
+            'r_fname': fio,
+            'r_bithday': birth_date,
+            'r_city': city,
+            'r_region': region,
+            'r_district': district
+        }
+    
+    def load_to_database(self, records):
+        """Загрузка данных в соответствующую таблицу"""
+        if self.table_name == 'r_list_m':
+            R_list_m.delete().execute()
+            for record in records:
+                R_list_m.create(**record)
+        elif self.table_name == 'r_list_d':
+            R_list_d.delete().execute()
+            for record in records:
+                R_list_d.create(**record)
+        elif self.table_name == 'r1_list_m':
+            R1_list_m.delete().execute()
+            for record in records:
+                R1_list_m.create(**{
+                    'r1_number': record['r_number'],
+                    'r1_list': record['r_list'],
+                    'r1_fname': record['r_fname'],
+                    'r1_bithday': record['r_bithday'],
+                    'r1_city': record['r_city'],
+                    'r1_region': record['r_region'],
+                    'r1_district': record['r_district']
+                })
+        elif self.table_name == 'r1_list_d':
+            R1_list_d.delete().execute()
+            for record in records:
+                R1_list_d.create(**{
+                    'r1_number': record['r_number'],
+                    'r1_list': record['r_list'],
+                    'r1_fname': record['r_fname'],
+                    'r1_bithday': record['r_bithday'],
+                    'r1_city': record['r_city'],
+                    'r1_region': record['r_region'],
+                    'r1_district': record['r_district']
+                })
 
 class RatingFileDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Загрузка рейтингов")
         self.setModal(True)
-        self.setMinimumWidth(600)
+        self.setMinimumWidth(700)
         
         layout = QVBoxLayout(self)
         
         # Информация
         info_label = QLabel("Выберите файлы рейтингов в следующем порядке:")
-        info_label.setStyleSheet("font-weight: bold; font-size: 12px;")
+        info_label.setStyleSheet("font-weight: bold; font-size: 12px; margin-bottom: 10px;")
         layout.addWidget(info_label)
         
         # Список файлов
         self.files_info = []
         file_names = [
-            ("1. Текущий рейтинг (мужчины) - файл должен содержать 'm' в названии", "r_list_m", "m"),
-            ("2. Текущий рейтинг (женщины) - файл должен содержать 'w' в названии", "r_list_d", "w"),
-            ("3. Январский рейтинг (мужчины) - файл должен содержать 'm' в названии", "r1_list_m", "m"),
-            ("4. Январский рейтинг (женщины) - файл должен содержать 'w' в названии", "r1_list_d", "w")
+            ("1. Текущий рейтинг (мужчины)", "r_list_m", "m"),
+            ("2. Текущий рейтинг (женщины)", "r_list_d", "w"),
+            ("3. Январский рейтинг (мужчины)", "r1_list_m", "m"),
+            ("4. Январский рейтинг (женщины)", "r1_list_d", "w")
         ]
         
         self.loader_threads = []
+        self.selected_count = 0
         
-        for name, table, gender in file_names:
-            file_layout = QHBoxLayout()
-            file_label = QLabel(f"{name}:")
-            file_label.setMinimumWidth(300)
-            file_label.setStyleSheet("font-size: 10px;")
-            file_path_label = QLabel("Файл не выбран")
-            file_path_label.setStyleSheet("color: gray; font-size: 10px;")
-            select_btn = QPushButton("Выбрать")
-            select_btn.setStyleSheet("padding: 3px; font-size: 10px;")
-            select_btn.clicked.connect(lambda checked, t=table, lbl=file_path_label, g=gender: self.select_file(t, lbl, g))
+        for idx, (name, table, gender) in enumerate(file_names, 1):
+            file_frame = QFrame()
+            file_frame.setStyleSheet("QFrame { background-color: #f5f5f5; border-radius: 5px; margin: 2px; }")
+            file_layout = QHBoxLayout(file_frame)
+            file_layout.setContentsMargins(10, 5, 10, 5)
             
+            # Название
+            file_label = QLabel(f"{name}:")
+            file_label.setMinimumWidth(250)
+            file_label.setStyleSheet("font-size: 11px; font-weight: bold;")
             file_layout.addWidget(file_label)
+            
+            # Статус
+            file_path_label = QLabel("❌ Файл не выбран")
+            file_path_label.setStyleSheet("color: red; font-size: 10px;")
+            file_path_label.setMinimumWidth(300)
             file_layout.addWidget(file_path_label, 1)
+            
+            # Прогресс для файла
+            file_progress = QProgressBar()
+            file_progress.setVisible(False)
+            file_progress.setMaximumWidth(100)
+            file_progress.setMaximumHeight(20)
+            file_progress.setStyleSheet("QProgressBar::chunk { background-color: #4CAF50; }")
+            file_layout.addWidget(file_progress)
+            
+            # Кнопка выбора
+            select_btn = QPushButton("📂 Выбрать")
+            select_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #4CAF50;
+                    color: white;
+                    padding: 5px 10px;
+                    font-size: 10px;
+                    border-radius: 3px;
+                }
+                QPushButton:hover { background-color: #45a049; }
+            """)
+            # ИСПРАВЛЕНО: передаем все необходимые аргументы в лямбду
+            select_btn.clicked.connect(lambda checked, t=table, lbl=file_path_label, g=gender, btn=select_btn, prog=file_progress: 
+                                       self.select_file(t, lbl, g, btn, prog))
             file_layout.addWidget(select_btn)
-            layout.addLayout(file_layout)
+            
+            layout.addWidget(file_frame)
             
             self.files_info.append({
                 'table': table,
                 'path': None,
                 'label': file_path_label,
-                'gender': gender
+                'gender': gender,
+                'frame': file_frame,
+                'button': select_btn,
+                'progress': file_progress,
+                'index': idx
             })
         
-        # Прогресс бар
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setVisible(False)
-        self.progress_bar.setStyleSheet("QProgressBar::chunk { background-color: #4CAF50; }")
-        layout.addWidget(self.progress_bar)
+        # Общий прогресс бар
+        self.total_progress_label = QLabel("Общий прогресс:")
+        self.total_progress_label.setStyleSheet("font-size: 11px; font-weight: bold; margin-top: 10px;")
+        layout.addWidget(self.total_progress_label)
+        
+        self.total_progress_bar = QProgressBar()
+        self.total_progress_bar.setVisible(False)
+        self.total_progress_bar.setStyleSheet("""
+            QProgressBar {
+                border: 2px solid #ccc;
+                border-radius: 5px;
+                text-align: center;
+                height: 25px;
+            }
+            QProgressBar::chunk {
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #4CAF50, stop:0.5 #8BC34A, stop:1 #4CAF50);
+                border-radius: 3px;
+            }
+        """)
+        layout.addWidget(self.total_progress_bar)
         
         # Статус
-        self.status_label = QLabel("Готов к загрузке")
-        self.status_label.setStyleSheet("font-size: 10px; color: gray;")
+        self.status_label = QLabel("✅ Готов к загрузке")
+        self.status_label.setStyleSheet("font-size: 11px; color: green; padding: 5px;")
         layout.addWidget(self.status_label)
         
         # Кнопки
         btn_layout = QHBoxLayout()
-        self.load_btn = QPushButton("Загрузить все")
+        btn_layout.setSpacing(10)
+        
+        self.load_btn = QPushButton("🚀 Загрузить все")
         self.load_btn.setEnabled(False)
-        self.load_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 8px; font-size: 11px;")
+        self.load_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                padding: 8px 15px;
+                font-size: 11px;
+                font-weight: bold;
+                border-radius: 4px;
+            }
+            QPushButton:hover { background-color: #45a049; }
+            QPushButton:disabled { background-color: #cccccc; }
+        """)
         self.load_btn.clicked.connect(self.start_loading)
-        cancel_btn = QPushButton("Отмена")
-        cancel_btn.setStyleSheet("background-color: #f44336; color: white; padding: 8px; font-size: 11px;")
+        
+        cancel_btn = QPushButton("❌ Отмена")
+        cancel_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #f44336;
+                color: white;
+                padding: 8px 15px;
+                font-size: 11px;
+                font-weight: bold;
+                border-radius: 4px;
+            }
+            QPushButton:hover { background-color: #d32f2f; }
+        """)
         cancel_btn.clicked.connect(self.reject)
+        
         btn_layout.addWidget(self.load_btn)
         btn_layout.addWidget(cancel_btn)
         layout.addLayout(btn_layout)
         
         self.current_index = 0
+        self.setMinimumHeight(500)
     
-    def select_file(self, table, label, gender):
-        """Выбор файла с возможностью пропуска"""
-        # Добавляем кнопку "Пропустить"
-        reply = QMessageBox.question(self, "Загрузка рейтинга", 
-                                    f"Загрузить рейтинг для {table}?\n"
-                                    f"Нажмите Yes для выбора файла, No для пропуска",
-                                    QMessageBox.Yes | QMessageBox.No)
-        
-        if reply == QMessageBox.No:
-            # Пропускаем этот файл
-            label.setText("Пропущен")
-            label.setStyleSheet("color: orange; font-size: 10px;")
-            for info in self.files_info:
-                if info['table'] == table:
-                    info['path'] = "SKIPPED"
-                    break
-            
-            # Проверяем, все ли файлы обработаны
-            all_processed = all(info['path'] for info in self.files_info)
-            self.load_btn.setEnabled(all_processed)
-            return
-        
+    def select_file(self, table, label, gender, button, progress):
+        """Выбор файла"""
         file_path, _ = QFileDialog.getOpenFileName(
             self, 
             f"Выберите файл для {table}", 
             "", 
             "Excel files (*.xlsx)"
         )
-
-    # def select_file(self, table, label, gender):
-    #     """Выбор файла с проверкой названия по полу"""
-    #     file_path, _ = QFileDialog.getOpenFileName(
-    #         self, 
-    #         f"Выберите файл для {table}", 
-    #         "", 
-    #         "Excel files (*.xlsx *.xls)"
-    #     )
         
-    #     if file_path:
-    #         file_name = os.path.basename(file_path).lower()
+        if file_path:
+            file_name = os.path.basename(file_path).lower()
             
-    #         # Проверяем соответствие пола
-    #         if gender == 'm' and 'm' not in file_name and 'муж' not in file_name:
-    #             reply = QMessageBox.question(self, "Предупреждение", 
-    #                                         f"Выбранный файл '{file_name}' не содержит 'm' или 'муж' в названии.\n"
-    #                                         f"Это может быть не рейтинг мужчин. Продолжить?",
-    #                                         QMessageBox.Yes | QMessageBox.No)
-    #             if reply == QMessageBox.No:
-    #                 return
+            if not file_name.endswith('.xlsx'):
+                QMessageBox.warning(self, "Ошибка", "Можно загружать только файлы с расширением .xlsx")
+                return
             
-    #         if gender == 'w' and 'w' not in file_name and 'жен' not in file_name:
-    #             reply = QMessageBox.question(self, "Предупреждение", 
-    #                                         f"Выбранный файл '{file_name}' не содержит 'w' или 'жен' в названии.\n"
-    #                                         f"Это может быть не рейтинг женщин. Продолжить?",
-    #                                         QMessageBox.Yes | QMessageBox.No)
-    #             if reply == QMessageBox.No:
-    #                 return
+            name_part = file_name.replace('.xlsx', '')
+            if gender == 'm' and 'm' not in name_part and 'муж' not in name_part:
+                QMessageBox.warning(self, "Ошибка", f"Файл должен содержать 'm' или 'муж' в названии")
+                return
             
-    #         label.setText(os.path.basename(file_path))
-    #         label.setStyleSheet("color: green; font-size: 10px;")
-    #         for info in self.files_info:
-    #             if info['table'] == table:
-    #                 info['path'] = file_path
-    #                 break
+            if gender == 'w' and 'w' not in name_part and 'жен' not in name_part:
+                QMessageBox.warning(self, "Ошибка", f"Файл должен содержать 'w' или 'жен' в названии")
+                return
             
-    #         # Проверяем, все ли файлы выбраны
-    #         all_selected = all(info['path'] for info in self.files_info)
-    #         self.load_btn.setEnabled(all_selected)
+            label.setText(f"✅ {os.path.basename(file_path)}")
+            label.setStyleSheet("color: green; font-size: 10px; font-weight: bold;")
+            
+            button.setStyleSheet("""
+                QPushButton {
+                    background-color: #FF9800;
+                    color: white;
+                    padding: 5px 10px;
+                    font-size: 10px;
+                    border-radius: 3px;
+                }
+                QPushButton:hover { background-color: #F57C00; }
+            """)
+            button.setText("🔄 Изменить")
+            
+            for info in self.files_info:
+                if info['table'] == table:
+                    info['path'] = file_path
+                    break
+            
+            self.selected_count = sum(1 for info in self.files_info if info['path'] is not None)
+            self.status_label.setText(f"📁 Выбрано файлов: {self.selected_count} из {len(self.files_info)}")
+            
+            all_selected = all(info['path'] for info in self.files_info)
+            self.load_btn.setEnabled(all_selected)
+            
+            if all_selected:
+                self.status_label.setText("✅ Все файлы выбраны! Нажмите 'Загрузить все'")
+                self.status_label.setStyleSheet("font-size: 11px; color: #4CAF50; font-weight: bold;")
     
     def start_loading(self):
+        """Начало загрузки всех файлов"""
         self.load_btn.setEnabled(False)
-        self.progress_bar.setVisible(True)
-        self.progress_bar.setValue(0)
+        self.total_progress_bar.setVisible(True)
+        self.total_progress_bar.setValue(0)
         self.current_index = 0
         self.loader_threads = []
         
-        # Запускаем загрузку последовательно
+        # Показываем прогресс-бары для каждого файла
+        for info in self.files_info:
+            info['progress'].setVisible(True)
+            info['progress'].setValue(0)
+            info['button'].setEnabled(False)
+            # Сбрасываем статус текста
+            if info['path']:
+                info['label'].setText(f"⏳ Ожидание загрузки...")
+                info['label'].setStyleSheet("color: gray; font-size: 10px;")
+        
+        self.status_label.setText("⏳ Начинаем загрузку рейтингов...")
         self.load_next_file()
     
     def load_next_file(self):
+        """Загрузка следующего файла"""
         if self.current_index >= len(self.files_info):
-            self.progress_bar.setVisible(False)
+            self.total_progress_bar.setValue(100)
+            self.status_label.setText("✅ Все рейтинги успешно загружены!")
+            QMessageBox.information(self, "Успех", "Все рейтинги успешно загружены!")
             self.accept()
             return
         
         info = self.files_info[self.current_index]
-        self.progress_bar.setValue(0)
-        self.status_label.setText(f"Загрузка: {info['table']}...")
         
-        self.current_loader = RatingLoaderThread(info['path'], info['table'])
-        self.current_loader.progress.connect(self.progress_bar.setValue)
+        if info['path'] is None:
+            # Пропускаем файл, если он не выбран
+            info['progress'].setVisible(False)
+            info['label'].setText("⏭️ Пропущен")
+            info['label'].setStyleSheet("color: gray; font-size: 10px;")
+            self.current_index += 1
+            self.load_next_file()
+            return
+        
+        info['progress'].setValue(0)
+        info['label'].setText(f"⏳ Загрузка {os.path.basename(info['path'])}...")
+        info['label'].setStyleSheet("color: orange; font-size: 10px;")
+        
+        self.current_loader = RatingLoaderThread(
+            info['path'], 
+            info['table'],
+            self.current_index + 1,
+            len([f for f in self.files_info if f['path'] is not None])  # Только выбранные файлы
+        )
+        self.current_loader.progress.connect(self.total_progress_bar.setValue)
+        self.current_loader.file_progress.connect(self.update_file_progress)
         self.current_loader.status.connect(self.status_label.setText)
         self.current_loader.finished.connect(self.on_file_loaded)
         self.current_loader.start()
         
         self.loader_threads.append(self.current_loader)
-    
+
+    def update_file_progress(self, progress, filename):
+        """Обновление прогресса текущего файла"""
+        for info in self.files_info:
+            if info['path'] and os.path.basename(info['path']) == filename:
+                info['progress'].setValue(progress)
+                if progress == 100:
+                    info['label'].setText(f"✅ Загружено: {filename}")
+                    info['label'].setStyleSheet("color: green; font-size: 10px;")
+                break
+
     def on_file_loaded(self, success, msg):
+        """Обработка завершения загрузки одного файла"""
         if success:
-            self.status_label.setText(f"✓ {msg}")
+            info = self.files_info[self.current_index]
+            info['label'].setText(f"✅ ЗАГРУЖЕНО: {os.path.basename(info['path'])}")
+            info['label'].setStyleSheet("color: #4CAF50; font-size: 10px; font-weight: bold;")
+            
             self.current_index += 1
             self.load_next_file()
         else:
-            QMessageBox.critical(self, "Ошибка", msg)
+            QMessageBox.critical(self, "Ошибка загрузки", 
+                               f"Ошибка при загрузке {self.files_info[self.current_index]['table']}:\n{msg}")
             self.reject()
     
     def reject(self):
-        # Останавливаем все загрузки
+        """Отмена загрузки"""
+        # Останавливаем все потоки
         for thread in self.loader_threads:
-            if thread.isRunning():
+            if hasattr(thread, 'isRunning') and thread.isRunning():
                 thread.stop()
                 thread.quit()
                 thread.wait()
         super().reject()
+
+    def check_loaded_ratings(self):
+        """Проверка загруженных рейтингов"""
+        try:
+            r_list_m_count = R_list_m.select().count()
+            r_list_d_count = R_list_d.select().count()
+            r1_list_m_count = R1_list_m.select().count()
+            r1_list_d_count = R1_list_d.select().count()
+            
+            print(f"Текущий рейтинг (мужчины): {r_list_m_count} записей")
+            print(f"Текущий рейтинг (женщины): {r_list_d_count} записей")
+            print(f"Январский рейтинг (мужчины): {r1_list_m_count} записей")
+            print(f"Январский рейтинг (женщины): {r1_list_d_count} записей")
+            
+            return {
+                'current_m': r_list_m_count,
+                'current_w': r_list_d_count,
+                'january_m': r1_list_m_count,
+                'january_w': r1_list_d_count
+            }
+        except Exception as e:
+            print(f"Ошибка проверки: {e}")
+            return None
 
 def main():
     app = QApplication(sys.argv)

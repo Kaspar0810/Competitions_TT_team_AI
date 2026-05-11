@@ -2736,7 +2736,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось добавить участника: {str(e)}")
 
-    def delete_player_from_table(self):
+    def _delete_player_from_table(self):
         """Удаление выбранного участника из таблицы"""
         selection = self.table_view.selectedIndexes()
         if not selection:
@@ -2764,6 +2764,69 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 QMessageBox.critical(self, "Ошибка", f"Ошибка: {str(e)}")
 
+    def delete_player_from_table(self):
+        """Удаление выбранного участника с записью в таблицу Delete_player"""
+        selection = self.table_view.selectedIndexes()
+        if not selection:
+            QMessageBox.warning(self, "Ошибка", "Выберите участника для удаления")
+            return
+        
+        row = selection[0].row()
+        
+        # Получаем ID участника из модели
+        player_id = self.players_model.get_id(row)
+        if not player_id:
+            return
+        
+        # Получаем данные игрока для подтверждения
+        fio = self.players_model.get_fio(row)
+        
+        # Получаем полные данные игрока из таблицы Player
+        try:
+            player = Player.get_by_id(player_id)
+            
+            reply = QMessageBox.question(self, "Подтверждение", 
+                                        f"Удалить участника {fio}?\n\n"
+                                        f"Игрок будет перемещен в архив удаленных.\n"
+                                        f"Вы сможете восстановить его позже.",
+                                        QMessageBox.Yes | QMessageBox.No)
+            
+            if reply == QMessageBox.Yes:
+                # Создаем запись в таблице Delete_player
+                Delete_player.create(
+                    player=player.player,
+                    bday=player.bday,
+                    rank=player.rank,
+                    city=player.city,
+                    region=player.region,
+                    razryad=player.razryad,
+                    coach_id=player.coach_id,
+                    full_name=player.fio,
+                    title_id=self.current_title_id,
+                    pay_rejting=player.pay_rejting or "",
+                    comment=player.comment or "",
+                    patronymic_id=player.patronymic_id.id if player.patronymic_id else None,
+                    sex=player.sex
+                )
+                
+                # Удаляем игрока из таблицы Player
+                player.delete_instance()
+                
+                # Обновляем таблицу
+                self.load_participants_for_title()
+                
+                # Обновляем количество игроков
+                self.update_table_header()
+                
+                # Показываем сообщение с возможностью восстановления
+                QMessageBox.information(self, "Успех", 
+                                    f"Участник {fio} удален.\n"
+                                    f"Данные сохранены в архиве.\n"
+                                    f"Для восстановления используйте фильтр 'Удаленные'.")
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Ошибка при удалении: {str(e)}")
+
     def update_table_header(self):
         """Обновление заголовка таблицы с количеством игроков"""
         if self.current_title_id:
@@ -2772,6 +2835,17 @@ class MainWindow(QMainWindow):
                 sex_text = "Женщины" if self.current_sex == "woman" else "Мужчины"
                 count = self.players_model.rowCount()
                 age_text = f" ({title.vozrast})" if title.vozrast else ""
+
+                age_text = f" ({title.vozrast})" if title.vozrast else ""
+                self.table_header.setText(f"🗑️ УДАЛЕННЫЕ: {title.name}{age_text} - {sex_text} ({count} чел.)")
+                self.table_header.setStyleSheet("""
+                    background-color: #f44336;
+                    color: white;
+                    padding: 6px;
+                    font-weight: bold;
+                    font-size: 11px;
+                    border-radius: 3px;
+                """)
                 
                 # Подсчитываем количество основных и предварительных заявок
                 main_count = Player.select().where(
@@ -2785,7 +2859,7 @@ class MainWindow(QMainWindow):
                 ).count()
                 
                 self.table_header.setText(f"👥 {title.name}{age_text} - {sex_text} ({count} чел.) | Основные: {main_count} | Предварительные: {pre_count}")
-            
+             
     def search_players(self):
         """Поиск участников по ФИО, городу, региону или тренеру"""
         if not self.current_title_id:
@@ -3372,7 +3446,18 @@ class MainWindow(QMainWindow):
         if not self.current_title_id:
             return
         
+        # Сбрасываем фильтр удаленных
+        if hasattr(self, 'btn_filter_deleted') and self.btn_filter_deleted.isChecked():
+            self.btn_filter_deleted.setChecked(False)
+            self.btn_filter_deleted.setText("📋 Показать удаленных")
+        
+        # Сбрасываем фильтр предварительных заявок
+        if hasattr(self, 'btn_filter_preliminary') and self.btn_filter_preliminary.isChecked():
+            self.btn_filter_preliminary.setChecked(False)
+        
+        # Загружаем активных участников
         self.load_participants_for_title()
+        
         QMessageBox.information(self, "Сброс фильтров", "Все фильтры сброшены")
 
     def on_fio_text_changed(self, text):
@@ -4793,8 +4878,15 @@ class MainWindow(QMainWindow):
         if not self.current_title_id:
             return
         
-        self.btn_filter_preliminary.setChecked(False)
-        self.load_participants_for_title()
+        if hasattr(self, 'btn_filter_preliminary'):
+            self.btn_filter_preliminary.setChecked(False)
+        
+        # Проверяем, не включен ли фильтр удаленных
+        if hasattr(self, 'btn_filter_deleted') and self.btn_filter_deleted.isChecked():
+            self.load_deleted_players()
+        else:
+            self.load_participants_for_title()
+        
         QMessageBox.information(self, "Сброс фильтра", "Показаны все заявки")
 
     def confirm_selected_applications(self):
@@ -5561,9 +5653,257 @@ class MainWindow(QMainWindow):
         btn_reset_application.clicked.connect(self.reset_application_filter)
         self.dynamic_filters_layout.addWidget(btn_reset_application)
 
+        # Разделитель
+        line4 = QFrame()
+        line4.setFrameShape(QFrame.HLine)
+        line4.setFrameShadow(QFrame.Sunken)
+        line4.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
+        self.dynamic_filters_layout.addWidget(line4)
+        
+        # Заголовок архива
+        filter_title_archive = QLabel("🗑️ Архив")
+        filter_title_archive.setStyleSheet("font-weight: bold; font-size: 12px; margin-top: 5px;")
+        self.dynamic_filters_layout.addWidget(filter_title_archive)
+        
+        # Горизонтальные кнопки для работы с архивом
+        archive_layout = QHBoxLayout()
+        archive_layout.setSpacing(10)
+        
+        # Кнопка фильтрации удаленных игроков
+        self.btn_filter_deleted = QPushButton("📋 Показать удаленных")
+        self.btn_filter_deleted.setCheckable(True)
+        self.btn_filter_deleted.setStyleSheet("""
+            QPushButton {
+                background-color: #9C27B0;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 8px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #7B1FA2; }
+            QPushButton:checked { background-color: #6A1B9A; }
+        """)
+        self.btn_filter_deleted.clicked.connect(self.toggle_deleted_filter)
+        archive_layout.addWidget(self.btn_filter_deleted)
+        
+        # Кнопка восстановления выбранного игрока
+        btn_restore = QPushButton("🔄 Восстановить выбранного")
+        btn_restore.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 8px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #45a049; }
+        """)
+        btn_restore.clicked.connect(self.restore_deleted_player)
+        archive_layout.addWidget(btn_restore)
+        
+        self.dynamic_filters_layout.addLayout(archive_layout)
+        
+        # Кнопка показа всех игроков
+        btn_show_all = QPushButton("👥 Показать всех (активные)")
+        btn_show_all.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 8px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #1976D2; }
+        """)
+        btn_show_all.clicked.connect(self.show_all_players)
+        self.dynamic_filters_layout.addWidget(btn_show_all)
+
     def search_players_dialog(self):
         """Поиск участников - вызов диалога"""
         self.search_players()  # вызываем существующий метод
+
+    def load_deleted_players(self):
+        """Загрузка удаленных участников для текущего соревнования"""
+        if not self.current_title_id:
+            self.players_model.setData([])
+            self.table_header.setText("👥 Список удаленных участников - выберите соревнование")
+            return
+        
+        try:
+            # Получаем удаленных игроков для текущего соревнования
+            query = Delete_player.select().where(Delete_player.title_id == self.current_title_id)
+            
+            # Применяем фильтр по полу
+            if self.current_sex == "woman":
+                query = query.where(Delete_player.sex == "woman")
+            elif self.current_sex == "man":
+                query = query.where(Delete_player.sex == "man")
+            
+            # Сортируем
+            query = query.order_by(Delete_player.rank.desc())
+            
+            participants_data = []
+            for player in query:
+                # Получаем тренера
+                coach_name = ""
+                if player.coach_id:
+                    coach = Coach.get_or_none(Coach.id == player.coach_id.id if hasattr(player.coach_id, 'id') else player.coach_id)
+                    if coach:
+                        coach_name = coach.coach
+                
+                participants_data.append({
+                    'id': player.id,
+                    'fio': player.full_name or player.player or "",
+                    'birth_date': player.bday,
+                    'rank': player.rank or 0,
+                    'city': player.city or "",
+                    'region': player.region or "",
+                    'razryad': player.razryad or "",
+                    'coach': coach_name,
+                    'sex': player.sex or "",
+                    'is_deleted': True  # Маркер для удаленного игрока
+                })
+            
+            self.players_model.setData(participants_data)
+            self.update_table_header_deleted()
+            
+        except Exception as e:
+            print(f"Ошибка загрузки удаленных участников: {e}")
+            self.players_model.setData([])
+
+    def update_table_header_deleted(self):
+        """Обновление заголовка таблицы для удаленных игроков"""
+        if self.current_title_id:
+            title = Title.get_or_none(Title.id == self.current_title_id)
+            if title:
+                sex_text = "Женщины" if self.current_sex == "woman" else "Мужчины"
+                count = self.players_model.rowCount()
+                age_text = f" ({title.vozrast})" if title.vozrast else ""
+                self.table_header.setText(f"🗑️ УДАЛЕННЫЕ: {title.name}{age_text} - {sex_text} ({count} чел.)")
+                self.table_header.setStyleSheet("""
+                    background-color: #f44336;
+                    color: white;
+                    padding: 6px;
+                    font-weight: bold;
+                    font-size: 11px;
+                    border-radius: 3px;
+                """)
+
+    def restore_deleted_player(self):
+        """Восстановление выбранного удаленного игрока"""
+        selection = self.table_view.selectedIndexes()
+        if not selection:
+            QMessageBox.warning(self, "Ошибка", "Выберите участника для восстановления")
+            return
+        
+        row = selection[0].row()
+        player_id = self.players_model.get_id(row)
+        if not player_id:
+            return
+        
+        fio = self.players_model.get_fio(row)
+        
+        reply = QMessageBox.question(self, "Подтверждение", 
+                                    f"Восстановить участника {fio}?\n\n"
+                                    f"Игрок будет возвращен в основной список.",
+                                    QMessageBox.Yes | QMessageBox.No)
+        
+        if reply == QMessageBox.Yes:
+            try:
+                # Получаем данные из таблицы Delete_player
+                deleted = Delete_player.get_by_id(player_id)
+                
+                # Восстанавливаем игрока в таблицу Player
+                Player.create(
+                    player=deleted.player,
+                    fio=deleted.full_name,
+                    bday=deleted.bday,
+                    rank=deleted.rank,
+                    city=deleted.city,
+                    region=deleted.region,
+                    razryad=deleted.razryad,
+                    coach_id=deleted.coach_id.id if deleted.coach_id else None,
+                    title_id=self.current_title_id,
+                    sex=deleted.sex,
+                    total_game_player=0,
+                    total_win_game=0,
+                    coefficient_victories=0.0,
+                    application="предварительная",
+                    comment=deleted.comment,
+                    pay_rejting=deleted.pay_rejting,
+                    patronymic_id=deleted.patronymic_id if deleted.patronymic_id else None,
+                    mesto=0
+                )
+                
+                # Удаляем запись из архива
+                deleted.delete_instance()
+                
+                # Обновляем таблицу в зависимости от текущего режима
+                if self.btn_filter_deleted.isChecked():
+                    self.load_deleted_players()
+                else:
+                    self.load_participants_for_title()
+                
+                QMessageBox.information(self, "Успех", f"Участник {fio} восстановлен")
+                
+            except Exception as e:
+                QMessageBox.critical(self, "Ошибка", f"Ошибка при восстановлении: {str(e)}")
+
+    def toggle_deleted_filter(self):
+        """Переключение фильтра удаленных игроков"""
+        if self.btn_filter_deleted.isChecked():
+            # Показываем удаленных игроков
+            self.load_deleted_players()
+            # Меняем стиль кнопок в левой панели
+            self.btn_filter_deleted.setText("📋 Скрыть удаленных")
+            # Отключаем другие фильтры сортировки
+            QMessageBox.information(self, "Режим архива", 
+                                "Показаны удаленные игроки.\n"
+                                "Используйте кнопку 'Восстановить' для возврата игрока.")
+        else:
+            # Показываем активных игроков
+            self.load_participants_for_title()
+            self.btn_filter_deleted.setText("📋 Показать удаленных")
+            # Восстанавливаем цвет заголовка
+            self.table_header.setStyleSheet("""
+                background-color: #2196F3;
+                color: white;
+                padding: 6px;
+                font-weight: bold;
+                font-size: 11px;
+                border-radius: 3px;
+            """)
+
+    def show_all_players(self):
+        """Показать всех активных игроков (сброс фильтров)"""
+        # Сбрасываем фильтр удаленных
+        if self.btn_filter_deleted.isChecked():
+            self.btn_filter_deleted.setChecked(False)
+            self.btn_filter_deleted.setText("📋 Показать удаленных")
+        
+        # Сбрасываем остальные фильтры
+        self.reset_filters()
+        
+        # Загружаем активных участников
+        self.load_participants_for_title()
+        
+        # Восстанавливаем цвет заголовка
+        self.table_header.setStyleSheet("""
+            background-color: #2196F3;
+            color: white;
+            padding: 6px;
+            font-weight: bold;
+            font-size: 11px;
+            border-radius: 3px;
+        """)
+        
+        QMessageBox.information(self, "Сброс фильтров", "Показаны все активные участники")
 # =================================
 class RatingLoaderThread(QThread):
     progress = pyqtSignal(int)

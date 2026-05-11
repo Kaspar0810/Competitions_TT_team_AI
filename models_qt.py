@@ -84,7 +84,14 @@ class PlayersTableModel(QAbstractTableModel):
                     return QColor(240, 240, 240)  # Светло-серый
                 elif application == "основная":
                     return QColor(255, 255, 255)  # Белый
-        
+                
+        # Цвет фона для удаленных игроков
+        if role == Qt.BackgroundRole:
+            if row < len(self._data):
+                is_deleted = self._data[row].get('is_deleted', False)
+                if is_deleted:
+                    return QColor(255, 220, 220)  # Светло-красный для удаленных
+                
         # Выравнивание номера строки по центру
         if role == Qt.TextAlignmentRole and col == 0:
             return Qt.AlignCenter

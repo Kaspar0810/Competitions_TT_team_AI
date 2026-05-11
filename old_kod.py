@@ -14,6 +14,8 @@ from PyQt5.QtWidgets import QGridLayout  # Добавьте в импорт
 from PyQt5.QtCore import Qt, QDate, QSize, pyqtSignal, QThread
 from PyQt5.QtGui import QFont, QColor
 from PyQt5.QtCore import QTimer
+from PyQt5.QtWidgets import QCompleter
+from PyQt5.QtCore import QStringListModel
 
 
 from models import connect_db, close_db
@@ -52,13 +54,16 @@ class MainWindow(QMainWindow):
         self.load_combo_data()
         self.load_referees_list()
         
-        # Контекст левой панели с действиями для каждой вкладки
         self.tab_context = {
-             0: {"title": "Титул", "description": "Управление информацией о соревновании",
-                "buttons": ["📋 Создать новое"]},  # Убрали кнопки Сохранить и Очистить
+            0: {"title": "Титул", "description": "Управление информацией о соревновании",
+                "buttons": ["📋 Создать новое"]},
             1: {"title": "Участники", "description": "Управление списком участников",
-                "buttons": ["➕ Добавить", "✏️ Редактировать", "🗑️ Удалить", "🔍 Поиск", "📤 Экспорт"],
-                "filters": ["Сортировка", "Фильтры"]},
+                "buttons": [
+                    ["➕ Добавить", "✏️ Редактировать"],
+                    ["🗑️ Удалить", "🔍 Поиск"],
+                    ["📤 Экспорт", "🗑️ Очистить"]
+                ],
+                "filters": ["Сортировка", "Фильтры", "Заявки"]},  # Добавлена секция заявок
             2: {"title": "Команды", "description": "Управление командами",
                 "buttons": ["➕ Добавить", "✏️ Редактировать", "🗑️ Удалить", "⭐ Рейтинг"]},
             3: {"title": "Пары", "description": "Формирование пар",
@@ -71,7 +76,7 @@ class MainWindow(QMainWindow):
                 "buttons": ["🔄 Обновить", "🏆 Топ-10", "📊 Расчёт"]},
             7: {"title": "Дополнительно", "description": "Дополнительные настройки",
                 "buttons": ["📝 Заметки", "❓ Справка", "ℹ️ О программе"]},
-        }
+            }
         
         self.current_competition_buttons = []
         self.current_tab_index = 0
@@ -88,9 +93,6 @@ class MainWindow(QMainWindow):
         
         # Обновляем активность вкладок (по умолчанию все отключены)
         self.update_tabs_enabled()
-        
-        # # Загрузка списка соревнований
-        # self.load_titles_list()
 
     def showEvent(self, event):
         """Событие при первом отображении окна"""
@@ -547,7 +549,7 @@ class MainWindow(QMainWindow):
         self.list_widget = QListWidget()
         self.list_widget.setStyleSheet("""
             QListWidget {
-                font-size: 10px;
+                font-size: 12px;
                 background-color: #fafafa;
                 border: 1px solid #ddd;
                 border-radius: 3px;
@@ -582,7 +584,7 @@ class MainWindow(QMainWindow):
         self.search_results_list = QListWidget()
         self.search_results_list.setStyleSheet("""
             QListWidget {
-                font-size: 10px;
+                font-size: 12px;
                 background-color: #fafafa;
                 border: 1px solid #ddd;
                 border-radius: 3px;
@@ -675,7 +677,11 @@ class MainWindow(QMainWindow):
 
         # Растягиваем последнюю колонку
         self.table_view.horizontalHeader().setStretchLastSection(True)
-                
+
+        # В init_ui, после создания table_view:
+        self.table_view.setSelectionMode(QTableView.ExtendedSelection)  # Множественное выделение
+        self.table_view.setSelectionBehavior(QTableView.SelectRows)  # Выделение строк
+
         bottom_layout.addWidget(self.table_view)
         
         # Добавляем виджеты в правую область
@@ -705,9 +711,13 @@ class MainWindow(QMainWindow):
         
         # Загружаем список соревнований для вкладки Титул
         self.load_titles_list()
+
+        # Загружаем последнее соревнование
+        self.load_last_competition()
+        
         # В конце метода, после создания всех виджетов, показываем фильтры
-        self.filters_widget.setVisible(True)
-#==================================
+        self.filters_widget.setVisible(True)     
+
     def create_category_buttons(self):
         """Создание кнопок для переключения между категориями участников (только man/woman)"""
         # Очищаем существующие кнопки
@@ -1322,8 +1332,20 @@ class MainWindow(QMainWindow):
         
         return tab_widget
 
+    def on_razryad_changed(self, index):
+        """Обработка изменения выбора в поле Разряд"""
+        self.coach_edit.setFocus()
+
+    def on_region_changed(self, index):
+        """Обработка изменения выбора в поле Регион"""
+        pass  # Можно оставить пустым
+
+    def on_sex_changed(self, index):
+        """Обработка изменения выбора в поле Пол"""
+        pass  # Можно оставить пустым 
+
     def create_participants_tab(self):
-        """Вкладка участников - с поиском по спискам"""
+        """Вкладка участников - с поиском по спискам и автодополнением"""
         tab_widget = QWidget()
         main_layout = QVBoxLayout(tab_widget)
         main_layout.setSpacing(3)
@@ -1346,123 +1368,138 @@ class MainWindow(QMainWindow):
         """
         
         form_widget = QWidget()
-        form_widget.setMaximumHeight(120)
+        form_widget.setMaximumHeight(350)
         form_layout = QGridLayout(form_widget)
         form_layout.setSpacing(4)
         form_layout.setContentsMargins(4, 4, 4, 4)
         
-        # Ряд 1: ФИО (только для поиска)
+        # Ряд 1: ФИО
         label_fio = QLabel("ФИО:")
-        label_fio.setStyleSheet("font-weight: bold; font-size: 12px;")
+        label_fio.setStyleSheet("font-weight: bold; font-size: 10px;")
         form_layout.addWidget(label_fio, 0, 0)
+        
         self.fio_edit = QLineEdit()
         self.fio_edit.setPlaceholderText("Введите фамилию для поиска...")
         self.fio_edit.setStyleSheet(input_style)
-        self.fio_edit.setEnabled(True)  # Убеждаемся, что поле активно
         self.fio_edit.textChanged.connect(self.on_fio_text_changed)
+        self.fio_edit.returnPressed.connect(self.on_fio_enter_pressed)
         form_layout.addWidget(self.fio_edit, 0, 1, 1, 9)
-# =========================================        
-        # Контейнер для поля ФИО и списка предложений
-        fio_container = QWidget()
-        fio_container_layout = QVBoxLayout(fio_container)
-        fio_container_layout.setSpacing(2)
-        fio_container_layout.setContentsMargins(0, 0, 0, 0)
         
-        self.fio_edit = QLineEdit()
-        self.fio_edit.setPlaceholderText("Введите фамилию для поиска...")
-        self.fio_edit.setStyleSheet(input_style)
-        self.fio_edit.textChanged.connect(self.on_fio_text_changed)
-        fio_container_layout.addWidget(self.fio_edit)
-        
-        # Список предложений из r_list
-        self.suggestions_list = QListWidget()
-        self.suggestions_list.setVisible(False)
-        self.suggestions_list.setMaximumHeight(120)
-        self.suggestions_list.setStyleSheet(input_style)
-        self.suggestions_list.itemClicked.connect(self.on_suggestion_selected)
-        fio_container_layout.addWidget(self.suggestions_list)
-        
-        form_layout.addWidget(fio_container, 0, 1, 1, 9)
-        
-        # Остальные поля
+        # Ряд 2: Отчество (с автодополнением)
         label_patronymic = QLabel("Отчество:")
-        label_patronymic.setStyleSheet("font-weight: bold; font-size: 12px;")
+        label_patronymic.setStyleSheet("font-weight: bold; font-size: 10px;")
         form_layout.addWidget(label_patronymic, 1, 0)
+        
         self.patronymic_edit = QLineEdit()
         self.patronymic_edit.setPlaceholderText("Иванович")
         self.patronymic_edit.setStyleSheet(input_style)
+        self.patronymic_edit.textChanged.connect(self.on_patronymic_text_changed)
+        self.patronymic_edit.returnPressed.connect(self.on_patronymic_enter_pressed)
         form_layout.addWidget(self.patronymic_edit, 1, 1, 1, 3)
         
-        label_birth = QLabel("Дата рожд.:")
-        label_birth.setStyleSheet("font-weight: bold; font-size: 12px;")
-        form_layout.addWidget(label_birth, 1, 4)
-        self.birth_date = QDateEdit()
-        self.birth_date.setDate(QDate.currentDate().addYears(-18))
-        self.birth_date.setCalendarPopup(True)
-        self.birth_date.setDisplayFormat("dd.MM.yyyy")
-        self.birth_date.setStyleSheet(input_style)
-        form_layout.addWidget(self.birth_date, 1, 5, 1, 2)
+        # Создаем QCompleter для отчества
+        self.patronymic_completer = QCompleter()
+        self.patronymic_completer.setCaseSensitivity(Qt.CaseInsensitive)
+        self.patronymic_completer.setFilterMode(Qt.MatchStartsWith)
+        self.patronymic_completer.setCompletionMode(QCompleter.PopupCompletion)
+        self.patronymic_edit.setCompleter(self.patronymic_completer)
         
-        label_rank = QLabel("Рейтинг:")
-        label_rank.setStyleSheet("font-weight: bold; font-size: 12px;")
+        # Ряд 3: Дата рождения
+        label_birth = QLabel("Дата рожд.:")
+        label_birth.setStyleSheet("font-weight: bold; font-size: 10px;")
+        form_layout.addWidget(label_birth, 1, 4)
+        
+        self.birth_date_edit = QLineEdit()
+        self.birth_date_edit.setPlaceholderText("ДД.ММ.ГГГГ")
+        self.birth_date_edit.setInputMask("99.99.9999")
+        self.birth_date_edit.setStyleSheet(input_style)
+        self.birth_date_edit.returnPressed.connect(self.on_birth_date_enter_pressed)
+        form_layout.addWidget(self.birth_date_edit, 1, 5, 1, 2)
+        
+        # Рейтинг
+        label_rank = QLabel("Рейт.:")
+        label_rank.setStyleSheet("font-weight: bold; font-size: 10px;")
         form_layout.addWidget(label_rank, 1, 7)
         self.rank_edit = QLineEdit()
-        self.rank_edit.setPlaceholderText("0")
+        self.rank_edit.setText("0")
         self.rank_edit.setMaximumWidth(60)
         self.rank_edit.setStyleSheet(input_style)
+        self.rank_edit.setReadOnly(True)
         form_layout.addWidget(self.rank_edit, 1, 8)
         
-        # Ряд 2
-        razryad_list = ["б/р", "3-юн", "2-юн", "1-юн", 
-                                    "3-р", "2-р", "1-р", "КМС", "МС", "МСМК"]
+        # Ряд 4: Город
         label_city = QLabel("Город:")
-        label_city.setStyleSheet("font-weight: bold; font-size: 12px;")
-        form_layout.addWidget(label_city, 2, 0)
+        label_city.setStyleSheet("font-weight: bold; font-size: 10px;")
+        form_layout.addWidget(label_city, 3, 0)
+        
         self.city_edit = QLineEdit()
         self.city_edit.setPlaceholderText("Москва")
         self.city_edit.setStyleSheet(input_style)
-        form_layout.addWidget(self.city_edit, 2, 1, 1, 4)
+        self.city_edit.textChanged.connect(self.on_city_text_changed)
+        self.city_edit.returnPressed.connect(self.on_city_enter_pressed)
+        form_layout.addWidget(self.city_edit, 3, 1, 1, 4)
         
+        # Создаем QCompleter для города
+        self.city_completer = QCompleter()
+        self.city_completer.setCaseSensitivity(Qt.CaseInsensitive)
+        self.city_completer.setFilterMode(Qt.MatchStartsWith)
+        self.city_completer.setCompletionMode(QCompleter.PopupCompletion)
+        self.city_edit.setCompleter(self.city_completer)
+        
+        # Регион (ComboBox)
         label_region = QLabel("Регион:")
-        label_region.setStyleSheet("font-weight: bold; font-size: 12px;")
-        form_layout.addWidget(label_region, 2, 5)
-        self.region_edit = QLineEdit()
-        self.region_edit.setPlaceholderText("Московская область")
-        self.region_edit.setStyleSheet(input_style)
-        form_layout.addWidget(self.region_edit, 2, 6, 1, 4)
+        label_region.setStyleSheet("font-weight: bold; font-size: 10px;")
+        form_layout.addWidget(label_region, 3, 5)
         
-        # Ряд 3
+        self.region_combo = QComboBox()
+        self.region_combo.setStyleSheet(input_style)
+        self.load_regions()
+        self.region_combo.currentIndexChanged.connect(self.on_region_changed)
+        form_layout.addWidget(self.region_combo, 3, 6, 1, 4)
+        
+        # Ряд 5: Разряд, Тренеры, Пол
+        razryad_list = ["б/р", "3-юн", "2-юн", "1-юн", "3-р", "2-р", "1-р", "КМС", "МС", "МСМК"]
         label_razryad = QLabel("Разряд:")
-        label_razryad.setStyleSheet("font-weight: bold; font-size: 12px;")
-        form_layout.addWidget(label_razryad, 3, 0)
+        label_razryad.setStyleSheet("font-weight: bold; font-size: 10px;")
+        form_layout.addWidget(label_razryad, 5, 0)
         self.razryad_combo = QComboBox()
         self.razryad_combo.addItems(razryad_list)
         self.razryad_combo.setStyleSheet(input_style)
-        self.razryad_combo.setMaximumWidth(100)
-        form_layout.addWidget(self.razryad_combo, 3, 1)
+        self.razryad_combo.currentIndexChanged.connect(self.on_razryad_changed)
+        form_layout.addWidget(self.razryad_combo, 5, 1)
         
-        label_coach = QLabel("Тренеры:")
-        label_coach.setStyleSheet("font-weight: bold; font-size: 12px;")
-        form_layout.addWidget(label_coach, 3, 2)
+        label_coach = QLabel("Тренер:")
+        label_coach.setStyleSheet("font-weight: bold; font-size: 10px;")
+        form_layout.addWidget(label_coach, 5, 2)
+        
         self.coach_edit = QLineEdit()
-        self.coach_edit.setPlaceholderText("Иванов И.И., Петров П.П.")
+        self.coach_edit.setPlaceholderText("Иванов И.И.")
         self.coach_edit.setStyleSheet(input_style)
-        form_layout.addWidget(self.coach_edit, 3, 3, 1, 5)
+        self.coach_edit.textChanged.connect(self.on_coach_text_changed)
+        self.coach_edit.returnPressed.connect(self.on_coach_enter_pressed)
+        form_layout.addWidget(self.coach_edit, 5, 3, 1, 5)
+        
+        # Создаем QCompleter для тренера
+        self.coach_completer = QCompleter()
+        self.coach_completer.setCaseSensitivity(Qt.CaseInsensitive)
+        self.coach_completer.setFilterMode(Qt.MatchStartsWith)
+        self.coach_completer.setCompletionMode(QCompleter.PopupCompletion)
+        self.coach_edit.setCompleter(self.coach_completer)
         
         label_sex = QLabel("Пол:")
-        label_sex.setStyleSheet("font-weight: bold; font-size: 12px;")
-        form_layout.addWidget(label_sex, 3, 8)
+        label_sex.setStyleSheet("font-weight: bold; font-size: 10px;")
+        form_layout.addWidget(label_sex, 5, 8)
         self.sex_combo = QComboBox()
         self.sex_combo.addItems(["Мужской", "Женский"])
         self.sex_combo.setStyleSheet(input_style)
-        self.sex_combo.setMaximumWidth(80)
-        form_layout.addWidget(self.sex_combo, 3, 9)
+        self.sex_combo.currentIndexChanged.connect(self.on_sex_changed)
+        form_layout.addWidget(self.sex_combo, 5, 9)
         
         main_layout.addWidget(form_widget)
         main_layout.addStretch()
         
         return tab_widget
-
+  
     def create_teams_tab(self):
         """Вкладка команд"""
         tab_widget = QWidget()
@@ -1900,7 +1937,7 @@ class MainWindow(QMainWindow):
         self.main_secretary_combo.setCurrentIndex(0)
         self.referee_category_combo.setCurrentIndex(0)
         self.secretary_category_combo.setCurrentIndex(0)
-#===============
+
     def on_title_selected(self, item):
         """Выбор соревнования из списка"""
         title_id = item.data(Qt.UserRole)
@@ -1968,7 +2005,7 @@ class MainWindow(QMainWindow):
                         border-radius: 3px;
                     """)
                 QTimer.singleShot(2000, reset_label)
-#  ======================
+
     def on_tab_changed(self, index):
         """Смена вкладки"""
         self.current_tab_index = index
@@ -2033,7 +2070,7 @@ class MainWindow(QMainWindow):
                 self.load_results_for_title()
             else:
                 self.list_widget.clear()
-# ======================================================
+
     def format_age_to_u(self, vozrast):
         """Преобразование возраста в формат UXX"""
         if not vozrast:
@@ -2074,7 +2111,6 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Выберите участника для редактирования")
             return
         
-        # Получаем строку из модели (индекс строки в модели)
         row = selection[0].row()
         player_id = self.players_model.get_id(row)
         if not player_id:
@@ -2082,42 +2118,47 @@ class MainWindow(QMainWindow):
         
         try:
             player = Player.get_by_id(player_id)
-
-             # Получаем отчество
+            
+            self.fio_edit.setText(player.fio or player.player or "")
+            
             patronymic_text = ""
             if player.patronymic_id:
                 patronymic = Patronymic.get_or_none(Patronymic.id == player.patronymic_id)
                 if patronymic:
                     patronymic_text = patronymic.patronymic
-
-            self.fio_edit.setText(player.player or "")
-            self.patronymic_edit.setText(patronymic_text or "")
-            self.rank_edit.setText(str(player.rank) if player.rank else "")
+            self.patronymic_edit.setText(patronymic_text)
+            
+            self.rank_edit.setText(str(player.rank) if player.rank else "0")
             self.city_edit.setText(player.city or "")
-            self.region_edit.setText(player.region or "")
+            
+            # Устанавливаем регион в comboBox
+            if player.region:
+                index = self.region_combo.findText(player.region)
+                if index >= 0:
+                    self.region_combo.setCurrentIndex(index)
             
             # Устанавливаем разряд
-            index = self.razryad_combo.findText(player.razryad or "без разряда")
+            index = self.razryad_combo.findText(player.razryad or "б/р")
             if index >= 0:
                 self.razryad_combo.setCurrentIndex(index)
             
-            # Устанавливаем тренера
-            coach_name = ""
+            coach_text = ""
             if player.coach_id:
                 coach = Coach.get_or_none(Coach.id == player.coach_id)
                 if coach:
-                    coach_name = coach.coach
-            self.coach_edit.setText(coach_name)
+                    coach_text = coach.coach
+            self.coach_edit.setText(coach_text)
             
+            # Устанавливаем дату рождения
             if player.bday:
                 if isinstance(player.bday, date):
-                    self.birth_date.setDate(QDate(player.bday.year, player.bday.month, player.bday.day))
+                    self.birth_date_edit.setText(player.bday.strftime("%d.%m.%Y"))
             
-            sex_index = 0 if player.sex == "М" else 1
+            sex_index = 0 if player.sex == "man" else 1
             self.sex_combo.setCurrentIndex(sex_index)
             
             self.editing_player_id = player_id
-            QMessageBox.information(self, "Редактирование", f"Редактирование: {player.player}")
+            QMessageBox.information(self, "Редактирование", f"Редактирование: {player.fio}")
             
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка: {str(e)}")
@@ -2128,36 +2169,121 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Нет выбранного участника для редактирования")
             return
         
-        fio = self.fio_edit.text().strip()
-        if not fio:
+        fio_input = self.fio_edit.text().strip()
+        if not fio_input:
             QMessageBox.warning(self, "Ошибка", "Введите ФИО участника")
             return
         
+        city = self.city_edit.text().strip()
+        if not city:
+            QMessageBox.warning(self, "Ошибка", "Введите город участника")
+            return
+        
+        # Форматируем ФИО
+        player_name, full_name = self.format_player_name(fio_input)
+        fio_city = self.format_fio_city(fio_input, city)
+        
+        # Отображаем в поле ввода правильный формат
+        self.fio_edit.setText(full_name)
+        
+        patronymic_text = self.patronymic_edit.text().strip()
+        region = self.region_combo.currentText()
+        coach_text = self.coach_edit.text().strip()
+        rank_text = self.rank_edit.text().strip()
+        
+        if not region:
+            QMessageBox.warning(self, "Ошибка", "Введите регион участника")
+            return
+        
+        if not rank_text:
+            QMessageBox.warning(self, "Ошибка", "Введите рейтинг участника")
+            return
+        
         try:
-            # Получаем данные из формы
-            patronymic_id = self.patronymic_combo.currentData()
-            coach_id = self.coach_combo.currentData()
-            sex = "Ж" if self.sex_combo.currentText() == "Женский" else "М"
-            rank = int(self.rank_edit.text()) if self.rank_edit.text().isdigit() else 0
+            rank = int(rank_text)
+        except:
+            QMessageBox.warning(self, "Ошибка", "Рейтинг должен быть числом")
+            return
+        
+        birth_date = self.parse_birth_date(self.birth_date_edit.text())
+        if not birth_date:
+            QMessageBox.warning(self, "Ошибка", "Введите корректную дату рождения")
+            return
+        
+        # Получаем дату начала соревнования
+        title = Title.get_by_id(self.current_title_id)
+        competition_start_date = title.data_start
+        current_date = QDate.currentDate().toPyDate()
+        
+        # Проверяем возраст участника
+        age_check_result = self.check_player_age(birth_date, competition_start_date, title.vozrast)
+        
+        if age_check_result == "too_young":
+            QMessageBox.warning(self, "Ошибка", 
+                            f"Игроку нет 8 лет на дату начала соревнования ({competition_start_date.strftime('%d.%m.%Y')}).")
+            return
+        elif age_check_result == "too_old":
+            QMessageBox.warning(self, "Ошибка", 
+                            f"Игрок превышает возрастное ограничение ({title.vozrast}).")
+            return
+        
+        # Определяем статус заявки
+        if current_date == competition_start_date:
+            application_status = "основная"
+        else:
+            application_status = "предварительная"
+        
+        try:
+            sex = "woman" if self.sex_combo.currentText() == "Женский" else "man"
+            razryad = self.razryad_combo.currentText()
             
-            # Обновляем данные участника
+            # Преобразуем отчество в ID
+            patronymic_id = None
+            if patronymic_text and patronymic_text != "-":
+                patronymic, created = Patronymic.get_or_create(
+                    patronymic=patronymic_text,
+                    defaults={'sex': "w" if sex == "woman" else "m"}
+                )
+                patronymic_id = patronymic.id
+            
+            # Преобразуем тренера в ID
+            coach_id = None
+            if coach_text and coach_text != "-":
+                coach, created = Coach.get_or_create(coach=coach_text)
+                coach_id = coach.id
+            
+            # Обновляем данные участника в таблице Player
             update_data = {
-                'player': fio,
-                'patronymic_id': patronymic_id,
-                'bday': self.birth_date.date().toPyDate(),
+                'player': player_name,
+                'fio': full_name,
+                'fio_city': fio_city,
+                'bday': birth_date,
                 'rank': rank,
-                'city': self.city_edit.text().strip(),
-                'region': self.region_combo.currentText(),
-                'razryad': self.razryad_edit.text().strip(),
-                'coach_id': coach_id,
+                'city': city,
+                'region': region,
+                'razryad': razryad,
                 'sex': sex,
-                'fio': fio,
-                'fio_city': f"{fio} ({self.city_edit.text()})"
+                'application': application_status,
+                'patronymic_id': patronymic_id,
+                'coach_id': coach_id,
+                'mesto': 0
             }
             
-            # Обновляем в БД
             query = Player.update(**update_data).where(Player.id == self.editing_player_id)
             query.execute()
+            
+            # СИНХРОНИЗАЦИЯ С TABLICA Players_full
+            players_full_data = {
+                'player': player_name,
+                'bday': birth_date,
+                'city': city,
+                'region': region,
+                'razryad': razryad,
+                'coach_id': coach_id,
+                'patronymic_id': patronymic_id,
+                'sex': sex
+            }
+            self.sync_with_players_full(players_full_data)
             
             # Очищаем форму и сбрасываем ID редактирования
             self.clear_participant_form()
@@ -2283,7 +2409,7 @@ class MainWindow(QMainWindow):
                     
             except Exception as e:
                 QMessageBox.critical(self, "Ошибка", f"Ошибка поиска: {str(e)}")
-      
+     
     def update_left_panel_for_tab(self, tab_index):
         """Обновление левой панели в зависимости от вкладки"""
         for i in reversed(range(self.dynamic_filters_layout.count())):
@@ -2297,41 +2423,121 @@ class MainWindow(QMainWindow):
         self.action_title.setText(f"🔧 {context['title']}")
         self.action_description.setText(context['description'])
         
-        # Кнопки действий
-        for btn_text in context["buttons"]:
-            btn = QPushButton(btn_text)
-            btn.setMinimumHeight(32)
-            btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #4CAF50;
-                    color: white;
-                    border: none;
-                    border-radius: 4px;
-                    padding: 8px;
-                    font-size: 11px;
-                    font-weight: bold;
-                    text-align: left;
-                    padding-left: 12px;
-                }
-                QPushButton:hover { background-color: #45a049; }
-            """)
-            
-            if tab_index == 0:  # Титул
-                if btn_text == "📋 Создать новое":
-                    btn.clicked.connect(self.new_competition)
-            elif tab_index == 1:  # Участники
-                if btn_text == "➕ Добавить":
-                    btn.clicked.connect(self.add_player_from_form)
-                elif btn_text == "✏️ Редактировать":
-                    btn.clicked.connect(self.edit_player)
-                elif btn_text == "🗑️ Удалить":
-                    btn.clicked.connect(self.delete_player_from_table)
-                elif btn_text == "🔍 Поиск":
-                    btn.clicked.connect(self.search_players)
-                elif btn_text == "📤 Экспорт":
-                    btn.clicked.connect(self.export_players)
-            
-            self.dynamic_filters_layout.addWidget(btn)
+        buttons = context["buttons"]
+        
+        # Проверяем, является ли список кнопок двумерным (для рядов)
+        if buttons and isinstance(buttons[0], list):
+            # Создаем ряды кнопок
+            for row_buttons in buttons:
+                row_layout = QHBoxLayout()
+                row_layout.setSpacing(10)
+                
+                for btn_text in row_buttons:
+                    btn = QPushButton(btn_text)
+                    btn.setMinimumHeight(35)
+                    btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+                    btn.setStyleSheet("""
+                        QPushButton {
+                            background-color: #4CAF50;
+                            color: white;
+                            border: none;
+                            border-radius: 4px;
+                            padding: 8px;
+                            font-size: 11px;
+                            font-weight: bold;
+                        }
+                        QPushButton:hover { background-color: #45a049; }
+                    """)
+                    
+                    # Привязываем функции для вкладки Участники
+                    if tab_index == 1:
+                        if btn_text == "➕ Добавить":
+                            btn.clicked.connect(self.add_player_from_form)
+                        elif btn_text == "✏️ Редактировать":
+                            btn.clicked.connect(self.edit_player)
+                        elif btn_text == "🗑️ Удалить":
+                            btn.clicked.connect(self.delete_player_from_table)
+                        elif btn_text == "🔍 Поиск":
+                            btn.clicked.connect(self.search_players)
+                        elif btn_text == "📤 Экспорт":
+                            btn.clicked.connect(self.export_players)
+                        elif btn_text == "🗑️ Очистить":
+                            btn.clicked.connect(self.clear_player_form)
+                    
+                    row_layout.addWidget(btn)
+                
+                self.dynamic_filters_layout.addLayout(row_layout)
+        else:
+            # Обычное отображение (для других вкладок)
+            for btn_text in buttons:
+                btn = QPushButton(btn_text)
+                btn.setMinimumHeight(32)
+                btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: #4CAF50;
+                        color: white;
+                        border: none;
+                        border-radius: 4px;
+                        padding: 8px;
+                        font-size: 11px;
+                        font-weight: bold;
+                        text-align: left;
+                        padding-left: 12px;
+                    }
+                    QPushButton:hover { background-color: #45a049; }
+                """)
+                
+                if tab_index == 0:  # Титул
+                    if btn_text == "📋 Создать новое":
+                        btn.clicked.connect(self.new_competition)
+                elif tab_index == 2:  # Команды
+                    if btn_text == "➕ Добавить":
+                        btn.clicked.connect(self.add_team)
+                    elif btn_text == "✏️ Редактировать":
+                        btn.clicked.connect(self.edit_team)
+                    elif btn_text == "🗑️ Удалить":
+                        btn.clicked.connect(self.delete_team)
+                    elif btn_text == "⭐ Рейтинг":
+                        btn.clicked.connect(self.show_team_rating)
+                elif tab_index == 3:  # Пары
+                    if btn_text == "🎲 Сформировать":
+                        btn.clicked.connect(self.generate_pairs)
+                    elif btn_text == "🔄 Разбить":
+                        btn.clicked.connect(self.break_pairs)
+                    elif btn_text == "📊 Посев":
+                        btn.clicked.connect(self.seeding_pairs)
+                elif tab_index == 4:  # Система
+                    if btn_text == "⚙️ Настройки":
+                        btn.clicked.connect(self.system_settings)
+                    elif btn_text == "📐 Параметры":
+                        btn.clicked.connect(self.system_parameters)
+                    elif btn_text == "🔄 Сброс":
+                        btn.clicked.connect(self.system_reset)
+                elif tab_index == 5:  # Результаты
+                    if btn_text == "📥 Загрузить":
+                        btn.clicked.connect(self.load_results)
+                    elif btn_text == "📤 Экспорт":
+                        btn.clicked.connect(self.export_results)
+                    elif btn_text == "🗑️ Очистить":
+                        btn.clicked.connect(self.clear_results)
+                    elif btn_text == "🧮 Рассчитать":
+                        btn.clicked.connect(self.calculate_results)
+                elif tab_index == 6:  # Рейтинг
+                    if btn_text == "🔄 Обновить":
+                        btn.clicked.connect(self.update_rating)
+                    elif btn_text == "🏆 Топ-10":
+                        btn.clicked.connect(self.show_top10)
+                    elif btn_text == "📊 Расчёт":
+                        btn.clicked.connect(self.calculate_rating)
+                elif tab_index == 7:  # Дополнительно
+                    if btn_text == "📝 Заметки":
+                        btn.clicked.connect(self.show_notes)
+                    elif btn_text == "❓ Справка":
+                        btn.clicked.connect(self.show_help)
+                    elif btn_text == "ℹ️ О программе":
+                        btn.clicked.connect(self.about_dialog)
+                
+                self.dynamic_filters_layout.addWidget(btn)
         
         # Добавляем фильтры для вкладки Участники
         if tab_index == 1:
@@ -2342,12 +2548,20 @@ class MainWindow(QMainWindow):
             line.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
             self.dynamic_filters_layout.addWidget(line)
             
+            # Создаем контейнер для фильтров с горизонтальным расположением
+            filters_container = QWidget()
+            filters_layout = QVBoxLayout(filters_container)
+            filters_layout.setSpacing(8)
+            
             # Заголовок фильтров
             filter_title = QLabel("📊 Сортировка")
             filter_title.setStyleSheet("font-weight: bold; font-size: 12px; margin-top: 5px;")
-            self.dynamic_filters_layout.addWidget(filter_title)
+            filters_layout.addWidget(filter_title)
             
-            # Сортировка по алфавиту
+            # Строка с кнопками сортировки
+            sort_layout = QHBoxLayout()
+            sort_layout.setSpacing(10)
+            
             btn_sort_alpha = QPushButton("🔤 По алфавиту (А-Я)")
             btn_sort_alpha.setStyleSheet("""
                 QPushButton {
@@ -2357,15 +2571,13 @@ class MainWindow(QMainWindow):
                     border-radius: 4px;
                     padding: 6px;
                     font-size: 10px;
-                    text-align: left;
-                    padding-left: 10px;
+                    font-weight: bold;
                 }
                 QPushButton:hover { background-color: #F57C00; }
             """)
             btn_sort_alpha.clicked.connect(self.filter_by_alphabet)
-            self.dynamic_filters_layout.addWidget(btn_sort_alpha)
+            sort_layout.addWidget(btn_sort_alpha)
             
-            # Сортировка по рейтингу
             btn_sort_rating = QPushButton("📊 По убыванию рейтинга")
             btn_sort_rating.setStyleSheet("""
                 QPushButton {
@@ -2375,27 +2587,24 @@ class MainWindow(QMainWindow):
                     border-radius: 4px;
                     padding: 6px;
                     font-size: 10px;
-                    text-align: left;
-                    padding-left: 10px;
+                    font-weight: bold;
                 }
                 QPushButton:hover { background-color: #F57C00; }
             """)
             btn_sort_rating.clicked.connect(self.filter_by_rating)
-            self.dynamic_filters_layout.addWidget(btn_sort_rating)
+            sort_layout.addWidget(btn_sort_rating)
             
-            # Разделитель
-            line2 = QFrame()
-            line2.setFrameShape(QFrame.HLine)
-            line2.setFrameShadow(QFrame.Sunken)
-            line2.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
-            self.dynamic_filters_layout.addWidget(line2)
+            filters_layout.addLayout(sort_layout)
             
             # Заголовок фильтров
             filter_title2 = QLabel("🎯 Фильтры")
             filter_title2.setStyleSheet("font-weight: bold; font-size: 12px; margin-top: 5px;")
-            self.dynamic_filters_layout.addWidget(filter_title2)
+            filters_layout.addWidget(filter_title2)
             
-            # Фильтр по регионам
+            # Строка с кнопками фильтров
+            filter_layout = QHBoxLayout()
+            filter_layout.setSpacing(10)
+            
             btn_filter_region = QPushButton("🗺️ По регионам")
             btn_filter_region.setStyleSheet("""
                 QPushButton {
@@ -2405,15 +2614,13 @@ class MainWindow(QMainWindow):
                     border-radius: 4px;
                     padding: 6px;
                     font-size: 10px;
-                    text-align: left;
-                    padding-left: 10px;
+                    font-weight: bold;
                 }
                 QPushButton:hover { background-color: #7B1FA2; }
             """)
             btn_filter_region.clicked.connect(self.filter_by_region)
-            self.dynamic_filters_layout.addWidget(btn_filter_region)
+            filter_layout.addWidget(btn_filter_region)
             
-            # Фильтр по городам
             btn_filter_city = QPushButton("🏙️ По городам")
             btn_filter_city.setStyleSheet("""
                 QPushButton {
@@ -2423,15 +2630,13 @@ class MainWindow(QMainWindow):
                     border-radius: 4px;
                     padding: 6px;
                     font-size: 10px;
-                    text-align: left;
-                    padding-left: 10px;
+                    font-weight: bold;
                 }
                 QPushButton:hover { background-color: #7B1FA2; }
             """)
             btn_filter_city.clicked.connect(self.filter_by_city)
-            self.dynamic_filters_layout.addWidget(btn_filter_city)
+            filter_layout.addWidget(btn_filter_city)
             
-            # Фильтр по тренерам
             btn_filter_coach = QPushButton("👨‍🏫 По тренерам")
             btn_filter_coach.setStyleSheet("""
                 QPushButton {
@@ -2441,21 +2646,16 @@ class MainWindow(QMainWindow):
                     border-radius: 4px;
                     padding: 6px;
                     font-size: 10px;
-                    text-align: left;
-                    padding-left: 10px;
+                    font-weight: bold;
                 }
                 QPushButton:hover { background-color: #7B1FA2; }
             """)
             btn_filter_coach.clicked.connect(self.filter_by_coach)
-            self.dynamic_filters_layout.addWidget(btn_filter_coach)
+            filter_layout.addWidget(btn_filter_coach)
+            
+            filters_layout.addLayout(filter_layout)
             
             # Кнопка сброса фильтров
-            line3 = QFrame()
-            line3.setFrameShape(QFrame.HLine)
-            line3.setFrameShadow(QFrame.Sunken)
-            line3.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
-            self.dynamic_filters_layout.addWidget(line3)
-            
             btn_reset = QPushButton("🔄 Сбросить все фильтры")
             btn_reset.setStyleSheet("""
                 QPushButton {
@@ -2465,17 +2665,86 @@ class MainWindow(QMainWindow):
                     border-radius: 4px;
                     padding: 6px;
                     font-size: 10px;
-                    text-align: left;
-                    padding-left: 10px;
+                    font-weight: bold;
                 }
                 QPushButton:hover { background-color: #D32F2F; }
             """)
             btn_reset.clicked.connect(self.reset_filters)
-            self.dynamic_filters_layout.addWidget(btn_reset)
+            filters_layout.addWidget(btn_reset)
+            
+            self.dynamic_filters_layout.addWidget(filters_container)
 
-            # ===========
-            pass
-            # =============
+            # Разделитель перед кнопками заявок
+            line4 = QFrame()
+            line4.setFrameShape(QFrame.HLine)
+            line4.setFrameShadow(QFrame.Sunken)
+            line4.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
+            self.dynamic_filters_layout.addWidget(line4)
+            
+            # Заголовок секции заявок
+            filter_title3 = QLabel("📋 Управление заявками")
+            filter_title3.setStyleSheet("font-weight: bold; font-size: 12px; margin-top: 5px;")
+            self.dynamic_filters_layout.addWidget(filter_title3)
+            
+            # Горизонтальные кнопки для фильтрации и подтверждения заявок
+            application_layout = QHBoxLayout()
+            application_layout.setSpacing(10)
+            
+            # Кнопка фильтрации предварительных заявок
+            self.btn_filter_preliminary = QPushButton("📝 Предварительные")
+            self.btn_filter_preliminary.setCheckable(True)
+            self.btn_filter_preliminary.setStyleSheet("""
+                QPushButton {
+                    background-color: #FF9800;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 6px;
+                    font-size: 10px;
+                    font-weight: bold;
+                }
+                QPushButton:hover { background-color: #F57C00; }
+                QPushButton:checked { background-color: #E65100; }
+            """)
+            self.btn_filter_preliminary.clicked.connect(self.filter_preliminary_applications)
+            application_layout.addWidget(self.btn_filter_preliminary)
+            
+            # Кнопка подтверждения выбранных заявок
+            btn_confirm = QPushButton("✅ Подтвердить выбранные")
+            btn_confirm.setStyleSheet("""
+                QPushButton {
+                    background-color: #4CAF50;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 6px;
+                    font-size: 10px;
+                    font-weight: bold;
+                }
+                QPushButton:hover { background-color: #45a049; }
+            """)
+            btn_confirm.clicked.connect(self.confirm_selected_applications)
+            application_layout.addWidget(btn_confirm)
+            
+            self.dynamic_filters_layout.addLayout(application_layout)
+            
+            # Кнопка сброса фильтра заявок
+            btn_reset_application = QPushButton("🔄 Показать все заявки")
+            btn_reset_application.setStyleSheet("""
+                QPushButton {
+                    background-color: #2196F3;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 6px;
+                    font-size: 10px;
+                    font-weight: bold;
+                }
+                QPushButton:hover { background-color: #1976D2; }
+            """)
+            btn_reset_application.clicked.connect(self.reset_application_filter)
+            self.dynamic_filters_layout.addWidget(btn_reset_application)
+        
         self.dynamic_filters_layout.addStretch()
 
     def add_player_from_form(self):
@@ -2483,93 +2752,188 @@ class MainWindow(QMainWindow):
         if not self.current_title_id:
             QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование из списка")
             return
-    
-        fio = self.fio_edit.text().strip()
-        if not fio:
+        
+        # Получаем данные из формы
+        fio_input = self.fio_edit.text().strip()
+        if not fio_input:
             QMessageBox.warning(self, "Ошибка", "Введите ФИО участника")
             return
         
+        patronymic_text = self.patronymic_edit.text().strip()
+        city = self.city_edit.text().strip()
+        region = self.region_combo.currentText()
+        coach_text = self.coach_edit.text().strip()
+        rank_text = self.rank_edit.text().strip()
+        
+        # Форматируем ФИО
+        fio_input =f"{fio_input} {patronymic_text}"
+        formatted_fio = self.format_fio_for_display(fio_input)
+        self.fio_edit.setText(formatted_fio)
+        fio_input = formatted_fio
+
+        # Получаем дату рождения из QLineEdit
+        birth_date_str = self.birth_date_edit.text()
+        birth_date = self.parse_birth_date(birth_date_str)
+        
+        if not birth_date:
+            QMessageBox.warning(self, "Ошибка", "Введите корректную дату рождения в формате ДД.ММ.ГГГГ")
+            return
+        
+        if not city:
+            QMessageBox.warning(self, "Ошибка", "Введите город участника")
+            return
+        
+        if not region:
+            QMessageBox.warning(self, "Ошибка", "Введите регион участника")
+            return
+        
+        if not rank_text:
+            QMessageBox.warning(self, "Ошибка", "Введите рейтинг участника")
+            return
+        
         try:
-            # Получаем данные из формы
-            patronymic = self.patronymic_edit.text().strip()
-            coach = self.coach_edit.text().strip()
-            sex_display = self.sex_combo.currentText()
-            # Преобразуем в man/woman
-            sex = "man" if sex_display == "Мужской" else "woman"
-            rank = int(self.rank_edit.text()) if self.rank_edit.text().isdigit() else 0
-            city = self.city_edit.text().strip()
-            region = self.region_edit.text().strip()
+            rank = int(rank_text)
+        except:
+            QMessageBox.warning(self, "Ошибка", "Рейтинг должен быть числом")
+            return
+        
+        # Формируем ФИО для полей player и fio
+        player_name, full_name = self.format_player_name(fio_input)
+        fio_city = self.format_fio_city(fio_input, city)
+        
+        # Получаем дату начала соревнования
+        title = Title.get_by_id(self.current_title_id)
+        competition_start_date = title.data_start
+        current_date = QDate.currentDate().toPyDate()
+        
+        # Проверяем возраст участника
+        age_check_result = self.check_player_age(birth_date, competition_start_date, title.vozrast)
+        
+        if age_check_result == "too_young":
+            QMessageBox.warning(self, "Ошибка", 
+                            f"Игроку нет 8 лет на дату начала соревнования ({competition_start_date.strftime('%d.%m.%Y')}).\n"
+                            f"Минимальный возраст для участия - 8 лет.")
+            return
+        elif age_check_result == "too_old":
+            QMessageBox.warning(self, "Ошибка", 
+                            f"Игрок превышает возрастное ограничение ({title.vozrast}).\n"
+                            f"На дату начала соревнования ({competition_start_date.strftime('%d.%m.%Y')}) игроку должно быть не более {self.get_max_age_from_text(title.vozrast)} лет.")
+            return
+        
+        # Определяем статус заявки (application)
+        if current_date == competition_start_date:
+            application_status = "основная"
+        else:
+            application_status = "предварительная"
+        
+        try:
+            sex = "woman" if self.sex_combo.currentText() == "Женский" else "man"
             razryad = self.razryad_combo.currentText()
             
-            # Проверяем, существует ли уже такой участник
+            # Преобразуем отчество в ID через таблицу Patronymic
+            patronymic_id = None
+            if patronymic_text and patronymic_text != "-":
+                patronymic, created = Patronymic.get_or_create(
+                    patronymic=patronymic_text,
+                    defaults={'sex': "w" if sex == "woman" else "m"}
+                )
+                patronymic_id = patronymic.id
+            
+            # Преобразуем тренера в ID через таблицу Coach
+            coach_id = None
+            if coach_text and coach_text != "-":
+                coach, created = Coach.get_or_create(coach=coach_text)
+                coach_id = coach.id
+            
+            # Проверяем, существует ли уже такой участник в текущем соревновании
             existing = Player.get_or_none(
-                (Player.player == fio) & 
+                (Player.player == player_name) & 
                 (Player.title_id == self.current_title_id)
             )
             
             if existing:
                 reply = QMessageBox.question(self, "Внимание", 
-                                            f"Участник {fio} уже существует.\nОбновить данные?",
+                                            f"Участник {player_name} уже существует.\nОбновить данные?",
                                             QMessageBox.Yes | QMessageBox.No)
                 if reply != QMessageBox.Yes:
                     return
-                player_id = existing.id
                 
                 update_data = {
-                    'player': fio,
-                    'bday': self.birth_date.date().toPyDate(),
+                    'player': player_name,
+                    'fio': full_name,
+                    'fio_city': fio_city,
+                    'bday': birth_date,
                     'rank': rank,
                     'city': city,
                     'region': region,
                     'razryad': razryad,
                     'title_id': self.current_title_id,
                     'sex': sex,
-                    'fio': fio,
-                    'fio_city': f"{fio} ({city})" if city else fio
+                    'application': application_status,
+                    'patronymic_id': patronymic_id,
+                    'coach_id': coach_id,
+                    'mesto': 0
                 }
-                query = Player.update(**update_data).where(Player.id == player_id)
+                query = Player.update(**update_data).where(Player.id == existing.id)
                 query.execute()
-                success = True
             else:
                 Player.create(
-                    player=fio,
-                    bday=self.birth_date.date().toPyDate(),
+                    player=player_name,
+                    fio=full_name,
+                    fio_city=fio_city,
+                    bday=birth_date,
                     rank=rank,
                     city=city,
                     region=region,
                     razryad=razryad,
                     title_id=self.current_title_id,
                     sex=sex,
-                    fio=fio,
-                    fio_city=f"{fio} ({city})" if city else fio,
                     total_game_player=0,
                     total_win_game=0,
                     coefficient_victories=0.0,
-                    application="",
+                    application=application_status,
                     comment="",
-                    pay_rejting=""
+                    pay_rejting="",
+                    patronymic_id=patronymic_id,
+                    coach_id=coach_id,
+                    mesto=0
                 )
-                success = True
             
-            if success:
-                # Обновляем таблицу
-                self.load_participants_for_title()
-                
-                # Очищаем форму
-                self.clear_participant_form()
-                
-                # Проверяем, нужно ли обновить tab_enabled
-                if self.current_title_id:
-                    title = Title.get_by_id(self.current_title_id)
-                    if title.tab_enabled == "1":
-                        title.tab_enabled = "2"
-                        title.save()
-                        self.update_tabs_enabled()
-                
-                QMessageBox.information(self, "Успех", f"Участник {fio} успешно добавлен")
+            # СИНХРОНИЗАЦИЯ С TABLICA Players_full
+            players_full_data = {
+                'player': player_name,
+                'bday': birth_date,
+                'city': city,
+                'region': region,
+                'razryad': razryad,
+                'coach_id': coach_id,
+                'patronymic_id': patronymic_id,
+                'sex': sex
+            }
+            self.sync_with_players_full(players_full_data)
+            
+            # Обновляем таблицу
+            self.load_participants_for_title()
+            
+            # Очищаем форму
+            self.fio_edit.clear()
+            self.patronymic_edit.clear()
+            self.birth_date_edit.clear()
+            self.city_edit.clear()
+            self.rank_edit.setText("0")
+            self.razryad_combo.setCurrentIndex(0)
+            self.coach_edit.clear()
+            self.sex_combo.setCurrentIndex(0)
+            
+            # Устанавливаем фокус на поле ФИО
+            self.fio_edit.setFocus()
+            
+            QMessageBox.information(self, "Успех", 
+                                f"Участник {player_name} успешно добавлен\n"
+                                f"Статус заявки: {application_status}")
             
         except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Не удалось добавить участника: {str(e)}")   
+            QMessageBox.critical(self, "Ошибка", f"Не удалось добавить участника: {str(e)}")
 
     def delete_player_from_table(self):
         """Удаление выбранного участника из таблицы"""
@@ -2599,62 +2963,27 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 QMessageBox.critical(self, "Ошибка", f"Ошибка: {str(e)}")
 
-    def load_participants_for_title(self):
-        """Загрузка участников для выбранного соревнования"""
-        if not self.current_title_id:
-            self.players_model.setData([])
-            self.table_header.setText("👥 Список участников - выберите соревнование")
-            return
-        
-        try:
-            # Базовый запрос
-            query = Player.select().where(Player.title_id == self.current_title_id)
-            
-            # Применяем фильтр по полу (man/woman)
-            if self.current_sex == "woman":
-                query = query.where(Player.sex == "woman")
-            elif self.current_sex == "man":
-                query = query.where(Player.sex == "man")
-            
-            # Сортируем по рейтингу
-            query = query.order_by(Player.rank.desc())
-            
-            participants_data = []
-            for player in query:
-                coach_name = ""
-                if player.coach_id:
-                    coach = Coach.get_or_none(Coach.id == player.coach_id)
-                    if coach:
-                        coach_name = coach.coach
-                
-                participants_data.append({
-                    'id': player.id,
-                    'fio': player.fio or "",
-                    'birth_date': player.bday,
-                    'rank': player.rank or 0,
-                    'city': player.city or "",
-                    'region': player.region or "",
-                    'razryad': player.razryad or "",
-                    'coach': coach_name,
-                    'sex': player.sex or ""
-                })
-            
-            self.players_model.setData(participants_data)
-            self.update_table_header()
-            
-        except Exception as e:
-            print(f"Ошибка загрузки участников: {e}")
-            self.players_model.setData([])
-
     def update_table_header(self):
-        """Обновление заголовка таблицы"""
+        """Обновление заголовка таблицы с количеством игроков"""
         if self.current_title_id:
             title = Title.get_or_none(Title.id == self.current_title_id)
             if title:
                 sex_text = "Женщины" if self.current_sex == "woman" else "Мужчины"
                 count = self.players_model.rowCount()
                 age_text = f" ({title.vozrast})" if title.vozrast else ""
-                self.table_header.setText(f"👥 {title.name}{age_text} - {sex_text} ({count} чел.)")    
+                
+                # Подсчитываем количество основных и предварительных заявок
+                main_count = Player.select().where(
+                    (Player.title_id == self.current_title_id) &
+                    (Player.application == "основная")
+                ).count()
+                
+                pre_count = Player.select().where(
+                    (Player.title_id == self.current_title_id) &
+                    (Player.application == "предварительная")
+                ).count()
+                
+                self.table_header.setText(f"👥 {title.name}{age_text} - {sex_text} ({count} чел.) | Основные: {main_count} | Предварительные: {pre_count}")
             
     def search_players(self):
         """Поиск участников по ФИО, городу, региону или тренеру"""
@@ -2791,7 +3120,7 @@ class MainWindow(QMainWindow):
                     if match:
                         results.append({
                             'id': player.id,
-                            'fio': player.player,
+                            'fio': player.fio,
                             'city': player.city or "",
                             'region': player.region or "",
                             'coach': coach_name,
@@ -2842,22 +3171,28 @@ class MainWindow(QMainWindow):
         search_edit.returnPressed.connect(perform_search)
         
         dialog.exec_()
-    
+        
     def clear_participant_form(self):
         """Очистка формы участника"""
         self.fio_edit.clear()
         self.patronymic_edit.clear()
-        self.birth_date.setDate(QDate.currentDate().addYears(-18))
+        self.birth_date_edit.clear()
         self.city_edit.clear()
-        self.region_edit.clear()
+        self.region_combo.setCurrentIndex(0)
         self.razryad_combo.setCurrentIndex(0)
         self.coach_edit.clear()
-        self.rank_edit.clear()
+        self.rank_edit.setText("0")
         self.sex_combo.setCurrentIndex(0)
-        # Очищаем результаты поиска и сбрасываем заголовок
+        
+        # Очищаем результаты поиска
         self.search_results_list.clear()
+        
+        # Сбрасываем заголовок поиска
         self.reset_search_label()
-   
+        
+        # Устанавливаем фокус на поле ФИО
+        self.fio_edit.setFocus()
+    
     def new_competition(self):
         """Создание нового соревнования с выбором типа и загрузкой рейтингов"""
         # Сначала спрашиваем тип соревнования
@@ -3059,7 +3394,7 @@ class MainWindow(QMainWindow):
 
                 participants_data.append({
                     'id': player.id,
-                    'fio': player.player or "",
+                    'fio': player.fio or "",
                     'birth_date': player.bday,
                     'rank': player.rank or 0,
                     'city': player.city or "",
@@ -3242,16 +3577,17 @@ class MainWindow(QMainWindow):
     def on_fio_text_changed(self, text):
         """Обработчик изменения текста в поле ФИО - поиск в списках"""
         if len(text) >= 2:
+            # Не форматируем при вводе, только при нажатии Enter
             self.search_in_r_lists(text)
         else:
-            # Очищаем результаты поиска, но не переключаем списки
+            # Очищаем результаты поиска
             if hasattr(self, 'search_results_list'):
                 self.search_results_list.clear()
             if hasattr(self, 'search_label'):
                 self.reset_search_label()
 
     def search_in_r_lists(self, search_text):
-        """Поиск в таблицах r_list_m, r_list_d, r1_list_m, r1_list_d (только по фамилии)"""
+        """Поиск в таблицах рейтинг-листа по фамилии и имени"""
         if not hasattr(self, 'search_results_list'):
             return
         
@@ -3260,132 +3596,159 @@ class MainWindow(QMainWindow):
         results = []
         current_source = None
         
-        # Разбиваем поисковый запрос на части (предполагаем, что первое слово - фамилия)
+        # Разбиваем поисковый запрос на части
         search_parts = search_text.strip().split()
-        if search_parts:
-            # Берем первое слово как фамилию для поиска
-            surname = search_parts[0]
-        else:
-            surname = search_text
+        search_surname = search_parts[0] if search_parts else search_text
+        search_name = search_parts[1] if len(search_parts) > 1 else ""
         
-        # Поиск в текущем рейтинге (r_list_m, r_list_d)
-        try:
-            from models import R_list_m, R_list_d, R1_list_m, R1_list_d
+        # Функция для проверки совпадения ФИО
+        def matches_fio(fio, surname, name):
+            if not fio:
+                return False
+            fio_parts = fio.strip().split()
+            if not fio_parts:
+                return False
             
-            # Ищем в r_list_m (мужчины)
-            query_m = R_list_m.select().where(
-                R_list_m.r_fname.startswith(surname)
-            ).limit(30)
-            for item in query_m:
-                results.append({
-                    'source': 'r_list_m',
-                    'source_name': '🏆 Текущий рейтинг (М)',
-                    'fio': item.r_fname,
-                    'birthday': item.r_bithday,
-                    'city': item.r_city,
-                    'region': item.r_region,
-                    'district': item.r_district,
-                    'number': item.r_number,
-                    'list': item.r_list,
-                    'sex': 'man'
-                })
-                current_source = 'current'
-        except Exception as e:
-            print(f"Ошибка поиска в r_list_m: {e}")
-        
-        try:
-            query_d = R_list_d.select().where(
-                R_list_d.r_fname.startswith(surname)
-            ).limit(30)
-            for item in query_d:
-                results.append({
-                    'source': 'r_list_d',
-                    'source_name': '🏆 Текущий рейтинг (Ж)',
-                    'fio': item.r_fname,
-                    'birthday': item.r_bithday,
-                    'city': item.r_city,
-                    'region': item.r_region,
-                    'district': item.r_district,
-                    'number': item.r_number,
-                    'list': item.r_list,
-                    'sex': 'woman'
-                })
-                current_source = 'current'
-        except Exception as e:
-            print(f"Ошибка поиска в r_list_d: {e}")
-        
-        # Если не найдено в текущем рейтинге, ищем в январском
-        if not results:
-            try:
-                query_r1m = R1_list_m.select().where(
-                    R1_list_m.r1_fname.startswith(surname)
-                ).limit(30)
-                for item in query_r1m:
-                    results.append({
-                        'source': 'r1_list_m',
-                        'source_name': '📅 Январский рейтинг (М)',
-                        'fio': item.r1_fname,
-                        'birthday': item.r1_bithday,
-                        'city': item.r1_city,
-                        'region': item.r1_region,
-                        'district': item.r1_district,
-                        'number': item.r1_number,
-                        'list': item.r1_list,
-                        'sex': 'man'
-                    })
-                    current_source = 'january'
-            except Exception as e:
-                print(f"Ошибка поиска в r1_list_m: {e}")
+            # Проверяем фамилию (первая часть)
+            fio_surname = fio_parts[0].lower()
+            if not fio_surname.startswith(surname.lower()):
+                return False
             
+            # Если имя задано, проверяем вторую часть
+            if name:
+                if len(fio_parts) >= 2:
+                    fio_name = fio_parts[1].lower()
+                    return fio_name.startswith(name.lower())
+                return False
+            
+            return True
+        
+        # Определяем, какой рейтинг искать в зависимости от current_sex
+        if self.current_sex == "woman":
+            # Ищем в женских рейтингах
             try:
-                query_r1d = R1_list_d.select().where(
-                    R1_list_d.r1_fname.startswith(surname)
-                ).limit(30)
-                for item in query_r1d:
-                    results.append({
-                        'source': 'r1_list_d',
-                        'source_name': '📅 Январский рейтинг (Ж)',
-                        'fio': item.r1_fname,
-                        'birthday': item.r1_bithday,
-                        'city': item.r1_city,
-                        'region': item.r1_region,
-                        'district': item.r1_district,
-                        'number': item.r1_number,
-                        'list': item.r1_list,
-                        'sex': 'woman'
-                    })
-                    current_source = 'january'
+                from models import R_list_d, R1_list_d
+                
+                # Поиск в текущем женском рейтинге
+                all_items = list(R_list_d.select())
+                for item in all_items:
+                    if matches_fio(item.r_fname, search_surname, search_name):
+                        results.append({
+                            'source': 'r_list_d',
+                            'source_name': '🏆 Текущий рейтинг (Ж)',
+                            'fio': item.r_fname,
+                            'birthday': item.r_bithday,
+                            'city': item.r_city,
+                            'region': item.r_region,
+                            'district': item.r_district,
+                            'number': item.r_number,
+                            'list': item.r_list,
+                            'sex': 'woman'
+                        })
+                        current_source = 'current'
+                        if len(results) >= 30:
+                            break
+                
+                # Если не найдено в текущем, ищем в январском
+                if not results:
+                    all_items = list(R1_list_d.select())
+                    for item in all_items:
+                        if matches_fio(item.r1_fname, search_surname, search_name):
+                            results.append({
+                                'source': 'r1_list_d',
+                                'source_name': '📅 Январский рейтинг (Ж)',
+                                'fio': item.r1_fname,
+                                'birthday': item.r1_bithday,
+                                'city': item.r1_city,
+                                'region': item.r1_region,
+                                'district': item.r1_district,
+                                'number': item.r1_number,
+                                'list': item.r1_list,
+                                'sex': 'woman'
+                            })
+                            current_source = 'january'
+                            if len(results) >= 30:
+                                break
+                        
             except Exception as e:
-                print(f"Ошибка поиска в r1_list_d: {e}")
+                print(f"Ошибка поиска в женских рейтингах: {e}")
+        
+        else:  # current_sex == "man"
+            # Ищем в мужских рейтингах
+            try:
+                from models import R_list_m, R1_list_m
+                
+                # Поиск в текущем мужском рейтинге
+                all_items = list(R_list_m.select())
+                for item in all_items:
+                    if matches_fio(item.r_fname, search_surname, search_name):
+                        results.append({
+                            'source': 'r_list_m',
+                            'source_name': '🏆 Текущий рейтинг (М)',
+                            'fio': item.r_fname,
+                            'birthday': item.r_bithday,
+                            'city': item.r_city,
+                            'region': item.r_region,
+                            'district': item.r_district,
+                            'number': item.r_number,
+                            'list': item.r_list,
+                            'sex': 'man'
+                        })
+                        current_source = 'current'
+                        if len(results) >= 30:
+                            break
+                
+                # Если не найдено в текущем, ищем в январском
+                if not results:
+                    all_items = list(R1_list_m.select())
+                    for item in all_items:
+                        if matches_fio(item.r1_fname, search_surname, search_name):
+                            results.append({
+                                'source': 'r1_list_m',
+                                'source_name': '📅 Январский рейтинг (М)',
+                                'fio': item.r1_fname,
+                                'birthday': item.r1_bithday,
+                                'city': item.r1_city,
+                                'region': item.r1_region,
+                                'district': item.r1_district,
+                                'number': item.r1_number,
+                                'list': item.r1_list,
+                                'sex': 'man'
+                            })
+                            current_source = 'january'
+                            if len(results) >= 30:
+                                break
+                        
+            except Exception as e:
+                print(f"Ошибка поиска в мужских рейтингах: {e}")
         
         if results and hasattr(self, 'search_label'):
             # Меняем заголовок
-            if current_source == 'current':
-                self.search_label.setText("🔍 Текущий рейтинг")
-                self.search_label.setStyleSheet("""
-                    background-color: #2196F3;
-                    color: white;
-                    padding: 6px;
-                    font-weight: bold;
-                    font-size: 14px;
-                    border-radius: 3px;
-                """)
+            if self.current_sex == "woman":
+                if current_source == 'current':
+                    self.search_label.setText("🔍 Текущий рейтинг (Женщины)")
+                else:
+                    self.search_label.setText("🔍 Январский рейтинг (Женщины)")
             else:
-                self.search_label.setText("🔍 Январский рейтинг")
-                self.search_label.setStyleSheet("""
-                    background-color: #FF9800;
-                    color: white;
-                    padding: 6px;
-                    font-weight: bold;
-                    font-size: 14px;
-                    border-radius: 3px;
-                """)
+                if current_source == 'current':
+                    self.search_label.setText("🔍 Текущий рейтинг (Мужчины)")
+                else:
+                    self.search_label.setText("🔍 Январский рейтинг (Мужчины)")
             
-            for r in results:
+            self.search_label.setStyleSheet("""
+                background-color: #2196F3;
+                color: white;
+                padding: 6px;
+                font-weight: bold;
+                font-size: 11px;
+                border-radius: 3px;
+            """)
+            
+            for r in results[:30]:
                 birthday_str = r['birthday'].strftime("%d.%m.%Y") if r['birthday'] else "---"
-                position = f"R:{r['list']}" if r['list'] else "---"
+                position = f"№{r['list']}" if r['list'] else "---"
                 
-                # Одна строка для отображения
+                # Формируем строку для отображения
                 item_text = f"🏅 {r['fio']} | {birthday_str} | {r['city']} | {position}"
                 
                 item = QListWidgetItem(item_text)
@@ -3394,39 +3757,43 @@ class MainWindow(QMainWindow):
                 
         elif hasattr(self, 'search_label'):
             self.search_results_list.clear()
-            self.search_label.setText("🔍 Ничего не найдено")
+            self.search_label.setText("🔍 Ничего не найдено. Введите нового игрока вручную.")
             self.search_label.setStyleSheet("""
                 background-color: #f44336;
                 color: white;
                 padding: 6px;
                 font-weight: bold;
-                font-size: 14px;
+                font-size: 11px;
                 border-radius: 3px;
             """)
             from PyQt5.QtCore import QTimer
-            QTimer.singleShot(2000, self.reset_search_label)
+            QTimer.singleShot(3000, self.reset_search_label)
 
     def on_suggestion_selected(self, item):
         """Выбор предложения из списка - заполнение формы"""
         data = item.data(Qt.UserRole)
         if data:
-            # Заполняем поля формы
             self.fio_edit.setText(data['fio'])
             
             # Устанавливаем дату рождения
             if data['birthday']:
                 if isinstance(data['birthday'], date):
-                    self.birth_date.setDate(QDate(data['birthday'].year, data['birthday'].month, data['birthday'].day))
+                    self.birth_date_edit.setText(data['birthday'].strftime("%d.%m.%Y"))
                 elif isinstance(data['birthday'], str):
                     try:
                         d = datetime.strptime(data['birthday'], "%Y-%m-%d").date()
-                        self.birth_date.setDate(QDate(d.year, d.month, d.day))
+                        self.birth_date_edit.setText(d.strftime("%d.%m.%Y"))
                     except:
                         pass
             
-            # Устанавливаем город и регион
+            # Устанавливаем город
             self.city_edit.setText(data['city'] or "")
-            self.region_edit.setText(data['region'] or "")
+            
+            # Устанавливаем регион в comboBox
+            if data.get('region'):
+                index = self.region_combo.findText(data['region'])
+                if index >= 0:
+                    self.region_combo.setCurrentIndex(index)
             
             # Устанавливаем пол
             if data['sex'] == 'man':
@@ -3434,75 +3801,146 @@ class MainWindow(QMainWindow):
             else:
                 self.sex_combo.setCurrentIndex(1)
             
-            # Автоматически устанавливаем разряд (можно настроить по номеру списка)
-            if data['list']:
-                if data['list'] <= 100:
-                    self.razryad_combo.setCurrentText("1 разряд")
-                elif data['list'] <= 200:
-                    self.razryad_combo.setCurrentText("2 разряд")
-                else:
-                    self.razryad_combo.setCurrentText("3 разряд")
-            
-            # Скрываем список предложений
             self.suggestions_list.clear()
             self.suggestions_list.setVisible(False)
-            
-            # Устанавливаем фокус на следующее поле
             self.patronymic_edit.setFocus()
-            
-            QMessageBox.information(self, "Данные загружены", 
-                                f"Данные из {data['source']}\n"
-                                f"ФИО: {data['fio']}\n"
-                                f"Дата рождения: {data['birthday']}\n"
-                                f"Город: {data['city']}\n"
-                                f"Регион: {data['region']}")
             
     def focusOutEvent(self, event):
         """Событие потери фокуса - скрываем список предложений"""
         super().focusOutEvent(event)
         if hasattr(self, 'suggestions_list'):
             QTimer.singleShot(200, lambda: self.suggestions_list.setVisible(False))
-
+            
     def on_search_result_selected(self, item):
         """Выбор результата поиска - заполнение формы"""
         data = item.data(Qt.UserRole)
         if data:
-            # Заполняем поля формы
-            self.fio_edit.setText(data['fio'])
+            # ФОРМАТИРУЕМ И ЗАПОЛНЯЕМ ФИО
+            raw_fio = data['fio']
+            # Разбиваем ФИО на части
+            fio_parts = raw_fio.split()
+            if len(fio_parts) >= 2:
+                # Фамилия заглавными, имя с заглавной
+                formatted_fio = f"{fio_parts[0].upper()} {fio_parts[1].capitalize()}"
+                if len(fio_parts) >= 3:
+                    formatted_fio += f" {fio_parts[2].capitalize()}"
+            else:
+                formatted_fio = raw_fio.capitalize()
+            
+            self.fio_edit.setText(formatted_fio)
             
             # Устанавливаем дату рождения
+            birth_date = None
             if data['birthday']:
                 if isinstance(data['birthday'], date):
-                    self.birth_date.setDate(QDate(data['birthday'].year, data['birthday'].month, data['birthday'].day))
+                    birth_date = data['birthday']
+                    self.birth_date_edit.setText(birth_date.strftime("%d.%m.%Y"))
                 elif isinstance(data['birthday'], str):
                     try:
-                        d = datetime.strptime(data['birthday'], "%Y-%m-%d").date()
-                        self.birth_date.setDate(QDate(d.year, d.month, d.day))
+                        for fmt in ["%Y-%m-%d", "%d.%m.%Y", "%Y/%m/%d"]:
+                            try:
+                                birth_date = datetime.strptime(data['birthday'], fmt).date()
+                                self.birth_date_edit.setText(birth_date.strftime("%d.%m.%Y"))
+                                break
+                            except:
+                                continue
                     except:
                         pass
             
-            # Устанавливаем город и регион
-            self.city_edit.setText(data['city'] or "")
-            self.region_edit.setText(data['region'] or "")
+            # Устанавливаем город
+            city = data['city'] if data['city'] else ""
+            self.city_edit.setText(city)
+            
+            # Устанавливаем регион в ComboBox
+            region = data['region'] if data['region'] else ""
+            if region:
+                index = self.region_combo.findText(region)
+                if index >= 0:
+                    self.region_combo.setCurrentIndex(index)
+                else:
+                    # Если регион не найден в списке, добавляем его
+                    self.region_combo.addItem(region)
+                    self.region_combo.setCurrentIndex(self.region_combo.count() - 1)
             
             # Устанавливаем пол
-            if data['sex'] == 'man':
+            player_sex = 'man' if (data['sex'] == 'man' or data['sex'] == 'man') else 'woman'
+            if player_sex == 'man':
                 self.sex_combo.setCurrentIndex(0)
+                if self.current_sex == "woman":
+                    QMessageBox.warning(self, "Внимание", 
+                                    "Найден спортсмен мужского пола, но выбран фильтр 'Женщины'.\n"
+                                    "Пожалуйста, переключите фильтр на 'Мужчины' для добавления.")
             else:
                 self.sex_combo.setCurrentIndex(1)
-                        
-            # Устанавливаем рейтинг
-            if data['list']:
+                if self.current_sex == "man":
+                    QMessageBox.warning(self, "Внимание", 
+                                    "Найден спортсмен женского пола, но выбран фильтр 'Мужчины'.\n"
+                                    "Пожалуйста, переключите фильтр на 'Женщины' для добавления.")
+            
+            # Устанавливаем рейтинг (если есть)
+            if data.get('list'):
                 self.rank_edit.setText(str(data['list']))
             
-            # Переключаемся обратно на список соревнований
-            self.competitions_label.setVisible(True)
-            self.list_widget.setVisible(True)
-            self.search_label.setVisible(False)
-            self.search_results_list.setVisible(False)
+            # ПОИСК В ТАБЛИЦЕ Players_full
+            if birth_date and city:
+                existing_player = self.find_player_in_players_full(formatted_fio, birth_date, city)
+                
+                if existing_player:
+                    # Заполняем недостающие поля из найденной записи
+                    print(f"Найден игрок в Players_full: {existing_player.player}")
+                    
+                    # Отчество
+                    if existing_player.patronymic_id:
+                        patronymic = Patronymic.get_or_none(Patronymic.id == existing_player.patronymic_id)
+                        if patronymic:
+                            self.patronymic_edit.setText(patronymic.patronymic)
+                    
+                    # Разряд
+                    if existing_player.razryad:
+                        index = self.razryad_combo.findText(existing_player.razryad)
+                        if index >= 0:
+                            self.razryad_combo.setCurrentIndex(index)
+                    
+                    # Тренер
+                    if existing_player.coach_id:
+                        coach = Coach.get_or_none(Coach.id == existing_player.coach_id)
+                        if coach:
+                            self.coach_edit.setText(coach.coach)
+                    
+                    # Город (если в Players_full есть более точный город)
+                    if existing_player.city:
+                        self.city_edit.setText(existing_player.city)
+                        # Обновляем регион для нового города
+                        city_obj = City.get_or_none(City.city == existing_player.city)
+                        if city_obj:
+                            index = self.region_combo.findData(city_obj.region_id)
+                            if index >= 0:
+                                self.region_combo.setCurrentIndex(index)
+                    
+                    QMessageBox.information(self, "Найдено в базе", 
+                                        f"Данные игрока найдены в общей базе.\n"
+                                        f"Заполнены поля: Отчество, Разряд, Тренер")
+                else:
+                    # Предлагаем внести недостающие данные
+                    reply = QMessageBox.question(self, "Новый игрок", 
+                                                f"Игрок {formatted_fio} не найден в общей базе.\n"
+                                                f"Внесите дополнительные данные (Отчество, Разряд) вручную?",
+                                                QMessageBox.Yes | QMessageBox.No)
+                    if reply == QMessageBox.Yes:
+                        self.patronymic_edit.setFocus()
+                    else:
+                        # Заполняем минимальными значениями
+                        if not self.patronymic_edit.text():
+                            self.patronymic_edit.setText("-")
+                        if not self.razryad_combo.currentText():
+                            self.razryad_combo.setCurrentText("б/р")
+            
+            # Очищаем список результатов поиска
+            self.search_results_list.clear()
             
             # Устанавливаем фокус на поле "Отчество"
             self.patronymic_edit.setFocus()
+            # self.fio_edit.clear()
 
     def reset_search_label(self):
         """Сброс заголовка поиска"""
@@ -3596,7 +4034,7 @@ class MainWindow(QMainWindow):
         self.month_combo.setCurrentIndex(0)
         self.sredi_combo.setCurrentIndex(0)
         self.load_titles_list()
-# =======================
+
     def save_new_competition(self):
         """Сохранение нового соревнования"""
         name = self.new_comp_name.text().strip()
@@ -3751,7 +4189,7 @@ class MainWindow(QMainWindow):
             import traceback
             traceback.print_exc()
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить соревнование: {str(e)}")    
-#========================
+
     def cancel_new_competition(self):
         """Отмена создания нового соревнования (только при нажатии кнопки Отмена)"""
         # Очищаем форму
@@ -3912,7 +4350,7 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             print(f"Ошибка установки даты рейтинга: {e}")
-#===========
+
     def update_tabs_enabled(self):
         """Обновление активности вкладок в зависимости от tab_enabled"""
         tab_dict = {'Титул': 0,
@@ -3954,46 +4392,7 @@ class MainWindow(QMainWindow):
             for i in range(self.tab_widget.count()):
                 self.tab_widget.setTabEnabled(i, False)
             self.tab_widget.setTabEnabled(0, True)
-# ============================================
-    def _update_tabs_enabled(self):
-        """Обновление активности вкладок в зависимости от tab_enabled"""
-        if not self.current_title_id:
-            for i in range(self.tab_widget.count()):
-                self.tab_widget.setTabEnabled(i, False)
-            self.tab_widget.setTabEnabled(0, True)  # Титул всегда активен
-            return
-        
-        try:
-            title = Title.get_by_id(self.current_title_id)
-            tab_enabled = title.tab_enabled if title.tab_enabled else "1"
-            
-            # Вкладка Титул всегда активна (индекс 0)
-            self.tab_widget.setTabEnabled(0, True)
-            
-            # Преобразуем tab_enabled в число
-            try:
-                enabled_level = int(tab_enabled)
-            except:
-                enabled_level = 1
-            
-            # Активируем вкладки до указанного уровня
-            for i in range(1, self.tab_widget.count()):
-                self.tab_widget.setTabEnabled(i, i <= enabled_level - 1)
-            
-            print(f"Активированы вкладки до уровня {enabled_level} (tab_enabled={tab_enabled})")
-            
-            # Если текущая вкладка неактивна, переключаемся на Титул
-            if not self.tab_widget.isTabEnabled(self.tab_widget.currentIndex()):
-                self.tab_widget.setCurrentIndex(0)
-            
-        except Exception as e:
-            print(f"Ошибка обновления вкладок: {e}")
-            # По умолчанию активируем только Титул и Участники
-            for i in range(self.tab_widget.count()):
-                self.tab_widget.setTabEnabled(i, False)
-            self.tab_widget.setTabEnabled(0, True)
-            self.tab_widget.setTabEnabled(1, True)           
-# ==================================================
+
     def find_similar_competitions(self, name, start_date, end_date):
         """Поиск похожих соревнований для группировки"""
         similar = Title.select().where(
@@ -4161,6 +4560,18 @@ class MainWindow(QMainWindow):
                 count = self.players_model.rowCount()
                 age_text = f" ({title.vozrast})" if title.vozrast else ""
                 self.table_header.setText(f"👥 {title.name}{age_text} - {sex_text} ({count} чел.)")
+        
+        # Очищаем результаты поиска при смене пола
+        self.search_results_list.clear()
+        
+        # Сбрасываем заголовок поиска
+        self.reset_search_label()
+        
+        # # Показываем сообщение о смене рейтинга
+        # if sex == "woman":
+        #     QMessageBox.information(self, "Поиск", "Теперь поиск будет выполняться в женских рейтинг-листах")
+        # else:
+        #     QMessageBox.information(self, "Поиск", "Теперь поиск будет выполняться в мужских рейтинг-листах")
 
     def load_participants_for_title(self):
         """Загрузка участников для выбранного соревнования"""
@@ -4170,9 +4581,6 @@ class MainWindow(QMainWindow):
             return
         
         try:
-            # Активируем поле поиска
-            self.fio_edit.setEnabled(True)
-            
             # Базовый запрос
             query = Player.select().where(Player.title_id == self.current_title_id)
             
@@ -4195,14 +4603,15 @@ class MainWindow(QMainWindow):
                 
                 participants_data.append({
                     'id': player.id,
-                    'fio': player.fio or "",
+                    'fio': player.fio or player.player or "",
                     'birth_date': player.bday,
                     'rank': player.rank or 0,
                     'city': player.city or "",
                     'region': player.region or "",
                     'razryad': player.razryad or "",
                     'coach': coach_name,
-                    'sex': player.sex or ""
+                    'sex': player.sex or "",
+                    'application': player.application or "предварительная"
                 })
             
             self.players_model.setData(participants_data)
@@ -4210,10 +4619,942 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             print(f"Ошибка загрузки участников: {e}")
-            self.players_model.setData([])                
+            self.players_model.setData([])
 
+    def load_last_competition(self):
+        """Загрузка последнего соревнования по умолчанию"""
+        try:
+            last_title = Title.select().order_by(Title.data_start.desc()).first()
+            
+            if last_title:
+                self.current_title_id = last_title.id
+                
+                self.comp_name_label.setText(last_title.name or "-")
+                self.comp_short_name_label.setText(last_title.short_name_comp or "-")
+                self.comp_full_name_label.setText(last_title.full_name_comp or "-")
+                self.comp_sredi_label.setText(last_title.sredi or "-")
+                self.comp_vozrast_label.setText(last_title.vozrast or "-")
+                self.comp_type_info_label.setText(last_title.vid_turnira or "-")
+                
+                start = last_title.data_start.strftime("%d.%m.%Y") if last_title.data_start else "---"
+                end = last_title.data_end.strftime("%d.%m.%Y") if last_title.data_end else "---"
+                self.comp_dates_label.setText(f"{start} - {end}")
+                self.comp_mesto_label.setText(last_title.mesto or "-")
+                self.comp_referee_label.setText(last_title.referee or "-")
+                self.comp_referee_category_label.setText(last_title.kat_ref or "-")
+                self.comp_secretary_label.setText(last_title.secretary or "-")
+                self.comp_secretary_category_label.setText(last_title.kat_sec or "-")
+                
+                if "девушки" in last_title.name.lower() or "дев" in last_title.name.lower():
+                    self.current_sex = "woman"
+                else:
+                    self.current_sex = "man"
+                
+                self.update_tabs_enabled()
+                self.create_category_buttons()
+                self.load_participants_for_title()
+                
+                for i in range(self.list_widget.count()):
+                    item = self.list_widget.item(i)
+                    if item.data(Qt.UserRole) == last_title.id:
+                        self.list_widget.setCurrentItem(item)
+                        break
+                        
+        except Exception as e:
+            print(f"Ошибка загрузки последнего соревнования: {e}")
 
+    def reset_search_label(self):
+        """Сброс заголовка поиска"""
+        if hasattr(self, 'current_tab_index') and self.current_tab_index == 1:
+            if hasattr(self, 'search_label'):
+                if self.current_sex == "woman":
+                    self.search_label.setText("🔍 Поиск игроков в женских рейтингах")
+                else:
+                    self.search_label.setText("🔍 Поиск игроков в мужских рейтингах")
+                self.search_label.setStyleSheet("""
+                    background-color: #FF9800;
+                    color: white;
+                    padding: 6px;
+                    font-weight: bold;
+                    font-size: 11px;
+                    border-radius: 3px;
+                """)    
 
+    def check_player_age(self, birth_date, competition_start_date, age_limit_text):
+        """Проверка возраста участника"""
+        if not birth_date or not competition_start_date:
+            return "ok"
+        
+        # Вычисляем возраст на дату начала соревнования
+        age_at_competition = competition_start_date.year - birth_date.year
+        # Корректировка, если день рождения еще не наступил
+        if (competition_start_date.month, competition_start_date.day) < (birth_date.month, birth_date.day):
+            age_at_competition -= 1
+        
+        # Проверяем минимальный возраст (8 лет)
+        if age_at_competition < 8:
+            return "too_young"
+        
+        # Получаем максимальный возраст из текста ограничения
+        max_age = self.get_max_age_from_text(age_limit_text)
+        
+        # Проверяем максимальный возраст
+        if max_age is not None and age_at_competition > max_age:
+            return "too_old"
+        
+        return "ok"
+
+    def get_max_age_from_text(self, age_text):
+        """Извлечение максимального возраста из текста (например 'до 16 лет' -> 16, 'U16' -> 16)"""
+        if not age_text:
+            return None
+        
+        import re
+        
+        # Формат "до X лет"
+        match = re.search(r'до (\d+)', age_text)
+        if match:
+            return int(match.group(1))
+        
+        # Формат "UXX"
+        match = re.search(r'U(\d+)', age_text.upper())
+        if match:
+            return int(match.group(1))
+        
+        # Формат "XX лет"
+        match = re.search(r'(\d+) лет', age_text)
+        if match:
+            return int(match.group(1))
+        
+        # Если число простое
+        if age_text.isdigit():
+            return int(age_text)
+        
+        return None
+
+    def get_min_age_from_text(self, age_text):
+        """Извлечение минимального возраста из текста (обычно 8 лет по умолчанию)"""
+        return 8  # Минимальный возраст для всех соревнований
+
+    def clear_participant_form_on_error(self):
+        """Очистка формы при ошибке (поля ФИО остаются для исправления)"""
+        self.patronymic_edit.clear()
+        self.birth_date.setDate(QDate.currentDate().addYears(-18))
+        self.city_edit.clear()
+        self.region_edit.clear()
+        self.razryad_combo.setCurrentIndex(0)
+        self.coach_edit.clear()
+        self.rank_edit.clear()
+        self.sex_combo.setCurrentIndex(0)
+        self.fio_edit.setFocus()
+
+    def clear_player_form(self):
+        """Очистка формы участника (вызывается по кнопке на левой панели)"""
+        reply = QMessageBox.question(self, "Подтверждение", 
+                                    "Очистить все поля формы?",
+                                    QMessageBox.Yes | QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            self.fio_edit.clear()
+            self.patronymic_edit.clear()
+            # self.birth_date.setDate(QDate.currentDate().addYears(-18))
+            self.birth_date_edit.clear()
+            self.city_edit.clear()
+            self.region_combo.setCurrentIndex(0)
+            self.razryad_combo.setCurrentIndex(0)
+            self.coach_edit.clear()
+            self.rank_edit.clear()
+            self.sex_combo.setCurrentIndex(0)
+            
+            # Очищаем результаты поиска
+            self.search_results_list.clear()
+            
+            # Сбрасываем заголовок поиска
+            self.reset_search_label()
+            
+            # Устанавливаем фокус на поле ФИО
+            self.fio_edit.setFocus()
+            
+            QMessageBox.information(self, "Очистка", "Форма очищена")
+            
+    def format_full_name(self, player):
+        """Форматирование ФИО: первая буква заглавная, остальные строчные"""
+        if not player:
+            return ""
+        
+        # Разбиваем на части
+        parts = player.strip().split()
+        formatted_parts = []
+        
+        # Делаем первую букву заглавной, остальные строчными
+        formatted_parts = f"{parts[0].upper()} {parts[1].capitalize()}"
+
+        return formatted_parts
+    
+    def find_player_in_players_full(self, player, birth_date, city):
+        """Поиск игрока в таблице players_full по ФИО, дате рождения и городу"""
+        try:
+            # Форматируем ФИО для поиска
+            player_normalized = self.format_full_name(player)
+            
+            # Ищем игрока по ФИО и дате рождения
+            query = Players_full.select().where(
+                (Players_full.player == player_normalized) &
+                (Players_full.bday == birth_date) &
+                (Players_full.city == city)
+            )
+            
+            if query.count() > 0:
+                return query.first()
+            
+            # Если не нашли по полному совпадению, ищем по ФИО и дате рождения (без города)
+            query2 = Players_full.select().where(
+                (Players_full.player == player_normalized) &
+                (Players_full.bday == birth_date)
+            )
+            
+            if query2.count() > 0:
+                return query2.first()
+            
+            return None
+        except Exception as e:
+            print(f"Ошибка поиска в players_full: {e}")
+            return None 
+
+    def add_team(self):
+        QMessageBox.information(self, "Добавление", "Добавление команды")
+
+    def edit_team(self):
+        QMessageBox.information(self, "Редактирование", "Редактирование команды")
+
+    def delete_team(self):
+        QMessageBox.information(self, "Удаление", "Удаление команды")
+
+    def show_team_rating(self):
+        QMessageBox.information(self, "Рейтинг", "Рейтинг команд")
+
+    def generate_pairs(self):
+        QMessageBox.information(self, "Пары", "Формирование пар")
+
+    def break_pairs(self):
+        QMessageBox.information(self, "Пары", "Разбивка пар")
+
+    def seeding_pairs(self):
+        QMessageBox.information(self, "Пары", "Посев пар")
+
+    def system_settings(self):
+        QMessageBox.information(self, "Система", "Настройки системы")
+
+    def system_parameters(self):
+        QMessageBox.information(self, "Система", "Параметры системы")
+
+    def system_reset(self):
+        QMessageBox.information(self, "Система", "Сброс настроек")
+
+    def load_results(self):
+        QMessageBox.information(self, "Результаты", "Загрузка результатов")
+
+    def export_results(self):
+        QMessageBox.information(self, "Результаты", "Экспорт результатов")
+
+    def clear_results(self):
+        QMessageBox.information(self, "Результаты", "Очистка результатов")
+
+    def calculate_results(self):
+        QMessageBox.information(self, "Результаты", "Расчет результатов")
+
+    def update_rating(self):
+        QMessageBox.information(self, "Рейтинг", "Обновление рейтинга")
+
+    def show_top10(self):
+        QMessageBox.information(self, "Рейтинг", "Топ-10 рейтинга")
+
+    def calculate_rating(self):
+        QMessageBox.information(self, "Рейтинг", "Расчет рейтинга")
+
+    def show_notes(self):
+        QMessageBox.information(self, "Заметки", "Показать заметки")
+
+    def show_help(self):
+        QMessageBox.information(self, "Справка", "Справка по программе")           
+
+    def get_players_count_by_status(self, title_id, status=None):
+        """Получение количества игроков по статусу заявки"""
+        try:
+            query = Player.select().where(Player.title_id == title_id)
+            if status:
+                query = query.where(Player.application == status)
+            return query.count()
+        except Exception as e:
+            print(f"Ошибка подсчета игроков: {e}")
+            return 0
+    
+    def format_player_name(self, fio):
+        """Форматирование имени игрока:
+        - player: ИВАНОВ Иван (фамилия ЗАГЛАВНЫМИ, имя с заглавной)
+        - fio: ИВАНОВ Иван Иванович (фамилия ЗАГЛАВНЫМИ, имя и отчество с заглавной)
+        - fio_city: ИВАНОВ Иван Иванович/Москва
+        """
+        if not fio:
+            return "", "", ""
+        
+        # Разбиваем строку на части
+        parts = fio.strip().split()
+        
+        if len(parts) == 1:
+            surname = parts[0].upper()
+            name = ""
+            patronymic = ""
+        elif len(parts) == 2:
+            surname = parts[0].upper()
+            name = parts[1].capitalize()
+            patronymic = ""
+        else:
+            surname = parts[0].upper()
+            name = parts[1].capitalize()
+            patronymic = parts[2].capitalize()
+        
+        # Формируем player (ИВАНОВ Иван)
+        player_name = f"{surname} {name}".strip()
+        
+        # Формируем fio (ИВАНОВ Иван Иванович)
+        if patronymic:
+            full_name = f"{surname} {name} {patronymic}".strip()
+        else:
+            full_name = f"{surname} {name}".strip()
+        
+        return player_name, full_name
+
+    def format_fio_city(self, fio, city):
+        """Форматирование поля fio_city: ИВАНОВ Иван Иванович/Москва"""
+        if not fio:
+            return ""
+        
+        # Форматируем ФИО
+        _, full_name = self.format_player_name(fio)
+        
+        # Добавляем город
+        if city:
+            return f"{full_name}/{city}"
+        else:
+            return full_name
+
+    def filter_preliminary_applications(self):
+        """Фильтрация предварительных заявок"""
+        if not self.current_title_id:
+            return
+        
+        if self.btn_filter_preliminary.isChecked():
+            try:
+                query = Player.select().where(
+                    (Player.title_id == self.current_title_id) &
+                    (Player.application == "предварительная")
+                )
+                
+                if self.current_sex == "woman":
+                    query = query.where(Player.sex == "woman")
+                elif self.current_sex == "man":
+                    query = query.where(Player.sex == "man")
+                
+                query = query.order_by(Player.rank.desc())
+                
+                participants_data = []
+                for player in query:
+                    coach_name = ""
+                    if player.coach_id:
+                        coach = Coach.get_or_none(Coach.id == player.coach_id)
+                        if coach:
+                            coach_name = coach.coach
+                    
+                    participants_data.append({
+                        'id': player.id,
+                        'fio': player.fio or player.player or "",
+                        'birth_date': player.bday,
+                        'rank': player.rank or 0,
+                        'city': player.city or "",
+                        'region': player.region or "",
+                        'razryad': player.razryad or "",
+                        'coach': coach_name,
+                        'sex': player.sex or "",
+                        'application': player.application or "предварительная"
+                    })
+                
+                self.players_model.setData(participants_data)
+                self.update_table_header()
+                QMessageBox.information(self, "Фильтр", f"Показано {len(participants_data)} предварительных заявок")
+                
+            except Exception as e:
+                print(f"Ошибка фильтрации: {e}")
+        else:
+            self.reset_application_filter()
+
+    def reset_application_filter(self):
+        """Сброс фильтра заявок и показ всех участников"""
+        if not self.current_title_id:
+            return
+        
+        self.btn_filter_preliminary.setChecked(False)
+        self.load_participants_for_title()
+        QMessageBox.information(self, "Сброс фильтра", "Показаны все заявки")
+
+    def confirm_selected_applications(self):
+        """Подтверждение выбранных заявок (перевод из предварительной в основную)"""
+        selection = self.table_view.selectionModel().selectedRows()
+        if not selection:
+            QMessageBox.warning(self, "Ошибка", "Выберите хотя бы одного участника для подтверждения")
+            return
+        
+        # Собираем ID выбранных участников
+        selected_ids = []
+        for index in selection:
+            row = index.row()
+            player_id = self.players_model.get_id(row)
+            if player_id:
+                selected_ids.append(player_id)
+        
+        if not selected_ids:
+            return
+        
+        # Запрашиваем подтверждение
+        reply = QMessageBox.question(self, "Подтверждение", 
+                                    f"Подтвердить заявки {len(selected_ids)} участников?\n"
+                                    f"Статус изменится с 'предварительная' на 'основная'.",
+                                    QMessageBox.Yes | QMessageBox.No)
+        
+        if reply == QMessageBox.Yes:
+            try:
+                # Обновляем статус заявок
+                for player_id in selected_ids:
+                    Player.update(application="основная").where(Player.id == player_id).execute()
+                
+                # Обновляем таблицу
+                if self.btn_filter_preliminary.isChecked():
+                    self.filter_preliminary_applications()
+                else:
+                    self.load_participants_for_title()
+                
+                QMessageBox.information(self, "Успех", f"Подтверждено {len(selected_ids)} заявок")
+                
+            except Exception as e:
+                QMessageBox.critical(self, "Ошибка", f"Не удалось подтвердить заявки: {str(e)}")
+
+    def on_patronymic_text_changed(self, text):
+        """Обработчик изменения текста в поле Отчество - обновление списка для QCompleter"""
+        if len(text) >= 2:
+            self.update_patronymic_completer(text)
+        else:
+            self.patronymic_completer.setModel(QStringListModel([]))
+        
+    def on_patronymic_enter_pressed(self):
+        """Обработка Enter в поле Отчество"""
+        text = self.patronymic_edit.text().strip()
+        if text:
+            # Добавляем отчество в таблицу Patronymic, если его там нет
+            patronymic, created = Patronymic.get_or_create(
+                patronymic=text,
+                defaults={'sex': "М"}  # По умолчанию мужской род
+            )
+        self.birth_date.setFocus()
+        self.birth_date.selectAll()
+
+    def on_coach_text_changed(self, text):
+        """Обработчик изменения текста в поле Тренер - обновление списка для QCompleter"""
+        if len(text) >= 2:
+            self.update_coach_completer(text)
+        else:
+            self.coach_completer.setModel(QStringListModel([]))
+
+    def on_coach_enter_pressed(self):
+        """Обработка Enter в поле Тренер"""
+        self.sex_combo.setFocus()
+
+    def on_fio_enter_pressed(self):
+        """Обработка Enter в поле ФИО - форматирование фамилии и имени"""
+        text = self.fio_edit.text().strip()
+        if not text:
+            self.patronymic_edit.setFocus()
+            return
+        
+        # Форматируем ФИО
+        formatted_text = self.format_fio_for_display(text)
+        self.fio_edit.setText(formatted_text)
+        
+        # Если есть текст, выполняем поиск в рейтинг-листе
+        if len(text) >= 2:
+            self.search_in_r_lists(text)
+        
+        # Переход к полю Отчество
+        self.patronymic_edit.setFocus()
+
+    def on_birth_date_enter_pressed(self):
+        """Обработка Enter в поле Дата рождения"""
+        self.city_edit.setFocus()
+
+    def on_rank_enter_pressed(self):
+        """Обработка Enter в поле Рейтинг"""
+        self.city_edit.setFocus()
+
+    def on_region_enter_pressed(self):
+        """Обработка Enter в поле Регион"""
+        self.razryad_combo.setFocus()
+
+    def on_razryad_enter_pressed(self):
+        """Обработка Enter в поле Разряд"""
+        self.coach_edit.setFocus()
+
+    def starts_with_ignore_case(self, text, prefix):
+        """Проверка, начинается ли строка с префикса (без учета регистра)"""
+        if not text or not prefix:
+            return False
+        return text.lower().startswith(prefix.lower())
+
+    def format_fio_for_display(self, fio_text):
+        """Форматирование ФИО: фамилия ЗАГЛАВНЫМИ, имя с заглавной буквы"""
+        if not fio_text:
+            return ""
+        
+        # Разбиваем строку на части
+        parts = fio_text.strip().split()
+        
+        if len(parts) == 1:
+            # Только фамилия
+            return parts[0].upper()
+        
+        elif len(parts) == 2:
+            # Фамилия и имя
+            surname = parts[0].upper()
+            name = parts[1].capitalize()
+            return f"{surname} {name}"
+        
+        else:
+            # Фамилия, имя, отчество
+            surname = parts[0].upper()
+            name = parts[1].capitalize()
+            patronymic = parts[2].capitalize()
+            return f"{surname} {name} {patronymic}"
+
+    def on_city_text_changed(self, text):
+        """Обработчик изменения текста в поле Город - обновление списка для QCompleter"""
+        if len(text) >= 2:
+            self.update_city_completer(text)
+        else:
+            self.city_completer.setModel(QStringListModel([]))
+
+    def on_birth_date_enter_pressed(self):
+        """Обработка Enter в поле Дата рождения"""
+        date_text = self.birth_date_edit.text()
+        # Проверка корректности даты
+        try:
+            day, month, year = map(int, date_text.split('.'))
+            if 1 <= day <= 31 and 1 <= month <= 12 and 1900 <= year <= 2024:
+                # Дата корректна
+                pass
+            else:
+                QMessageBox.warning(self, "Ошибка", "Введите корректную дату в формате ДД.ММ.ГГГГ")
+                self.birth_date_edit.setFocus()
+                return
+        except:
+            QMessageBox.warning(self, "Ошибка", "Введите дату в формате ДД.ММ.ГГГГ")
+            self.birth_date_edit.setFocus()
+            return
+        
+        self.rank_edit.setFocus()
+
+    def on_rank_enter_pressed(self):
+        """Обработка Enter в поле Рейтинг"""
+        self.city_edit.setFocus()
+
+    def parse_birth_date(self, date_str):
+        """Преобразование строки даты в объект date"""
+        try:
+            day, month, year = map(int, date_str.split('.'))
+            return date(year, month, day)
+        except:
+            return None
+
+    def on_razryad_activated(self):
+        """Обработка выбора в поле Разряд"""
+        self.coach_edit.setFocus()
+
+    def on_sex_activated(self):
+        """Обработка выбора в поле Пол (последнее поле)"""
+        # Можно оставить пустым или добавить автоматическое добавление
+        pass
+
+    def on_patronymic_enter_pressed(self):
+        """Обработка Enter в поле Отчество"""
+        text = self.patronymic_edit.text().strip()
+        if text and text.startswith('+ Добавить'):
+            # Извлекаем текст для добавления
+            new_text = text.replace('+ Добавить \'', '').replace('\'', '')
+            self.patronymic_edit.setText(new_text)
+            Patronymic.get_or_create(patronymic=new_text, defaults={'sex': "ьфт"})
+        
+        self.birth_date_edit.setFocus()
+        self.birth_date_edit.selectAll()
+
+    def on_birth_date_enter_pressed(self):
+        """Обработка Enter в поле Дата рождения"""
+        date_text = self.birth_date_edit.text()
+        import re
+        if re.match(r'\d{2}\.\d{2}\.\d{4}', date_text):
+            try:
+                day, month, year = map(int, date_text.split('.'))
+                if 1 <= day <= 31 and 1 <= month <= 12 and 1900 <= year <= 2024:
+                    # Автоматически подставляем рейтинг 0
+                    self.rank_edit.setText("0")
+                    self.city_edit.setFocus()
+                    return
+            except:
+                pass
+        QMessageBox.warning(self, "Ошибка", "Введите корректную дату в формате ДД.ММ.ГГГГ")
+        self.birth_date_edit.setFocus()
+        self.birth_date_edit.selectAll()
+
+    def on_rank_enter_pressed(self):
+        """Обработка Enter в поле Рейтинг"""
+        self.city_edit.setFocus()
+
+    def on_region_enter_pressed(self):
+        """Обработка Enter в поле Регион (ComboBox)"""
+        self.razryad_combo.setFocus()
+
+    def on_coach_enter_pressed(self):
+        """Обработка Enter в поле Тренер"""
+        text = self.coach_edit.text().strip()
+        if text and text.startswith('+ Добавить'):
+            new_text = text.replace('+ Добавить \'', '').replace('\'', '')
+            self.coach_edit.setText(new_text)
+            Coach.get_or_create(coach=new_text)
+        
+        self.sex_combo.setFocus()
+
+    def on_region_enter_pressed(self):
+        """Обработка Enter в поле Регион (ComboBox)"""
+        self.razryad_combo.setFocus()
+
+    def focusOutEvent(self, event):
+        """Событие потери фокуса - скрываем списки предложений"""
+        super().focusOutEvent(event)
+        
+        # Скрываем список предложений для отчества
+        if hasattr(self, 'patronymic_suggestions'):
+            QTimer.singleShot(200, lambda: self.patronymic_suggestions.setVisible(False))
+        
+        # Скрываем список предложений для города
+        if hasattr(self, 'city_suggestions'):
+            QTimer.singleShot(200, lambda: self.city_suggestions.setVisible(False))
+        
+        # Скрываем список предложений для тренера
+        if hasattr(self, 'coach_suggestions'):
+            QTimer.singleShot(200, lambda: self.coach_suggestions.setVisible(False))
+
+    def update_coach_completer(self, search_text):
+        """Обновление списка подсказок для тренера"""
+        try:
+            query = Coach.select().where(
+                Coach.coach.startswith(search_text)
+            ).limit(20)
+            
+            items = [item.coach for item in query]
+            
+            if not items:
+                items = [f"+ Добавить '{search_text}'"]
+            
+            model = QStringListModel(items)
+            self.coach_completer.setModel(model)
+            
+        except Exception as e:
+            print(f"Ошибка обновления списка тренеров: {e}")
+
+    def update_patronymic_completer(self, search_text):
+        """Обновление списка подсказок для отчества с фильтрацией по полу"""
+        try:
+            from models import Patronymic
+            
+            # Определяем пол текущего соревнования
+            if self.current_sex == "woman":
+                sex_filter = "w"
+            else:
+                sex_filter = "m"
+            
+            # Ищем отчества, начинающиеся с введенного текста, и соответствующие полу
+            query = Patronymic.select().where(
+                (Patronymic.patronymic.startswith(search_text)) &
+                (Patronymic.sex == sex_filter)
+            ).limit(20)
+            
+            items = [item.patronymic for item in query]
+            
+            # Добавляем предложение добавить новое, если ничего не найдено
+            if not items:
+                items = [f"+ Добавить '{search_text}'"]
+            
+            model = QStringListModel(items)
+            self.patronymic_completer.setModel(model)
+            
+        except Exception as e:
+            print(f"Ошибка обновления списка отчеств: {e}")
+
+    def update_city_completer(self, search_text):
+        """Обновление списка подсказок для города"""
+        try:
+            from models import City, Region
+            query = City.select().where(
+                City.city.startswith(search_text)
+            ).limit(20)
+            
+            items = []
+            for city in query:
+                items.append(f"{city.city}")
+            
+            if not items:
+                items = [f"+ Добавить '{search_text}'"]
+            
+            model = QStringListModel(items)
+            self.city_completer.setModel(model)
+            
+        except Exception as e:
+            print(f"Ошибка обновления списка городов: {e}")
+
+    def update_coach_completer(self, search_text):
+        """Обновление списка подсказок для тренера"""
+        try:
+            from models import Coach
+            query = Coach.select().where(
+                Coach.coach.startswith(search_text)
+            ).limit(20)
+            
+            items = [item.coach for item in query]
+            
+            if not items:
+                items = [f"+ Добавить '{search_text}'"]
+            
+            model = QStringListModel(items)
+            self.coach_completer.setModel(model)
+            
+        except Exception as e:
+            print(f"Ошибка обновления списка тренеров: {e}")
+
+    def on_patronymic_enter_pressed(self):
+        """Обработка Enter в поле Отчество"""
+        text = self.patronymic_edit.text().strip()
+        if text and text.startswith('+ Добавить'):
+            # Извлекаем текст для добавления
+            new_text = text.replace('+ Добавить \'', '').replace('\'', '')
+            self.patronymic_edit.setText(new_text)
+            
+            # Определяем пол для нового отчества
+            if self.current_sex == "woman":
+                sex_value = "w"
+            else:
+                sex_value = "m"
+            
+            from models import Patronymic
+            Patronymic.get_or_create(patronymic=new_text, defaults={'sex': sex_value})
+        
+        self.birth_date_edit.setFocus()
+        self.birth_date_edit.selectAll()
+
+    def on_city_enter_pressed(self):
+        """Обработка Enter в поле Город"""
+        city_text = self.city_edit.text().strip()
+        if not city_text:
+            self.region_combo.setFocus()
+            return
+        
+        try:
+            from models import City, Region
+            
+            # Ищем город в базе данных (без учета регистра)
+            city = City.get_or_none(City.city ** city_text)
+            
+            if city:
+                # Город найден, подставляем регион
+                print(f"Город найден: {city.city}, region_id={city.region_id}")
+                
+                # Ищем регион по ID в comboBox
+                region_found = False
+                for i in range(self.region_combo.count()):
+                    item_data = self.region_combo.itemData(i)
+                    if item_data == city.region_id:
+                        self.region_combo.setCurrentIndex(i)
+                        region_found = True
+                        QMessageBox.information(self, "Информация", 
+                                            f"Город '{city_text}' найден.\nРегион: {self.region_combo.currentText()}")
+                        break
+                
+                if not region_found:
+                    # Если не нашли по data, пробуем найти по названию региона
+                    region = Region.get_or_none(Region.id == city.region_id)
+                    if region:
+                        for i in range(self.region_combo.count()):
+                            if self.region_combo.itemText(i) == region.region:
+                                self.region_combo.setCurrentIndex(i)
+                                region_found = True
+                                break
+                    
+                    if not region_found:
+                        QMessageBox.warning(self, "Ошибка", f"Регион для города '{city_text}' не найден в списке")
+            else:
+                # Город не найден, предлагаем создать новый
+                reply = QMessageBox.question(self, "Новый город", 
+                                            f"Город '{city_text}' не найден в базе данных.\n"
+                                            f"Создать новый город с выбором региона?",
+                                            QMessageBox.Yes | QMessageBox.No)
+                
+                if reply == QMessageBox.Yes:
+                    # Открываем диалог выбора региона
+                    dialog = QDialog(self)
+                    dialog.setWindowTitle("Выбор региона")
+                    dialog.setModal(True)
+                    dialog.setFixedSize(400, 150)
+                    
+                    layout = QVBoxLayout(dialog)
+                    layout.addWidget(QLabel(f"Выберите регион для города '{city_text}':"))
+                    
+                    region_combo = QComboBox()
+                    # Загружаем все регионы
+                    regions = Region.select().order_by(Region.region)
+                    for region in regions:
+                        region_combo.addItem(region.region, region.id)
+                    
+                    layout.addWidget(region_combo)
+                    
+                    btn_layout = QHBoxLayout()
+                    ok_btn = QPushButton("OK")
+                    ok_btn.clicked.connect(dialog.accept)
+                    cancel_btn = QPushButton("Отмена")
+                    cancel_btn.clicked.connect(dialog.reject)
+                    btn_layout.addWidget(ok_btn)
+                    btn_layout.addWidget(cancel_btn)
+                    layout.addLayout(btn_layout)
+                    
+                    if dialog.exec_() == QDialog.Accepted:
+                        region_id = region_combo.currentData()
+                        if region_id:
+                            # Получаем название региона
+                            region = Region.get_or_none(Region.id == region_id)
+                            region_name = region.region if region else ""
+                            
+                            # Создаем новый город
+                            City.create(city=city_text, region_id=region_id)
+                            
+                            # Обновляем регион в основном comboBox
+                            region_found = False
+                            for i in range(self.region_combo.count()):
+                                if self.region_combo.itemData(i) == region_id:
+                                    self.region_combo.setCurrentIndex(i)
+                                    region_found = True
+                                    break
+                            
+                            if not region_found:
+                                # Если не нашли, добавляем новый регион в comboBox
+                                self.region_combo.addItem(region_name, region_id)
+                                self.region_combo.setCurrentIndex(self.region_combo.count() - 1)
+                            
+                            QMessageBox.information(self, "Успех", 
+                                                f"Город '{city_text}' добавлен в базу данных\n"
+                                                f"Регион: {region_name}")
+                        else:
+                            QMessageBox.warning(self, "Ошибка", "Регион не выбран")
+                else:
+                    # Пользователь отказался создавать новый город
+                    QMessageBox.information(self, "Информация", 
+                                        f"Город '{city_text}' не будет добавлен.\n"
+                                        f"Выберите регион вручную из списка.")
+        
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print(f"Ошибка при обработке города: {e}")
+            QMessageBox.critical(self, "Ошибка", f"Произошла ошибка: {str(e)}")
+        
+        # Переход к следующему полю
+        self.region_combo.setFocus()
+
+    def on_coach_enter_pressed(self):
+        """Обработка Enter в поле Тренер"""
+        text = self.coach_edit.text().strip()
+        if text and text.startswith('+ Добавить'):
+            new_text = text.replace('+ Добавить \'', '').replace('\'', '')
+            self.coach_edit.setText(new_text)
+            from models import Coach
+            Coach.get_or_create(coach=new_text)
+        
+        self.sex_combo.setFocus() 
+
+    def on_patronymic_text_changed(self, text):
+        """Обработчик изменения текста в поле Отчество - обновление списка для QCompleter"""
+        if len(text) >= 2:
+            self.update_patronymic_completer(text)
+        else:
+            self.patronymic_completer.setModel(QStringListModel([]))
+
+    def on_city_text_changed(self, text):
+        """Обработчик изменения текста в поле Город - обновление списка для QCompleter"""
+        if len(text) >= 2:
+            self.update_city_completer(text)
+        else:
+            self.city_completer.setModel(QStringListModel([]))
+
+    def on_coach_text_changed(self, text):
+        """Обработчик изменения текста в поле Тренер - обновление списка для QCompleter"""
+        if len(text) >= 2:
+            self.update_coach_completer(text)
+        else:
+            self.coach_completer.setModel(QStringListModel([]))           
+
+    def load_regions(self):
+        """Загрузка регионов в comboBox"""
+        self.region_combo.clear()
+        try:
+            from models import Region
+            regions = Region.select().order_by(Region.region)
+            for region in regions:
+                self.region_combo.addItem(region.region, region.id)
+            print(f"Загружено {regions.count()} регионов")  # Отладка
+        except Exception as e:
+            print(f"Ошибка загрузки регионов: {e}")
+
+    def sync_with_players_full(self, player_data):
+        """Синхронизация данных с таблицей Players_full"""
+        try:
+            from models import Players_full, Patronymic, Coach
+            
+            # Получаем или создаем запись в Players_full
+            players_full, created = Players_full.get_or_create(
+                player=player_data['player'],
+                bday=player_data['bday'],
+                defaults={
+                    'city': player_data['city'],
+                    'region': player_data['region'],
+                    'razryad': player_data['razryad'],
+                    'coach_id': player_data.get('coach_id'),
+                    'patronymic_id': player_data.get('patronymic_id'),
+                    'sex': player_data['sex']
+                }
+            )
+            
+            if not created:
+                # Обновляем существующую запись
+                players_full.city = player_data['city']
+                players_full.region = player_data['region']
+                players_full.razryad = player_data['razryad']
+                players_full.coach_id = player_data.get('coach_id')
+                players_full.patronymic_id = player_data.get('patronymic_id')
+                players_full.sex = player_data['sex']
+                players_full.save()
+                print(f"Обновлена запись в Players_full для {player_data['player']}")
+            else:
+                print(f"Создана новая запись в Players_full для {player_data['player']}")
+            
+            return players_full
+            
+        except Exception as e:
+            print(f"Ошибка синхронизации с Players_full: {e}")
+            return None
+
+# =================================
 class RatingLoaderThread(QThread):
     progress = pyqtSignal(int)
     status = pyqtSignal(str)
@@ -4480,7 +5821,7 @@ class RatingLoaderThread(QThread):
         except Exception as e:
             print(f"Ошибка загрузки в БД: {e}")
             raise
-# ==================================
+
 class RatingFileDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)

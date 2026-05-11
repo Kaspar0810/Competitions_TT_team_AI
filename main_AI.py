@@ -2009,8 +2009,11 @@ class MainWindow(QMainWindow):
     def on_tab_changed(self, index):
         """Смена вкладки"""
         self.current_tab_index = index
+        
+        # ОБНОВЛЯЕМ ЛЕВУЮ ПАНЕЛЬ ПРИ СМЕНЕ ВКЛАДКИ (очищаем и пересоздаем)
         self.update_left_panel_for_tab(index)
         
+        # Управление отображением правой панели в зависимости от вкладки
         if index == 0:  # Вкладка Титул
             self.competitions_label.setVisible(True)
             self.list_widget.setVisible(True)
@@ -2034,8 +2037,9 @@ class MainWindow(QMainWindow):
             self.search_results_list.setVisible(True)
             self.filters_widget.setVisible(False)
             
-            # АКТИВИРУЕМ ПОЛЕ ПОИСКА
-            self.fio_edit.setEnabled(True)
+            # Активируем поле поиска
+            if hasattr(self, 'fio_edit'):
+                self.fio_edit.setEnabled(True)
             
             # Загружаем участников для текущего соревнования
             if self.current_title_id:
@@ -2048,18 +2052,24 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(100, self.resize_table_for_participants)
             
         else:
+            # Для всех остальных вкладок
             self.competitions_label.setVisible(True)
             self.list_widget.setVisible(True)
             self.search_label.setVisible(False)
             self.search_results_list.setVisible(False)
             self.filters_widget.setVisible(False)
             
-            if index == 2:
-                self.competitions_label.setText("🏆 Команды")
-            elif index == 3:
-                self.competitions_label.setText("🤝 Пары")
-            elif index == 5:
-                self.competitions_label.setText("📊 Результаты")
+            # Устанавливаем заголовки для разных вкладок
+            tab_names = {
+                2: "🏆 Команды",
+                3: "🤝 Пары",
+                4: "⚙️ Система",
+                5: "📊 Результаты",
+                6: "⭐ Рейтинг",
+                7: "ℹ️ Дополнительно"
+            }
+            if index in tab_names:
+                self.competitions_label.setText(tab_names[index])
             
             # Загружаем соответствующие данные
             if index == 2 and self.current_title_id:
@@ -2070,6 +2080,9 @@ class MainWindow(QMainWindow):
                 self.load_results_for_title()
             else:
                 self.list_widget.clear()
+        
+        # Устанавливаем высоту для текущей вкладки
+        self.set_tab_height(index)
 
     def format_age_to_u(self, vozrast):
         """Преобразование возраста в формат UXX"""
@@ -2409,13 +2422,20 @@ class MainWindow(QMainWindow):
                     
             except Exception as e:
                 QMessageBox.critical(self, "Ошибка", f"Ошибка поиска: {str(e)}")
-     
+
     def update_left_panel_for_tab(self, tab_index):
-        """Обновление левой панели в зависимости от вкладки"""
+        """Обновление левой панели в зависимости от вкладки (полная очистка)"""
+        # ПОЛНОСТЬЮ ОЧИЩАЕМ ЛЕВУЮ ПАНЕЛЬ
         for i in reversed(range(self.dynamic_filters_layout.count())):
-            widget = self.dynamic_filters_layout.itemAt(i).widget()
-            if widget:
-                widget.deleteLater()
+            item = self.dynamic_filters_layout.itemAt(i)
+            if item.widget():
+                item.widget().deleteLater()
+            elif item.layout():
+                # Очищаем вложенные layout
+                while item.layout().count():
+                    child = item.layout().takeAt(0)
+                    if child.widget():
+                        child.widget().deleteLater()
         
         context = self.tab_context.get(tab_index, self.tab_context[0])
         
@@ -2463,6 +2483,10 @@ class MainWindow(QMainWindow):
                             btn.clicked.connect(self.export_players)
                         elif btn_text == "🗑️ Очистить":
                             btn.clicked.connect(self.clear_player_form)
+                    # Для вкладки Титул
+                    elif tab_index == 0:
+                        if btn_text == "📋 Создать новое":
+                            btn.clicked.connect(self.new_competition)
                     
                     row_layout.addWidget(btn)
                 
@@ -2506,13 +2530,6 @@ class MainWindow(QMainWindow):
                         btn.clicked.connect(self.break_pairs)
                     elif btn_text == "📊 Посев":
                         btn.clicked.connect(self.seeding_pairs)
-                elif tab_index == 4:  # Система
-                    if btn_text == "⚙️ Настройки":
-                        btn.clicked.connect(self.system_settings)
-                    elif btn_text == "📐 Параметры":
-                        btn.clicked.connect(self.system_parameters)
-                    elif btn_text == "🔄 Сброс":
-                        btn.clicked.connect(self.system_reset)
                 elif tab_index == 5:  # Результаты
                     if btn_text == "📥 Загрузить":
                         btn.clicked.connect(self.load_results)
@@ -2522,229 +2539,13 @@ class MainWindow(QMainWindow):
                         btn.clicked.connect(self.clear_results)
                     elif btn_text == "🧮 Рассчитать":
                         btn.clicked.connect(self.calculate_results)
-                elif tab_index == 6:  # Рейтинг
-                    if btn_text == "🔄 Обновить":
-                        btn.clicked.connect(self.update_rating)
-                    elif btn_text == "🏆 Топ-10":
-                        btn.clicked.connect(self.show_top10)
-                    elif btn_text == "📊 Расчёт":
-                        btn.clicked.connect(self.calculate_rating)
-                elif tab_index == 7:  # Дополнительно
-                    if btn_text == "📝 Заметки":
-                        btn.clicked.connect(self.show_notes)
-                    elif btn_text == "❓ Справка":
-                        btn.clicked.connect(self.show_help)
-                    elif btn_text == "ℹ️ О программе":
-                        btn.clicked.connect(self.about_dialog)
                 
                 self.dynamic_filters_layout.addWidget(btn)
         
-        # Добавляем фильтры для вкладки Участники
+        # Добавляем фильтры ТОЛЬКО для вкладки Участники
         if tab_index == 1:
-            # Разделитель
-            line = QFrame()
-            line.setFrameShape(QFrame.HLine)
-            line.setFrameShadow(QFrame.Sunken)
-            line.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
-            self.dynamic_filters_layout.addWidget(line)
-            
-            # Создаем контейнер для фильтров с горизонтальным расположением
-            filters_container = QWidget()
-            filters_layout = QVBoxLayout(filters_container)
-            filters_layout.setSpacing(8)
-            
-            # Заголовок фильтров
-            filter_title = QLabel("📊 Сортировка")
-            filter_title.setStyleSheet("font-weight: bold; font-size: 12px; margin-top: 5px;")
-            filters_layout.addWidget(filter_title)
-            
-            # Строка с кнопками сортировки
-            sort_layout = QHBoxLayout()
-            sort_layout.setSpacing(10)
-            
-            btn_sort_alpha = QPushButton("🔤 По алфавиту (А-Я)")
-            btn_sort_alpha.setStyleSheet("""
-                QPushButton {
-                    background-color: #FF9800;
-                    color: white;
-                    border: none;
-                    border-radius: 4px;
-                    padding: 6px;
-                    font-size: 10px;
-                    font-weight: bold;
-                }
-                QPushButton:hover { background-color: #F57C00; }
-            """)
-            btn_sort_alpha.clicked.connect(self.filter_by_alphabet)
-            sort_layout.addWidget(btn_sort_alpha)
-            
-            btn_sort_rating = QPushButton("📊 По убыванию рейтинга")
-            btn_sort_rating.setStyleSheet("""
-                QPushButton {
-                    background-color: #FF9800;
-                    color: white;
-                    border: none;
-                    border-radius: 4px;
-                    padding: 6px;
-                    font-size: 10px;
-                    font-weight: bold;
-                }
-                QPushButton:hover { background-color: #F57C00; }
-            """)
-            btn_sort_rating.clicked.connect(self.filter_by_rating)
-            sort_layout.addWidget(btn_sort_rating)
-            
-            filters_layout.addLayout(sort_layout)
-            
-            # Заголовок фильтров
-            filter_title2 = QLabel("🎯 Фильтры")
-            filter_title2.setStyleSheet("font-weight: bold; font-size: 12px; margin-top: 5px;")
-            filters_layout.addWidget(filter_title2)
-            
-            # Строка с кнопками фильтров
-            filter_layout = QHBoxLayout()
-            filter_layout.setSpacing(10)
-            
-            btn_filter_region = QPushButton("🗺️ По регионам")
-            btn_filter_region.setStyleSheet("""
-                QPushButton {
-                    background-color: #9C27B0;
-                    color: white;
-                    border: none;
-                    border-radius: 4px;
-                    padding: 6px;
-                    font-size: 10px;
-                    font-weight: bold;
-                }
-                QPushButton:hover { background-color: #7B1FA2; }
-            """)
-            btn_filter_region.clicked.connect(self.filter_by_region)
-            filter_layout.addWidget(btn_filter_region)
-            
-            btn_filter_city = QPushButton("🏙️ По городам")
-            btn_filter_city.setStyleSheet("""
-                QPushButton {
-                    background-color: #9C27B0;
-                    color: white;
-                    border: none;
-                    border-radius: 4px;
-                    padding: 6px;
-                    font-size: 10px;
-                    font-weight: bold;
-                }
-                QPushButton:hover { background-color: #7B1FA2; }
-            """)
-            btn_filter_city.clicked.connect(self.filter_by_city)
-            filter_layout.addWidget(btn_filter_city)
-            
-            btn_filter_coach = QPushButton("👨‍🏫 По тренерам")
-            btn_filter_coach.setStyleSheet("""
-                QPushButton {
-                    background-color: #9C27B0;
-                    color: white;
-                    border: none;
-                    border-radius: 4px;
-                    padding: 6px;
-                    font-size: 10px;
-                    font-weight: bold;
-                }
-                QPushButton:hover { background-color: #7B1FA2; }
-            """)
-            btn_filter_coach.clicked.connect(self.filter_by_coach)
-            filter_layout.addWidget(btn_filter_coach)
-            
-            filters_layout.addLayout(filter_layout)
-            
-            # Кнопка сброса фильтров
-            btn_reset = QPushButton("🔄 Сбросить все фильтры")
-            btn_reset.setStyleSheet("""
-                QPushButton {
-                    background-color: #f44336;
-                    color: white;
-                    border: none;
-                    border-radius: 4px;
-                    padding: 6px;
-                    font-size: 10px;
-                    font-weight: bold;
-                }
-                QPushButton:hover { background-color: #D32F2F; }
-            """)
-            btn_reset.clicked.connect(self.reset_filters)
-            filters_layout.addWidget(btn_reset)
-            
-            self.dynamic_filters_layout.addWidget(filters_container)
-
-            # Разделитель перед кнопками заявок
-            line4 = QFrame()
-            line4.setFrameShape(QFrame.HLine)
-            line4.setFrameShadow(QFrame.Sunken)
-            line4.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
-            self.dynamic_filters_layout.addWidget(line4)
-            
-            # Заголовок секции заявок
-            filter_title3 = QLabel("📋 Управление заявками")
-            filter_title3.setStyleSheet("font-weight: bold; font-size: 12px; margin-top: 5px;")
-            self.dynamic_filters_layout.addWidget(filter_title3)
-            
-            # Горизонтальные кнопки для фильтрации и подтверждения заявок
-            application_layout = QHBoxLayout()
-            application_layout.setSpacing(10)
-            
-            # Кнопка фильтрации предварительных заявок
-            self.btn_filter_preliminary = QPushButton("📝 Предварительные")
-            self.btn_filter_preliminary.setCheckable(True)
-            self.btn_filter_preliminary.setStyleSheet("""
-                QPushButton {
-                    background-color: #FF9800;
-                    color: white;
-                    border: none;
-                    border-radius: 4px;
-                    padding: 6px;
-                    font-size: 10px;
-                    font-weight: bold;
-                }
-                QPushButton:hover { background-color: #F57C00; }
-                QPushButton:checked { background-color: #E65100; }
-            """)
-            self.btn_filter_preliminary.clicked.connect(self.filter_preliminary_applications)
-            application_layout.addWidget(self.btn_filter_preliminary)
-            
-            # Кнопка подтверждения выбранных заявок
-            btn_confirm = QPushButton("✅ Подтвердить выбранные")
-            btn_confirm.setStyleSheet("""
-                QPushButton {
-                    background-color: #4CAF50;
-                    color: white;
-                    border: none;
-                    border-radius: 4px;
-                    padding: 6px;
-                    font-size: 10px;
-                    font-weight: bold;
-                }
-                QPushButton:hover { background-color: #45a049; }
-            """)
-            btn_confirm.clicked.connect(self.confirm_selected_applications)
-            application_layout.addWidget(btn_confirm)
-            
-            self.dynamic_filters_layout.addLayout(application_layout)
-            
-            # Кнопка сброса фильтра заявок
-            btn_reset_application = QPushButton("🔄 Показать все заявки")
-            btn_reset_application.setStyleSheet("""
-                QPushButton {
-                    background-color: #2196F3;
-                    color: white;
-                    border: none;
-                    border-radius: 4px;
-                    padding: 6px;
-                    font-size: 10px;
-                    font-weight: bold;
-                }
-                QPushButton:hover { background-color: #1976D2; }
-            """)
-            btn_reset_application.clicked.connect(self.reset_application_filter)
-            self.dynamic_filters_layout.addWidget(btn_reset_application)
-        
+            self.add_participant_filters()
+    
         self.dynamic_filters_layout.addStretch()
 
     def add_player_from_form(self):
@@ -2817,7 +2618,7 @@ class MainWindow(QMainWindow):
         elif age_check_result == "too_old":
             QMessageBox.warning(self, "Ошибка", 
                             f"Игрок превышает возрастное ограничение ({title.vozrast}).\n"
-                            f"На дату начала соревнования ({competition_start_date.strftime('%d.%m.%Y')}) игроку должно быть не более {self.get_max_age_from_text(title.vozrast)} лет.")
+                            f"На год соревнования ({competition_start_date.strftime('%d.%m.%Y')}) игроку должно быть не более {self.get_max_age_from_text(title.vozrast)} лет.")
             return
         
         # Определяем статус заявки (application)
@@ -4699,7 +4500,7 @@ class MainWindow(QMainWindow):
         max_age = self.get_max_age_from_text(age_limit_text)
         
         # Проверяем максимальный возраст
-        if max_age is not None and age_at_competition > max_age:
+        if max_age is not None and age_at_competition >= max_age:
             return "too_old"
         
         return "ok"
@@ -5553,7 +5354,216 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Ошибка синхронизации с Players_full: {e}")
             return None
+        
+    def add_participant_filters(self):
+        """Добавление фильтров для вкладки Участники"""
+        # Разделитель
+        line = QFrame()
+        line.setFrameShape(QFrame.HLine)
+        line.setFrameShadow(QFrame.Sunken)
+        line.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
+        self.dynamic_filters_layout.addWidget(line)
+        
+        # Создаем контейнер для фильтров
+        filters_container = QWidget()
+        filters_layout = QVBoxLayout(filters_container)
+        filters_layout.setSpacing(8)
+        
+        # Заголовок фильтров
+        filter_title = QLabel("📊 Сортировка")
+        filter_title.setStyleSheet("font-weight: bold; font-size: 12px; margin-top: 5px;")
+        filters_layout.addWidget(filter_title)
+        
+        # Строка с кнопками сортировки
+        sort_layout = QHBoxLayout()
+        sort_layout.setSpacing(10)
+        
+        btn_sort_alpha = QPushButton("🔤 По алфавиту (А-Я)")
+        btn_sort_alpha.setStyleSheet("""
+            QPushButton {
+                background-color: #FF9800;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 6px;
+                font-size: 10px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #F57C00; }
+        """)
+        btn_sort_alpha.clicked.connect(self.filter_by_alphabet)
+        sort_layout.addWidget(btn_sort_alpha)
+        
+        btn_sort_rating = QPushButton("📊 По убыванию рейтинга")
+        btn_sort_rating.setStyleSheet("""
+            QPushButton {
+                background-color: #FF9800;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 6px;
+                font-size: 10px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #F57C00; }
+        """)
+        btn_sort_rating.clicked.connect(self.filter_by_rating)
+        sort_layout.addWidget(btn_sort_rating)
+        
+        filters_layout.addLayout(sort_layout)
+        
+        # Заголовок фильтров
+        filter_title2 = QLabel("🎯 Фильтры")
+        filter_title2.setStyleSheet("font-weight: bold; font-size: 12px; margin-top: 5px;")
+        filters_layout.addWidget(filter_title2)
+        
+        # Строка с кнопками фильтров
+        filter_layout = QHBoxLayout()
+        filter_layout.setSpacing(10)
+        
+        btn_filter_region = QPushButton("🗺️ По регионам")
+        btn_filter_region.setStyleSheet("""
+            QPushButton {
+                background-color: #9C27B0;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 6px;
+                font-size: 10px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #7B1FA2; }
+        """)
+        btn_filter_region.clicked.connect(self.filter_by_region)
+        filter_layout.addWidget(btn_filter_region)
+        
+        btn_filter_city = QPushButton("🏙️ По городам")
+        btn_filter_city.setStyleSheet("""
+            QPushButton {
+                background-color: #9C27B0;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 6px;
+                font-size: 10px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #7B1FA2; }
+        """)
+        btn_filter_city.clicked.connect(self.filter_by_city)
+        filter_layout.addWidget(btn_filter_city)
+        
+        btn_filter_coach = QPushButton("👨‍🏫 По тренерам")
+        btn_filter_coach.setStyleSheet("""
+            QPushButton {
+                background-color: #9C27B0;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 6px;
+                font-size: 10px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #7B1FA2; }
+        """)
+        btn_filter_coach.clicked.connect(self.filter_by_coach)
+        filter_layout.addWidget(btn_filter_coach)
+        
+        filters_layout.addLayout(filter_layout)
+        
+        # Кнопка сброса фильтров
+        btn_reset = QPushButton("🔄 Сбросить все фильтры")
+        btn_reset.setStyleSheet("""
+            QPushButton {
+                background-color: #f44336;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 6px;
+                font-size: 10px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #D32F2F; }
+        """)
+        btn_reset.clicked.connect(self.reset_filters)
+        filters_layout.addWidget(btn_reset)
+        
+        self.dynamic_filters_layout.addWidget(filters_container)
+        
+        # Разделитель перед кнопками заявок
+        line4 = QFrame()
+        line4.setFrameShape(QFrame.HLine)
+        line4.setFrameShadow(QFrame.Sunken)
+        line4.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
+        self.dynamic_filters_layout.addWidget(line4)
+        
+        # Заголовок секции заявок
+        filter_title3 = QLabel("📋 Управление заявками")
+        filter_title3.setStyleSheet("font-weight: bold; font-size: 12px; margin-top: 5px;")
+        self.dynamic_filters_layout.addWidget(filter_title3)
+        
+        # Горизонтальные кнопки для фильтрации и подтверждения заявок
+        application_layout = QHBoxLayout()
+        application_layout.setSpacing(10)
+        
+        # Кнопка фильтрации предварительных заявок
+        self.btn_filter_preliminary = QPushButton("📝 Предварительные")
+        self.btn_filter_preliminary.setCheckable(True)
+        self.btn_filter_preliminary.setStyleSheet("""
+            QPushButton {
+                background-color: #FF9800;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 6px;
+                font-size: 10px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #F57C00; }
+            QPushButton:checked { background-color: #E65100; }
+        """)
+        self.btn_filter_preliminary.clicked.connect(self.filter_preliminary_applications)
+        application_layout.addWidget(self.btn_filter_preliminary)
+        
+        # Кнопка подтверждения выбранных заявок
+        btn_confirm = QPushButton("✅ Подтвердить выбранные")
+        btn_confirm.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 6px;
+                font-size: 10px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #45a049; }
+        """)
+        btn_confirm.clicked.connect(self.confirm_selected_applications)
+        application_layout.addWidget(btn_confirm)
+        
+        self.dynamic_filters_layout.addLayout(application_layout)
+        
+        # Кнопка сброса фильтра заявок
+        btn_reset_application = QPushButton("🔄 Показать все заявки")
+        btn_reset_application.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 6px;
+                font-size: 10px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #1976D2; }
+        """)
+        btn_reset_application.clicked.connect(self.reset_application_filter)
+        self.dynamic_filters_layout.addWidget(btn_reset_application)
 
+    def search_players_dialog(self):
+        """Поиск участников - вызов диалога"""
+        self.search_players()  # вызываем существующий метод
 # =================================
 class RatingLoaderThread(QThread):
     progress = pyqtSignal(int)

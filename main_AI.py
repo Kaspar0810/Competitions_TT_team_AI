@@ -2736,34 +2736,6 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось добавить участника: {str(e)}")
 
-    def _delete_player_from_table(self):
-        """Удаление выбранного участника из таблицы"""
-        selection = self.table_view.selectedIndexes()
-        if not selection:
-            QMessageBox.warning(self, "Ошибка", "Выберите участника для удаления")
-            return
-        
-        row = selection[0].row()
-        
-        # Получаем ID участника из модели
-        player_id = self.players_model.get_id(row)
-        if not player_id:
-            return
-        
-        # Получаем ФИО для подтверждения
-        fio = self.players_model.get_fio(row)
-        reply = QMessageBox.question(self, "Подтверждение", 
-                                    f"Удалить участника {fio}?",
-                                    QMessageBox.Yes | QMessageBox.No)
-        
-        if reply == QMessageBox.Yes:
-            try:
-                Player.delete().where(Player.id == player_id).execute()
-                self.load_participants_for_title()
-                QMessageBox.information(self, "Успех", "Участник удалён")
-            except Exception as e:
-                QMessageBox.critical(self, "Ошибка", f"Ошибка: {str(e)}")
-
     def delete_player_from_table(self):
         """Удаление выбранного участника с записью в таблицу Delete_player"""
         selection = self.table_view.selectedIndexes()
@@ -3404,42 +3376,69 @@ class MainWindow(QMainWindow):
                 print(f"Ошибка: {e}")
 
     def filter_by_coach(self):
-        """Фильтр по тренерам"""
+        """Фильтр по тренерам (поиск по вхождению, учитывая нескольких тренеров)"""
         if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
             return
         
-        coach_name, ok = QInputDialog.getText(self, "Фильтр по тренеру", "Введите фамилию тренера:")
+        coach_name, ok = QInputDialog.getText(self, "Фильтр по тренеру", 
+                                            "Введите фамилию тренера (или часть):")
         if ok and coach_name:
+            coach_search = coach_name.strip().lower()
+            
             try:
-                # Ищем ID тренера
-                coach = Coach.get_or_none(Coach.coach.contains(coach_name))
-                if coach:
-                    query = Player.select().where(
-                        (Player.title_id == self.current_title_id) &
-                        (Player.coach_id == coach.id)
-                    )
-                    if self.current_sex:
-                        query = query.where(Player.sex == self.current_sex)
+                # Получаем всех игроков в соревновании
+                query = Player.select().where(Player.title_id == self.current_title_id)
+                
+                if self.current_sex == "woman":
+                    query = query.where(Player.sex == "woman")
+                elif self.current_sex == "man":
+                    query = query.where(Player.sex == "man")
+                
+                filtered_players = []
+                
+                for player in query:
+                    # Получаем имя тренера
+                    coach_text = ""
+                    if player.coach_id:
+                        coach = Coach.get_or_none(Coach.id == player.coach_id)
+                        if coach:
+                            coach_text = coach.coach.lower()
                     
-                    participants_data = []
-                    for player in query:
-                        participants_data.append({
+                    # Проверяем, содержится ли искомая строка в имени тренера
+                    if coach_search in coach_text:
+                        # Получаем данные для отображения
+                        coach_name_display = ""
+                        if player.coach_id:
+                            coach_obj = Coach.get_or_none(Coach.id == player.coach_id)
+                            if coach_obj:
+                                coach_name_display = coach_obj.coach
+                        
+                        filtered_players.append({
                             'id': player.id,
-                            'fio': player.fio or "",
+                            'fio': player.fio or player.player or "",
                             'birth_date': player.bday,
                             'rank': player.rank or 0,
                             'city': player.city or "",
                             'region': player.region or "",
                             'razryad': player.razryad or "",
-                            'coach': coach.coach,
-                            'sex': player.sex or ""
+                            'coach': coach_name_display,
+                            'sex': player.sex or "",
+                            'application': player.application or "предварительная"
                         })
-                    self.players_model.setData(participants_data)
-                    QMessageBox.information(self, "Фильтр", f"Найдено {len(participants_data)} участников")
+                
+                if filtered_players:
+                    self.players_model.setData(filtered_players)
+                    self.update_table_header()
+                    QMessageBox.information(self, "Фильтр", 
+                                        f"Найдено {len(filtered_players)} участников\n"
+                                        f"с тренером: {coach_name}")
                 else:
-                    QMessageBox.information(self, "Фильтр", f"Тренер {coach_name} не найден")
+                    QMessageBox.information(self, "Фильтр", 
+                                        f"Участники с тренером '{coach_name}' не найдены")
+                    
             except Exception as e:
-                print(f"Ошибка: {e}")
+                QMessageBox.critical(self, "Ошибка", f"Ошибка фильтрации: {str(e)}")
 
     def reset_filters(self):
         """Сброс всех фильтров и сортировок"""
@@ -5446,7 +5445,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Ошибка синхронизации с Players_full: {e}")
             return None
-        
+    
     def add_participant_filters(self):
         """Добавление фильтров для вкладки Участники"""
         # Разделитель
@@ -5652,13 +5651,13 @@ class MainWindow(QMainWindow):
         """)
         btn_reset_application.clicked.connect(self.reset_application_filter)
         self.dynamic_filters_layout.addWidget(btn_reset_application)
-
-        # Разделитель
-        line4 = QFrame()
-        line4.setFrameShape(QFrame.HLine)
-        line4.setFrameShadow(QFrame.Sunken)
-        line4.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
-        self.dynamic_filters_layout.addWidget(line4)
+        
+        # Разделитель перед архивом
+        line5 = QFrame()
+        line5.setFrameShape(QFrame.HLine)
+        line5.setFrameShadow(QFrame.Sunken)
+        line5.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
+        self.dynamic_filters_layout.addWidget(line5)
         
         # Заголовок архива
         filter_title_archive = QLabel("🗑️ Архив")

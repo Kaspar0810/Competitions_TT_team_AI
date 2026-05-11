@@ -2132,9 +2132,10 @@ class MainWindow(QMainWindow):
             self.city_edit.setText(player.city or "")
             
             # Устанавливаем регион в comboBox
-            index = self.region_combo.findText(player.region or "")
-            if index >= 0:
-                self.region_combo.setCurrentIndex(index)
+            if player.region:
+                index = self.region_combo.findText(player.region)
+                if index >= 0:
+                    self.region_combo.setCurrentIndex(index)
             
             # Устанавливаем разряд
             index = self.razryad_combo.findText(player.razryad or "б/р")
@@ -2148,6 +2149,7 @@ class MainWindow(QMainWindow):
                     coach_text = coach.coach
             self.coach_edit.setText(coach_text)
             
+            # Устанавливаем дату рождения
             if player.bday:
                 if isinstance(player.bday, date):
                     self.birth_date_edit.setText(player.bday.strftime("%d.%m.%Y"))
@@ -2185,7 +2187,7 @@ class MainWindow(QMainWindow):
         self.fio_edit.setText(full_name)
         
         patronymic_text = self.patronymic_edit.text().strip()
-        region = self.region_edit.text().strip()
+        region = self.region_combo.currentText()
         coach_text = self.coach_edit.text().strip()
         rank_text = self.rank_edit.text().strip()
         
@@ -2203,7 +2205,10 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Рейтинг должен быть числом")
             return
         
-        birth_date = self.birth_date.date().toPyDate()
+        birth_date = self.parse_birth_date(self.birth_date_edit.text())
+        if not birth_date:
+            QMessageBox.warning(self, "Ошибка", "Введите корректную дату рождения")
+            return
         
         # Получаем дату начала соревнования
         title = Title.get_by_id(self.current_title_id)
@@ -2237,19 +2242,17 @@ class MainWindow(QMainWindow):
             if patronymic_text and patronymic_text != "-":
                 patronymic, created = Patronymic.get_or_create(
                     patronymic=patronymic_text,
-                    defaults={'sex': sex}
+                    defaults={'sex': "w" if sex == "woman" else "m"}
                 )
                 patronymic_id = patronymic.id
             
             # Преобразуем тренера в ID
             coach_id = None
             if coach_text and coach_text != "-":
-                coach, created = Coach.get_or_create(
-                    coach=coach_text
-                )
+                coach, created = Coach.get_or_create(coach=coach_text)
                 coach_id = coach.id
             
-            # Обновляем данные участника
+            # Обновляем данные участника в таблице Player
             update_data = {
                 'player': player_name,
                 'fio': full_name,
@@ -2266,9 +2269,21 @@ class MainWindow(QMainWindow):
                 'mesto': 0
             }
             
-            # Обновляем в БД
             query = Player.update(**update_data).where(Player.id == self.editing_player_id)
             query.execute()
+            
+            # СИНХРОНИЗАЦИЯ С TABLICA Players_full
+            players_full_data = {
+                'player': player_name,
+                'bday': birth_date,
+                'city': city,
+                'region': region,
+                'razryad': razryad,
+                'coach_id': coach_id,
+                'patronymic_id': patronymic_id,
+                'sex': sex
+            }
+            self.sync_with_players_full(players_full_data)
             
             # Очищаем форму и сбрасываем ID редактирования
             self.clear_participant_form()
@@ -2280,7 +2295,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Успех", "Данные участника успешно обновлены")
             
         except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить изменения: {str(e)}")  
+            QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить изменения: {str(e)}")
 
     def export_players(self):
         """Экспорт списка участников в файл"""
@@ -2744,17 +2759,18 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Введите ФИО участника")
             return
         
-        # Форматируем ФИО
-        formatted_fio = self.format_fio_for_display(fio_input)
-        self.fio_edit.setText(formatted_fio)
-        fio_input = formatted_fio
-        
         patronymic_text = self.patronymic_edit.text().strip()
         city = self.city_edit.text().strip()
         region = self.region_combo.currentText()
         coach_text = self.coach_edit.text().strip()
         rank_text = self.rank_edit.text().strip()
         
+        # Форматируем ФИО
+        fio_input =f"{fio_input} {patronymic_text}"
+        formatted_fio = self.format_fio_for_display(fio_input)
+        self.fio_edit.setText(formatted_fio)
+        fio_input = formatted_fio
+
         # Получаем дату рождения из QLineEdit
         birth_date_str = self.birth_date_edit.text()
         birth_date = self.parse_birth_date(birth_date_str)
@@ -2819,7 +2835,7 @@ class MainWindow(QMainWindow):
             if patronymic_text and patronymic_text != "-":
                 patronymic, created = Patronymic.get_or_create(
                     patronymic=patronymic_text,
-                    defaults={'sex': "man"}
+                    defaults={'sex': "w" if sex == "woman" else "m"}
                 )
                 patronymic_id = patronymic.id
             
@@ -2829,7 +2845,7 @@ class MainWindow(QMainWindow):
                 coach, created = Coach.get_or_create(coach=coach_text)
                 coach_id = coach.id
             
-            # Проверяем, существует ли уже такой участник
+            # Проверяем, существует ли уже такой участник в текущем соревновании
             existing = Player.get_or_none(
                 (Player.player == player_name) & 
                 (Player.title_id == self.current_title_id)
@@ -2882,6 +2898,19 @@ class MainWindow(QMainWindow):
                     coach_id=coach_id,
                     mesto=0
                 )
+            
+            # СИНХРОНИЗАЦИЯ С TABLICA Players_full
+            players_full_data = {
+                'player': player_name,
+                'bday': birth_date,
+                'city': city,
+                'region': region,
+                'razryad': razryad,
+                'coach_id': coach_id,
+                'patronymic_id': patronymic_id,
+                'sex': sex
+            }
+            self.sync_with_players_full(players_full_data)
             
             # Обновляем таблицу
             self.load_participants_for_title()
@@ -3744,23 +3773,27 @@ class MainWindow(QMainWindow):
         """Выбор предложения из списка - заполнение формы"""
         data = item.data(Qt.UserRole)
         if data:
-            # Заполняем поля формы
             self.fio_edit.setText(data['fio'])
             
             # Устанавливаем дату рождения
             if data['birthday']:
                 if isinstance(data['birthday'], date):
-                    self.birth_date.setDate(QDate(data['birthday'].year, data['birthday'].month, data['birthday'].day))
+                    self.birth_date_edit.setText(data['birthday'].strftime("%d.%m.%Y"))
                 elif isinstance(data['birthday'], str):
                     try:
                         d = datetime.strptime(data['birthday'], "%Y-%m-%d").date()
-                        self.birth_date.setDate(QDate(d.year, d.month, d.day))
+                        self.birth_date_edit.setText(d.strftime("%d.%m.%Y"))
                     except:
                         pass
             
-            # Устанавливаем город и регион
+            # Устанавливаем город
             self.city_edit.setText(data['city'] or "")
-            self.region_edit.setText(data['region'] or "")
+            
+            # Устанавливаем регион в comboBox
+            if data.get('region'):
+                index = self.region_combo.findText(data['region'])
+                if index >= 0:
+                    self.region_combo.setCurrentIndex(index)
             
             # Устанавливаем пол
             if data['sex'] == 'man':
@@ -3768,62 +3801,70 @@ class MainWindow(QMainWindow):
             else:
                 self.sex_combo.setCurrentIndex(1)
             
-            # # Автоматически устанавливаем разряд (можно настроить по номеру списка)
-            # if data['list']:
-            #     if data['list'] <= 100:
-            #         self.razryad_combo.setCurrentText("1 разряд")
-            #     elif data['list'] <= 200:
-            #         self.razryad_combo.setCurrentText("2 разряд")
-            #     else:
-            #         self.razryad_combo.setCurrentText("3 разряд")
-            
-            # Скрываем список предложений
             self.suggestions_list.clear()
             self.suggestions_list.setVisible(False)
-            
-            # Устанавливаем фокус на следующее поле
             self.patronymic_edit.setFocus()
-            
-            QMessageBox.information(self, "Данные загружены", 
-                                f"Данные из {data['source']}\n"
-                                f"ФИО: {data['fio']}\n"
-                                f"Дата рождения: {data['birthday']}\n"
-                                f"Город: {data['city']}\n"
-                                f"Регион: {data['region']}")
             
     def focusOutEvent(self, event):
         """Событие потери фокуса - скрываем список предложений"""
         super().focusOutEvent(event)
         if hasattr(self, 'suggestions_list'):
             QTimer.singleShot(200, lambda: self.suggestions_list.setVisible(False))
-
+            
     def on_search_result_selected(self, item):
         """Выбор результата поиска - заполнение формы"""
         data = item.data(Qt.UserRole)
         if data:
-            # Форматируем ФИО для отображения в форме
+            # ФОРМАТИРУЕМ И ЗАПОЛНЯЕМ ФИО
             raw_fio = data['fio']
-            formatted_fio = self.format_fio_for_display(raw_fio)
+            # Разбиваем ФИО на части
+            fio_parts = raw_fio.split()
+            if len(fio_parts) >= 2:
+                # Фамилия заглавными, имя с заглавной
+                formatted_fio = f"{fio_parts[0].upper()} {fio_parts[1].capitalize()}"
+                if len(fio_parts) >= 3:
+                    formatted_fio += f" {fio_parts[2].capitalize()}"
+            else:
+                formatted_fio = raw_fio.capitalize()
+            
             self.fio_edit.setText(formatted_fio)
             
             # Устанавливаем дату рождения
+            birth_date = None
             if data['birthday']:
                 if isinstance(data['birthday'], date):
-                    self.birth_date.setDate(QDate(data['birthday'].year, data['birthday'].month, data['birthday'].day))
+                    birth_date = data['birthday']
+                    self.birth_date_edit.setText(birth_date.strftime("%d.%m.%Y"))
                 elif isinstance(data['birthday'], str):
                     try:
-                        d = datetime.strptime(data['birthday'], "%Y-%m-%d").date()
-                        self.birth_date.setDate(QDate(d.year, d.month, d.day))
+                        for fmt in ["%Y-%m-%d", "%d.%m.%Y", "%Y/%m/%d"]:
+                            try:
+                                birth_date = datetime.strptime(data['birthday'], fmt).date()
+                                self.birth_date_edit.setText(birth_date.strftime("%d.%m.%Y"))
+                                break
+                            except:
+                                continue
                     except:
                         pass
             
-            # Устанавливаем город и регион
+            # Устанавливаем город
             city = data['city'] if data['city'] else ""
             self.city_edit.setText(city)
-            self.region_edit.setText(data['region'] or "")
+            
+            # Устанавливаем регион в ComboBox
+            region = data['region'] if data['region'] else ""
+            if region:
+                index = self.region_combo.findText(region)
+                if index >= 0:
+                    self.region_combo.setCurrentIndex(index)
+                else:
+                    # Если регион не найден в списке, добавляем его
+                    self.region_combo.addItem(region)
+                    self.region_combo.setCurrentIndex(self.region_combo.count() - 1)
             
             # Устанавливаем пол
-            if data['sex'] == 'man':
+            player_sex = 'man' if (data['sex'] == 'man' or data['sex'] == 'man') else 'woman'
+            if player_sex == 'man':
                 self.sex_combo.setCurrentIndex(0)
                 if self.current_sex == "woman":
                     QMessageBox.warning(self, "Внимание", 
@@ -3836,14 +3877,70 @@ class MainWindow(QMainWindow):
                                     "Найден спортсмен женского пола, но выбран фильтр 'Мужчины'.\n"
                                     "Пожалуйста, переключите фильтр на 'Женщины' для добавления.")
             
+            # Устанавливаем рейтинг (если есть)
+            if data.get('list'):
+                self.rank_edit.setText(str(data['list']))
+            
+            # ПОИСК В ТАБЛИЦЕ Players_full
+            if birth_date and city:
+                existing_player = self.find_player_in_players_full(formatted_fio, birth_date, city)
+                
+                if existing_player:
+                    # Заполняем недостающие поля из найденной записи
+                    print(f"Найден игрок в Players_full: {existing_player.player}")
+                    
+                    # Отчество
+                    if existing_player.patronymic_id:
+                        patronymic = Patronymic.get_or_none(Patronymic.id == existing_player.patronymic_id)
+                        if patronymic:
+                            self.patronymic_edit.setText(patronymic.patronymic)
+                    
+                    # Разряд
+                    if existing_player.razryad:
+                        index = self.razryad_combo.findText(existing_player.razryad)
+                        if index >= 0:
+                            self.razryad_combo.setCurrentIndex(index)
+                    
+                    # Тренер
+                    if existing_player.coach_id:
+                        coach = Coach.get_or_none(Coach.id == existing_player.coach_id)
+                        if coach:
+                            self.coach_edit.setText(coach.coach)
+                    
+                    # Город (если в Players_full есть более точный город)
+                    if existing_player.city:
+                        self.city_edit.setText(existing_player.city)
+                        # Обновляем регион для нового города
+                        city_obj = City.get_or_none(City.city == existing_player.city)
+                        if city_obj:
+                            index = self.region_combo.findData(city_obj.region_id)
+                            if index >= 0:
+                                self.region_combo.setCurrentIndex(index)
+                    
+                    QMessageBox.information(self, "Найдено в базе", 
+                                        f"Данные игрока найдены в общей базе.\n"
+                                        f"Заполнены поля: Отчество, Разряд, Тренер")
+                else:
+                    # Предлагаем внести недостающие данные
+                    reply = QMessageBox.question(self, "Новый игрок", 
+                                                f"Игрок {formatted_fio} не найден в общей базе.\n"
+                                                f"Внесите дополнительные данные (Отчество, Разряд) вручную?",
+                                                QMessageBox.Yes | QMessageBox.No)
+                    if reply == QMessageBox.Yes:
+                        self.patronymic_edit.setFocus()
+                    else:
+                        # Заполняем минимальными значениями
+                        if not self.patronymic_edit.text():
+                            self.patronymic_edit.setText("-")
+                        if not self.razryad_combo.currentText():
+                            self.razryad_combo.setCurrentText("б/р")
+            
             # Очищаем список результатов поиска
             self.search_results_list.clear()
             
             # Устанавливаем фокус на поле "Отчество"
             self.patronymic_edit.setFocus()
-            
-            # Очищаем строку поиска
-            self.fio_edit.clear()
+            # self.fio_edit.clear()
 
     def reset_search_label(self):
         """Сброс заголовка поиска"""
@@ -4470,11 +4567,11 @@ class MainWindow(QMainWindow):
         # Сбрасываем заголовок поиска
         self.reset_search_label()
         
-        # Показываем сообщение о смене рейтинга
-        if sex == "woman":
-            QMessageBox.information(self, "Поиск", "Теперь поиск будет выполняться в женских рейтинг-листах")
-        else:
-            QMessageBox.information(self, "Поиск", "Теперь поиск будет выполняться в мужских рейтинг-листах")
+        # # Показываем сообщение о смене рейтинга
+        # if sex == "woman":
+        #     QMessageBox.information(self, "Поиск", "Теперь поиск будет выполняться в женских рейтинг-листах")
+        # else:
+        #     QMessageBox.information(self, "Поиск", "Теперь поиск будет выполняться в мужских рейтинг-листах")
 
     def load_participants_for_title(self):
         """Загрузка участников для выбранного соревнования"""
@@ -4659,9 +4756,10 @@ class MainWindow(QMainWindow):
         if reply == QMessageBox.Yes:
             self.fio_edit.clear()
             self.patronymic_edit.clear()
-            self.birth_date.setDate(QDate.currentDate().addYears(-18))
+            # self.birth_date.setDate(QDate.currentDate().addYears(-18))
+            self.birth_date_edit.clear()
             self.city_edit.clear()
-            self.region_edit.clear()
+            self.region_combo.setCurrentIndex(0)
             self.razryad_combo.setCurrentIndex(0)
             self.coach_edit.clear()
             self.rank_edit.clear()
@@ -5278,7 +5376,6 @@ class MainWindow(QMainWindow):
                 region_found = False
                 for i in range(self.region_combo.count()):
                     item_data = self.region_combo.itemData(i)
-                    print(f"Проверяем индекс {i}: data={item_data}, text={self.region_combo.itemText(i)}")
                     if item_data == city.region_id:
                         self.region_combo.setCurrentIndex(i)
                         region_found = True
@@ -5418,6 +5515,44 @@ class MainWindow(QMainWindow):
             print(f"Загружено {regions.count()} регионов")  # Отладка
         except Exception as e:
             print(f"Ошибка загрузки регионов: {e}")
+
+    def sync_with_players_full(self, player_data):
+        """Синхронизация данных с таблицей Players_full"""
+        try:
+            from models import Players_full, Patronymic, Coach
+            
+            # Получаем или создаем запись в Players_full
+            players_full, created = Players_full.get_or_create(
+                player=player_data['player'],
+                bday=player_data['bday'],
+                defaults={
+                    'city': player_data['city'],
+                    'region': player_data['region'],
+                    'razryad': player_data['razryad'],
+                    'coach_id': player_data.get('coach_id'),
+                    'patronymic_id': player_data.get('patronymic_id'),
+                    'sex': player_data['sex']
+                }
+            )
+            
+            if not created:
+                # Обновляем существующую запись
+                players_full.city = player_data['city']
+                players_full.region = player_data['region']
+                players_full.razryad = player_data['razryad']
+                players_full.coach_id = player_data.get('coach_id')
+                players_full.patronymic_id = player_data.get('patronymic_id')
+                players_full.sex = player_data['sex']
+                players_full.save()
+                print(f"Обновлена запись в Players_full для {player_data['player']}")
+            else:
+                print(f"Создана новая запись в Players_full для {player_data['player']}")
+            
+            return players_full
+            
+        except Exception as e:
+            print(f"Ошибка синхронизации с Players_full: {e}")
+            return None
 
 # =================================
 class RatingLoaderThread(QThread):

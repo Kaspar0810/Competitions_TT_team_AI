@@ -60,7 +60,8 @@ class MainWindow(QMainWindow):
                     ["➕ Добавить", "✏️ Редактировать"],
                     ["🗑️ Удалить", "🔍 Поиск"],
                     ["📤 Экспорт", "🗑️ Очистить"]
-                ]},
+                ],
+                "filters": ["Сортировка", "Фильтры", "Заявки"]},  # Добавлена секция заявок
             2: {"title": "Команды", "description": "Управление командами",
                 "buttons": ["➕ Добавить", "✏️ Редактировать", "🗑️ Удалить", "⭐ Рейтинг"]},
             3: {"title": "Пары", "description": "Формирование пар",
@@ -674,7 +675,11 @@ class MainWindow(QMainWindow):
 
         # Растягиваем последнюю колонку
         self.table_view.horizontalHeader().setStretchLastSection(True)
-                
+
+        # В init_ui, после создания table_view:
+        self.table_view.setSelectionMode(QTableView.ExtendedSelection)  # Множественное выделение
+        self.table_view.setSelectionBehavior(QTableView.SelectRows)  # Выделение строк
+
         bottom_layout.addWidget(self.table_view)
         
         # Добавляем виджеты в правую область
@@ -2623,6 +2628,77 @@ class MainWindow(QMainWindow):
             filters_layout.addWidget(btn_reset)
             
             self.dynamic_filters_layout.addWidget(filters_container)
+
+            # Разделитель перед кнопками заявок
+            line4 = QFrame()
+            line4.setFrameShape(QFrame.HLine)
+            line4.setFrameShadow(QFrame.Sunken)
+            line4.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
+            self.dynamic_filters_layout.addWidget(line4)
+            
+            # Заголовок секции заявок
+            filter_title3 = QLabel("📋 Управление заявками")
+            filter_title3.setStyleSheet("font-weight: bold; font-size: 12px; margin-top: 5px;")
+            self.dynamic_filters_layout.addWidget(filter_title3)
+            
+            # Горизонтальные кнопки для фильтрации и подтверждения заявок
+            application_layout = QHBoxLayout()
+            application_layout.setSpacing(10)
+            
+            # Кнопка фильтрации предварительных заявок
+            self.btn_filter_preliminary = QPushButton("📝 Предварительные")
+            self.btn_filter_preliminary.setCheckable(True)
+            self.btn_filter_preliminary.setStyleSheet("""
+                QPushButton {
+                    background-color: #FF9800;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 6px;
+                    font-size: 10px;
+                    font-weight: bold;
+                }
+                QPushButton:hover { background-color: #F57C00; }
+                QPushButton:checked { background-color: #E65100; }
+            """)
+            self.btn_filter_preliminary.clicked.connect(self.filter_preliminary_applications)
+            application_layout.addWidget(self.btn_filter_preliminary)
+            
+            # Кнопка подтверждения выбранных заявок
+            btn_confirm = QPushButton("✅ Подтвердить выбранные")
+            btn_confirm.setStyleSheet("""
+                QPushButton {
+                    background-color: #4CAF50;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 6px;
+                    font-size: 10px;
+                    font-weight: bold;
+                }
+                QPushButton:hover { background-color: #45a049; }
+            """)
+            btn_confirm.clicked.connect(self.confirm_selected_applications)
+            application_layout.addWidget(btn_confirm)
+            
+            self.dynamic_filters_layout.addLayout(application_layout)
+            
+            # Кнопка сброса фильтра заявок
+            btn_reset_application = QPushButton("🔄 Показать все заявки")
+            btn_reset_application.setStyleSheet("""
+                QPushButton {
+                    background-color: #2196F3;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 6px;
+                    font-size: 10px;
+                    font-weight: bold;
+                }
+                QPushButton:hover { background-color: #1976D2; }
+            """)
+            btn_reset_application.clicked.connect(self.reset_application_filter)
+            self.dynamic_filters_layout.addWidget(btn_reset_application)
         
         self.dynamic_filters_layout.addStretch()
 
@@ -2870,7 +2946,7 @@ class MainWindow(QMainWindow):
                     (Player.application == "предварительная")
                 ).count()
                 
-                self.table_header.setText(f"👥 {title.name}{age_text} - {sex_text} ({count} чел.) | Основные: {main_count} | Предварительные: {pre_count}") 
+                self.table_header.setText(f"👥 {title.name}{age_text} - {sex_text} ({count} чел.) | Основные: {main_count} | Предварительные: {pre_count}")
             
     def search_players(self):
         """Поиск участников по ФИО, городу, региону или тренеру"""
@@ -3471,162 +3547,6 @@ class MainWindow(QMainWindow):
                 self.search_results_list.clear()
             if hasattr(self, 'search_label'):
                 self.reset_search_label()
-# ====================================
-    def _search_in_r_lists(self, search_text):
-        """Поиск в таблицах r_list_m, r_list_d, r1_list_m, r1_list_d (только по фамилии)"""
-        if not hasattr(self, 'search_results_list'):
-            return
-        
-        self.search_results_list.clear()
-        
-        results = []
-        current_source = None
-        
-        # Разбиваем поисковый запрос на части (предполагаем, что первое слово - фамилия)
-        search_parts = search_text.strip().split()
-        if search_parts:
-            # Берем первое слово как фамилию для поиска
-            surname = search_parts[0]
-        else:
-            surname = search_text
-        
-        # Поиск в текущем рейтинге (r_list_m, r_list_d)
-        try:
-            from models import R_list_m, R_list_d, R1_list_m, R1_list_d
-            
-            # Ищем в r_list_m (мужчины)
-            query_m = R_list_m.select().where(
-                R_list_m.r_fname.startswith(surname)
-            ).limit(30)
-            for item in query_m:
-                results.append({
-                    'source': 'r_list_m',
-                    'source_name': '🏆 Текущий рейтинг (М)',
-                    'fio': item.r_fname,
-                    'birthday': item.r_bithday,
-                    'city': item.r_city,
-                    'region': item.r_region,
-                    'district': item.r_district,
-                    'number': item.r_number,
-                    'list': item.r_list,
-                    'sex': 'man'
-                })
-                current_source = 'current'
-        except Exception as e:
-            print(f"Ошибка поиска в r_list_m: {e}")
-        
-        try:
-            query_d = R_list_d.select().where(
-                R_list_d.r_fname.startswith(surname)
-            ).limit(30)
-            for item in query_d:
-                results.append({
-                    'source': 'r_list_d',
-                    'source_name': '🏆 Текущий рейтинг (Ж)',
-                    'fio': item.r_fname,
-                    'birthday': item.r_bithday,
-                    'city': item.r_city,
-                    'region': item.r_region,
-                    'district': item.r_district,
-                    'number': item.r_number,
-                    'list': item.r_list,
-                    'sex': 'woman'
-                })
-                current_source = 'current'
-        except Exception as e:
-            print(f"Ошибка поиска в r_list_d: {e}")
-        
-        # Если не найдено в текущем рейтинге, ищем в январском
-        if not results:
-            try:
-                query_r1m = R1_list_m.select().where(
-                    R1_list_m.r1_fname.startswith(surname)
-                ).limit(30)
-                for item in query_r1m:
-                    results.append({
-                        'source': 'r1_list_m',
-                        'source_name': '📅 Январский рейтинг (М)',
-                        'fio': item.r1_fname,
-                        'birthday': item.r1_bithday,
-                        'city': item.r1_city,
-                        'region': item.r1_region,
-                        'district': item.r1_district,
-                        'number': item.r1_number,
-                        'list': item.r1_list,
-                        'sex': 'man'
-                    })
-                    current_source = 'january'
-            except Exception as e:
-                print(f"Ошибка поиска в r1_list_m: {e}")
-            
-            try:
-                query_r1d = R1_list_d.select().where(
-                    R1_list_d.r1_fname.startswith(surname)
-                ).limit(30)
-                for item in query_r1d:
-                    results.append({
-                        'source': 'r1_list_d',
-                        'source_name': '📅 Январский рейтинг (Ж)',
-                        'fio': item.r1_fname,
-                        'birthday': item.r1_bithday,
-                        'city': item.r1_city,
-                        'region': item.r1_region,
-                        'district': item.r1_district,
-                        'number': item.r1_number,
-                        'list': item.r1_list,
-                        'sex': 'woman'
-                    })
-                    current_source = 'january'
-            except Exception as e:
-                print(f"Ошибка поиска в r1_list_d: {e}")
-        
-        if results and hasattr(self, 'search_label'):
-            # Меняем заголовок
-            if current_source == 'current':
-                self.search_label.setText("🔍 Текущий рейтинг")
-                self.search_label.setStyleSheet("""
-                    background-color: #2196F3;
-                    color: white;
-                    padding: 6px;
-                    font-weight: bold;
-                    font-size: 14px;
-                    border-radius: 3px;
-                """)
-            else:
-                self.search_label.setText("🔍 Январский рейтинг")
-                self.search_label.setStyleSheet("""
-                    background-color: #FF9800;
-                    color: white;
-                    padding: 6px;
-                    font-weight: bold;
-                    font-size: 14px;
-                    border-radius: 3px;
-                """)
-            
-            for r in results:
-                birthday_str = r['birthday'].strftime("%d.%m.%Y") if r['birthday'] else "---"
-                position = f"R:{r['list']}" if r['list'] else "---"
-                
-                # Одна строка для отображения
-                item_text = f"🏅 {r['fio']} | {birthday_str} | {r['city']} | {position}"
-                
-                item = QListWidgetItem(item_text)
-                item.setData(Qt.UserRole, r)
-                self.search_results_list.addItem(item)
-                
-        elif hasattr(self, 'search_label'):
-            self.search_results_list.clear()
-            self.search_label.setText("🔍 Ничего не найдено")
-            self.search_label.setStyleSheet("""
-                background-color: #f44336;
-                color: white;
-                padding: 6px;
-                font-weight: bold;
-                font-size: 14px;
-                border-radius: 3px;
-            """)
-            from PyQt5.QtCore import QTimer
-            QTimer.singleShot(2000, self.reset_search_label)
 
     def search_in_r_lists(self, search_text):
         """Поиск в таблицах r_list_m, r_list_d, r1_list_m, r1_list_d в зависимости от выбранного пола"""
@@ -3786,7 +3706,7 @@ class MainWindow(QMainWindow):
             """)
             from PyQt5.QtCore import QTimer
             QTimer.singleShot(2000, self.reset_search_label)
-# ==============================
+
     def on_suggestion_selected(self, item):
         """Выбор предложения из списка - заполнение формы"""
         data = item.data(Qt.UserRole)
@@ -3843,7 +3763,7 @@ class MainWindow(QMainWindow):
         super().focusOutEvent(event)
         if hasattr(self, 'suggestions_list'):
             QTimer.singleShot(200, lambda: self.suggestions_list.setVisible(False))
-# ===================================
+
     def on_search_result_selected(self, item):
         """Выбор результата поиска - заполнение формы"""
         data = item.data(Qt.UserRole)
@@ -3937,7 +3857,6 @@ class MainWindow(QMainWindow):
             # Устанавливаем фокус на поле "Отчество"
             self.patronymic_edit.setFocus() 
 
-
     def _on_search_result_selected(self, item):
         """Выбор результата поиска - заполнение формы"""
         data = item.data(Qt.UserRole)
@@ -3994,7 +3913,7 @@ class MainWindow(QMainWindow):
             
             # Очищаем строку поиска
             self.fio_edit.clear()
-# =================================
+
     def reset_search_label(self):
         """Сброс заголовка поиска"""
         if hasattr(self, 'current_tab_index') and self.current_tab_index == 1:
@@ -4626,7 +4545,7 @@ class MainWindow(QMainWindow):
         else:
             QMessageBox.information(self, "Поиск", "Теперь поиск будет выполняться в мужских рейтинг-листах")
 
-    def load_participants_for_title(self):
+    def _load_participants_for_title(self):
         """Загрузка участников для выбранного соревнования"""
         if not self.current_title_id:
             self.players_model.setData([])
@@ -4668,6 +4587,54 @@ class MainWindow(QMainWindow):
                     'razryad': player.razryad or "",
                     'coach': coach_name,
                     'sex': player.sex or ""
+                })
+            
+            self.players_model.setData(participants_data)
+            self.update_table_header()
+            
+        except Exception as e:
+            print(f"Ошибка загрузки участников: {e}")
+            self.players_model.setData([])
+
+    def load_participants_for_title(self):
+        """Загрузка участников для выбранного соревнования"""
+        if not self.current_title_id:
+            self.players_model.setData([])
+            self.table_header.setText("👥 Список участников - выберите соревнование")
+            return
+        
+        try:
+            # Базовый запрос
+            query = Player.select().where(Player.title_id == self.current_title_id)
+            
+            # Применяем фильтр по полу
+            if self.current_sex == "woman":
+                query = query.where(Player.sex == "woman")
+            elif self.current_sex == "man":
+                query = query.where(Player.sex == "man")
+            
+            # Сортируем по рейтингу
+            query = query.order_by(Player.rank.desc())
+            
+            participants_data = []
+            for player in query:
+                coach_name = ""
+                if player.coach_id:
+                    coach = Coach.get_or_none(Coach.id == player.coach_id)
+                    if coach:
+                        coach_name = coach.coach
+                
+                participants_data.append({
+                    'id': player.id,
+                    'fio': player.fio or player.player or "",
+                    'birth_date': player.bday,
+                    'rank': player.rank or 0,
+                    'city': player.city or "",
+                    'region': player.region or "",
+                    'razryad': player.razryad or "",
+                    'coach': coach_name,
+                    'sex': player.sex or "",
+                    'application': player.application or "предварительная"
                 })
             
             self.players_model.setData(participants_data)
@@ -5008,6 +4975,108 @@ class MainWindow(QMainWindow):
         else:
             return full_name
 
+    def filter_preliminary_applications(self):
+        """Фильтрация предварительных заявок"""
+        if not self.current_title_id:
+            return
+        
+        if self.btn_filter_preliminary.isChecked():
+            try:
+                query = Player.select().where(
+                    (Player.title_id == self.current_title_id) &
+                    (Player.application == "предварительная")
+                )
+                
+                if self.current_sex == "woman":
+                    query = query.where(Player.sex == "Ж")
+                elif self.current_sex == "man":
+                    query = query.where(Player.sex == "М")
+                
+                query = query.order_by(Player.rank.desc())
+                
+                participants_data = []
+                for player in query:
+                    coach_name = ""
+                    if player.coach_id:
+                        coach = Coach.get_or_none(Coach.id == player.coach_id)
+                        if coach:
+                            coach_name = coach.coach
+                    
+                    participants_data.append({
+                        'id': player.id,
+                        'fio': player.fio or player.player or "",
+                        'birth_date': player.bday,
+                        'rank': player.rank or 0,
+                        'city': player.city or "",
+                        'region': player.region or "",
+                        'razryad': player.razryad or "",
+                        'coach': coach_name,
+                        'sex': player.sex or "",
+                        'application': player.application or "предварительная"
+                    })
+                
+                self.players_model.setData(participants_data)
+                self.update_table_header()
+                QMessageBox.information(self, "Фильтр", f"Показано {len(participants_data)} предварительных заявок")
+                
+            except Exception as e:
+                print(f"Ошибка фильтрации: {e}")
+        else:
+            self.reset_application_filter()
+
+    def reset_application_filter(self):
+        """Сброс фильтра заявок и показ всех участников"""
+        if not self.current_title_id:
+            return
+        
+        self.btn_filter_preliminary.setChecked(False)
+        self.load_participants_for_title()
+        QMessageBox.information(self, "Сброс фильтра", "Показаны все заявки")
+
+    def confirm_selected_applications(self):
+        """Подтверждение выбранных заявок (перевод из предварительной в основную)"""
+        selection = self.table_view.selectionModel().selectedRows()
+        if not selection:
+            QMessageBox.warning(self, "Ошибка", "Выберите хотя бы одного участника для подтверждения")
+            return
+        
+        # Собираем ID выбранных участников
+        selected_ids = []
+        for index in selection:
+            row = index.row()
+            player_id = self.players_model.get_id(row)
+            if player_id:
+                selected_ids.append(player_id)
+        
+        if not selected_ids:
+            return
+        
+        # Запрашиваем подтверждение
+        reply = QMessageBox.question(self, "Подтверждение", 
+                                    f"Подтвердить заявки {len(selected_ids)} участников?\n"
+                                    f"Статус изменится с 'предварительная' на 'основная'.",
+                                    QMessageBox.Yes | QMessageBox.No)
+        
+        if reply == QMessageBox.Yes:
+            try:
+                # Обновляем статус заявок
+                for player_id in selected_ids:
+                    Player.update(application="основная").where(Player.id == player_id).execute()
+                
+                # Обновляем таблицу
+                if self.btn_filter_preliminary.isChecked():
+                    self.filter_preliminary_applications()
+                else:
+                    self.load_participants_for_title()
+                
+                QMessageBox.information(self, "Успех", f"Подтверждено {len(selected_ids)} заявок")
+                
+            except Exception as e:
+                QMessageBox.critical(self, "Ошибка", f"Не удалось подтвердить заявки: {str(e)}")
+# =================================
+
+
+
 
 class RatingLoaderThread(QThread):
     progress = pyqtSignal(int)
@@ -5275,7 +5344,7 @@ class RatingLoaderThread(QThread):
         except Exception as e:
             print(f"Ошибка загрузки в БД: {e}")
             raise
-# ==================================
+
 class RatingFileDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)

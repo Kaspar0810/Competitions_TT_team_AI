@@ -3,6 +3,7 @@ from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt, QDate
 from PyQt5.QtWidgets import QMessageBox
 from models import *
 from datetime import datetime, date
+from PyQt5.QtGui import QFont, QColor
 
 class PlayersTableModel(QAbstractTableModel):
     """Модель для отображения игроков с нумерацией строк"""
@@ -41,6 +42,8 @@ class PlayersTableModel(QAbstractTableModel):
             return date_value.strftime("%d.%m.%Y")
         return str(date_value)
     
+    # В классе PlayersTableModel добавьте метод data для цвета фона:
+
     def data(self, index, role=Qt.DisplayRole):
         if not index.isValid():
             return None
@@ -72,6 +75,15 @@ class PlayersTableModel(QAbstractTableModel):
                 return player.get('razryad', '')
             elif col == 7:  # Тренер
                 return player.get('coach', '')
+        
+        # Цвет фона для предварительных заявок
+        if role == Qt.BackgroundRole:
+            if row < len(self._data):
+                application = self._data[row].get('application', '')
+                if application == "предварительная":
+                    return QColor(240, 240, 240)  # Светло-серый
+                elif application == "основная":
+                    return QColor(255, 255, 255)  # Белый
         
         # Выравнивание номера строки по центру
         if role == Qt.TextAlignmentRole and col == 0:

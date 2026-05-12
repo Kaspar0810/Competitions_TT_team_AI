@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (
     QFrame, QSizePolicy, QMessageBox, QListWidget, QListWidgetItem,
     QLineEdit, QDateEdit, QComboBox, QGroupBox, QFormLayout,
     QScrollArea, QSplitter, QInputDialog, QHeaderView, QAbstractItemView,
-    QDialog, QProgressBar, QFileDialog, QMenu
+    QDialog, QProgressBar, QFileDialog, QMenu, QProgressDialog
 )
 from PyQt5.QtWidgets import QGridLayout  # Добавьте в импорт
 from PyQt5.QtCore import Qt, QDate, QSize, pyqtSignal, QThread
@@ -39,7 +39,11 @@ class MainWindow(QMainWindow):
         
         # Подключение к БД
         self.db = connect_db()
-        
+
+        # Создаем папку для бэкапов, если её нет
+        if not os.path.exists("backup_db"):
+            os.makedirs("backup_db")
+
         # Текущее соревнование
         self.current_title_id = None
         self.current_sex = None
@@ -3155,7 +3159,7 @@ class MainWindow(QMainWindow):
                                 f"🏆 Тип соревнования: {self.selected_tournament_type}\n\n"
                                 f"Теперь заполните информацию о соревновании.")
       
-    def create_menu_bar(self):
+    def _create_menu_bar(self):
         """Создание меню"""
         menubar = self.menuBar()
         menubar.setStyleSheet("QMenuBar { padding: 3px; } QMenuBar::item { padding: 3px 8px; font-size: 10px; }")
@@ -3193,6 +3197,67 @@ class MainWindow(QMainWindow):
         about_action = QAction("О программе", self)
         about_action.triggered.connect(self.about_dialog)
         help_menu.addAction(about_action)
+
+    def create_menu_bar(self):
+        """Создание меню"""
+        menubar = self.menuBar()
+        menubar.setStyleSheet("QMenuBar { padding: 3px; } QMenuBar::item { padding: 3px 8px; font-size: 10px; }")
+        
+        # Соревнования
+        competitions_menu = menubar.addMenu("Соревнования")
+        new_comp_action = QAction("Новое соревнование", self)
+        new_comp_action.triggered.connect(self.new_competition)
+        competitions_menu.addAction(new_comp_action)
+        competitions_menu.addSeparator()
+        exit_action = QAction("Выход", self)
+        exit_action.triggered.connect(self.close)
+        competitions_menu.addAction(exit_action)
+        
+        # Редактировать
+        edit_menu = menubar.addMenu("Редактировать")
+        edit_action = QAction("Параметры", self)
+        edit_action.triggered.connect(lambda: QMessageBox.information(self, "Редактировать", "Параметры"))
+        edit_menu.addAction(edit_action)
+        
+        # Печать
+        print_menu = menubar.addMenu("Печать")
+        print_action = QAction("Предпросмотр", self)
+        print_action.triggered.connect(lambda: QMessageBox.information(self, "Печать", "Печать"))
+        print_menu.addAction(print_action)
+        
+        # Просмотр
+        view_menu = menubar.addMenu("Просмотр")
+        fullscreen_action = QAction("Полный экран", self)
+        fullscreen_action.triggered.connect(self.toggle_fullscreen)
+        view_menu.addAction(fullscreen_action)
+        
+        # Рейтинг
+        rating_menu = menubar.addMenu("Рейтинг")
+        rating_action = QAction("Показать рейтинг", self)
+        rating_action.triggered.connect(lambda: QMessageBox.information(self, "Рейтинг", "Рейтинг"))
+        rating_menu.addAction(rating_action)
+        
+        # БАЗА ДАННЫХ - НОВОЕ МЕНЮ
+        db_menu = menubar.addMenu("База данных")
+        
+        # Импортировать
+        import_action = QAction("📥 Импортировать", self)
+        import_action.triggered.connect(self.import_database)
+        db_menu.addAction(import_action)
+        
+        # Экспортировать
+        export_action = QAction("📤 Экспортировать", self)
+        export_action.triggered.connect(self.export_database)
+        db_menu.addAction(export_action)
+        
+        # Помощь
+        help_menu = menubar.addMenu("Помощь")
+        about_action = QAction("О программе", self)
+        about_action.triggered.connect(self.about_dialog)
+        help_menu.addAction(about_action)
+        
+        # Добавляем меню База данных в подменю Помощь (если нужно)
+        # help_menu.addMenu(db_menu)
     
     def toggle_fullscreen(self):
         """Полноэкранный режим"""
@@ -5903,6 +5968,198 @@ class MainWindow(QMainWindow):
         """)
         
         QMessageBox.information(self, "Сброс фильтров", "Показаны все активные участники")
+
+
+    def export_database(self):
+        """Экспорт базы данных в файл"""
+        try:
+            # Создаем диалог выбора места сохранения
+            file_path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Экспорт базы данных",
+                f"backup_db/backup_{QDate.currentDate().toString('yyyy_MM_dd')}.sql",
+                "SQL files (*.sql);;All files (*.*)"
+            )
+            
+            if not file_path:
+                return
+            
+            # Убедимся, что папка существует
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            
+            # Показываем прогресс-бар
+            progress = QProgressDialog("Экспорт базы данных...", "Отмена", 0, 100, self)
+            progress.setWindowModality(Qt.WindowModal)
+            progress.show()
+            
+            from models import db
+            
+            # Получаем параметры подключения
+            # Для Peewee connection_params хранит параметры
+            if hasattr(db, 'connection_params'):
+                host = db.connection_params.get('host', 'localhost')
+                user = db.connection_params.get('user', 'root')
+                password = db.connection_params.get('password', '')
+                port = db.connection_params.get('port', 3306)
+                database = db.database
+            else:
+                # Альтернативный способ
+                host = 'localhost'
+                user = 'root'
+                password = 'db_pass'
+                port = 3306
+                database = db.database
+            
+            progress.setValue(20)
+            
+            # Формируем команду mysqldump
+            import subprocess
+            
+            cmd = [
+                'mysqldump',
+                f'--host={host}',
+                f'--user={user}',
+                f'--password={password}',
+                f'--port={port}',
+                database,
+                '--result-file=' + file_path,
+                '--skip-extended-insert',
+                '--complete-insert'
+            ]
+            
+            progress.setValue(50)
+            
+            # Выполняем команду
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            
+            progress.setValue(100)
+            
+            if result.returncode == 0:
+                QMessageBox.information(self, "Успех", 
+                                    f"База данных успешно экспортирована в файл:\n{file_path}")
+            else:
+                QMessageBox.warning(self, "Предупреждение", 
+                                f"Не удалось выполнить экспорт через mysqldump.\n"
+                                f"Будет использован встроенный экспорт.\n\n"
+                                f"Ошибка: {result.stderr}")
+                # Если mysqldump не работает, используем встроенный экспорт
+                self.export_database_internal(file_path, progress)
+            
+            progress.close()
+            
+        except Exception as e:
+            progress.close()
+            # Если произошла ошибка, пробуем встроенный экспорт
+            self.export_database_internal(file_path, None)
+
+    def import_database(self):
+        """Импорт базы данных из файла бэкапа"""
+        try:
+            # Создаем диалог выбора файла, по умолчанию открываем папку backup_db
+            backup_dir = "backup_db"
+            if os.path.exists(backup_dir):
+                start_dir = backup_dir
+            else:
+                start_dir = ""
+            
+            file_path, _ = QFileDialog.getOpenFileName(
+                self,
+                "Импорт базы данных",
+                start_dir,
+                "SQL files (*.sql);;All files (*.*)"
+            )
+            
+            if not file_path:
+                return
+            
+            # Запрашиваем подтверждение
+            reply = QMessageBox.question(
+                self, 
+                "Подтверждение", 
+                f"Импорт базы данных из файла:\n{file_path}\n\n"
+                f"ВНИМАНИЕ! Текущие данные будут заменены!\n"
+                f"Перед импортом рекомендуется сделать резервную копию.\n\n"
+                f"Продолжить?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            
+            if reply != QMessageBox.Yes:
+                return
+            
+            # Показываем прогресс-бар
+            progress = QProgressDialog("Импорт базы данных...", "Отмена", 0, 100, self)
+            progress.setWindowModality(Qt.WindowModal)
+            progress.show()
+            
+            # Читаем SQL файл
+            with open(file_path, 'r', encoding='utf-8') as f:
+                sql_content = f.read()
+            
+            progress.setValue(30)
+            
+            # Подключаемся к БД и выполняем импорт
+            from models import db
+            
+            # Закрываем текущее соединение
+            if not db.is_closed():
+                db.close()
+            
+            progress.setValue(50)
+            
+            # Открываем новое соединение
+            db.connect()
+            
+            progress.setValue(70)
+            
+            # Разбиваем SQL на отдельные запросы
+            import re
+            # Убираем комментарии
+            sql_content = re.sub(r'--.*$', '', sql_content, flags=re.MULTILINE)
+            # Разбиваем по точкам с запятой
+            statements = [s.strip() for s in sql_content.split(';') if s.strip()]
+            
+            total = len(statements)
+            for i, statement in enumerate(statements):
+                if statement:
+                    try:
+                        db.execute_sql(statement)
+                    except Exception as e:
+                        print(f"Ошибка выполнения запроса: {e}")
+                        print(f"Запрос: {statement[:100]}...")
+                
+                # Обновляем прогресс
+                progress.setValue(70 + int((i + 1) / total * 30))
+                
+                if progress.wasCanceled():
+                    break
+            
+            progress.setValue(100)
+            
+            QMessageBox.information(self, "Успех", 
+                                f"База данных успешно импортирована из файла:\n{file_path}\n\n"
+                                f"Рекомендуется перезапустить приложение для полного применения изменений.")
+            
+            progress.close()
+            
+            # Предлагаем перезапустить приложение
+            restart_reply = QMessageBox.question(
+                self,
+                "Перезапуск",
+                "Для полного применения изменений рекомендуется перезапустить приложение.\n"
+                "Перезапустить сейчас?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            
+            if restart_reply == QMessageBox.Yes:
+                # Перезапускаем приложение
+                python = sys.executable
+                os.execl(python, python, *sys.argv)
+            
+        except Exception as e:
+            progress.close()
+            QMessageBox.critical(self, "Ошибка", f"Не удалось импортировать базу данных: {str(e)}")
+
+
 # =================================
 class RatingLoaderThread(QThread):
     progress = pyqtSignal(int)

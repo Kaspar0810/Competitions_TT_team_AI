@@ -6909,6 +6909,10 @@ class MainWindow(QMainWindow):
                 info_label.setText(f"Всего в финале: {total_in_final} чел.\n"
                                 f"Количество финалов: {finals_count}\n"
                                 f"Распределение: " + ", ".join(finals_list))
+                # переводим с нумерацией финала
+                txt = finals_list[0]
+                mark = txt.find(":")
+                stage_name = txt[:mark] if mark > 0 else stage_name
                 
                 return total_in_final, finals_count, finals_list
             
@@ -6942,6 +6946,7 @@ class MainWindow(QMainWindow):
  # ===============================================================           
             # Проверка, что все участники распределены
             total_in_final = previous_stage.total_group * stage_exit
+            # total_in_final = previous_stage.total_group * stage_exit
             if total_in_final > total_players:
                 QMessageBox.warning(self, "Ошибка", "Количество участников в финале превышает общее число участников")
                 return
@@ -6958,11 +6963,11 @@ class MainWindow(QMainWindow):
         else:
             QMessageBox.warning(self, "Ошибка", f"Неизвестный тип этапа: {stage_name}")
             return
+        
         # переводим с нумерацией финала
         txt = finals_list[0]
         mark = txt.find(":")
-        stage_name[mark:] if mark > 0 else stage_name
-            
+        stage_name = txt[:mark] if mark > 0 else stage_name    
         # Сохраняем в базу данных
         try:
             system_data = {
@@ -7014,7 +7019,7 @@ class MainWindow(QMainWindow):
                 self.stages_info.setText(f"🏆 Соревнование: {title_name}\n\n{'=' * 50}\n\n❌ Нет добавленных этапов")
                 return
             
-            info_text = f"🏆 СОРЕВНОВАНИЕ: {title_name.upper()}\n"
+            info_text = f"🏆 СОРЕВНОВАНИЕ: {title_name.upper()}. Создание системы.\n"
             info_text += "=" * 70 + "\n\n"
             
             previous_stage = None
@@ -7029,7 +7034,7 @@ class MainWindow(QMainWindow):
                     additional_info = ""
                 else:
                     groups_count = system.total_group if system.total_group else 1
-                    
+                
                     # Для полуфинала рассчитываем распределение отдельно
                     if "полуфинал" in system.stage.lower() and previous_stage and "Квалификация" in previous_stage.stage:
                         # Количество участников в полуфинале = количество групп квалификации * количество выходящих
@@ -7040,7 +7045,7 @@ class MainWindow(QMainWindow):
                         
                         # Расчет количества игр в полуфинале
                         total_games = self.calculate_semifinal_games_count(groups_count, players_per_group, previous_stage)
-                        additional_info = f"\n   │   (учитывая уже сыгранные в квалификации)"
+                        # additional_info = f"\n   │   (учитывая уже сыгранные в квалификации)"
                         
                         # Расчет количества игр по группам для полуфинала
                         group_games = []
@@ -7062,7 +7067,7 @@ class MainWindow(QMainWindow):
                             system.type_table, total_players, groups_count, group_sizes,
                             system.stage, previous_stage
                         )
-                        additional_info = ""
+                        # additional_info = ""
                         
                         # Расчет количества игр по группам
                         group_games = []
@@ -7087,7 +7092,7 @@ class MainWindow(QMainWindow):
                 
                 # Отображение информации об этапе
                 info_text += f"📌 ЭТАП {idx}: {system.stage}\n"
-                info_text += f"└─ ➡️ Тип таблицы: {system.type_table}🏆{distribution_text}🎯 Всего игр: {total_games}"
+                info_text += f"└─ ➡️ Тип таблицы: {system.type_table}🏆{distribution_text}: Всего игр: {total_games}"
                 # info_text += f"├─ 🏆 Распределение: {distribution_text}\n"
                 # info_text += f"├─ 🎾 Количество партий: {system.score_flag}\n"
                 # info_text += f"├─ 🎯 Количество игр по группам: {group_games_text}\n"

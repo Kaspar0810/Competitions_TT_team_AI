@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (
     QFrame, QSizePolicy, QMessageBox, QListWidget, QListWidgetItem,
     QLineEdit, QDateEdit, QComboBox, QGroupBox, QFormLayout,
     QScrollArea, QSplitter, QInputDialog, QHeaderView, QAbstractItemView,
-    QDialog, QProgressBar, QFileDialog, QMenu, QProgressDialog
+    QDialog, QProgressBar, QFileDialog, QMenu, QProgressDialog, QTextEdit, QSpinBox
 )
 from PyQt5.QtWidgets import QGridLayout  # Добавьте в импорт
 from PyQt5.QtCore import Qt, QDate, QSize, pyqtSignal, QThread
@@ -89,14 +89,22 @@ class MainWindow(QMainWindow):
         # Для редактирования участников
         self.editing_player_id = None
         
-        # Инициализация интерфейса
+         # Инициализация интерфейса
         self.init_ui()
         
         # Загрузка списка соревнований
         self.load_titles_list()
         
-        # Обновляем активность вкладок (по умолчанию все отключены)
-        self.update_tabs_enabled()
+        # Отключаем все вкладки кроме Титул при запуске
+        for i in range(1, self.tab_widget.count()):
+            self.tab_widget.setTabEnabled(i, False)
+        self.tab_widget.setTabEnabled(0, True)  # Титул всегда активен
+        
+        # Устанавливаем текущую вкладку - Титул
+        self.tab_widget.setCurrentIndex(0)
+        
+        # Загружаем последнее соревнование (если есть)
+        self.load_last_competition()
 
     def showEvent(self, event):
         """Событие при первом отображении окна"""
@@ -275,7 +283,8 @@ class MainWindow(QMainWindow):
         main_layout = QHBoxLayout(central_widget)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
-#============ левая панель ===================        
+
+    # ========== Левая панель ==========
         self.left_panel = QFrame()
         self.left_panel.setFrameShape(QFrame.StyledPanel)
         self.left_panel.setMinimumWidth(320)
@@ -296,17 +305,119 @@ class MainWindow(QMainWindow):
         self.gender_buttons_layout.setSpacing(10)
         left_layout.addLayout(self.gender_buttons_layout)
         
-        # Контейнер для возрастных кнопок (если есть несколько возрастных категорий)
-        self.age_buttons_layout = QVBoxLayout()
-        self.age_buttons_layout.setSpacing(8)
-        left_layout.addLayout(self.age_buttons_layout)
-        
         # Разделитель
         line = QFrame()
         line.setFrameShape(QFrame.HLine)
         line.setFrameShadow(QFrame.Sunken)
         line.setStyleSheet("background-color: #ccc; max-height: 2px; margin: 10px 0;")
         left_layout.addWidget(line)
+        
+        # === СЕКЦИЯ ДЛЯ СОЗДАНИЯ ЭТАПА ===
+        self.stage_section = QGroupBox("🏆 Создание этапа")
+        self.stage_section.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                font-size: 12px;
+                border: 1px solid #4CAF50;
+                border-radius: 5px;
+                margin-top: 10px;
+            }
+            QGroupBox::title {
+                color: #4CAF50;
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+            }
+        """)
+        stage_layout = QVBoxLayout(self.stage_section)
+        stage_layout.setSpacing(8)
+        stage_layout.setContentsMargins(8, 12, 8, 8)
+        
+        # Название этапа
+        stage_name_layout = QHBoxLayout()
+        stage_name_layout.addWidget(QLabel("Этап:"))
+        self.system_stage = QComboBox()
+        self.system_stage.addItems([
+            "Одна таблица",
+            "Квалификация",
+            "Квалификация. 1-й полуфинал",
+            "Квалификация. 2-й полуфинал",
+            "Финал"
+        ])
+        self.system_stage.setEditable(True)
+        self.system_stage.currentTextChanged.connect(self.on_stage_type_changed)
+        stage_name_layout.addWidget(self.system_stage, 1)
+        stage_layout.addLayout(stage_name_layout)
+        
+        # Тип таблицы
+        table_type_layout = QHBoxLayout()
+        table_type_layout.addWidget(QLabel("Тип таблицы:"))
+        self.table_type = QComboBox()
+        self.table_type.addItems([
+            "Круговая",
+            "Олимпийская (минус 2)",
+            "Олимпийская (с розыгрышем всех мест)",
+            "Олимпийская (за 1-3 место)"
+        ])
+        table_type_layout.addWidget(self.table_type, 1)
+        stage_layout.addLayout(table_type_layout)
+        
+        # Количество групп (показывается только для квалификации)
+        self.groups_widget = QWidget()
+        groups_layout = QHBoxLayout(self.groups_widget)
+        groups_layout.setContentsMargins(0, 0, 0, 0)
+        groups_layout.addWidget(QLabel("Количество групп:"))
+        self.total_groups = QLineEdit()
+        self.total_groups.setPlaceholderText("кол-во")
+        self.total_groups.setMaximumWidth(80)
+        groups_layout.addWidget(self.total_groups)
+        groups_layout.addWidget(QLabel("гр."))
+        groups_layout.addStretch()
+        stage_layout.addWidget(self.groups_widget)
+        self.groups_widget.setVisible(True)  # Скрываем по умолчанию
+        
+        # Количество партий
+        parties_layout = QHBoxLayout()
+        parties_layout.addWidget(QLabel("Количество партий:"))
+        self.score_flag = QComboBox()
+        self.score_flag.addItems(["3", "5", "7"])
+        self.score_flag.setCurrentText("5")
+        parties_layout.addWidget(self.score_flag)
+        parties_layout.addStretch()
+        stage_layout.addLayout(parties_layout)
+        
+        # Кнопка добавления этапа
+        add_stage_btn = QPushButton("➕ Добавить этап")
+        add_stage_btn.setMinimumHeight(30)
+        add_stage_btn.clicked.connect(self.add_system_stage)
+        stage_layout.addWidget(add_stage_btn)
+        
+        left_layout.addWidget(self.stage_section)
+        
+        # Разделитель
+        line2 = QFrame()
+        line2.setFrameShape(QFrame.HLine)
+        line2.setFrameShadow(QFrame.Sunken)
+        line2.setStyleSheet("background-color: #ccc; max-height: 2px; margin: 10px 0;")
+        left_layout.addWidget(line2)
+        
+        # # Заголовок текущего действия
+        # self.action_title = QLabel("🔧 Действия")
+        # self.action_title.setStyleSheet("font-weight: bold; font-size: 14px; color: #4CAF50; margin-top: 5px;")
+        # left_layout.addWidget(self.action_title)
+        
+        # self.action_description = QLabel("Выберите вкладку для отображения действий")
+        # self.action_description.setStyleSheet("font-size: 11px; color: #666; margin-bottom: 10px;")
+        # self.action_description.setWordWrap(True)
+        # left_layout.addWidget(self.action_description)
+        
+        # Контейнер для кнопок действий
+        self.dynamic_filters_widget = QWidget()
+        self.dynamic_filters_layout = QVBoxLayout(self.dynamic_filters_widget)
+        self.dynamic_filters_layout.setAlignment(Qt.AlignTop)
+        self.dynamic_filters_layout.setSpacing(8)
+        self.dynamic_filters_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.addWidget(self.dynamic_filters_widget)
 # ===================================================        
         # Заголовок текущего действия
         self.action_title = QLabel("🔧 Действия")
@@ -704,7 +815,7 @@ class MainWindow(QMainWindow):
             1: 180,  # Участники
             2: 180,  # Команды
             3: 180,  # Пары
-            4: 220,  # Система
+            4: 600,  # Система
             5: 220,  # Результаты
             6: 180,  # Рейтинг
             7: 200   # Дополнительно
@@ -716,11 +827,16 @@ class MainWindow(QMainWindow):
         # Загружаем список соревнований для вкладки Титул
         self.load_titles_list()
 
-        # Загружаем последнее соревнование
-        self.load_last_competition()
+        # # Отключаем все вкладки кроме Титул при запуске
+        # for i in range(1, self.tab_widget.count()):
+        #     self.tab_widget.setTabEnabled(i, False)
+        # self.tab_widget.setTabEnabled(0, True)  # Титул всегда активен
         
-        # В конце метода, после создания всех виджетов, показываем фильтры
-        self.filters_widget.setVisible(True)     
+        # # Устанавливаем текущую вкладку - Титул
+        # self.tab_widget.setCurrentIndex(0)
+        
+        # # Загружаем последнее соревнование (если есть)
+        # self.load_last_competition()   
 
     def create_category_buttons(self):
         """Создание кнопок для переключения между категориями участников (только man/woman)"""
@@ -927,7 +1043,7 @@ class MainWindow(QMainWindow):
     def get_category_code(self, display_text):
         """Преобразование отображаемого текста в код категории"""
         code_map = {
-            'ВК (Всероссийская категория)': 'ВК',
+            'ВК (Всероссийская категория)': 'ССВК',
             '1К (Первая категория)': '1К',
             '2К (Вторая категория)': '2К',
             '3К (Третья категория)': '3К'
@@ -1609,7 +1725,7 @@ class MainWindow(QMainWindow):
         main_layout.addStretch()
         
         return tab_widget
-
+#=====================================
     def create_system_tab(self):
         """Вкладка Система"""
         tab_widget = QWidget()
@@ -1619,15 +1735,22 @@ class MainWindow(QMainWindow):
         
         input_style = """
             QLineEdit, QComboBox {
-                max-height: 26px;
-                padding: 3px 5px;
-                font-size: 10px;
+                max-height: 32px;
+                min-height: 30px;
+                padding: 5px;
+                font-size: 11px;
                 border: 1px solid #ccc;
-                border-radius: 3px;
+                border-radius: 4px;
+            }
+            QTextEdit {
+                font-size: 11px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                padding: 5px;
             }
             QGroupBox {
                 font-weight: bold;
-                font-size: 11px;
+                font-size: 12px;
                 border: 1px solid #ccc;
                 border-radius: 5px;
                 margin-top: 10px;
@@ -1637,33 +1760,102 @@ class MainWindow(QMainWindow):
                 left: 10px;
                 padding: 0 5px 0 5px;
             }
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 8px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
         """
         
-        group = QGroupBox("⚙️ Настройки системы проведения")
+        # Информационное окно для вывода этапов
+        info_group = QGroupBox("📋 Информация о добавленных этапах")
+        info_layout = QVBoxLayout(info_group)
+        
+        self.stages_info = QTextEdit()
+        self.stages_info.setReadOnly(True)
+        self.stages_info.setMaximumHeight(150)
+        self.stages_info.setStyleSheet("""
+            QTextEdit {
+                background-color: #f9f9f9;
+                font-family: monospace;
+                font-size: 12px;
+            }
+        """)
+        info_layout.addWidget(self.stages_info)
+        
+        main_layout.addWidget(info_group)
+        
+        # Группа настройки системы
+        group = QGroupBox("⚙️ Настройка этапа")
         group_layout = QFormLayout(group)
-        group_layout.setSpacing(8)
+        group_layout.setSpacing(10)
         group_layout.setContentsMargins(10, 15, 10, 10)
         
+        # Название этапа
         self.system_stage = QComboBox()
-        self.system_stage.addItems(["Олимпийская", "Круговая", "Смешанная", "Швейцарская"])
+        self.system_stage.addItems([
+            "Квалификация",
+            "1-й полуфинал",
+            "2-й полуфинал",
+            "Финал",
+            "Суперфинал"
+        ])
+        self.system_stage.setEditable(True)
         self.system_stage.setStyleSheet(input_style)
-        group_layout.addRow("Система проведения:", self.system_stage)
+        group_layout.addRow("Название этапа:", self.system_stage)
         
+        # Тип таблицы (вместо Тип системы)
+        self.table_type = QComboBox()
+        self.table_type.addItems([
+            "Круговая",
+            "Олимпийская (минус 2)",
+            "Олимпийская (с розыгрышем всех мест)",
+            "Олимпийская (за 1-3 место)"
+        ])
+        self.table_type.setStyleSheet(input_style)
+        group_layout.addRow("Тип таблицы:", self.table_type)
+        
+        # Количество групп
         self.total_groups = QLineEdit()
         self.total_groups.setPlaceholderText("Количество групп")
         self.total_groups.setStyleSheet(input_style)
         group_layout.addRow("Количество групп:", self.total_groups)
         
+        # Максимум участников
         self.max_players = QLineEdit()
         self.max_players.setPlaceholderText("Максимум участников в группе")
         self.max_players.setStyleSheet(input_style)
         group_layout.addRow("Максимум участников:", self.max_players)
         
+        # Количество проходящих
+        self.stage_exit = QLineEdit()
+        self.stage_exit.setPlaceholderText("Количество проходящих в следующий этап")
+        self.stage_exit.setStyleSheet(input_style)
+        group_layout.addRow("Проходят в след. этап:", self.stage_exit)
+        
+        # Кнопка "Добавить этап"
+        add_stage_btn = QPushButton("➕ Добавить этап")
+        add_stage_btn.clicked.connect(self.add_system_stage)
+        group_layout.addRow("", add_stage_btn)
+        
         main_layout.addWidget(group)
         main_layout.addStretch()
         
+        # Список для хранения добавленных этапов
+        self.stages_list = []
+        
+        # Загружаем существующие данные
+        self.load_system_data()
+        
         return tab_widget
-
+#=====================================
     def create_results_tab(self):
         """Вкладка Результаты"""
         tab_widget = QWidget()
@@ -1949,9 +2141,6 @@ class MainWindow(QMainWindow):
             self.current_title_id = title_id
             title = Title.get_or_none(Title.id == title_id)
             if title:
-                # Проверяем количество соревнований на эту дату (без вывода сообщения)
-                competitions_count = self.check_competitions_by_date(title)
-                
                 # Обновляем информацию на вкладке Титул
                 self.comp_name_label.setText(title.name or "-")
                 self.comp_short_name_label.setText(title.short_name_comp or "-")
@@ -1969,20 +2158,21 @@ class MainWindow(QMainWindow):
                 self.comp_secretary_label.setText(title.secretary or "-")
                 self.comp_secretary_category_label.setText(title.kat_sec or "-")
                 
-                # Определяем пол по умолчанию (man/woman)
-                if "девушки" in title.name.lower() or "дев" in title.name.lower() or "woman" in title.name.lower():
+                # Определяем пол по умолчанию
+                if "девушки" in title.name.lower() or "дев" in title.name.lower():
                     self.current_sex = "woman"
                 else:
                     self.current_sex = "man"
                 
-                # Обновляем активность вкладок
+                # ОБНОВЛЯЕМ АКТИВНОСТЬ ВКЛАДОК (после выбора соревнования)
                 self.update_tabs_enabled()
                 
                 # Обновляем кнопки категорий
                 self.create_category_buttons()
                 
-                # Загружаем участников
-                self.load_participants_for_title()
+                # Загружаем участников (если вкладка Участники активна)
+                if self.tab_widget.isTabEnabled(1):
+                    self.load_participants_for_title()
                 
                 # Обновляем заголовок списка
                 self.competitions_label.setText(f"🏆 Текущее: {title.name[:40]}...")
@@ -2014,7 +2204,7 @@ class MainWindow(QMainWindow):
         """Смена вкладки"""
         self.current_tab_index = index
         
-        # ОБНОВЛЯЕМ ЛЕВУЮ ПАНЕЛЬ ПРИ СМЕНЕ ВКЛАДКИ (очищаем и пересоздаем)
+        # ОБНОВЛЯЕМ ЛЕВУЮ ПАНЕЛЬ ПРИ СМЕНЕ ВКЛАДКИ
         self.update_left_panel_for_tab(index)
         
         # Управление отображением правой панели в зависимости от вкладки
@@ -2030,6 +2220,9 @@ class MainWindow(QMainWindow):
                 self.new_comp_frame.setVisible(False)
             if hasattr(self, 'info_group'):
                 self.info_group.setVisible(True)
+            # Скрываем секцию создания этапа
+            if hasattr(self, 'stage_section'):
+                self.stage_section.setVisible(False)
             
             # Загружаем список соревнований
             self.load_titles_list()
@@ -2041,6 +2234,9 @@ class MainWindow(QMainWindow):
             self.search_results_list.setVisible(True)
             self.filters_widget.setVisible(False)
             
+            # Скрываем секцию создания этапа
+            if hasattr(self, 'stage_section'):
+                self.stage_section.setVisible(False)
             # Активируем поле поиска
             if hasattr(self, 'fio_edit'):
                 self.fio_edit.setEnabled(True)
@@ -2055,36 +2251,97 @@ class MainWindow(QMainWindow):
             # Изменяем размеры для увеличения таблицы
             QTimer.singleShot(100, self.resize_table_for_participants)
             
-        else:
-            # Для всех остальных вкладок
+        elif index == 2:  # Вкладка Команды
             self.competitions_label.setVisible(True)
             self.list_widget.setVisible(True)
             self.search_label.setVisible(False)
             self.search_results_list.setVisible(False)
             self.filters_widget.setVisible(False)
+            self.competitions_label.setText("🏆 Команды")
             
-            # Устанавливаем заголовки для разных вкладок
-            tab_names = {
-                2: "🏆 Команды",
-                3: "🤝 Пары",
-                4: "⚙️ Система",
-                5: "📊 Результаты",
-                6: "⭐ Рейтинг",
-                7: "ℹ️ Дополнительно"
-            }
-            if index in tab_names:
-                self.competitions_label.setText(tab_names[index])
-            
-            # Загружаем соответствующие данные
-            if index == 2 and self.current_title_id:
+            if self.current_title_id:
                 self.load_teams_for_title()
-            elif index == 3 and self.current_title_id:
+            else:
+                self.list_widget.clear()
+                # Скрываем секцию создания этапа
+            if hasattr(self, 'stage_section'):
+                self.stage_section.setVisible(False)   
+        elif index == 3:  # Вкладка Пары
+            self.competitions_label.setVisible(True)
+            self.list_widget.setVisible(True)
+            self.search_label.setVisible(False)
+            self.search_results_list.setVisible(False)
+            self.filters_widget.setVisible(False)
+            self.competitions_label.setText("🤝 Пары")
+            
+            if self.current_title_id:
                 self.load_doubles_for_title()
-            elif index == 5 and self.current_title_id:
+            else:
+                self.list_widget.clear()
+
+             # Скрываем секцию создания этапа
+            if hasattr(self, 'stage_section'):
+                self.stage_section.setVisible(False) 
+
+        elif index == 4:  # Вкладка Система
+            self.competitions_label.setVisible(True)
+            self.list_widget.setVisible(True)
+            self.search_label.setVisible(False)
+            self.search_results_list.setVisible(False)
+            self.filters_widget.setVisible(False)
+            self.competitions_label.setText("⚙️ Система")
+            
+             # ПОКАЗЫВАЕМ СЕКЦИЮ СОЗДАНИЯ ЭТАПА
+            if hasattr(self, 'stage_section'):
+                self.stage_section.setVisible(True)
+            
+            # Обновляем информацию о системе
+            if self.current_title_id:
+                self.update_stages_info()
+            else:
+                self.list_widget.clear()
+                if hasattr(self, 'stages_info'):
+                    self.stages_info.setText("Нет выбранного соревнования")
+        
+                
+        elif index == 5:  # Вкладка Результаты
+            self.competitions_label.setVisible(True)
+            self.list_widget.setVisible(True)
+            self.search_label.setVisible(False)
+            self.search_results_list.setVisible(False)
+            self.filters_widget.setVisible(False)
+            self.competitions_label.setText("📊 Результаты")
+            
+            if self.current_title_id:
                 self.load_results_for_title()
             else:
                 self.list_widget.clear()
-        
+            # Скрываем секцию создания этапа
+            if hasattr(self, 'stage_section'):
+                self.stage_section.setVisible(False)   
+        elif index == 6:  # Вкладка Рейтинг
+            self.competitions_label.setVisible(True)
+            self.list_widget.setVisible(True)
+            self.search_label.setVisible(False)
+            self.search_results_list.setVisible(False)
+            self.filters_widget.setVisible(False)
+            self.competitions_label.setText("⭐ Рейтинг")
+            self.list_widget.clear()
+
+            # Скрываем секцию создания этапа
+            if hasattr(self, 'stage_section'):
+                self.stage_section.setVisible(False) 
+        elif index == 7:  # Вкладка Дополнительно
+            self.competitions_label.setVisible(True)
+            self.list_widget.setVisible(True)
+            self.search_label.setVisible(False)
+            self.search_results_list.setVisible(False)
+            self.filters_widget.setVisible(False)
+            self.competitions_label.setText("ℹ️ Дополнительно")
+            self.list_widget.clear()
+            # Скрываем секцию создания этапа
+            if hasattr(self, 'stage_section'):
+                self.stage_section.setVisible(False)
         # Устанавливаем высоту для текущей вкладки
         self.set_tab_height(index)
 
@@ -3158,46 +3415,7 @@ class MainWindow(QMainWindow):
                                 f"📅 Дата рейтинга: {rating_date_str}\n"
                                 f"🏆 Тип соревнования: {self.selected_tournament_type}\n\n"
                                 f"Теперь заполните информацию о соревновании.")
-      
-    def _create_menu_bar(self):
-        """Создание меню"""
-        menubar = self.menuBar()
-        menubar.setStyleSheet("QMenuBar { padding: 3px; } QMenuBar::item { padding: 3px 8px; font-size: 10px; }")
-        
-        competitions_menu = menubar.addMenu("Соревнования")
-        new_comp_action = QAction("Новое соревнование", self)
-        new_comp_action.triggered.connect(self.new_competition)
-        competitions_menu.addAction(new_comp_action)
-        competitions_menu.addSeparator()
-        exit_action = QAction("Выход", self)
-        exit_action.triggered.connect(self.close)
-        competitions_menu.addAction(exit_action)
-        
-        edit_menu = menubar.addMenu("Редактировать")
-        edit_action = QAction("Параметры", self)
-        edit_action.triggered.connect(lambda: QMessageBox.information(self, "Редактировать", "Параметры"))
-        edit_menu.addAction(edit_action)
-        
-        print_menu = menubar.addMenu("Печать")
-        print_action = QAction("Предпросмотр", self)
-        print_action.triggered.connect(lambda: QMessageBox.information(self, "Печать", "Печать"))
-        print_menu.addAction(print_action)
-        
-        view_menu = menubar.addMenu("Просмотр")
-        fullscreen_action = QAction("Полный экран", self)
-        fullscreen_action.triggered.connect(self.toggle_fullscreen)
-        view_menu.addAction(fullscreen_action)
-        
-        rating_menu = menubar.addMenu("Рейтинг")
-        rating_action = QAction("Показать рейтинг", self)
-        rating_action.triggered.connect(lambda: QMessageBox.information(self, "Рейтинг", "Рейтинг"))
-        rating_menu.addAction(rating_action)
-        
-        help_menu = menubar.addMenu("Помощь")
-        about_action = QAction("О программе", self)
-        about_action.triggered.connect(self.about_dialog)
-        help_menu.addAction(about_action)
-
+#===========================
     def create_menu_bar(self):
         """Создание меню"""
         menubar = self.menuBar()
@@ -3205,10 +3423,41 @@ class MainWindow(QMainWindow):
         
         # Соревнования
         competitions_menu = menubar.addMenu("Соревнования")
+        
         new_comp_action = QAction("Новое соревнование", self)
         new_comp_action.triggered.connect(self.new_competition)
         competitions_menu.addAction(new_comp_action)
+        
+        open_comp_action = QAction("Открыть соревнование", self)
+        open_comp_action.triggered.connect(self.open_competition)
+        competitions_menu.addAction(open_comp_action)
+        
         competitions_menu.addSeparator()
+        
+        # Система - подменю
+        system_menu = competitions_menu.addMenu("⚙️ Система")
+        
+        create_system_action = QAction("Создать", self)
+        create_system_action.triggered.connect(self.create_system_settings)
+        system_menu.addAction(create_system_action)
+        
+        edit_system_action = QAction("Редактировать", self)
+        edit_system_action.triggered.connect(self.edit_system_settings)
+        system_menu.addAction(edit_system_action)
+        
+        competitions_menu.addSeparator()
+        
+        exit_action = QAction("Выход", self)
+        exit_action.triggered.connect(self.close)
+        competitions_menu.addAction(exit_action)
+        # # Редактировать
+        # edit_system_action = QAction("Редактировать", self)
+        # edit_system_action.triggered.connect(self.edit_system_settings)
+        # system_menu.addAction(edit_system_action)
+        
+        competitions_menu.addSeparator()
+        
+        # Выход
         exit_action = QAction("Выход", self)
         exit_action.triggered.connect(self.close)
         competitions_menu.addAction(exit_action)
@@ -3237,15 +3486,13 @@ class MainWindow(QMainWindow):
         rating_action.triggered.connect(lambda: QMessageBox.information(self, "Рейтинг", "Рейтинг"))
         rating_menu.addAction(rating_action)
         
-        # БАЗА ДАННЫХ - НОВОЕ МЕНЮ
+        # База данных
         db_menu = menubar.addMenu("База данных")
         
-        # Импортировать
         import_action = QAction("📥 Импортировать", self)
         import_action.triggered.connect(self.import_database)
         db_menu.addAction(import_action)
         
-        # Экспортировать
         export_action = QAction("📤 Экспортировать", self)
         export_action.triggered.connect(self.export_database)
         db_menu.addAction(export_action)
@@ -3255,9 +3502,6 @@ class MainWindow(QMainWindow):
         about_action = QAction("О программе", self)
         about_action.triggered.connect(self.about_dialog)
         help_menu.addAction(about_action)
-        
-        # Добавляем меню База данных в подменю Помощь (если нужно)
-        # help_menu.addMenu(db_menu)
     
     def toggle_fullscreen(self):
         """Полноэкранный режим"""
@@ -3278,7 +3522,7 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         close_db()
         event.accept()
-
+#==============================================
     def filter_by_alphabet(self):
         """Сортировка по алфавиту"""
         if not self.current_title_id:
@@ -4005,7 +4249,11 @@ class MainWindow(QMainWindow):
                 short_name = name[:30]
             else:
                 return
-        
+        title_data = {
+        # ... другие поля ...
+        'tab_enabled': "Титул Участники",  # Начальное значение - только вкладка Титул активна
+        # ... остальные поля ...
+        }
         # Формируем полное имя
         start_date = self.new_comp_start.date().toPyDate()
         date_str = start_date.strftime("%Y-%m-%d")
@@ -4083,6 +4331,25 @@ class MainWindow(QMainWindow):
                 title.tab_enabled = "Титул Участники"  # Активируем вкладку Участники
                 title.save()
 
+                # Создаем начальную систему
+                System.create(
+                    title_id=self.current_title_id,
+                    total_athletes=0,
+                    total_group=1,
+                    max_player=16,
+                    stage="Квалификация",
+                    type_table="Круговая",
+                    page_vid="лист",
+                    label_string="",
+                    kol_game_string="",
+                    choice_flag=False,
+                    score_flag=0,
+                    visible_game=True,
+                    stage_exit="0",
+                    mesta_exit=0,
+                    no_game="",
+                    sex=self.current_sex if self.current_sex else "man"
+        )
             # Обновляем активность вкладок
             self.update_tabs_enabled()
             
@@ -4303,38 +4570,52 @@ class MainWindow(QMainWindow):
 
     def update_tabs_enabled(self):
         """Обновление активности вкладок в зависимости от tab_enabled"""
-        tab_dict = {'Титул': 0,
-                    'Участники': 1,
-                    'Команды': 2,
-                    'Пары': 3,
-                    'Система': 4,
-                    'Результаты': 5,
-                    'Рейтинг': 6,
-                    'Дополнительно': 7}
-
         if not self.current_title_id:
             # Если нет выбранного соревнования, отключаем все вкладки кроме Титул
             for i in range(self.tab_widget.count()):
                 self.tab_widget.setTabEnabled(i, False)
             self.tab_widget.setTabEnabled(0, True)  # Титул всегда активен
+            self.tab_widget.setCurrentIndex(0)  # Переключаемся на Титул
             return
         
         try:
             title = Title.get_by_id(self.current_title_id)
             tab_enabled = title.tab_enabled if title.tab_enabled else "Титул"
             
-            # Вкладка Титул всегда активна (индекс 0)
-            self.tab_widget.setTabEnabled(0, True)
+            # Словарь соответствия названий вкладок их индексам
+            tab_dict = {
+                'Титул': 0,
+                'Участники': 1,
+                'Команды': 2,
+                'Пары': 3,
+                'Система': 4,
+                'Результаты': 5,
+                'Рейтинг': 6,
+                'Дополнительно': 7
+            }
             
-            result = tab_enabled.split()
-
-            for i in result:
-                idx = tab_dict[i]
-                self.tab_widget.setTabEnabled(idx, True)
-
+            # Сначала отключаем все вкладки
+            for i in range(self.tab_widget.count()):
+                self.tab_widget.setTabEnabled(i, False)
+            
+            # Разбираем строку tab_enabled (формат: "Титул Участники Система")
+            enabled_tabs = tab_enabled.split()
+            
+            # Активируем указанные вкладки
+            for tab_name in enabled_tabs:
+                if tab_name in tab_dict:
+                    idx = tab_dict[tab_name]
+                    self.tab_widget.setTabEnabled(idx, True)
+            
+            # Если ни одна вкладка не активирована, активируем только Титул
+            if not any(self.tab_widget.isTabEnabled(i) for i in range(self.tab_widget.count())):
+                self.tab_widget.setTabEnabled(0, True)
+            
             # Если текущая вкладка неактивна, переключаемся на Титул
             if not self.tab_widget.isTabEnabled(self.tab_widget.currentIndex()):
                 self.tab_widget.setCurrentIndex(0)
+            
+            print(f"Активированы вкладки: {enabled_tabs}")
             
         except Exception as e:
             print(f"Ошибка обновления вкладок: {e}")
@@ -4342,7 +4623,7 @@ class MainWindow(QMainWindow):
             for i in range(self.tab_widget.count()):
                 self.tab_widget.setTabEnabled(i, False)
             self.tab_widget.setTabEnabled(0, True)
-
+        
     def find_similar_competitions(self, name, start_date, end_date):
         """Поиск похожих соревнований для группировки"""
         similar = Title.select().where(
@@ -4579,6 +4860,7 @@ class MainWindow(QMainWindow):
             if last_title:
                 self.current_title_id = last_title.id
                 
+                # Обновляем информацию на вкладке Титул
                 self.comp_name_label.setText(last_title.name or "-")
                 self.comp_short_name_label.setText(last_title.short_name_comp or "-")
                 self.comp_full_name_label.setText(last_title.full_name_comp or "-")
@@ -4595,21 +4877,31 @@ class MainWindow(QMainWindow):
                 self.comp_secretary_label.setText(last_title.secretary or "-")
                 self.comp_secretary_category_label.setText(last_title.kat_sec or "-")
                 
+                # Определяем пол по умолчанию
                 if "девушки" in last_title.name.lower() or "дев" in last_title.name.lower():
                     self.current_sex = "woman"
                 else:
                     self.current_sex = "man"
                 
+                # АКТИВИРУЕМ ВКЛАДКИ НА ОСНОВЕ tab_enabled
                 self.update_tabs_enabled()
-                self.create_category_buttons()
-                self.load_participants_for_title()
                 
+                # Обновляем кнопки категорий
+                self.create_category_buttons()
+                
+                # Загружаем участников (если вкладка активна)
+                if self.tab_widget.isTabEnabled(1):
+                    self.load_participants_for_title()
+                
+                # Подсвечиваем последнее соревнование в списке
                 for i in range(self.list_widget.count()):
                     item = self.list_widget.item(i)
                     if item.data(Qt.UserRole) == last_title.id:
                         self.list_widget.setCurrentItem(item)
                         break
                         
+                print(f"Загружено последнее соревнование: {last_title.name}")
+                
         except Exception as e:
             print(f"Ошибка загрузки последнего соревнования: {e}")
 
@@ -5969,7 +6261,6 @@ class MainWindow(QMainWindow):
         
         QMessageBox.information(self, "Сброс фильтров", "Показаны все активные участники")
 
-
     def export_database(self):
         """Экспорт базы данных в файл"""
         try:
@@ -6159,7 +6450,1190 @@ class MainWindow(QMainWindow):
             progress.close()
             QMessageBox.critical(self, "Ошибка", f"Не удалось импортировать базу данных: {str(e)}")
 
+    def open_competition(self):
+        """Открыть существующее соревнование"""
+        # Переключаемся на вкладку Титул, где отображаются все соревнования
+        self.tab_widget.setCurrentIndex(0)
+        QMessageBox.information(self, "Открытие соревнования", 
+                            "Выберите соревнование из списка справа")
+# ============================     
+    def create_system_tab(self):
+        """Вкладка Система - только отображение информации о этапах"""
+        tab_widget = QWidget()
+        main_layout = QVBoxLayout(tab_widget)
+        main_layout.setSpacing(5)
+        main_layout.setContentsMargins(5, 5, 5, 5)
+        
+        # Информационное окно для вывода этапов
+        info_group = QGroupBox("📋 Информация о добавленных этапах")
+        info_layout = QVBoxLayout(info_group)
+        info_layout.setSpacing(3)
+        info_layout.setContentsMargins(5, 10, 5, 5)
+        
+        self.stages_info = QTextEdit()
+        self.stages_info.setReadOnly(True)
+        self.stages_info.setMinimumHeight(500)
+        self.stages_info.setStyleSheet("""
+            QTextEdit {
+                background-color: #f9f9f9;
+                font-family: Consolas, monospace;
+                font-size: 12px;
+                line-height: 1.4;
+                padding: 10px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+            }
+        """)
+        info_layout.addWidget(self.stages_info)
+        
+        main_layout.addWidget(info_group)
+        main_layout.addStretch()
+        
+        # Загружаем существующие данные
+        self.load_system_data()
+        
+        return tab_widget
+# ======================================
+    def edit_system_settings(self):
+        """Редактирование существующей системы проведения"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+        
+        try:
+            # Получаем выбранный этап
+            if not hasattr(self, 'stages_list') or not self.stages_list:
+                QMessageBox.warning(self, "Ошибка", "Нет добавленных этапов для редактирования")
+                return
+            
+            # Создаем диалог выбора этапа
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Выбор этапа для редактирования")
+            dialog.setModal(True)
+            dialog.setFixedSize(400, 200)
+            
+            layout = QVBoxLayout(dialog)
+            layout.addWidget(QLabel("Выберите этап для редактирования:"))
+            
+            stage_combo = QComboBox()
+            for i, stage in enumerate(self.stages_list, 1):
+                stage_combo.addItem(f"{i}. {stage['stage_name']}")
+            
+            layout.addWidget(stage_combo)
+            
+            btn_layout = QHBoxLayout()
+            ok_btn = QPushButton("Редактировать")
+            ok_btn.clicked.connect(dialog.accept)
+            cancel_btn = QPushButton("Отмена")
+            cancel_btn.clicked.connect(dialog.reject)
+            btn_layout.addWidget(ok_btn)
+            btn_layout.addWidget(cancel_btn)
+            layout.addLayout(btn_layout)
+            
+            if dialog.exec_() != QDialog.Accepted:
+                return
+            
+            selected_index = stage_combo.currentIndex()
+            selected_stage = self.stages_list[selected_index]
+            
+            # Открываем диалог редактирования
+            edit_dialog = QDialog(self)
+            edit_dialog.setWindowTitle(f"Редактирование этапа: {selected_stage['stage_name']}")
+            edit_dialog.setModal(True)
+            edit_dialog.setMinimumWidth(450)
+            
+            edit_layout = QVBoxLayout(edit_dialog)
+            
+            edit_group = QGroupBox("Параметры этапа")
+            edit_group_layout = QFormLayout(edit_group)
+            
+            # Название этапа
+            stage_edit = QComboBox()
+            stage_edit.addItems([
+                "Квалификация",
+                "1-й полуфинал",
+                "2-й полуфинал",
+                "Финал",
+                "Суперфинал"
+            ])
+            stage_edit.setEditable(True)
+            stage_edit.setCurrentText(selected_stage['stage_name'])
+            edit_group_layout.addRow("Название этапа:", stage_edit)
+            
+            # Тип таблицы
+            table_type_edit = QComboBox()
+            table_type_edit.addItems([
+                "Круговая",
+                "Олимпийская (минус 2)",
+                "Олимпийская (с розыгрышем всех мест)",
+                "Олимпийская (за 1-3 место)"
+            ])
+            table_type_edit.setCurrentText(selected_stage['table_type'])
+            edit_group_layout.addRow("Тип таблицы:", table_type_edit)
+            
+            # Количество групп
+            groups_edit = QLineEdit()
+            groups_edit.setText(str(selected_stage['total_groups']))
+            edit_group_layout.addRow("Количество групп:", groups_edit)
+            
+            # Максимум участников
+            max_players_edit = QLineEdit()
+            max_players_edit.setText(str(selected_stage['max_players']))
+            edit_group_layout.addRow("Максимум участников:", max_players_edit)
+            
+            # Количество проходящих
+            stage_exit_edit = QLineEdit()
+            stage_exit_edit.setText(str(selected_stage['stage_exit']))
+            edit_group_layout.addRow("Проходят в след. этап:", stage_exit_edit)
+            
+            edit_layout.addWidget(edit_group)
+            
+            btn_edit_layout = QHBoxLayout()
+            save_btn = QPushButton("💾 Сохранить изменения")
+            save_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 5px;")
+            cancel_edit_btn = QPushButton("❌ Отмена")
+            cancel_edit_btn.setStyleSheet("background-color: #f44336; color: white; padding: 5px;")
+            
+            def save_changes():
+                try:
+                    # Обновляем данные в списке
+                    selected_stage['stage_name'] = stage_edit.currentText()
+                    selected_stage['table_type'] = table_type_edit.currentText()
+                    selected_stage['total_groups'] = int(groups_edit.text()) if groups_edit.text().isdigit() else 1
+                    selected_stage['max_players'] = int(max_players_edit.text()) if max_players_edit.text().isdigit() else 16
+                    selected_stage['stage_exit'] = int(stage_exit_edit.text()) if stage_exit_edit.text().isdigit() else 0
+                    
+                    # Обновляем в базе данных
+                    system = System.get_or_none(
+                        (System.title_id == self.current_title_id) &
+                        (System.stage == selected_stage['stage_name'])
+                    )
+                    
+                    if system:
+                        system.stage = selected_stage['stage_name']
+                        if hasattr(system, 'type_table'):
+                            system.type_table = selected_stage['table_type']
+                        system.total_group = selected_stage['total_groups']
+                        system.max_player = selected_stage['max_players']
+                        system.mesta_exit = selected_stage['stage_exit']
+                        system.save()
+                    
+                    # Обновляем информационное окно
+                    self.update_stages_info()
+                    
+                    QMessageBox.information(edit_dialog, "Успех", "Изменения сохранены")
+                    edit_dialog.accept()
+                    
+                except Exception as e:
+                    QMessageBox.critical(edit_dialog, "Ошибка", f"Не удалось сохранить изменения: {str(e)}")
+            
+            save_btn.clicked.connect(save_changes)
+            cancel_edit_btn.clicked.connect(edit_dialog.reject)
+            
+            btn_edit_layout.addWidget(save_btn)
+            btn_edit_layout.addWidget(cancel_edit_btn)
+            edit_layout.addLayout(btn_edit_layout)
+            
+            edit_dialog.exec_()
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Ошибка: {str(e)}")
+       
+    def system_settings(self):
+        """Настройки системы (вызов из левой панели)"""
+        # Создаем диалог выбора
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Система проведения")
+        dialog.setModal(True)
+        dialog.setFixedSize(300, 150)
+        
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel("Выберите действие:"))
+        
+        btn_create = QPushButton("📝 Создать новую систему")
+        btn_create.clicked.connect(lambda: [dialog.accept(), self.create_system_settings()])
+        btn_create.setStyleSheet("background-color: #4CAF50; color: white; padding: 8px;")
+        
+        btn_edit = QPushButton("✏️ Редактировать текущую систему")
+        btn_edit.clicked.connect(lambda: [dialog.accept(), self.edit_system_settings()])
+        btn_edit.setStyleSheet("background-color: #2196F3; color: white; padding: 8px;")
+        
+        btn_cancel = QPushButton("Отмена")
+        btn_cancel.clicked.connect(dialog.reject)
+        
+        layout.addWidget(btn_create)
+        layout.addWidget(btn_edit)
+        layout.addWidget(btn_cancel)
+        
+        dialog.exec_()
+#====================================
+    def load_system_data(self):
+        """Загрузка данных системы на вкладке Система"""
+        if not self.current_title_id:
+            return
+        
+        try:
+            from models import System
+            
+            # Обновляем информационное окно с существующими этапами
+            self.update_stages_info()
+            
+            # Получаем последний добавленный этап для заполнения полей
+            last_system = System.select().where(
+                System.title_id == self.current_title_id
+            ).order_by(System.id.desc()).first()
+            
+            if last_system:
+                # Заполняем поля последним использованным значением
+                index = self.system_stage.findText(last_system.stage)
+                if index >= 0:
+                    self.system_stage.setCurrentIndex(index)
+                else:
+                    self.system_stage.setCurrentText(last_system.stage)
+                
+                index = self.table_type.findText(last_system.type_table)
+                if index >= 0:
+                    self.table_type.setCurrentIndex(index)
+                
+                # Для квалификации заполняем количество групп
+                if "Квалификация" in last_system.stage:
+                    self.total_groups.setText(str(last_system.total_group))
+                    self.total_groups.setEnabled(True)
+                else:
+                    # Для полуфиналов и финалов количество групп рассчитывается автоматически
+                    self.total_groups.setText(str(last_system.total_group))
+                    self.total_groups.setEnabled(False)
+                    self.total_groups.setStyleSheet("background-color: #f0f0f0; color: #999;")
+                
+                self.score_flag.setCurrentText(str(last_system.score_flag) if last_system.score_flag else "5")
+            else:
+                # Очищаем поля, если этапов нет
+                self.system_stage.setCurrentIndex(0)
+                self.table_type.setCurrentIndex(0)
+                self.total_groups.clear()
+                self.total_groups.setEnabled(True)
+                self.total_groups.setStyleSheet("")
+                self.score_flag.setCurrentText("5")
+                
+        except Exception as e:
+            print(f"Ошибка загрузки данных системы: {e}")
+#===============================
+    def add_system_stage(self):
+        """Добавление этапа в список"""
+        from models import System
+        from PyQt5.QtWidgets import QSpinBox
+        
+        # Получаем данные из формы
+        stage_name = self.system_stage.currentText().strip()
+        if not stage_name:
+            QMessageBox.warning(self, "Ошибка", "Введите название этапа")
+            return
+        
+        table_type = self.table_type.currentText()
+        score_flag = self.score_flag.currentText()
+        total_players = Player.select().where(Player.title_id == self.current_title_id).count()
+        
+        # Получаем предыдущий этап
+        previous_stage = System.select().where(
+            System.title_id == self.current_title_id
+        ).order_by(System.id.desc()).first()
+        
+        # === ОДНА ТАБЛИЦА ===
+        if stage_name == "Одна таблица":
+            if previous_stage:
+                QMessageBox.warning(self, "Ошибка", "Этап 'Одна таблица' может быть только первым этапом")
+                return
+            
+            total_groups = 1
+            max_players = total_players
+            stage_exit = 0
+            
+            # Расчет количества игр
+            if table_type == "Круговая":
+                total_games = (total_players * (total_players - 1)) // 2
+            else:
+                # Олимпийская система
+                total_games = self.calculate_olympic_games(total_players)
+            
+            reply = QMessageBox.question(self, "Подтверждение", 
+                                        f"Создать этап 'Одна таблица'?\n"
+                                        f"Участников: {total_players}\n"
+                                        f"Тип таблицы: {table_type}\n"
+                                        f"Количество игр: {total_games}\n\n"
+                                        f"Продолжить?",
+                                        QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.No:
+                return
+            
+            choice_flag = 1
+            stage_exit = 0
+            
+        # === КВАЛИФИКАЦИЯ ===
+        elif "Квалификация" in stage_name and "полуфинал" not in stage_name:
+            total_groups_text = self.total_groups.text().strip()
+            if not total_groups_text or not total_groups_text.isdigit():
+                QMessageBox.warning(self, "Ошибка", "Введите количество групп")
+                return
+            total_groups = int(total_groups_text)
+            
+            # Распределение участников по группам
+            base = total_players // total_groups
+            remainder = total_players % total_groups
+            players_per_group = base + (1 if remainder > 0 else 0)
+            max_players = players_per_group
+            
+            # Спрашиваем количество выходящих из каждой группы
+            if previous_stage:
+                exit_count, ok = QInputDialog.getInt(self, "Выход из групп", 
+                                                    "Сколько участников выходит из каждой группы?",
+                                                    2, 1, players_per_group)
+                if not ok:
+                    return
+                stage_exit = exit_count
+            else:
+                stage_exit = 2  # По умолчанию 2
+            
+            choice_flag = 0
+            
+        # === ПОЛУФИНАЛЫ ===
+        elif "полуфинал" in stage_name.lower():
+            if not previous_stage or "Квалификация" not in previous_stage.stage:
+                QMessageBox.warning(self, "Ошибка", "Полуфинал может следовать только после квалификации")
+                return
+            
+            # Количество групп полуфинала = количество групп квалификации / 2
+            total_groups = max(1, previous_stage.total_group // 2)
+            
+            # Спрашиваем количество выходящих из квалификации
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Настройка полуфинала")
+            dialog.setModal(True)
+            dialog.setMinimumWidth(400)
+            
+            layout = QVBoxLayout(dialog)
+            layout.addWidget(QLabel(f"Из этапа '{previous_stage.stage}' в полуфинал переходят:"))
+            
+            exit_layout = QHBoxLayout()
+            exit_layout.addWidget(QLabel("Количество участников из каждой группы:"))
+            exit_spin = QSpinBox()
+            exit_spin.setMinimum(1)
+            exit_spin.setMaximum(previous_stage.max_player)
+            exit_spin.setValue(previous_stage.mesta_exit if previous_stage.mesta_exit > 0 else 2)
+            exit_layout.addWidget(exit_spin)
+            layout.addLayout(exit_layout)
+            
+            # Информация о полуфинале
+            info_label = QLabel()
+            info_label.setStyleSheet("color: blue;")
+            info_label.setWordWrap(True)
+            layout.addWidget(info_label)
+            
+            def update_semifinal_info():
+                exit_val = exit_spin.value()
+                total_in_semifinal = previous_stage.total_group * exit_val
+                players_per_group = exit_val * 2
+                info_label.setText(f"Всего в полуфинале: {total_in_semifinal} чел.\n"
+                                f"Количество групп: {total_groups}\n"
+                                f"Участников в группе: {players_per_group} чел.\n"
+                                f"Всего игр: {self.calculate_semifinal_games_count(total_groups, players_per_group, previous_stage)}")
+            
+            exit_spin.valueChanged.connect(update_semifinal_info)
+            update_semifinal_info()
+            
+            btn_layout = QHBoxLayout()
+            ok_btn = QPushButton("OK")
+            ok_btn.clicked.connect(dialog.accept)
+            cancel_btn = QPushButton("Отмена")
+            cancel_btn.clicked.connect(dialog.reject)
+            btn_layout.addWidget(ok_btn)
+            btn_layout.addWidget(cancel_btn)
+            layout.addLayout(btn_layout)
+            
+            if dialog.exec_() != QDialog.Accepted:
+                return
+            
+            stage_exit = exit_spin.value()
+            max_players = stage_exit * 2  # В каждой группе полуфинала по 2*exit участников
+            choice_flag = 0        
+            
+        # === ФИНАЛ ===
+        elif "Финал" in stage_name:
+            if not previous_stage:
+                QMessageBox.warning(self, "Ошибка", "Финал не может быть первым этапом (используйте 'Одна таблица')")
+                return
+            
+            total_groups = 1
+            
+            # Диалог для финала
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Настройка финала")
+            dialog.setModal(True)
+            dialog.setMinimumWidth(300)
+            
+            layout = QVBoxLayout(dialog)
+            layout.addWidget(QLabel(f"Из этапа '{previous_stage.stage}' в финал выходят:"))
+            
+            # Количество выходящих
+            exit_layout = QHBoxLayout()
+            exit_layout.addWidget(QLabel("Количество участников из каждой группы:"))
+            exit_spin = QSpinBox()
+            exit_spin.setMinimum(1)
+            exit_spin.setMaximum(previous_stage.max_player)
+            exit_spin.setValue(previous_stage.mesta_exit if previous_stage.mesta_exit > 0 else 2)
+            exit_layout.addWidget(exit_spin)
+            layout.addLayout(exit_layout)
+            
+            # Информация о распределении
+            info_label = QLabel()
+            info_label.setStyleSheet("color: blue;")
+            info_label.setWordWrap(True)
+            layout.addWidget(info_label)
+            
+            def update_info():
+                exit_val = exit_spin.value()
+                total_in_final = previous_stage.total_group * exit_val
+                
+                # Определяем количество финалов
+                # max_per_final = previous_stage.max_player * 2
+                max_per_final = previous_stage.max_player
 
+                finals_count = (total_in_final + max_per_final - 1) // max_per_final
+                
+                finals_list = []
+                remaining = total_in_final
+                for i in range(finals_count):
+                    players = min(max_per_final, remaining)
+                    finals_list.append(f"{i+1}-й финал: {players} чел.")
+                    remaining -= players
+                
+                info_label.setText(f"Всего в финале: {total_in_final} чел.\n"
+                                f"Количество финалов: {finals_count}\n"
+                                f"Распределение: " + ", ".join(finals_list))
+                
+                return total_in_final, finals_count, finals_list
+            
+            btn_layout = QHBoxLayout()
+            ok_btn = QPushButton("OK")
+            ok_btn.clicked.connect(dialog.accept)
+            cancel_btn = QPushButton("Отмена")
+            cancel_btn.clicked.connect(dialog.reject)
+            btn_layout.addWidget(ok_btn)
+            btn_layout.addWidget(cancel_btn)
+            layout.addLayout(btn_layout)
+            
+            exit_spin.valueChanged.connect(lambda: update_info())
+            total_in_final, finals_count, finals_list = update_info()
+            
+            if dialog.exec_() != QDialog.Accepted:
+                return
+            
+            stage_exit = exit_spin.value()
+            max_players = total_in_final
+            # max_players = previous_stage.max_player * 2
+            
+            
+            # Сохраняем информацию о финалах в атрибут для отображения
+            self.current_finals_info = {
+                'count': finals_count,
+                'distribution': finals_list,
+                'total_players': total_in_final
+            }
+            choice_flag = 0
+ # ===============================================================           
+            # Проверка, что все участники распределены
+            total_in_final = previous_stage.total_group * stage_exit
+            if total_in_final > total_players:
+                QMessageBox.warning(self, "Ошибка", "Количество участников в финале превышает общее число участников")
+                return
+            
+            if total_in_final == total_players:
+                reply = QMessageBox.question(self, "Завершение", 
+                                            "Все участники распределены по финалам.\n"
+                                            "Создание системы завершено.\n"
+                                            "Провести жеребьевку сейчас?",
+                                            QMessageBox.Yes | QMessageBox.No)
+                if reply == QMessageBox.Yes:
+                    self.perform_drawing()
+        
+        else:
+            QMessageBox.warning(self, "Ошибка", f"Неизвестный тип этапа: {stage_name}")
+            return
+        # переводим с нумерацией финала
+        txt = finals_list[0]
+        mark = txt.find(":")
+        stage_name[mark:] if mark > 0 else stage_name
+            
+        # Сохраняем в базу данных
+        try:
+            system_data = {
+                'title_id': self.current_title_id,
+                'total_athletes': total_players,
+                'total_group': total_groups,
+                'max_player': max_players,
+                'stage': stage_name,
+                'stage_exit': previous_stage.stage if previous_stage else "",
+                'mesta_exit': stage_exit if 'stage_exit' in dir() else 0,
+                'page_vid': "лист",
+                'label_string': "",
+                'kol_game_string': "",
+                'choice_flag': choice_flag if 'choice_flag' in dir() else 0,
+                'score_flag': int(score_flag),
+                'visible_game': True,
+                'no_game': "",
+                'sex': self.current_sex if self.current_sex else "man"
+            }
+            
+            if hasattr(System, 'type_table'):
+                system_data['type_table'] = table_type
+            
+            system = System.create(**system_data)
+            self.update_stages_info()
+            
+            QMessageBox.information(self, "Успех", f"Этап '{stage_name}' добавлен")
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось добавить этап: {str(e)}")        
+#=============================
+    def update_stages_info(self):
+        """Обновление информационного окна со списком этапов"""
+        try:
+            from models import System, Player, Title
+            
+            if not self.current_title_id:
+                self.stages_info.setText("Нет выбранного соревнования")
+                return
+            
+            title = Title.get_or_none(Title.id == self.current_title_id)
+            title_name = title.name if title else "Неизвестное соревнование"
+            
+            systems = System.select().where(System.title_id == self.current_title_id).order_by(System.id)
+            
+            self.stages_info.clear()
+            
+            if systems.count() == 0:
+                self.stages_info.setText(f"🏆 Соревнование: {title_name}\n\n{'=' * 50}\n\n❌ Нет добавленных этапов")
+                return
+            
+            info_text = f"🏆 СОРЕВНОВАНИЕ: {title_name.upper()}\n"
+            info_text += "=" * 70 + "\n\n"
+            
+            previous_stage = None
+            
+            for idx, system in enumerate(systems, 1):
+                total_players = Player.select().where(Player.title_id == self.current_title_id).count()
+                
+                if total_players == 0:
+                    distribution_text = "нет участников"
+                    total_games = 0
+                    group_games_text = ""
+                    additional_info = ""
+                else:
+                    groups_count = system.total_group if system.total_group else 1
+                    
+                    # Для полуфинала рассчитываем распределение отдельно
+                    if "полуфинал" in system.stage.lower() and previous_stage and "Квалификация" in previous_stage.stage:
+                        # Количество участников в полуфинале = количество групп квалификации * количество выходящих
+                        players_in_semifinal = previous_stage.total_group * previous_stage.mesta_exit
+                        players_per_group = previous_stage.mesta_exit * 2
+                        group_sizes = [players_per_group] * groups_count
+                        distribution_text = self.calculate_group_distribution(players_in_semifinal, groups_count)
+                        
+                        # Расчет количества игр в полуфинале
+                        total_games = self.calculate_semifinal_games_count(groups_count, players_per_group, previous_stage)
+                        additional_info = f"\n   │   (учитывая уже сыгранные в квалификации)"
+                        
+                        # Расчет количества игр по группам для полуфинала
+                        group_games = []
+                        exit_count = previous_stage.mesta_exit
+                        for i, gsize in enumerate(group_sizes, 1):
+                            total_possible = (gsize * (gsize - 1)) // 2
+                            already_played = (exit_count * (exit_count - 1)) // 2 * 2
+                            games = total_possible - already_played
+                            group_games.append(f"Гр{i}: {games} игр")
+                        group_games_text = " | ".join(group_games)
+                    # elif "финал" in system.stage.lower() and previous_stage:
+                    #     # fin = self.calculate_finals_info(self, total_players, max_players, table_type)
+                    #     distribution_text = self.calculate_finals_distribution(self, total_players, max_per_final) 
+                    else:
+                        # Для остальных этапов
+                        group_sizes = self.calculate_group_sizes(total_players, groups_count)
+                        distribution_text = self.calculate_group_distribution(total_players, groups_count)
+                        total_games = self.calculate_total_games(
+                            system.type_table, total_players, groups_count, group_sizes,
+                            system.stage, previous_stage
+                        )
+                        additional_info = ""
+                        
+                        # Расчет количества игр по группам
+                        group_games = []
+                        for i, gsize in enumerate(group_sizes, 1):
+                            if "Круговая" in system.type_table:
+                                games = (gsize * (gsize - 1)) // 2 if gsize > 1 else 0
+                            elif "Олимпийская" in system.type_table:
+                                if gsize == 4:
+                                    games = 4
+                                elif gsize == 8:
+                                    games = 12
+                                elif gsize == 16:
+                                    games = 32
+                                elif gsize == 32:
+                                    games = 80
+                                else:
+                                    games = gsize - 1
+                            else:
+                                games = 0
+                            group_games.append(f"Гр{i}: {games} игр")
+                        group_games_text = " | ".join(group_games)
+                
+                # Отображение информации об этапе
+                info_text += f"📌 ЭТАП {idx}: {system.stage}\n"
+                info_text += f"└─ ➡️ Тип таблицы: {system.type_table}🏆{distribution_text}🎯 Всего игр: {total_games}"
+                # info_text += f"├─ 🏆 Распределение: {distribution_text}\n"
+                # info_text += f"├─ 🎾 Количество партий: {system.score_flag}\n"
+                # info_text += f"├─ 🎯 Количество игр по группам: {group_games_text}\n"
+                # info_text += f"├─ 🎯 Всего игр: {total_games}{additional_info}\n"
+                
+                # if system.stage_exit:
+                #     info_text += f"├─ 🔗 Попадают из этапа: {system.stage_exit}\n"
+                # info_text += f"└─ ➡️ Проходят в след. этап: {system.mesta_exit} чел. из каждой группы\n"
+                
+                # if system.mesta_exit > 0:
+                #     next_stage_players = system.total_group * system.mesta_exit
+                #     info_text += f"    📊 Всего в следующем этапе: {next_stage_players} чел.\n"
+                
+                info_text += "\n"
+                
+                previous_stage = system
+            
+            self.stages_info.setText(info_text)
+            
+        except Exception as e:
+            print(f"Ошибка обновления информации об этапах: {e}")
+            import traceback
+            traceback.print_exc()
+            self.stages_info.setText(f"Ошибка: {str(e)}")
+# ===================================
+    def calculate_group_sizes(self, players, groups):
+        """Расчет количества участников в каждой группе"""
+        if groups <= 0:
+            return []
+        
+        if players == 0:
+            return [0] * groups
+        
+        base = players // groups
+        remainder = players % groups
+        
+        group_sizes = []
+        for i in range(groups):
+            if i < remainder:
+                group_sizes.append(base + 1)
+            else:
+                group_sizes.append(base)
+        
+        return group_sizes
+    # =============================
+    def calculate_group_distribution(self, players, groups):
+        """Расчет распределения участников по группам"""
+        if groups <= 0:
+            return "нет групп"
+        
+        if players == 0:
+            return "нет участников"
+        
+        base = players // groups
+        remainder = players % groups
+        
+        if remainder == 0:
+            return f"{groups} гр по {base} чел."
+        else:
+            return f"{groups} гр ({remainder} гр по {base + 1} чел., {groups - remainder} гр по {base} чел.)"
+#============
+    def calculate_total_games(self, table_type, total_players, groups_count, group_sizes, stage_name=None, previous_stage=None):
+        """Расчет общего количества игр"""
+        if total_players == 0:
+            return 0
+        
+        total_games = 0
+        
+        if "Круговая" in table_type:
+            for group_size in group_sizes:
+                if group_size > 1:
+                    total_games += (group_size * (group_size - 1)) // 2
+            
+            # Для финала с круговой системой учитываем уже сыгранные игры
+            if "Финал" in stage_name and previous_stage:
+                # Вычитаем игры, которые уже были сыграны в полуфиналах
+                total_games -= previous_stage.total_group * 1  # Примерная корректировка
+        
+        elif "Олимпийская" in table_type:
+            for group_size in group_sizes:
+                if group_size == 4:
+                    total_games += 6
+                elif group_size == 8:
+                    total_games += 12
+                elif group_size == 16:
+                    total_games += 32
+                elif group_size == 32:
+                    total_games += 80
+                else:
+                    total_games += group_size - 1
+        
+        return total_games
+  # ========================  
+    def create_system_settings(self):
+        """Создание новой системы проведения (вызывается из меню)"""
+        # Переключаемся на вкладку Система
+        self.tab_widget.setCurrentIndex(4)  # Индекс вкладки Система
+        QMessageBox.information(self, "Создание системы", 
+                            "Заполните параметры этапа и нажмите 'Добавить этап'")      
+
+    def edit_system_settings(self):
+        """Редактирование существующей системы проведения (вызывается из меню)"""
+        # Переключаемся на вкладку Система
+        self.tab_widget.setCurrentIndex(4)  # Индекс вкладки Система
+        
+        # Проверяем, есть ли добавленные этапы
+        try:
+            systems_count = System.select().where(System.title_id == self.current_title_id).count()
+            if systems_count == 0:
+                QMessageBox.information(self, "Редактирование системы", 
+                                    "Нет добавленных этапов.\n"
+                                    "Создайте новый этап с помощью кнопки 'Добавить этап'")
+                return
+            
+            # Создаем диалог выбора этапа для редактирования
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Выбор этапа для редактирования")
+            dialog.setModal(True)
+            dialog.setFixedSize(400, 200)
+            
+            layout = QVBoxLayout(dialog)
+            layout.addWidget(QLabel("Выберите этап для редактирования:"))
+            
+            stage_combo = QComboBox()
+            systems = System.select().where(System.title_id == self.current_title_id)
+            for system in systems:
+                stage_combo.addItem(f"{system.stage} (Групп: {system.total_group})", system.id)
+            
+            layout.addWidget(stage_combo)
+            
+            btn_layout = QHBoxLayout()
+            ok_btn = QPushButton("Редактировать")
+            ok_btn.clicked.connect(dialog.accept)
+            cancel_btn = QPushButton("Отмена")
+            cancel_btn.clicked.connect(dialog.reject)
+            btn_layout.addWidget(ok_btn)
+            btn_layout.addWidget(cancel_btn)
+            layout.addLayout(btn_layout)
+            
+            if dialog.exec_() == QDialog.Accepted:
+                system_id = stage_combo.currentData()
+                self.edit_system_stage(system_id)
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Ошибка: {str(e)}")
+# =================================
+    def edit_system_stage(self, system_id):
+        """Редактирование выбранного этапа"""
+        from models import System
+        
+        try:
+            system = System.get_by_id(system_id)
+            
+            dialog = QDialog(self)
+            dialog.setWindowTitle(f"Редактирование этапа: {system.stage}")
+            dialog.setModal(True)
+            dialog.setMinimumWidth(450)
+            
+            layout = QVBoxLayout(dialog)
+            
+            group = QGroupBox("Параметры этапа")
+            group_layout = QFormLayout(group)
+            group_layout.setSpacing(10)
+            
+            # Название этапа
+            stage_edit = QComboBox()
+            stage_edit.addItems(["Одна таблица",
+                "Квалификация",
+                "1-й полуфинал",
+                "2-й полуфинал",
+                "Финал",
+                "Суперфинал"
+            ])
+            stage_edit.setEditable(True)
+            stage_edit.setCurrentText(system.stage)
+            group_layout.addRow("Название этапа:", stage_edit)
+            
+            # Тип таблицы
+            table_type_edit = QComboBox()
+            table_type_edit.addItems([
+                "Круговая",
+                "Олимпийская (минус 2)",
+                "Олимпийская (с розыгрышем всех мест)",
+                "Олимпийская (за 1-3 место)"
+            ])
+            if hasattr(system, 'type_table'):
+                table_type_edit.setCurrentText(system.type_table)
+            group_layout.addRow("Тип таблицы:", table_type_edit)
+            
+            # Количество групп
+            groups_edit = QLineEdit()
+            groups_edit.setText(str(system.total_group))
+            group_layout.addRow("Количество групп:", groups_edit)
+            
+            # Максимум участников
+            max_players_edit = QLineEdit()
+            max_players_edit.setText(str(system.max_player) if system.max_player else "16")
+            group_layout.addRow("Максимум участников:", max_players_edit)
+            
+            # Количество проходящих
+            stage_exit_edit = QLineEdit()
+            stage_exit_edit.setText(str(system.mesta_exit) if system.mesta_exit else "0")
+            group_layout.addRow("Проходят в след. этап:", stage_exit_edit)
+            
+            layout.addWidget(group)
+            
+            btn_layout = QHBoxLayout()
+            save_btn = QPushButton("💾 Сохранить изменения")
+            save_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 5px;")
+            cancel_btn = QPushButton("❌ Отмена")
+            cancel_btn.setStyleSheet("background-color: #f44336; color: white; padding: 5px;")
+            
+            def save_changes():
+                try:
+                    system.stage = stage_edit.currentText()
+                    if hasattr(system, 'type_table'):
+                        system.type_table = table_type_edit.currentText()
+                    system.total_group = int(groups_edit.text()) if groups_edit.text().isdigit() else 1
+                    system.max_player = int(max_players_edit.text()) if max_players_edit.text().isdigit() else 16
+                    system.mesta_exit = int(stage_exit_edit.text()) if stage_exit_edit.text().isdigit() else 0
+                    system.save()
+                    
+                    # Обновляем информационное окно
+                    self.update_stages_info()
+                    
+                    QMessageBox.information(dialog, "Успех", "Изменения сохранены")
+                    dialog.accept()
+                    
+                except Exception as e:
+                    QMessageBox.critical(dialog, "Ошибка", f"Не удалось сохранить изменения: {str(e)}")
+            
+            save_btn.clicked.connect(save_changes)
+            cancel_btn.clicked.connect(dialog.reject)
+            
+            btn_layout.addWidget(save_btn)
+            btn_layout.addWidget(cancel_btn)
+            layout.addLayout(btn_layout)
+            
+            dialog.exec_()
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Ошибка: {str(e)}")
+# ========================================
+    def open_competition(self):
+        """Открыть существующее соревнование"""
+        self.tab_widget.setCurrentIndex(0)  # Переключаемся на вкладку Титул
+        QMessageBox.information(self, "Открытие соревнования", 
+                            "Выберите соревнование из списка справа")
+        
+    def on_stage_changed(self, stage_name):
+        """Обработка изменения этапа"""
+        # Если этап "Финал" или "Суперфинал", отключаем поле "Группы"
+        if stage_name in ["Финал", "Суперфинал"]:
+            self.total_groups.setEnabled(False)
+            self.total_groups.setText("1")
+            self.total_groups.setStyleSheet("background-color: #f0f0f0; color: #999;")
+        else:
+            self.total_groups.setEnabled(True)
+            self.total_groups.setStyleSheet("")
+
+    def on_table_type_changed(self, table_type):
+        """Обработка изменения типа таблицы"""
+        # Если тип таблицы не "Круговая", то макс. участников может быть только 4, 8, 16, 32 или 64
+        if table_type != "Круговая":
+            self.max_players.setPlaceholderText("4, 8, 16, 32 или 64")
+            # Проверяем текущее значение
+            current_value = self.max_players.text()
+            if current_value and current_value.isdigit():
+                value = int(current_value)
+                if value not in [4, 8, 16, 32, 64]:
+                    self.max_players.setText("")
+                    QMessageBox.warning(self, "Ошибка", 
+                                    "Для олимпийской системы максимальное количество участников должно быть 4, 8, 16, 32 или 64")
+        else:
+            self.max_players.setPlaceholderText("чел.")
+            self.max_players.setStyleSheet("")
+
+    def on_max_players_changed(self, text):
+        """Проверка вводимого значения макс. участников"""
+        if self.table_type.currentText() != "Круговая":
+            if text and text.isdigit():
+                value = int(text)
+                if value not in [4, 8, 16, 32, 64]:
+                    # Показываем предупреждение, но не блокируем ввод
+                    self.max_players.setStyleSheet("border: 1px solid red;")
+                else:
+                    self.max_players.setStyleSheet("")
+            else:
+                self.max_players.setStyleSheet("")
+
+    def perform_drawing(self):
+        """Проведение жеребьевки"""
+        QMessageBox.information(self, "Жеребьевка", 
+                            "Функция жеребьевки в разработке.\n"
+                            "Будет реализована позже.")
+        # Здесь будет логика жеребьевки
+
+    def calculate_finals_info(self, total_players, max_players, table_type):
+        """Расчет информации о финалах"""
+        if table_type == "Круговая":
+            # Для круговой системы финал один, если все игроки
+            if total_players <= max_players:
+                return {"count": 1, "has_number": False, "distribution": f"{total_players} игроков"}
+            else:
+                # Игроки разбиваются на группы
+                groups = (total_players + max_players - 1) // max_players
+                last_group_size = total_players % max_players
+                if last_group_size == 0:
+                    last_group_size = max_players
+                
+                distribution = f"{groups} финалов"
+                if groups > 1:
+                    distribution += f" (последний: {last_group_size} игр.)"
+                return {"count": groups, "has_number": groups > 1, "distribution": distribution}
+        
+        else:  # Олимпийская система
+            # Определяем размеры сеток
+            valid_sizes = [4, 8, 16, 32, 64]
+            remaining = total_players
+            finals = []
+            final_number = 1
+            
+            while remaining > 0:
+                # Находим подходящий размер сетки
+                grid_size = max([s for s in valid_sizes if s <= remaining], default=valid_sizes[0])
+                if grid_size > remaining:
+                    grid_size = valid_sizes[0]
+                
+                finals.append({
+                    'number': final_number,
+                    'size': grid_size,
+                    'players': min(grid_size, remaining)
+                })
+                remaining -= grid_size
+                final_number += 1
+            
+            if len(finals) == 1:
+                return {"count": 1, "has_number": False, "distribution": f"{finals[0]['players']} игроков в сетке {finals[0]['size']}"}
+            else:
+                distribution = ", ".join([f"{f['number']}-й финал: {f['players']} игр." for f in finals])
+                return {"count": len(finals), "has_number": True, "distribution": distribution}
+
+    def calculate_empty_slots(self, total_players, max_players, table_type):
+        """Расчет свободных мест в сетке"""
+        if table_type == "Круговая":
+            return 0
+        
+        valid_sizes = [4, 8, 16, 32, 64]
+        remaining = total_players
+        empty_slots = 0
+        
+        while remaining > 0:
+            grid_size = max([s for s in valid_sizes if s <= remaining], default=valid_sizes[0])
+            if grid_size > remaining:
+                grid_size = valid_sizes[0]
+            
+            empty_slots += grid_size - min(grid_size, remaining)
+            remaining -= grid_size
+        
+        return empty_slots
+ #=================================================   
+    def on_stage_selected(self, index):
+        """Обработка выбора этапа для автоматического расчета"""
+        stage_name = self.system_stage.currentText()
+        
+        previous_stages = System.select().where(
+            System.title_id == self.current_title_id
+        ).order_by(System.id)
+        
+        previous_stages_list = list(previous_stages)
+        
+        if not previous_stages_list:
+            return
+        
+        last_stage = previous_stages_list[-1]
+        
+        # Логика для 1-го полуфинала после квалификации
+        if "Квалификация" in last_stage.stage and "полуфинал" in stage_name.lower():
+            # Количество групп полуфинала = количество групп квалификации / 2
+            auto_groups = max(1, last_stage.total_group // 2)
+            self.total_groups.setText(str(auto_groups))
+            
+            # Для полуфинала поле "Группы" делаем неактивным
+            self.total_groups.setEnabled(False)
+            self.total_groups.setStyleSheet("background-color: #f0f0f0; color: #999;")
+            
+            QMessageBox.information(self, "Автоматический расчет", 
+                                f"На основе предыдущего этапа 'Квалификация' автоматически установлены:\n"
+                                f"📦 Количество групп в полуфинале: {auto_groups}\n"
+                                f"(Количество групп квалификации: {last_stage.total_group})")
+        
+        # Логика для 2-го полуфинала после 1-го полуфинала
+        elif "1-й полуфинал" in last_stage.stage and "2-й полуфинал" in stage_name:
+            # Количество групп 2-го полуфинала = количество групп 1-го полуфинала / 2
+            auto_groups = max(1, last_stage.total_group // 2)
+            self.total_groups.setText(str(auto_groups))
+            
+            # Для полуфинала поле "Группы" делаем неактивным
+            self.total_groups.setEnabled(False)
+            self.total_groups.setStyleSheet("background-color: #f0f0f0; color: #999;")
+            
+            QMessageBox.information(self, "Автоматический расчет", 
+                                f"На основе предыдущего этапа '1-й полуфинал' автоматически установлены:\n"
+                                f"📦 Количество групп во 2-м полуфинале: {auto_groups}\n"
+                                f"(Количество групп в 1-м полуфинале: {last_stage.total_group})")
+        
+        # Логика для финала после полуфинала
+        elif "полуфинал" in last_stage.stage and "Финал" in stage_name:
+            # Для финала количество групп всегда 1
+            self.total_groups.setText("1")
+            self.total_groups.setEnabled(False)
+            self.total_groups.setStyleSheet("background-color: #f0f0f0; color: #999;")
+            
+            # Количество участников финала = количество групп полуфинала * количество проходящих
+            if last_stage.mesta_exit > 0:
+                auto_players = last_stage.total_group * last_stage.mesta_exit
+                QMessageBox.information(self, "Автоматический расчет", 
+                                    f"На основе предыдущего этапа '{last_stage.stage}' автоматически установлены:\n"
+                                    f"📦 Количество групп в финале: 1\n"
+                                    f"👥 Количество участников финала: {auto_players} чел.\n"
+                                    f"(Из {last_stage.total_group} групп выходит по {last_stage.mesta_exit} чел.)")
+        
+        # Логика для финала после квалификации (без полуфинала)
+        elif "Квалификация" in last_stage.stage and "Финал" in stage_name:
+            # Для финала количество групп всегда 1
+            self.total_groups.setText("1")
+            self.total_groups.setEnabled(False)
+            self.total_groups.setStyleSheet("background-color: #f0f0f0; color: #999;")
+            
+            # Количество участников финала = количество групп квалификации * количество проходящих
+            if last_stage.mesta_exit > 0:
+                auto_players = last_stage.total_group * last_stage.mesta_exit
+                QMessageBox.information(self, "Автоматический расчет", 
+                                    f"На основе предыдущего этапа 'Квалификация' автоматически установлены:\n"
+                                    f"📦 Количество групп в финале: 1\n"
+                                    f"👥 Количество участников финала: {auto_players} чел.\n"
+                                    f"(Из {last_stage.total_group} групп выходит по {last_stage.mesta_exit} чел.)")
+ # ==================================                             
+    def perform_drawing(self):
+        """Проведение жеребьевки"""
+        QMessageBox.information(self, "Жеребьевка", 
+                            "Функция жеребьевки в разработке.\n"
+                            "Будет реализована позже.")
+        # Здесь будет логика жеребьевки
+    
+    def calculate_semifinal_games(self, groups_count, players_per_group, exit_count):
+        """
+        Расчет количества игр в полуфинале с учетом уже сыгранных встреч
+        """
+        if groups_count <= 0 or players_per_group <= 0 or exit_count <= 0:
+            return 0, 0, 0
+        
+        # В полуфинале группы формируются путем слияния двух групп квалификации
+        semifinal_groups = groups_count // 2
+        
+        # В каждой группе полуфинала будет 2 * exit_count игроков
+        players_in_semifinal_group = exit_count * 2
+        
+        # Общее количество возможных игр в группе (если бы все встречались впервые)
+        total_possible_games = (players_in_semifinal_group * (players_in_semifinal_group - 1)) // 2
+        
+        # Количество уже сыгранных игр:
+        # В каждой группе квалификации сыграно (exit_count * (exit_count - 1)) // 2 игр между вышедшими
+        # Таких групп в одной группе полуфинала - 2 (из двух групп квалификации)
+        already_played = ((exit_count * (exit_count - 1)) // 2) * 2
+        
+        # Также нужно учесть, что игроки из одной группы квалификации уже играли между собой
+        # Поэтому уникальных игр будет меньше
+        unique_games = total_possible_games - already_played
+        
+        # Общее количество игр в полуфинале
+        total_games = unique_games * semifinal_groups
+        
+        return total_games, unique_games, semifinal_groups
+    
+    def on_stage_type_changed(self, stage_name):
+        """Обработка изменения типа этапа - показываем/скрываем поле количество групп"""
+        print(f"Выбран этап: {stage_name}")  # Для отладки
+        
+        if "Квалификация" in stage_name and "полуфинал" not in stage_name:
+            # Показываем поле для квалификации
+            self.groups_widget.setVisible(True)
+            self.total_groups.setEnabled(True)
+            self.total_groups.setFocus()
+            # print("Поле 'Количество групп' показано")
+        else:
+            # Скрываем поле для остальных этапов
+            self.groups_widget.setVisible(False)
+            self.total_groups.clear()
+            self.total_groups.setEnabled(False)
+            # print("Поле 'Количество групп' скрыто")
+
+    def calculate_max_players_for_final(self, total_players):
+        """Расчет максимального количества участников в одном финале"""
+        # Стандартные размеры сеток для олимпийской системы
+        valid_sizes = [4, 8, 16, 32, 64]
+        
+        # Находим ближайший подходящий размер
+        for size in valid_sizes:
+            if total_players <= size:
+                return size
+        
+        # Если больше 64, берем 64
+        return 64
+    
+    def calculate_olympic_games(self, players):
+        """Расчет количества игр в олимпийской системе"""
+        if players == 4:
+            return 6
+        elif players == 8:
+            return 12
+        elif players == 16:
+            return 32
+        elif players == 32:
+            return 80
+        else:
+            return players - 1
+
+    def calculate_finals_distribution(self, total_players, max_per_final):
+        """Расчет распределения по финалам"""
+        if max_per_final <= 0:
+            return "ошибка"
+        
+        finals_count = (total_players + max_per_final - 1) // max_per_final
+        distribution = []
+        remaining = total_players
+        for i in range(finals_count):
+            players = min(max_per_final, remaining)
+            distribution.append(f"Финал {i+1}: {players} чел.")
+            remaining -= players
+        
+        return ", ".join(distribution)
+        
+    def calculate_semifinal_games_count(self, groups_count, players_per_group, previous_stage):
+        """Расчет количества игр в полуфинале с учетом уже сыгранных"""
+        # Всего возможных игр в группе (если все встречаются впервые)
+        total_possible = (players_per_group * (players_per_group - 1)) // 2
+        
+        # Уже сыграно в квалификации между вышедшими участниками
+        exit_count = previous_stage.mesta_exit
+        already_played = (exit_count * (exit_count - 1)) // 2 * 2  # По 2 группы в одном полуфинале
+        
+        unique_games_per_group = total_possible - already_played
+        total_games = unique_games_per_group * groups_count
+        
+        return total_games
 # =================================
 class RatingLoaderThread(QThread):
     progress = pyqtSignal(int)

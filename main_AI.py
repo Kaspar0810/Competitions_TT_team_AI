@@ -6719,7 +6719,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Ошибка загрузки данных системы: {e}")
 #===============================
-    def _add_system_stage(self):
+    def add_system_stage(self):
         """Добавление этапа в список"""
         from models import System
         from PyQt5.QtWidgets import QSpinBox
@@ -6856,9 +6856,9 @@ class MainWindow(QMainWindow):
             stage_exit = exit_spin.value()
             max_players = stage_exit * 2  # В каждой группе полуфинала по 2*exit участников
             choice_flag = 0        
-            
+# ===============================================            
         # === ФИНАЛ ===
-        elif "Финал" in stage_name or "финал" in stage_name.lower():
+        elif self.is_final_stage(stage_name):
             if not previous_stage:
                 QMessageBox.warning(self, "Ошибка", "Финал не может быть первым этапом (используйте 'Одна таблица')")
                 return
@@ -6932,8 +6932,8 @@ class MainWindow(QMainWindow):
                     
                     # Формируем информацию о финале
                     end_place = current_place + players_in_final - 1
-                    finals_list.append(f"Финал {i+1}: {players_in_final} чел.")
-                    places_list.append(f"  • Финал {i+1}: места с {current_place} по {end_place}")
+                    finals_list.append(f"{i+1}-й финал: {players_in_final} чел.")
+                    places_list.append(f"{i+1}-й финал: места с {current_place} по {end_place}")
                     
                     current_place += players_in_final
                     remaining -= players_in_final
@@ -6964,7 +6964,7 @@ class MainWindow(QMainWindow):
                     remaining = total_in_final
                     for i in range(finals_count):
                         players_in_final = min(max_per_final, remaining)
-                        from_info += f"   • Финал {i+1}: {players_in_final} чел. из групп {i*2+1}-{(i+1)*2}"
+                        from_info += f"{i+1}-й Финал: {players_in_final} чел. из групп {i*2+1}-{(i+1)*2}"
                         remaining -= players_in_final
                 
                 info_label.setText(from_info)
@@ -6990,7 +6990,8 @@ class MainWindow(QMainWindow):
                 return
             
             stage_exit = exit_spin.value()
-            max_players = previous_stage.max_player * 2
+            # max_players = previous_stage.max_player * 2
+            max_players = previous_stage.max_player
             choice_flag = 0
             
             # Сохраняем информацию о финалах
@@ -7064,6 +7065,7 @@ class MainWindow(QMainWindow):
 # =====================================================            
         # Сохраняем в базу данных
         try:
+            # if self.is_final_stage(stage_name):
             if stage_name == "Финал":
                 # переводим с нумерацией финала
                 txt = finals_list[0]
@@ -7078,7 +7080,7 @@ class MainWindow(QMainWindow):
                 'stage': stage_name,
                 'stage_exit': previous_stage.stage if previous_stage else "",
                 'mesta_exit': stage_exit if 'stage_exit' in dir() else 0,
-                'page_vid': "лист",
+                'page_vid': "книжная",
                 'label_string': "",
                 'kol_game_string': "",
                 'choice_flag': choice_flag if 'choice_flag' in dir() else 0,
@@ -7097,12 +7099,9 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Успех", f"Этап '{stage_name}' добавлен")
             
         except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Не удалось добавить этап: {str(e)}") 
-
-
-       
+            QMessageBox.critical(self, "Ошибка", f"Не удалось добавить этап: {str(e)}")     
 # ==================================
-    def _update_stages_info(self):
+    def update_stages_info(self):
         """Обновление информационного окна со списком этапов"""
         try:
             from models import System, Player, Title
@@ -7133,8 +7132,8 @@ class MainWindow(QMainWindow):
                 if total_players == 0:
                     distribution_text = "нет участников"
                     total_games = 0
-                    group_games_text = ""
-                    additional_info = ""
+                    # group_games_text = ""
+                    # additional_info = ""
                 else:
                     groups_count = system.total_group if system.total_group else 1
                     
@@ -7145,7 +7144,7 @@ class MainWindow(QMainWindow):
                         group_sizes = [players_per_group] * groups_count
                         distribution_text = self.calculate_group_distribution(players_in_semifinal, groups_count)
                         total_games = self.calculate_semifinal_games_count(groups_count, players_per_group, previous_stage)
-                        additional_info = f"\n   │   (учитывая уже сыгранные в квалификации)"
+                        # additional_info = f"\n   │   (учитывая уже сыгранные в квалификации)"
                         
                         group_games = []
                         exit_count = previous_stage.mesta_exit
@@ -7154,44 +7153,29 @@ class MainWindow(QMainWindow):
                             already_played = (exit_count * (exit_count - 1)) // 2 * 2
                             games = total_possible - already_played
                             group_games.append(f"Гр{i}: {games} игр")
-                        group_games_text = " | ".join(group_games)
+                        # group_games_text = " | ".join(group_games)
                         
-                    # Для финала
+                    # Для финала (точно не полуфинал)
                     elif self.is_final_stage(system.stage):
-                        # Получаем информацию о группах предыдущего этапа
-                        if previous_stage:
-                            # Количество участников из каждой группы предыдущего этапа
-                            players_per_previous_group = previous_stage.mesta_exit
-                            groups_count_previous = previous_stage.total_group
-                            
-                            # В финале общее количество участников
-                            total_in_final = groups_count_previous * players_per_previous_group
-                            group_sizes = [players_per_previous_group] * groups_count_previous
-                            
-                            # distribution_text = f"{groups_count_previous} гр по {players_per_previous_group} чел."
-                            distribution_text = f"{total_in_final} чел."
-                            
-                            # Расчет игр с учетом уже сыгранных
-                            total_possible = (total_in_final * (total_in_final - 1)) // 2
-                            already_played = 0
-                            for gsize in group_sizes:
-                                if gsize > 1:
-                                    already_played += (gsize * (gsize - 1)) // 2
-                            total_games = total_possible - already_played
-                            additional_info = f"\n   │   (всего возможных: {total_possible}, вычитаем сыгранные: {already_played})"
-                        else:
-                            group_sizes = [total_players]
-                            # distribution_text = f"1 гр по {total_players} чел."
-                            distribution_text = f"{total_players} чел."
-                            total_games = (total_players * (total_players - 1)) // 2
-                            additional_info = ""
+                        # group_sizes = self.calculate_group_sizes(total_players, groups_count)
+                        # distribution_text = self.calculate_group_distribution(total_players, groups_count)
+                        max_per_final = 4
+                        group_sizes = 1
+                        distribution_text = self.calculate_finals_distribution(total_players, max_per_final)
+                        total_games = self.calculate_total_games(
+                            system.type_table, total_players, groups_count, group_sizes,
+                            system.stage, previous_stage
+                        )
+                        # additional_info = ""
                         
-                        # Расчет количества игр по группам
                         group_games = []
                         for i, gsize in enumerate(group_sizes, 1):
-                            games = (gsize * (gsize - 1)) // 2 if gsize > 1 else 0
+                            if "Круговая" in system.type_table:
+                                games = (gsize * (gsize - 1)) // 2 if gsize > 1 else 0
+                            else:
+                                games = gsize - 1 if gsize > 1 else 0
                             group_games.append(f"Гр{i}: {games} игр")
-                        group_games_text = " | ".join(group_games)
+                        # group_games_text = " | ".join(group_games)
                         
                     else:
                         # Для квалификации и других этапов
@@ -7201,7 +7185,7 @@ class MainWindow(QMainWindow):
                             system.type_table, total_players, groups_count, group_sizes,
                             system.stage, previous_stage
                         )
-                        additional_info = ""
+                        # additional_info = ""
                         
                         group_games = []
                         for i, gsize in enumerate(group_sizes, 1):
@@ -7210,84 +7194,19 @@ class MainWindow(QMainWindow):
                             else:
                                 games = gsize - 1 if gsize > 1 else 0
                             group_games.append(f"Гр{i}: {games} игр")
-                        group_games_text = " | ".join(group_games)
+                        # group_games_text = " | ".join(group_games)
+                
                 
                 # Отображение информации об этапе
                 info_text += f"┌─ 📌 ЭТАП {idx}: {system.stage}\n"
                 info_text += f"└─ ➡️ Тип таблицы: {system.type_table}🏆 {distribution_text}: Всего игр: {total_games}\n"
-                
-                previous_stage = system
-            
-            self.stages_info.setText(info_text)
-            
-        except Exception as e:
-            print(f"Ошибка обновления информации об этапах: {e}")
-            import traceback
-            traceback.print_exc()
-            self.stages_info.setText(f"Ошибка: {str(e)}")
-
-
-    def update_stages_info(self):
-        """Обновление информационного окна со списком этапов"""
-        try:
-            from models import System, Player, Title
-            
-            if not self.current_title_id:
-                self.stages_info.setText("Нет выбранного соревнования")
-                return
-            
-            title = Title.get_or_none(Title.id == self.current_title_id)
-            title_name = title.name if title else "Неизвестное соревнование"
-            
-            systems = System.select().where(System.title_id == self.current_title_id).order_by(System.id)
-            
-            self.stages_info.clear()
-            
-            if systems.count() == 0:
-                self.stages_info.setText(f"🏆 Соревнование: {title_name}\n\n{'=' * 50}\n\n❌ Нет добавленных этапов")
-                return
-            
-            info_text = f"🏆 СОРЕВНОВАНИЕ: {title_name.upper()}\n"
-            info_text += "=" * 70 + "\n\n"
-            
-            previous_stage = None
-            final_counter = 1
-            current_place = 1
-            
-            for idx, system in enumerate(systems, 1):
-                total_players = Player.select().where(Player.title_id == self.current_title_id).count()
-                
-                if total_players == 0:
-                    distribution_text = "нет участников"
-                    total_games = 0
-                    group_games_text = ""
-                    additional_info = ""
-                    places_info = ""
-                else:
-                    groups_count = system.total_group if system.total_group else 1
-                    
-                    if self.is_final_stage(system.stage):
-                        # Для финала показываем места
-                        players_in_final = system.max_player
-                        start_place = current_place
-                        end_place = current_place + players_in_final - 1
-                        places_info = f"\n   │   🏆 Места в финале: с {start_place} по {end_place}"
-                        current_place += players_in_final
-                        final_counter += 1
-                    else:
-                        places_info = ""
-                    
-                    # ... остальной код расчета игр ...
-                # Отображение информации об этапе
-                info_text += f"┌─ 📌 ЭТАП {idx}: {system.stage}\n"
-                info_text += f"└─ ➡️ Тип таблицы: {system.type_table}🏆 {distribution_text}: Всего игр: {total_games}{additional_info}{places_info}\n"
-                # Отображение информации об этапе с местами
+                # # Отображение информации об этапе
                 # info_text += f"┌─ 📌 ЭТАП {idx}: {system.stage}\n"
                 # info_text += f"├─ 📊 Тип таблицы: {system.type_table}\n"
                 # info_text += f"├─ 🏆 Распределение: {distribution_text}\n"
                 # info_text += f"├─ 🎾 Количество партий: {system.score_flag}\n"
                 # info_text += f"├─ 🎯 Количество игр по группам: {group_games_text}\n"
-                # info_text += f"├─ 🎯 Всего игр: {total_games}{additional_info}{places_info}\n"
+                # info_text += f"├─ 🎯 Всего игр: {total_games}{additional_info}\n"
                 
                 # if system.stage_exit:
                 #     info_text += f"├─ 🔗 Попадают из этапа: {system.stage_exit}\n"
@@ -7297,7 +7216,7 @@ class MainWindow(QMainWindow):
                 #     next_stage_players = system.total_group * system.mesta_exit
                 #     info_text += f"    📊 Всего в следующем этапе: {next_stage_players} чел.\n"
                 
-                # info_text += "\n"
+                info_text += "\n"
                 
                 previous_stage = system
             
@@ -7353,20 +7272,15 @@ class MainWindow(QMainWindow):
         total_games = 0
         
         if "Круговая" in table_type:
-            # Для финала (любой финал с номером)
+            # Для финала (точно не полуфинал)
             if self.is_final_stage(stage_name) and previous_stage:
                 # В финале играют участники из разных групп предыдущего этапа
-                # Нужно вычесть игры, уже сыгранные между участниками из одной группы
                 total_possible = (total_players * (total_players - 1)) // 2
                 
                 # Вычитаем игры, сыгранные внутри каждой группы предыдущего этапа
                 already_played = 0
-                # Предполагаем, что участники финала приходят из разных групп поровну
-                players_per_previous_group = total_players // groups_count if groups_count > 0 else total_players
-                
                 for group_size in group_sizes:
                     if group_size > 1:
-                        # Игры, сыгранные в каждой группе предыдущего этапа
                         already_played += (group_size * (group_size - 1)) // 2
                 
                 total_games = total_possible - already_played
@@ -7995,10 +7909,12 @@ class MainWindow(QMainWindow):
         return 1
     
     def is_final_stage(self, stage_name):
-        """Проверка, является ли этап финалом (содержит слово 'финал' в любом регистре)"""
+        """Проверка, является ли этап финалом (точно не полуфиналом)"""
         if not stage_name:
             return False
-        return "финал" in stage_name.lower()
+        # Проверяем, что это финал, но не полуфинал
+        stage_lower = stage_name.lower()
+        return "финал" in stage_lower and "полуфинал" not in stage_lower
 # =================================
 class RatingLoaderThread(QThread):
     progress = pyqtSignal(int)

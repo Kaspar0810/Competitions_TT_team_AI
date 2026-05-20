@@ -25009,9 +25009,9 @@ def schedule_reset():
 #     #     Player.update(region=reg).execute()
 #     print("Все записи обновлены")
 # =======        
-# def proba(): 
-#     # ======================
-#     myconn = pymysql.connect(host = "localhost", user = "root", password = "db_pass", database = "mysql_db") 
+def proba(): 
+    # ======================
+    myconn = pymysql.connect(host = "localhost", user = "root", password = "db_pass", database = "mysql_db") 
 #     # ========== создать таблицу    
 
 #     class Choice_Team(BaseModel):
@@ -25068,7 +25068,18 @@ def schedule_reset():
     # cursor.close()
 # ===== создание, удаление, переименование столбцов
     # with db.atomic():
-    #     migrator = MySQLMigrator(db)
+        # migrator = MySQLMigrator(db)
+    with db.transaction():
+        migrator = MySQLMigrator(db)
+        # Изменение длины поля name с 50 на 100
+        migrate(
+            migrator.alter_column_type(
+                'system',           # имя таблицы
+                'stage_exit',           # имя столбца
+                CharField(max_length=100)  # новое определение поля
+            )
+        )
+        print("Длина поля name изменена на 100")
         # migrate(migrator.drop_column('game_lists', 'team_id')) # удаление столбца
         # migrate(migrator.alter_column_type('choice_teams', 'team_region', CharField(null=True)))
         # migrate(migrator.rename_column('teams', 'team_region', 'team_full')) # Переименование столбца (таблица, старое название, новое название столбца)
@@ -25078,7 +25089,7 @@ def schedule_reset():
         # migrate(migrator.add_column('choice_teams', 'team_full', new_column)) # null=True допускает пустое значение
         # migrate(migrator.set_null('teams', 'id_pl1', True))
 #     db.close()
-# my_win.Button_proba.clicked.connect(proba) # запуск пробной функции
+my_win.Button_proba.clicked.connect(proba) # запуск пробной функции
 
 my_win.btn_select_range.clicked.connect(select_rows_with_options)
 my_win.btn_number_table.clicked.connect(select_numbers_tables)

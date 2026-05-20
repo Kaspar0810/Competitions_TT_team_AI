@@ -7282,11 +7282,15 @@ class MainWindow(QMainWindow):
                 max_perl_final = systems.max_player
                 # количество групп ПФ
                 total_group = systems.total_group
+                # стадия откуда выхлдят в финал
+                stage_exit = systems.stage_exit
+                prev_systems = System.select().where((System.title_id == self.current_title_id) & (System.stage == stage_exit)).get()
+                prev_groups = prev_systems.total_group
                 # В финале играют участники из разных групп предыдущего этапа
                 total_possible = (max_perl_final * (max_perl_final - 1)) // 2
                 # Вычитаем игры, сыгранные внутри каждой группы предыдущего этапа
                 already_played = 0
-                for group_size in total_group:
+                for group_size in range(0, prev_groups):
                     # if group_size > 1:
                     already_played += (count_exit * (count_exit - 1)) // 2
 

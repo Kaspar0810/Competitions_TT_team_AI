@@ -1,0 +1,15 @@
+2026-05-20 11:51:49,603 - ERROR - Необработанное исключение: ValueError: time data '026_-p_-ck' does not match format '%Y-%m-%d'
+2026-05-20 11:51:49,604 - ERROR - Трассировка стека:
+Traceback (most recent call last):
+  File "c:\Users\Alex_SSHOR13\Competitions_TT_team_AI\main.py", line 1674, in last_comp_open
+    flag = check_delete_db()
+           ^^^^^^^^^^^^^^^^^
+  File "c:\Users\Alex_SSHOR13\Competitions_TT_team_AI\main.py", line 1869, in check_delete_db
+    df = datetime.strptime(date_str, '%Y-%m-%d')
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Alex_SSHOR13\AppData\Local\Programs\Python\Python312\Lib\_strptime.py", line 554, in _strptime_datetime
+    tt, fraction, gmtoff_fraction = _strptime(data_string, format)
+                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Alex_SSHOR13\AppData\Local\Programs\Python\Python312\Lib\_strptime.py", line 333, in _strptime
+    raise ValueError("time data %r does not match format %r" %
+ValueError: time data '026_-p_-ck' does not match format '%Y-%m-%d'

@@ -7279,7 +7279,7 @@ class MainWindow(QMainWindow):
             
             kol_game_string = " | ".join(games_info)
             label_string = f"Полуфинал: {total_groups} гр по {players_per_group} чел."
-            
+# ================================================            
         # === ФИНАЛ ===
         elif self.is_final_stage(stage_name):
             if not previous_stage:
@@ -7287,6 +7287,27 @@ class MainWindow(QMainWindow):
                 return
             
             total_groups = 1
+            
+            # Получаем информацию о предыдущих финалах
+            existing_finals = System.select().where(
+                (System.title_id == self.current_title_id) &
+                (self.is_final_stage(System.stage))
+            ).order_by(System.id)
+            
+            # Рассчитываем, сколько игроков уже распределено по финалам
+            players_already_in_finals = 0
+            for final in existing_finals:
+                players_already_in_finals += final.max_player
+            
+            # Общее количество игроков, которые должны выйти из полуфиналов
+            total_players_from_semifinals = previous_stage.total_group * previous_stage.mesta_exit
+            
+            # Оставшиеся игроки, которые еще не распределены по финалам
+            remaining_players = total_players_from_semifinals - players_already_in_finals
+            
+            if remaining_players <= 0:
+                QMessageBox.warning(self, "Ошибка", "Все игроки уже распределены по финалам")
+                return
             
             # Диалог для финала
             dialog = QDialog(self)
@@ -7296,89 +7317,87 @@ class MainWindow(QMainWindow):
             
             layout = QVBoxLayout(dialog)
             
+            # Информация о предыдущем этапе
             info_label = QLabel(f"Из этапа '{previous_stage.stage}' в финал переходят:")
             info_label.setStyleSheet("font-weight: bold; font-size: 12px;")
             layout.addWidget(info_label)
             
             layout.addSpacing(10)
             
+            # Показываем оставшихся игроков
+            remaining_label = QLabel(f"Осталось нераспределенных игроков: {remaining_players}")
+            remaining_label.setStyleSheet("color: orange; font-weight: bold;")
+            layout.addWidget(remaining_label)
+            
+            layout.addSpacing(5)
+            
+            # Количество выходящих из каждой группы
             exit_layout = QHBoxLayout()
             exit_layout.addWidget(QLabel("Количество участников из каждой группы:"))
             exit_spin = QSpinBox()
             exit_spin.setMinimum(1)
-            exit_spin.setMaximum(previous_stage.max_player)
-            exit_spin.setValue(previous_stage.mesta_exit if previous_stage.mesta_exit > 0 else 2)
+            exit_spin.setMaximum(previous_stage.mesta_exit)
+            exit_spin.setValue(min(2, previous_stage.mesta_exit))
             exit_layout.addWidget(exit_spin)
             layout.addLayout(exit_layout)
             
+            # Информация о распределении по финалам
             finals_info_label = QLabel()
             finals_info_label.setStyleSheet("color: blue;")
             finals_info_label.setWordWrap(True)
             layout.addWidget(finals_info_label)
             
+            # Информация о местах в финалах
             places_info_label = QLabel()
             places_info_label.setStyleSheet("color: green;")
             places_info_label.setWordWrap(True)
             layout.addWidget(places_info_label)
             
+            # Расчет начальных позиций мест
             start_place = 1
-            for prev_system in System.select().where(System.title_id == self.current_title_id).order_by(System.id):
-                if self.is_final_stage(prev_system.stage):
-                    start_place += prev_system.max_player
-
-            # Номер финала определяется автоматически
-            existing_finals = System.select().where(
-                (System.title_id == self.current_title_id) &
-                (self.is_final_stage(System.stage))
-            ).count()
+            for final in existing_finals:
+                start_place += final.max_player
             
-            final_number = existing_finals + 1
-            stage_name = f"{final_number}-й финал"
-# ====================================================            
             def update_finals_info():
                 exit_val = exit_spin.value()
-                total_in_final = previous_stage.total_group * exit_val
-                max_per_final = previous_stage.max_player * 2
-                finals_count = (total_in_final + max_per_final - 1) // max_per_final
+                total_in_this_final = previous_stage.total_group * exit_val
                 
-                finals_list = []
-                places_list = []
-                games_list = []
-                current_place = start_place
-                remaining = total_in_final
+                if total_in_this_final > remaining_players:
+                    total_in_this_final = remaining_players
+                    exit_spin.setValue(exit_val - 1)
+                    return
                 
-                for i in range(finals_count):
-                    players_in_final = min(max_per_final, remaining)
-                    end_place = current_place + players_in_final - 1
-                    
-                    finals_list.append(f"Финал {i+1}: {players_in_final} чел.")
-                    places_list.append(f"  • Финал {i+1}: места с {current_place} по {end_place}")
-                    
-                    if self.table_type.currentText() == "Круговая":
-                        games = (players_in_final * (players_in_final - 1)) // 2
-                    else:
-                        games = self.calculate_olympic_games(players_in_final)
-                    games_list.append(f"Финал {i+1}: {games} игр")
-                    
-                    current_place += players_in_final
-                    remaining -= players_in_final
+                # Формируем информацию о финале
+                end_place = start_place + total_in_this_final - 1
+
+                # Получаем следующий номер финала
+                final_number = existing_finals.count() + 1
+                stage_name = f"{final_number}-й финал"
                 
-                finals_info_label.setText(f"Всего в финале: {total_in_final} чел.\n"
-                                        f"Количество финалов: {finals_count}\n"
-                                        f"Распределение: " + ", ".join(finals_list))
+                finals_info_label.setText(f"Всего в {stage_name}: {total_in_this_final} чел.\n"
+                                        f"Из каждой группы выходит: {exit_val} чел.")
                 
-                places_info_label.setText(f"🏆 Распределение мест:\n" + "\n".join(places_list) + 
-                                        f"\n\n🎯 Количество игр:\n" + "\n".join(games_list))
+                places_info_label.setText(f"Места в {stage_name}: с {start_place} по {end_place}")
                 
-                return total_in_final, finals_count, finals_list, places_list, games_list
+                # Рассчитываем количество игр
+                if self.table_type.currentText() == "Круговая":
+                    games = (total_in_this_final * (total_in_this_final - 1)) // 2
+                else:
+                    games = self.calculate_olympic_games(total_in_this_final)
+                
+                return total_in_this_final, games
             
             exit_spin.valueChanged.connect(lambda: update_finals_info())
-            total_in_final, finals_count, finals_list, places_list, games_list = update_finals_info()
+            total_in_this_final, games_in_this_final = update_finals_info()
+            
+            layout.addSpacing(10)
             
             btn_layout = QHBoxLayout()
             ok_btn = QPushButton("OK")
+            ok_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 5px;")
             ok_btn.clicked.connect(dialog.accept)
             cancel_btn = QPushButton("Отмена")
+            cancel_btn.setStyleSheet("background-color: #f44336; color: white; padding: 5px;")
             cancel_btn.clicked.connect(dialog.reject)
             btn_layout.addWidget(ok_btn)
             btn_layout.addWidget(cancel_btn)
@@ -7388,14 +7407,12 @@ class MainWindow(QMainWindow):
                 return
             
             stage_exit = exit_spin.value()
-            max_players = previous_stage.max_player * 2
+            max_players = total_in_this_final
             choice_flag = 0
             
-            label_string = " | ".join(places_list)
-            kol_game_string = " | ".join(games_list)
-            total_games_in_stage = sum([int(g.split(": ")[1].split(" ")[0]) for g in games_list])
-
-
+            # Формируем строки для записи в БД
+            label_string = places_info_label.text()
+            kol_game_string = f"{games_in_this_final} игр."
             
         else:
             QMessageBox.warning(self, "Ошибка", f"Неизвестный тип этапа: {stage_name}")
@@ -7414,7 +7431,7 @@ class MainWindow(QMainWindow):
                 'mesta_exit': stage_exit,
                 'label_string': label_string,
                 'kol_game_string': kol_game_string,
-                'page_vid': "лист",
+                'page_vid': "книжная",
                 'choice_flag': choice_flag,
                 'score_flag': int(score_flag),
                 'visible_game': True,
@@ -7447,7 +7464,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось добавить этап: {str(e)}")    
 # ==================================
-    def update_stages_info(self):
+    def _update_stages_info(self):
         """Обновление информационного окна со списком этапов (формат 2 строки)"""
         try:
             from models import System, Player, Title
@@ -7557,9 +7574,9 @@ class MainWindow(QMainWindow):
             import traceback
             traceback.print_exc()
             self.stages_info.setText(f"Ошибка: {str(e)}")
-# ===================================
-    def _update_stages_info(self):
-        """Обновление информационного окна со списком этапов"""
+
+    def update_stages_info(self):
+        """Обновление информационного окна со списком этапов (формат 2 строки)"""
         try:
             from models import System, Player, Title
             
@@ -7575,13 +7592,15 @@ class MainWindow(QMainWindow):
             self.stages_info.clear()
             
             if systems.count() == 0:
-                self.stages_info.setText(f"🏆 Соревнование: {title_name}\n\n{'=' * 50}\n\n❌ Нет добавленных этапов")
+                self.stages_info.setText(f"🏆 СОРЕВНОВАНИЕ: {title_name}\n\n{'=' * 60}\n\n❌ Нет добавленных этапов")
                 return
             
             info_text = f"🏆 СОРЕВНОВАНИЕ: {title_name.upper()}. СИСТЕМА ПРОВЕДЕНИЯ.\n"
             info_text += "=" * 70 + "\n\n"
             
             previous_stage = None
+            current_place = 1
+            total_all_games = 0
             
             for idx, system in enumerate(systems, 1):
                 total_players = Player.select().where(Player.title_id == self.current_title_id).count()
@@ -7589,8 +7608,8 @@ class MainWindow(QMainWindow):
                 if total_players == 0:
                     distribution_text = "нет участников"
                     total_games = 0
-                    # group_games_text = ""
-                    additional_info = ""
+                    stage_display = system.stage
+                    places_display = ""
                 else:
                     groups_count = system.total_group if system.total_group else 1
                     
@@ -7601,41 +7620,31 @@ class MainWindow(QMainWindow):
                         group_sizes = [players_per_group] * groups_count
                         distribution_text = self.calculate_group_distribution(players_in_semifinal, groups_count)
                         total_games = self.calculate_semifinal_games_count(groups_count, players_per_group, previous_stage)
-                        # additional_info = f"\n   │   (учитывая уже сыгранные в квалификации)"
-                        additional_info = ""
-                        group_games = []
-                        exit_count = previous_stage.mesta_exit
-                        for i, gsize in enumerate(group_sizes, 1):
-                            total_possible = (gsize * (gsize - 1)) // 2
-                            already_played = (exit_count * (exit_count - 1)) // 2 * 2
-                            games = total_possible - already_played
-                            group_games.append(f"Гр{i}: {games} игр")
-                        # group_games_text = " | ".join(group_games)
+                        stage_display = system.stage
+                        places_display = ""
                         
                     # Для финала
                     elif self.is_final_stage(system.stage):
-                        group_sizes = self.calculate_group_sizes(total_players, groups_count)
-                        distribution_text = self.calculate_group_distribution(total_players, groups_count)
-                        total_games = self.calculate_total_games(
-                            system.type_table, total_players, groups_count, group_sizes,
-                            system.stage, previous_stage
-                        )
-                        additional_info = ""
+                        players_in_final = system.max_player
+                        start_place = current_place
+                        end_place = current_place + players_in_final - 1
                         
-                        # Добавляем информацию о местах и играх из БД
-                        if system.label_string:
-                            additional_info += f"\n   │   🏆 {system.label_string}"
+                        distribution_text = f"1 гр по {players_in_final} чел."
+                        
+                        # Получаем количество игр из БД или рассчитываем
                         if system.kol_game_string:
-                            additional_info += f"\n   │   🎯 {system.kol_game_string}"
-                        
-                        group_games = []
-                        for i, gsize in enumerate(group_sizes, 1):
+                            import re
+                            games_match = re.search(r'(\d+)', system.kol_game_string)
+                            total_games = int(games_match.group(1)) if games_match else 0
+                        else:
                             if "Круговая" in system.type_table:
-                                games = (gsize * (gsize - 1)) // 2 if gsize > 1 else 0
+                                total_games = (players_in_final * (players_in_final - 1)) // 2
                             else:
-                                games = gsize - 1 if gsize > 1 else 0
-                            group_games.append(f"Гр{i}: {games} игр")
-                        # group_games_text = " | ".join(group_games)
+                                total_games = self.calculate_olympic_games(players_in_final)
+                        
+                        stage_display = system.stage
+                        places_display = f" | места {start_place}-{end_place}"
+                        current_place += players_in_final
                         
                     else:
                         # Для квалификации и других этапов
@@ -7645,36 +7654,23 @@ class MainWindow(QMainWindow):
                             system.type_table, total_players, groups_count, group_sizes,
                             system.stage, previous_stage
                         )
-                        additional_info = ""
-                        
-                        group_games = []
-                        for i, gsize in enumerate(group_sizes, 1):
-                            if "Круговая" in system.type_table:
-                                games = (gsize * (gsize - 1)) // 2 if gsize > 1 else 0
-                            else:
-                                games = gsize - 1 if gsize > 1 else 0
-                            group_games.append(f"Гр{i}: {games} игр")
-                        # group_games_text = " | ".join(group_games)
+                        stage_display = system.stage
+                        places_display = ""
                 
-                # Отображение информации об этапе
-                info_text += f"┌─ 📌 ЭТАП {idx}: {system.stage}\n"
-                info_text += f"└─ ➡️ Тип таблицы:🏆{system.type_table}:{distribution_text} Всего игр:{total_games}{additional_info}\n"
-                # info_text += f"├─ 🏆 Распределение: {distribution_text}\n"
-                # info_text += f"├─ 🎾 Количество партий: {system.score_flag}\n"
-                # info_text += f"├─ 🎯 Количество игр по группам: {group_games_text}\n"
-                # info_text += f"├─ 🎯 Всего игр: {total_games}{additional_info}\n"
+                # Подсчитываем общее количество игр
+                total_all_games += total_games
                 
-                # if system.stage_exit:
-                #     info_text += f"├─ 🔗 Попадают из этапа: {system.stage_exit}\n"
-                # info_text += f"└─ ➡️ Проходят в след. этап: {system.mesta_exit} чел. из каждой группы\n"
-                
-                # if system.mesta_exit > 0:
-                #     next_stage_players = system.total_group * system.mesta_exit
-                #     info_text += f"    📊 Всего в следующем этапе: {next_stage_players} чел.\n"
-                
+                # 1-я строка: номер этапа, название, места
+                info_text += f"┌─ 📌 ЭТАП {idx}: {stage_display}{places_display}\n"
+                # 2-я строка: тип таблицы, распределение, количество игр
+                info_text += f"└─ 📊 {system.type_table} | {distribution_text} | {total_games} игр\n"
                 # info_text += "\n"
                 
                 previous_stage = system
+            
+            # Подчеркивание и сумма игр всех этапов
+            info_text += "─" * 70 + "\n"
+            info_text += f"🏆 ВСЕГО ИГР НА СОРЕВНОВАНИИ: {total_all_games}\n"
             
             self.stages_info.setText(info_text)
             
@@ -8379,9 +8375,14 @@ class MainWindow(QMainWindow):
         """Проверка, является ли этап финалом (точно не полуфиналом)"""
         if not stage_name:
             return False
-        # Проверяем, что это финал, но не полуфинал
-        stage_lower = stage_name.lower()
-        return "финал" in stage_lower and "полуфинал" not in stage_lower
+        # Если передан объект поля, получаем его значение
+        if hasattr(stage_name, 'lower'):
+            stage_str = stage_name
+        else:
+            stage_str = str(stage_name)
+        
+        stage_lower = stage_str.lower()
+        return "финал" in stage_lower and "полуфинал" not in stage_lower and "квалификация" not in stage_lower
 
     def get_total_games_count(self):
         """Подсчет общего количества игр на соревновании"""
@@ -8402,9 +8403,11 @@ class MainWindow(QMainWindow):
     def get_next_final_number(self):
         """Получение следующего номера финала"""
         try:
+            from models import System
             existing_finals = System.select().where(
                 (System.title_id == self.current_title_id) &
-                (self.is_final_stage(System.stage))
+                (System.stage.contains("финал")) &
+                (~System.stage.contains("полуфинал"))
             ).count()
             return existing_finals + 1
         except Exception as e:

@@ -165,7 +165,7 @@ class System(BaseModel):
     choice_flag = BooleanField()
     score_flag = IntegerField()
     visible_game = BooleanField()
-    stage_exit = CharField(50)
+    stage_exit = CharField(100)
     mesta_exit = IntegerField()
     no_game = CharField(15)
     sex = CharField(10)

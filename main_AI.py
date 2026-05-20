@@ -7136,7 +7136,7 @@ class MainWindow(QMainWindow):
                     # additional_info = ""
                 else:
                     groups_count = system.total_group if system.total_group else 1
-                    
+
                     # Для полуфинала
                     if "полуфинал" in system.stage.lower() and previous_stage and "Квалификация" in previous_stage.stage:
                         players_in_semifinal = previous_stage.total_group * previous_stage.mesta_exit
@@ -7157,10 +7157,9 @@ class MainWindow(QMainWindow):
                         
                     # Для финала (точно не полуфинал)
                     elif self.is_final_stage(system.stage):
+                        max_per_final = system.max_player
+                        group_sizes = [system.mesta_exit]
                         # group_sizes = self.calculate_group_sizes(total_players, groups_count)
-                        # distribution_text = self.calculate_group_distribution(total_players, groups_count)
-                        max_per_final = 4
-                        group_sizes = 1
                         distribution_text = self.calculate_finals_distribution(total_players, max_per_final)
                         total_games = self.calculate_total_games(
                             system.type_table, total_players, groups_count, group_sizes,
@@ -7266,6 +7265,9 @@ class MainWindow(QMainWindow):
 #============
     def calculate_total_games(self, table_type, total_players, groups_count, group_sizes, stage_name=None, previous_stage=None):
         """Расчет общего количества игр с учетом типа этапа"""
+        from models import System, Player, Title
+        systems = System.select().where((System.title_id == self.current_title_id) & (System.stage == stage_name)).get()
+
         if total_players == 0:
             return 0
         
@@ -7274,14 +7276,25 @@ class MainWindow(QMainWindow):
         if "Круговая" in table_type:
             # Для финала (точно не полуфинал)
             if self.is_final_stage(stage_name) and previous_stage:
+                # количество игроков, выходящих из ПФ
+                count_exit = systems.mesta_exit
+                # количество игроков, всего в финале
+                max_perl_final = systems.max_player
+                # количество групп ПФ
+                total_group = systems.total_group
                 # В финале играют участники из разных групп предыдущего этапа
-                total_possible = (total_players * (total_players - 1)) // 2
-                
+                total_possible = (max_perl_final * (max_perl_final - 1)) // 2
                 # Вычитаем игры, сыгранные внутри каждой группы предыдущего этапа
                 already_played = 0
-                for group_size in group_sizes:
-                    if group_size > 1:
-                        already_played += (group_size * (group_size - 1)) // 2
+                for group_size in total_group:
+                    # if group_size > 1:
+                    already_played += (count_exit * (count_exit - 1)) // 2
+
+                # Вычитаем игры, сыгранные внутри каждой группы предыдущего этапа
+                # already_played = 0
+                # for group_size in group_sizes:
+                #     if group_size > 1:
+                #         already_played += (group_size * (group_size - 1)) // 2
                 
                 total_games = total_possible - already_played
             else:

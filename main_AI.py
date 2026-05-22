@@ -12,7 +12,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtWidgets import QGridLayout  # Добавьте в импорт
 from PyQt5.QtCore import Qt, QDate, QSize, pyqtSignal, QThread
-from PyQt5.QtGui import QFont, QColor
+from PyQt5.QtGui import QFont, QColor, QIntValidator
 from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QCompleter
 from PyQt5.QtCore import QStringListModel
@@ -6899,33 +6899,31 @@ class MainWindow(QMainWindow):
             
             # Получаем информацию о распределении игроков
             distribution = self.get_players_distribution_info()
+
+            # Получаем следующий номер финала
+            final_number = len(distribution['finals']) + 1
+            stage_name = f"{final_number}-й финал"
             
             # Определяем, откуда будут браться игроки для следующего финала
             source_stage = None
             remaining_players = 0
             players_per_group = 0
             total_groups = 0
+            total_from_semifinal_1_exit = 0
             already_in_finals = sum([f['players'] for f in distribution['finals']])
             
-
-            # Получаем следующий номер финала
-            final_number = len(distribution['finals']) + 1
-            stage_name = f"{final_number}-й финал"
-
             # Сначала проверяем 1-й полуфинал
             if distribution['semifinal_1']['total_groups'] > 0:
                 # число игроков группе 1-ого полуфинал
                 total_from_semifinal_1 = distribution['semifinal_1']['players_per_group']
-                # # число игроков из группе 1-ого полуфинал, посеянных в финале
-                # total_from_semifinal_1_exit = distribution['semifinal_1']['exited_per_group']
-                
-                if already_in_finals > total_from_semifinal_1 or already_in_finals == 0:
-                # if total_from_semifinal_1 > total_from_semifinal_1_exit:
-                    source_stage = "1-й полуфинал"
-                    # players_per_group = distribution['semifinal_1']['exited_per_group']
-                    remaining_players = total_from_semifinal_1
-                    # players_per_group = distribution['semifinal_1']['exited_per_group']
-                    # total_groups = distribution['semifinal_1']['total_groups']
+                # число игроков из группе 1-ого полуфинал, посеянных в финале
+                total_from_semifinal_1_exit = 0 if stage_name == "1-й финал" else distribution['semifinal_1']['exited_per_group']
+                source_stage = "1-й полуфинал"
+                # число игроков из группе 1-ого полуфинал, которые еще не посеяны в финале
+                remaining_players = total_from_semifinal_1 - total_from_semifinal_1_exit
+                               
+                players_per_group = distribution['semifinal_1']['players_per_group']
+                total_groups = distribution['semifinal_1']['total_groups']
             
             # Затем проверяем 2-й полуфинал (если еще не все игроки из 1-го распределены)
             if not source_stage and distribution['semifinal_2']['total_groups'] > 0:
@@ -6950,27 +6948,27 @@ class MainWindow(QMainWindow):
             if not source_stage or remaining_players <= 0:
                 QMessageBox.warning(self, "Ошибка", "Нет игроков для создания нового финала")
                 return
-# ================================================            
+            
             # Диалог для финала
             dialog = QDialog(self)
             dialog.setWindowTitle("Настройка финала")
             dialog.setModal(True)
             dialog.setMinimumWidth(500)
-
+            
             layout = QVBoxLayout(dialog)
-
+            
             # Информация об источнике игроков
-            info_label = QLabel(f"Из этапа '{source_stage}' в {stage_name} переходят:")
+            info_label = QLabel(f"Из этапа '{source_stage}' в {stage_name} выходят:")
             info_label.setStyleSheet("font-weight: bold; font-size: 12px;")
             layout.addWidget(info_label)
-
+            
             layout.addSpacing(10)
-
+            
             # Показываем оставшихся игроков
             remaining_label = QLabel(f"Осталось нераспределенных игроков из {source_stage}: {remaining_players}")
             remaining_label.setStyleSheet("color: orange; font-weight: bold;")
             layout.addWidget(remaining_label)
-
+            
             # Показываем сколько игроков уже в финалах из этого этапа
             already_in_finals_from_source = already_in_finals
             if source_stage == "1-й полуфинал":
@@ -6979,22 +6977,22 @@ class MainWindow(QMainWindow):
                 already_in_finals_from_source = already_in_finals - distribution['semifinal_1']['exited_total'] if distribution['semifinal_1']['exited_total'] > 0 else already_in_finals
             elif source_stage == "Квалификация":
                 already_in_finals_from_source = already_in_finals - distribution['semifinal_1']['exited_total'] - distribution['semifinal_2']['exited_total'] if distribution['semifinal_2']['exited_total'] > 0 else already_in_finals
-
+            
             already_label = QLabel(f"Уже распределено в финалы из {source_stage}: {already_in_finals_from_source}")
             already_label.setStyleSheet("color: blue;")
             layout.addWidget(already_label)
-
+            
             layout.addSpacing(5)
-
+# ===========================================            
             # Количество выходящих из каждой группы
             exit_layout = QHBoxLayout()
             exit_layout.addWidget(QLabel("Количество участников из каждой группы:"))
-            exit_spin = QSpinBox()
-            exit_spin.setMinimum(1)
-            exit_spin.setMaximum(players_per_group)
-            exit_spin.setValue(min(2, players_per_group))
-            # exit_spin.setValue(1)
-            exit_layout.addWidget(exit_spin)
+            exit_edit = QLineEdit()
+            exit_edit.setPlaceholderText("число")
+            exit_edit.setText(str(min(2, 1)))
+            exit_edit.setValidator(QIntValidator(1, players_per_group))  # Только целые числа
+            exit_edit.setMaximumWidth(80)
+            exit_layout.addWidget(exit_edit)
             layout.addLayout(exit_layout)
 
             # Информация о финале
@@ -7018,54 +7016,65 @@ class MainWindow(QMainWindow):
             total_in_this_final = 0
             games_in_this_final = 0
 
-            # Упрощенная версия без nonlocal
             def update_finals_info():
-                exit_val = exit_spin.value()
-                total = total_groups * exit_val
+                nonlocal total_in_this_final, games_in_this_final
                 
-                if total > remaining_players:
-                    total = remaining_players
+                # Получаем значение из QLineEdit
+                try:
+                    exit_val = int(exit_edit.text())
+                    if exit_val < 1:
+                        exit_val = 1
+                        exit_edit.setText("1")
+                    if exit_val > players_per_group:
+                        exit_val = players_per_group
+                        exit_edit.setText(str(players_per_group))
+                except ValueError:
+                    exit_val = min(2, players_per_group)
+                    exit_edit.setText(str(exit_val))
                 
-                end_place = start_place + total - 1
+                total_in_this_final = total_groups * exit_val
                 
-                groups_info = [f"Группа {i+1}: {exit_val} чел." for i in range(total_groups)]
+                if exit_val > remaining_players:
+                # if total_in_this_final > remaining_players:
+                    # total_in_this_final = remaining_players
+                    # Показываем предупреждение, не изменяя значение
+                    finals_info_label.setText(f"⚠️ Недостаточно игроков! Максимум: {remaining_players} чел.\n"
+                                            f"Текущее значение: {total_in_this_final} чел.")
+                    return total_in_this_final, games_in_this_final
                 
-                finals_info_label.setText(f"Всего в этом финале: {total} чел.\n"
-                                        f"Источник: {source_stage}")
-                                        # f"Распределение: " + ", ".join(groups_info))
+                end_place = start_place + total_in_this_final - 1
+                
+                # Показываем, из каких групп выходят игроки
+                groups_info = []
+                for i in range(total_groups):
+                    groups_info.append(f"Группа {i+1}: {exit_val} чел.")
+                
+                finals_info_label.setText(f"✅ Всего в этом финале: {total_in_this_final} чел.\n"
+                                        f"📌 Источник: {source_stage}")
                 
                 places_info_label.setText(f" Места: с {start_place} по {end_place}")
                 
-                return total
+                # Рассчитываем количество игр
+                group_sizes = [total_in_this_final]
+                games_in_this_final = self.calculate_total_games(
+                    self.table_type.currentText(), 
+                    total_in_this_final, 
+                    1, 
+                    group_sizes, 
+                    stage_name, 
+                    previous_stage
+                )
+                
+                return total_in_this_final, games_in_this_final
 
-            # Подключаем сигнал
-            exit_spin.valueChanged.connect(lambda: update_finals_info())
-            update_finals_info()
-
-            # В конце диалога получаем значения
-            total_in_this_final = total_groups * exit_spin.value()
-            if total_in_this_final > remaining_players:
-                total_in_this_final = remaining_players
-
-            # Рассчитываем количество игр
-            group_sizes = [total_in_this_final]
-            games_in_this_final = self.calculate_total_games(
-                self.table_type.currentText(), 
-                total_in_this_final, 
-                1, 
-                group_sizes, 
-                stage_name, 
-                previous_stage
-            )
-
-            # Подключаем сигнал изменения значения
-            def on_exit_spin_changed(value):
+            # Подключаем сигналы изменения текста
+            def on_exit_text_changed():
                 update_finals_info()
 
-            exit_spin.valueChanged.connect(on_exit_spin_changed)
+            exit_edit.textChanged.connect(on_exit_text_changed)
 
-            # # Вызываем функцию для начального расчета
-            # total_in_this_final, games_in_this_final = update_finals_info()
+            # Вызываем функцию для начального расчета
+            total_in_this_final, games_in_this_final = update_finals_info()
 
             layout.addSpacing(10)
 
@@ -7083,170 +7092,31 @@ class MainWindow(QMainWindow):
             if dialog.exec_() != QDialog.Accepted:
                 return
 
-            stage_exit = exit_spin.value()
+            # Получаем значение из QLineEdit после закрытия диалога
+            try:
+                stage_exit = int(exit_edit.text())
+                if stage_exit < 1:
+                    stage_exit = 1
+                if stage_exit > players_per_group:
+                    stage_exit = players_per_group
+            except ValueError:
+                stage_exit = min(2, players_per_group)
+
             max_players = total_in_this_final
             choice_flag = 0
 
             # Формируем строки для записи в БД
             label_string = places_info_label.text()
             kol_game_string = f"Всего игр: {games_in_this_final}"
-
-            # # Получаем следующий номер финала
-            # final_number = len(distribution['finals']) + 1
-            # stage_name_with_number = f"{final_number}-й финал"
-# ==============================================================            
+# ==============================            
             # Сохраняем информацию о финале
             self.current_finals_info = {
                 'number': final_number,
                 'players': total_in_this_final,
                 'source': source_stage,
                 'places': f"{start_place}-{start_place + total_in_this_final - 1}"
-            }
-       
+            }      
     # Продолжаем сохранение в БД...
-# ================================
-        # elif self.is_final_stage(stage_name):
-        #     if not previous_stage:
-        #         QMessageBox.warning(self, "Ошибка", "Финал не может быть первым этапом (используйте 'Одна таблица')")
-        #         return
-            
-        #     total_groups = 1
-        #     # Получаем информацию о предыдущих финалах
-        #     # existing_finals = System.select().where(
-        #     #     (System.title_id == self.current_title_id) &
-        #     #     (self.is_final_stage(System.stage))
-        #     # ).order_by(System.id)
-
-        #     # Получаем информацию о предыдущих финалах
-        #     existing_finals = System.select().where((System.title_id == self.current_title_id) & (System.stage == (self.is_final_stage(stage_name)))).order_by(System.id)
-        #     #     )
-        #     # )
-            
-        #     # Рассчитываем, сколько игроков уже распределено по финалам
-        #     players_already_in_finals = 0
-        #     for final in existing_finals:
-        #         players_already_in_finals += final.max_player
-            
-        #     # Общее количество игроков, которые должны выйти из полуфиналов
-        #     total_players_from_semifinals = previous_stage.total_group * previous_stage.mesta_exit
-            
-        #     # Оставшиеся игроки, которые еще не распределены по финалам
-        #     remaining_players = total_players_from_semifinals - players_already_in_finals
-            
-        #     if remaining_players <= 0:
-        #         QMessageBox.warning(self, "Ошибка", "Все игроки уже распределены по финалам")
-        #         return
-            
-        #     # Диалог для финала
-        #     dialog = QDialog(self)
-        #     dialog.setWindowTitle("Настройка финала")
-        #     dialog.setModal(True)
-        #     dialog.setMinimumWidth(300)
-            
-        #     layout = QVBoxLayout(dialog)
-            
-        #     # Информация о предыдущем этапе
-        #     info_label = QLabel(f"Из этапа '{previous_stage.stage}' в финал переходят:")
-        #     info_label.setStyleSheet("font-weight: bold; font-size: 12px;")
-        #     layout.addWidget(info_label)
-            
-        #     layout.addSpacing(10)
-            
-        #     # Показываем оставшихся игроков
-        #     remaining_label = QLabel(f"Осталось нераспределенных игроков: {remaining_players}")
-        #     remaining_label.setStyleSheet("color: orange; font-weight: bold;")
-        #     layout.addWidget(remaining_label)
-            
-        #     layout.addSpacing(5)
-            
-        #     # Количество выходящих из каждой группы
-        #     exit_layout = QHBoxLayout()
-        #     exit_layout.addWidget(QLabel("Количество участников из каждой группы:"))
-        #     exit_spin = QSpinBox()
-        #     exit_spin.setMinimum(1)
-        #     exit_spin.setMaximum(previous_stage.mesta_exit)
-        #     exit_spin.setValue(min(2, previous_stage.mesta_exit))
-        #     exit_layout.addWidget(exit_spin)
-        #     layout.addLayout(exit_layout)
-            
-        #     # Информация о распределении по финалам
-        #     finals_info_label = QLabel()
-        #     finals_info_label.setStyleSheet("color: blue;")
-        #     finals_info_label.setWordWrap(True)
-        #     layout.addWidget(finals_info_label)
-            
-        #     # Информация о местах в финалах
-        #     places_info_label = QLabel()
-        #     places_info_label.setStyleSheet("color: green;")
-        #     places_info_label.setWordWrap(True)
-        #     layout.addWidget(places_info_label)
-            
-        #     # Расчет начальных позиций мест
-        #     start_place = 1
-        #     for final in existing_finals:
-        #         start_place += final.max_player
-            
-        #     def update_finals_info():
-        #         exit_val = exit_spin.value()
-        #         total_in_this_final = previous_stage.total_group * exit_val
-                
-        #         if total_in_this_final > remaining_players:
-        #             total_in_this_final = remaining_players
-        #             exit_spin.setValue(exit_val - 1)
-        #             return
-                
-        #         end_place = start_place + total_in_this_final - 1
-                
-        #         finals_info_label.setText(f"Всего в этом финале: {total_in_this_final} чел.\n"
-        #                                 f"Из каждой группы выходит: {exit_val} чел.")
-                
-        #         places_info_label.setText(f"Места в этом финале: с {start_place} по {end_place}")
-                
-        #         # Используем calculate_total_games для учета уже сыгранных игр
-        #         group_sizes = [total_in_this_final]
-        #         total_games = self.calculate_total_games(
-        #             self.table_type.currentText(), 
-        #             total_in_this_final, 
-        #             1, 
-        #             group_sizes, 
-        #             stage_name, 
-        #             previous_stage
-        #         )
-                
-        #         return total_in_this_final, total_games
-            
-        #     exit_spin.valueChanged.connect(lambda: update_finals_info())
-        #     total_in_this_final, games_in_this_final = update_finals_info()
-            
-        #     layout.addSpacing(10)
-            
-        #     btn_layout = QHBoxLayout()
-        #     ok_btn = QPushButton("OK")
-        #     ok_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 5px;")
-        #     ok_btn.clicked.connect(dialog.accept)
-        #     cancel_btn = QPushButton("Отмена")
-        #     cancel_btn.setStyleSheet("background-color: #f44336; color: white; padding: 5px;")
-        #     cancel_btn.clicked.connect(dialog.reject)
-        #     btn_layout.addWidget(ok_btn)
-        #     btn_layout.addWidget(cancel_btn)
-        #     layout.addLayout(btn_layout)
-            
-        #     if dialog.exec_() != QDialog.Accepted:
-        #         return
-            
-        #     stage_exit = exit_spin.value()
-        #     max_players = total_in_this_final
-        #     choice_flag = 0
-            
-        #     # Формируем строки для записи в БД
-        #     label_string = places_info_label.text()
-        #     kol_game_string = f"{games_in_this_final} игр."
-            
-        #     # Получаем следующий номер финала
-        #     final_number = existing_finals.count() + 1
-        #     # stage_name_with_number = f"{final_number}-й финал"
-        #     stage_name = f"{final_number}-й финал"
-
         else:
             QMessageBox.warning(self, "Ошибка", f"Неизвестный тип этапа: {stage_name}")
             return
@@ -7292,7 +7162,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Успех", 
                                 f"✅ Этап '{stage_name}' добавлен\n"
                                 f"📊 Игр в этапе: {total_games_in_stage}\n"
-                                f"🏆 Всего игр на соревновании: {total_all_games}")
+                                f"🏆 Всего на соревновании: {total_all_games} игр.")
             
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось добавить этап: {str(e)}")    
@@ -7323,6 +7193,8 @@ class MainWindow(QMainWindow):
             previous_stage = None
             current_place = 1
             total_all_games = 0
+
+            
             
             for idx, system in enumerate(systems, 1):
                 total_players = Player.select().where(Player.title_id == self.current_title_id).count()
@@ -7391,8 +7263,9 @@ class MainWindow(QMainWindow):
                 previous_stage = system
             
             # Подчеркивание и сумма игр всех этапов
+            # no_choice_player = f"{total_players - distribution_text} НЕ РАСПРЕДЕЛЕННЫХ ИГРОКОВ ПО ФИНАЛАМ."
             info_text += "─" * 70 + "\n"
-            info_text += f"🏆 ВСЕГО ИГР НА СОРЕВНОВАНИИ: {total_all_games}\n"
+            info_text += f"🏆 ВСЕГО НА СОРЕВНОВАНИИ: {total_all_games} ИГР.\n"
             
             self.stages_info.setText(info_text)
             

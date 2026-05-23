@@ -7060,7 +7060,6 @@ class MainWindow(QMainWindow):
             # Количество групп полуфинала = количество групп квалификации / 2
             total_groups = max(1, previous_stage.total_group // 2)
             
-            # Спрашиваем количество выходящих из квалификации
             dialog = QDialog(self)
             dialog.setWindowTitle("Настройка полуфинала")
             dialog.setModal(True)
@@ -7369,16 +7368,20 @@ class MainWindow(QMainWindow):
             self.update_seeding_info()
 
             # # Проверяем, все ли игроки распределены
-            # remaining_players = self.update_seeding_info(self)
+            remaining_players = self.update_seeding_info()
 
-            if total_players - already_in_finals - players_not_out  <= 1:
-
+            all_posev_player = total_in_this_final + remaining_players
+            if total_players <= all_posev_player:
+                self.fill_choice_table()
+            # if total_players - already_in_finals - players_not_out  <= 1:
+            # if total_players - remaining_players <= 1:
                 reply = QMessageBox.question(self, "Завершение посева", 
                                             f"✅ Все {total_players} игроков распределены по финалам!\n\n"
                                             f"Провести жеребьевку квалификации сейчас?",
                                             QMessageBox.Yes | QMessageBox.No)
                 if reply == QMessageBox.Yes:
                     self.perform_drawing()
+                  
 
             # Сохраняем информацию о финале
             self.current_finals_info = {
@@ -7418,6 +7421,9 @@ class MainWindow(QMainWindow):
             
             system = System.create(**system_data)
             self.update_stages_info()
+
+            # После добавления финала, обновляем информацию о посеве
+            self.update_seeding_info()
             
             # Подсчет общей суммы игр
             total_all_games = 0
@@ -7438,7 +7444,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось добавить этап: {str(e)}")    
 # ==================================
-    def update_stages_info(self):
+    def _update_stages_info(self):
         """Обновление информационного окна со списком этапов (формат 2 строки)"""
         try:
             from models import System, Player, Title
@@ -7548,7 +7554,155 @@ class MainWindow(QMainWindow):
             import traceback
             traceback.print_exc()
             self.stages_info.setText(f"Ошибка: {str(e)}")
-# ===================================
+
+    def update_stages_info(self):
+        """Обновление информационного окна со списком этапов (формат 2 строки с выравниванием)"""
+        try:
+            from models import System, Player, Title
+            
+            if not self.current_title_id:
+                self.stages_info.setText("Нет выбранного соревнования")
+                return
+            
+            title = Title.get_or_none(Title.id == self.current_title_id)
+            title_name = title.name if title else "Неизвестное соревнование"
+            
+            systems = System.select().where(System.title_id == self.current_title_id).order_by(System.id)
+            
+            self.stages_info.clear()
+            
+            if systems.count() == 0:
+                self.stages_info.setText(f"🏆 СОРЕВНОВАНИЕ: {title_name}\n\n{'=' * 60}\n\n❌ Нет добавленных этапов")
+                return
+            
+            info_text = f"🏆 СОРЕВНОВАНИЕ: {title_name.upper()}. СИСТЕМА ПРОВЕДЕНИЯ.\n"
+            info_text += "=" * 70 + "\n\n"
+            
+            previous_stage = None
+            current_place = 1
+            total_all_games = 0
+            
+            # Определяем максимальную ширину для выравнивания
+            max_games_width = 0
+            
+            # Первый проход: определяем максимальную ширину
+            temp_games_list = []
+            for system in systems:
+                total_players = Player.select().where(Player.title_id == self.current_title_id).count()
+                if total_players == 0:
+                    temp_games_list.append(0)
+                else:
+                    groups_count = system.total_group if system.total_group else 1
+                    if "полуфинал" in system.stage.lower() and previous_stage and "Квалификация" in previous_stage.stage:
+                        players_in_semifinal = previous_stage.total_group * previous_stage.mesta_exit
+                        players_per_group = previous_stage.mesta_exit * 2
+                        group_sizes = [players_per_group] * groups_count
+                        games = self.calculate_semifinal_games_count(groups_count, players_per_group, previous_stage)
+                    elif self.is_final_stage(system.stage):
+                        if system.kol_game_string:
+                            import re
+                            games_match = re.search(r'(\d+)', system.kol_game_string)
+                            games = int(games_match.group(1)) if games_match else 0
+                        else:
+                            if "Круговая" in system.type_table:
+                                games = (system.max_player * (system.max_player - 1)) // 2
+                            else:
+                                games = self.calculate_olympic_games(system.max_player)
+                    else:
+                        group_sizes = self.calculate_group_sizes(total_players, groups_count)
+                        games = self.calculate_total_games(
+                            system.type_table, total_players, groups_count, group_sizes,
+                            system.stage, previous_stage
+                        )
+                    temp_games_list.append(games)
+                previous_stage = system
+            
+            # Определяем максимальную ширину для выравнивания
+            max_games_width = max([len(str(g)) for g in temp_games_list]) if temp_games_list else 0
+            max_games_width = max(max_games_width, 5)  # Минимум 5 символов
+            
+            # Второй проход: выводим с выравниванием
+            previous_stage = None
+            for idx, system in enumerate(systems, 1):
+                total_players = Player.select().where(Player.title_id == self.current_title_id).count()
+                
+                if total_players == 0:
+                    distribution_text = "нет участников"
+                    total_games = 0
+                    stage_display = system.stage
+                    places_display = ""
+                else:
+                    groups_count = system.total_group if system.total_group else 1
+                    
+                    # Для полуфинала
+                    if "полуфинал" in system.stage.lower() and previous_stage and "Квалификация" in previous_stage.stage:
+                        players_in_semifinal = previous_stage.total_group * previous_stage.mesta_exit
+                        players_per_group = previous_stage.mesta_exit * 2
+                        group_sizes = [players_per_group] * groups_count
+                        distribution_text = self.calculate_group_distribution(players_in_semifinal, groups_count)
+                        total_games = self.calculate_semifinal_games_count(groups_count, players_per_group, previous_stage)
+                        stage_display = system.stage
+                        places_display = ""
+                        
+                    # Для финала
+                    elif self.is_final_stage(system.stage):
+                        players_in_final = system.max_player
+                        start_place = current_place
+                        end_place = current_place + players_in_final - 1
+                        
+                        distribution_text = f"{players_in_final} чел."
+                        
+                        if system.kol_game_string:
+                            import re
+                            games_match = re.search(r'(\d+)', system.kol_game_string)
+                            total_games = int(games_match.group(1)) if games_match else 0
+                        else:
+                            if "Круговая" in system.type_table:
+                                total_games = (players_in_final * (players_in_final - 1)) // 2
+                            else:
+                                total_games = self.calculate_olympic_games(players_in_final)
+                        
+                        stage_display = system.stage
+                        places_display = f" | места {start_place}-{end_place}"
+                        current_place += players_in_final
+                        
+                    else:
+                        # Для квалификации и других этапов
+                        group_sizes = self.calculate_group_sizes(total_players, groups_count)
+                        distribution_text = self.calculate_group_distribution(total_players, groups_count)
+                        total_games = self.calculate_total_games(
+                            system.type_table, total_players, groups_count, group_sizes,
+                            system.stage, previous_stage
+                        )
+                        stage_display = system.stage
+                        places_display = ""
+                
+                # Подсчитываем общее количество игр
+                total_all_games += total_games
+                
+                # Выравниваем количество игр по правому краю
+                games_str = str(total_games)
+                games_padded = games_str.rjust(max_games_width)
+                
+                # 1-я строка: номер этапа, название, места
+                info_text += f"┌─ 📌 ЭТАП {idx}: {stage_display}{places_display}\n"
+                # 2-я строка: тип таблицы, распределение, количество игр (выровнено)
+                info_text += f"└─ 📊 {system.type_table} | {distribution_text} | {games_padded} игр\n"
+                
+                previous_stage = system
+            
+            # Подчеркивание и сумма игр всех этапов
+            info_text += "─" * 70 + "\n"
+            info_text += f"🏆 ВСЕГО НА СОРЕВНОВАНИИ: {total_all_games} ИГР.\n"
+            
+            self.stages_info.setText(info_text)
+            
+        except Exception as e:
+            print(f"Ошибка обновления информации об этапах: {e}")
+            import traceback
+            traceback.print_exc()
+            self.stages_info.setText(f"Ошибка: {str(e)}")
+    # ===================================
     def calculate_group_sizes(self, players, groups):
         """Расчет количества участников в каждой группе"""
         if groups <= 0:
@@ -7871,13 +8025,6 @@ class MainWindow(QMainWindow):
             else:
                 self.max_players.setStyleSheet("")
 
-    def perform_drawing(self):
-        """Проведение жеребьевки"""
-        QMessageBox.information(self, "Жеребьевка", 
-                            "Функция жеребьевки в разработке.\n"
-                            "Будет реализована позже.")
-        # Здесь будет логика жеребьевки
-
     def calculate_finals_info(self, total_players, max_players, table_type):
         """Расчет информации о финалах"""
         if table_type == "Круговая":
@@ -8036,7 +8183,10 @@ class MainWindow(QMainWindow):
         
         # Проверяем, все ли игроки распределены по финалам
         total_players = Player.select().where(Player.title_id == self.current_title_id).count()
-        seeded_players = sum([s.max_player for s in stages if self.is_final_stage(s.stage)])
+        seeded_players = 0
+        for s in stages:
+            if self.is_final_stage(s.stage):
+                seeded_players += s.max_player
         
         if seeded_players < total_players:
             reply = QMessageBox.question(self, "Внимание", 
@@ -8047,11 +8197,14 @@ class MainWindow(QMainWindow):
             if reply == QMessageBox.No:
                 return
         
+        # Заполняем таблицу Choice
+        self.fill_choice_table()
+        
         QMessageBox.information(self, "Жеребьевка", 
                             f"Проведение жеребьевки для этапа: {qualification.stage}\n"
                             f"Количество групп: {qualification.total_group}\n"
                             f"Участников в группе: {qualification.max_player}\n\n"
-                            f"Функция жеребьевки в разработке.")
+                            f"Таблица Choice успешно заполнена!")
     
     def calculate_semifinal_games(self, groups_count, players_per_group, exit_count):
         """
@@ -8364,8 +8517,8 @@ class MainWindow(QMainWindow):
             dialog = QDialog(self)
             dialog.setWindowTitle("Неподтвержденные участники")
             dialog.setModal(True)
-            dialog.setMinimumWidth(500)
-            dialog.setMinimumHeight(400)
+            dialog.setMinimumWidth(700)
+            dialog.setMinimumHeight(500)
             
             layout = QVBoxLayout(dialog)
             
@@ -8375,8 +8528,9 @@ class MainWindow(QMainWindow):
             
             layout.addSpacing(10)
             
-            # Список неподтвержденных игроков
+            # Список неподтвержденных игроков с возможностью множественного выделения
             players_list = QListWidget()
+            players_list.setSelectionMode(QListWidget.ExtendedSelection)  # Множественное выделение
             players_list.setStyleSheet("""
                 QListWidget {
                     font-size: 11px;
@@ -8387,40 +8541,124 @@ class MainWindow(QMainWindow):
                     padding: 5px;
                     border-bottom: 1px solid #eee;
                 }
+                QListWidget::item:selected {
+                    background-color: #4CAF50;
+                    color: white;
+                }
             """)
             
+            # Сохраняем ID игроков для быстрого доступа
+            player_ids = []
             for player in pending_players:
+                player_ids.append(player.id)
                 item_text = f"🏅 {player.fio} | {player.city} | {player.razryad}"
                 if player.coach_id:
                     coach = Coach.get_or_none(Coach.id == player.coach_id)
                     if coach:
                         item_text += f" | Тренер: {coach.coach}"
-                players_list.addItem(item_text)
+                item = QListWidgetItem(item_text)
+                item.setData(Qt.UserRole, player.id)
+                players_list.addItem(item)
             
             layout.addWidget(players_list)
             
             layout.addSpacing(10)
             
-            # Кнопка для подтверждения всех
+            # Кнопки управления
+            buttons_layout = QHBoxLayout()
+            buttons_layout.setSpacing(10)
+            
+            # Кнопка подтверждения выделенных
+            confirm_selected_btn = QPushButton("✅ Подтвердить выделенных")
+            confirm_selected_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #4CAF50;
+                    color: white;
+                    padding: 8px;
+                    font-size: 11px;
+                    font-weight: bold;
+                    border-radius: 4px;
+                }
+                QPushButton:hover {
+                    background-color: #45a049;
+                }
+            """)
+            confirm_selected_btn.clicked.connect(lambda: self.confirm_selected_players(players_list, dialog))
+            buttons_layout.addWidget(confirm_selected_btn)
+            
+            # Кнопка удаления выделенных
+            delete_selected_btn = QPushButton("🗑️ Удалить выделенных")
+            delete_selected_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #f44336;
+                    color: white;
+                    padding: 8px;
+                    font-size: 11px;
+                    font-weight: bold;
+                    border-radius: 4px;
+                }
+                QPushButton:hover {
+                    background-color: #d32f2f;
+                }
+            """)
+            delete_selected_btn.clicked.connect(lambda: self.delete_selected_players(players_list, dialog))
+            buttons_layout.addWidget(delete_selected_btn)
+            
+            # Кнопка подтверждения всех
             confirm_all_btn = QPushButton("✅ Подтвердить всех")
-            confirm_all_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 5px;")
+            confirm_all_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #2196F3;
+                    color: white;
+                    padding: 8px;
+                    font-size: 11px;
+                    font-weight: bold;
+                    border-radius: 4px;
+                }
+                QPushButton:hover {
+                    background-color: #1976D2;
+                }
+            """)
+            confirm_all_btn.clicked.connect(lambda: self.confirm_all_players(dialog))
+            buttons_layout.addWidget(confirm_all_btn)
             
-            def confirm_all():
-                # Обновляем статус всех игроков на "основная"
-                Player.update(application="основная").where(
-                    Player.title_id == self.current_title_id
-                ).execute()
-                QMessageBox.information(dialog, "Успех", "Все участники подтверждены")
-                dialog.accept()
+            # Кнопка удаления всех неподтвержденных
+            delete_all_btn = QPushButton("🗑️ Удалить всех")
+            delete_all_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #FF9800;
+                    color: white;
+                    padding: 8px;
+                    font-size: 11px;
+                    font-weight: bold;
+                    border-radius: 4px;
+                }
+                QPushButton:hover {
+                    background-color: #F57C00;
+                }
+            """)
+            delete_all_btn.clicked.connect(lambda: self.delete_all_pending_players(dialog))
+            buttons_layout.addWidget(delete_all_btn)
             
-            confirm_all_btn.clicked.connect(confirm_all)
-            layout.addWidget(confirm_all_btn)
+            layout.addLayout(buttons_layout)
             
             layout.addSpacing(5)
             
             # Кнопка закрытия
             close_btn = QPushButton("Закрыть")
-            close_btn.setStyleSheet("background-color: #f44336; color: white; padding: 5px;")
+            close_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #9E9E9E;
+                    color: white;
+                    padding: 8px;
+                    font-size: 11px;
+                    font-weight: bold;
+                    border-radius: 4px;
+                }
+                QPushButton:hover {
+                    background-color: #757575;
+                }
+            """)
             close_btn.clicked.connect(dialog.reject)
             layout.addWidget(close_btn)
             
@@ -8428,6 +8666,196 @@ class MainWindow(QMainWindow):
             return False
         
         return True
+
+    def confirm_selected_players(self, players_list, dialog):
+        """Подтверждение выделенных игроков"""
+        selected_items = players_list.selectedItems()
+        if not selected_items:
+            QMessageBox.warning(dialog, "Ошибка", "Выберите игроков для подтверждения")
+            return
+        
+        selected_ids = [item.data(Qt.UserRole) for item in selected_items]
+        
+        reply = QMessageBox.question(dialog, "Подтверждение", 
+                                    f"Подтвердить заявки {len(selected_ids)} участников?\n"
+                                    f"Статус изменится с 'предварительная' на 'основная'.",
+                                    QMessageBox.Yes | QMessageBox.No)
+        
+        if reply == QMessageBox.Yes:
+            try:
+                # Обновляем статус выбранных игроков
+                for player_id in selected_ids:
+                    Player.update(application="основная").where(Player.id == player_id).execute()
+                
+                # Обновляем список
+                self.refresh_pending_players_list(players_list)
+                
+                # Проверяем, остались ли еще неподтвержденные
+                remaining = Player.select().where(
+                    (Player.title_id == self.current_title_id) &
+                    (Player.application != "основная")
+                ).count()
+                
+                if remaining == 0:
+                    QMessageBox.information(dialog, "Успех", "Все участники подтверждены!")
+                    dialog.accept()
+                else:
+                    QMessageBox.information(dialog, "Успех", f"Подтверждено {len(selected_ids)} участников")
+                    
+            except Exception as e:
+                QMessageBox.critical(dialog, "Ошибка", f"Не удалось подтвердить участников: {str(e)}")
+
+    def delete_selected_players(self, players_list, dialog):
+        """Удаление выделенных игроков"""
+        selected_items = players_list.selectedItems()
+        if not selected_items:
+            QMessageBox.warning(dialog, "Ошибка", "Выберите игроков для удаления")
+            return
+        
+        selected_ids = [item.data(Qt.UserRole) for item in selected_items]
+        
+        # Получаем ФИО для отображения
+        fios = []
+        for player_id in selected_ids:
+            player = Player.get_or_none(Player.id == player_id)
+            if player:
+                fios.append(player.fio)
+        
+        reply = QMessageBox.question(dialog, "Подтверждение", 
+                                    f"Удалить {len(selected_ids)} участников?\n\n"
+                                    f"{chr(10).join(fios[:5])}{chr(10) if len(fios) > 5 else ''}"
+                                    f"{f'... и еще {len(fios) - 5}' if len(fios) > 5 else ''}\n\n"
+                                    f"Игроки будут перемещены в архив удаленных.",
+                                    QMessageBox.Yes | QMessageBox.No)
+        
+        if reply == QMessageBox.Yes:
+            try:
+                for player_id in selected_ids:
+                    player = Player.get_by_id(player_id)
+                    
+                    # Создаем запись в таблице Delete_player
+                    Delete_player.create(
+                        player=player.player,
+                        bday=player.bday,
+                        rank=player.rank,
+                        city=player.city,
+                        region=player.region,
+                        razryad=player.razryad,
+                        coach_id=player.coach_id,
+                        full_name=player.fio,
+                        title_id=self.current_title_id,
+                        pay_rejting=player.pay_rejting or "",
+                        comment=player.comment or "",
+                        patronymic_id=player.patronymic_id.id if player.patronymic_id else None,
+                        sex=player.sex
+                    )
+                    
+                    # Удаляем игрока из таблицы Player
+                    player.delete_instance()
+                
+                # Обновляем список
+                self.refresh_pending_players_list(players_list)
+                
+                # Проверяем, остались ли еще неподтвержденные
+                remaining = Player.select().where(
+                    (Player.title_id == self.current_title_id) &
+                    (Player.application != "основная")
+                ).count()
+                
+                if remaining == 0:
+                    QMessageBox.information(dialog, "Успех", "Все участники обработаны!")
+                    dialog.accept()
+                else:
+                    QMessageBox.information(dialog, "Успех", f"Удалено {len(selected_ids)} участников")
+                    
+            except Exception as e:
+                QMessageBox.critical(dialog, "Ошибка", f"Не удалось удалить участников: {str(e)}")
+
+    def confirm_all_players(self, dialog):
+        """Подтверждение всех неподтвержденных игроков"""
+        reply = QMessageBox.question(dialog, "Подтверждение", 
+                                    "Подтвердить заявки ВСЕХ участников?\n"
+                                    "Статус изменится с 'предварительная' на 'основная'.",
+                                    QMessageBox.Yes | QMessageBox.No)
+        
+        if reply == QMessageBox.Yes:
+            try:
+                # Обновляем статус всех игроков
+                Player.update(application="основная").where(
+                    (Player.title_id == self.current_title_id) &
+                    (Player.application != "основная")
+                ).execute()
+                
+                QMessageBox.information(dialog, "Успех", "Все участники подтверждены")
+                dialog.accept()
+                
+            except Exception as e:
+                QMessageBox.critical(dialog, "Ошибка", f"Не удалось подтвердить участников: {str(e)}")
+
+    def delete_all_pending_players(self, dialog):
+        """Удаление всех неподтвержденных игроков"""
+        pending_count = Player.select().where(
+            (Player.title_id == self.current_title_id) &
+            (Player.application != "основная")
+        ).count()
+        
+        reply = QMessageBox.question(dialog, "Подтверждение", 
+                                    f"Удалить ВСЕХ неподтвержденных участников ({pending_count} чел.)?\n\n"
+                                    f"Игроки будут перемещены в архив удаленных.",
+                                    QMessageBox.Yes | QMessageBox.No)
+        
+        if reply == QMessageBox.Yes:
+            try:
+                pending_players = Player.select().where(
+                    (Player.title_id == self.current_title_id) &
+                    (Player.application != "основная")
+                )
+                
+                for player in pending_players:
+                    # Создаем запись в таблице Delete_player
+                    Delete_player.create(
+                        player=player.player,
+                        bday=player.bday,
+                        rank=player.rank,
+                        city=player.city,
+                        region=player.region,
+                        razryad=player.razryad,
+                        coach_id=player.coach_id,
+                        full_name=player.fio,
+                        title_id=self.current_title_id,
+                        pay_rejting=player.pay_rejting or "",
+                        comment=player.comment or "",
+                        patronymic_id=player.patronymic_id.id if player.patronymic_id else None,
+                        sex=player.sex
+                    )
+                    
+                    # Удаляем игрока из таблицы Player
+                    player.delete_instance()
+                
+                QMessageBox.information(dialog, "Успех", f"Удалено {pending_count} участников")
+                dialog.accept()
+                
+            except Exception as e:
+                QMessageBox.critical(dialog, "Ошибка", f"Не удалось удалить участников: {str(e)}")
+
+    def refresh_pending_players_list(self, players_list):
+        """Обновление списка неподтвержденных игроков"""
+        players_list.clear()
+        
+        pending_players = Player.select().where(
+            (Player.title_id == self.current_title_id) &
+            (Player.application != "основная")
+        )
+        
+        for player in pending_players:
+            item_text = f"🏅 {player.fio} | {player.city} | {player.razryad}"
+            if player.coach_id:
+                coach = Coach.get_or_none(Coach.id == player.coach_id)
+                if coach:
+                    item_text += f" | Тренер: {coach.coach}"
+            item = QListWidgetItem(item_text)
+            item.setData(Qt.UserRole, player.id)
+            players_list.addItem(item)
 
     def update_seeding_info(self):
         """Обновление информации о посеянных игроках"""
@@ -8493,6 +8921,101 @@ class MainWindow(QMainWindow):
                 info_text += f"   • {final['stage_name']}: {final['players']} игроков\n"
         
         QMessageBox.information(self, "Информация о распределении", info_text)
+
+    def fill_choice_table(self):
+        """Заполнение таблицы Choice игроками соревнования"""
+        if not self.current_title_id:
+            return
+        
+        try:
+            # Проверяем, есть ли уже записи в Choice для этого соревнования
+            existing_choices = Choice.select().where(Choice.title_id == self.current_title_id).count()
+            
+            if existing_choices > 0:
+                reply = QMessageBox.question(self, "Подтверждение", 
+                                            f"Таблица Choice уже содержит {existing_choices} записей.\n"
+                                            f"Перезаписать?",
+                                            QMessageBox.Yes | QMessageBox.No)
+                if reply == QMessageBox.No:
+                    return
+                # Удаляем существующие записи
+                Choice.delete().where(Choice.title_id == self.current_title_id).execute()
+            
+            # Получаем всех игроков соревнования
+            players = Player.select().where(Player.title_id == self.current_title_id)
+            
+            # Получаем систему для определения групп
+            systems = System.select().where(System.title_id == self.current_title_id).order_by(System.id)
+            
+            # Находим квалификацию
+            qualification = None
+            for system in systems:
+                if "Квалификация" in system.stage and "полуфинал" not in system.stage:
+                    qualification = system
+                    break
+            
+            if not qualification:
+                QMessageBox.warning(self, "Ошибка", "Не найдена квалификация для заполнения Choice")
+                return
+            
+            # Распределяем игроков по группам
+            total_players = players.count()
+            groups = qualification.total_group
+            players_per_group = total_players // groups
+            remainder = total_players % groups
+            
+            # Сортируем игроков по рейтингу для посева
+            players_sorted = players.order_by(Player.rank.desc())
+            
+            group_counter = 1
+            player_index = 0
+            players_list = list(players_sorted)
+            
+            for i in range(groups):
+                # Определяем размер группы
+                current_group_size = players_per_group + (1 if i < remainder else 0)
+                
+                for j in range(current_group_size):
+                    if player_index < len(players_list):
+                        player = players_list[player_index]
+                        
+                        # Получаем тренера
+                        coach_name = ""
+                        if player.coach_id:
+                            coach = Coach.get_or_none(Coach.id == player.coach_id)
+                            if coach:
+                                coach_name = coach.coach
+                        
+                        # Получаем регион
+                        region_name = player.region if player.region else ""
+                        
+                        # Создаем запись в Choice
+                        Choice.create(
+                            player_choice=player.id,
+                            family=player.fio or player.player,
+                            region=region_name,
+                            coach=coach_name,
+                            rank=player.rank or 0,
+                            basic=None,
+                            group=None,
+                            posev_group=None,
+                            mesto_group=0,
+                            title_id=self.current_title_id,
+                            sex=player.sex
+                        )
+                        player_index += 1
+                
+                group_counter += 1
+            
+            QMessageBox.information(self, "Успех", 
+                                f"Таблица Choice заполнена.\n"
+                                f"Всего игроков: {player_index}\n"
+                                f"Количество групп: {groups}")
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось заполнить Choice: {str(e)}")
+
+
 # =================================
 class RatingLoaderThread(QThread):
     progress = pyqtSignal(int)

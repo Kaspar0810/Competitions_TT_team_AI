@@ -17,6 +17,17 @@ from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QCompleter
 from PyQt5.QtCore import QStringListModel
 
+from reportlab.pdfbase.pdfmetrics import registerFontFamily
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import mm, cm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.colors import *
+from reportlab.lib.styles import ParagraphStyle as PS
+import tempfile
 
 from models import connect_db, close_db
 from models import *
@@ -29,6 +40,9 @@ import pandas as pd
 
 from datetime import datetime
 
+# =========================
+import manual_choice
+# =======================
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -42,7 +56,13 @@ class MainWindow(QMainWindow):
 
         # Создаем папку для бэкапов, если её нет
         if not os.path.exists("backup_db"):
-            os.makedirs("backup_db")
+            os.makedirs("backup_db") 
+        if not os.path.isdir("table_pdf"):  # создает папку 
+            os.mkdir("table_pdf")
+        if not os.path.isdir("competition_pdf"):  # создает папку 
+            os.mkdir("competition_pdf")
+        if not os.path.isdir("sign"):  # создает папку 
+            os.mkdir("sign")
 
         # Текущее соревнование
         self.current_title_id = None
@@ -297,8 +317,8 @@ class MainWindow(QMainWindow):
     # ========== Левая панель ==========
         self.left_panel = QFrame()
         self.left_panel.setFrameShape(QFrame.StyledPanel)
-        self.left_panel.setMinimumWidth(320)
-        self.left_panel.setMaximumWidth(400)
+        self.left_panel.setMinimumWidth(250)
+        self.left_panel.setMaximumWidth(280)
         self.left_panel.setStyleSheet("background-color: #f5f5f5;")
         left_layout = QVBoxLayout(self.left_panel)
         left_layout.setAlignment(Qt.AlignTop)
@@ -339,9 +359,27 @@ class MainWindow(QMainWindow):
                 padding: 0 5px 0 5px;
             }
         """)
-        stage_layout = QVBoxLayout(self.stage_section)
+        stage_layout = QVBoxLayout(self.stage_section)  # <-- stage_layout определяется здесь
         stage_layout.setSpacing(8)
         stage_layout.setContentsMargins(8, 12, 8, 8)
+        
+        # Кнопка параметров системы (ДОБАВИТЬ ЗДЕСЬ)
+        params_btn = QPushButton("⚙️ Параметры системы")
+        params_btn.setMinimumHeight(30)
+        params_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 6px;
+                font-size: 10px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #1976D2; }
+        """)
+        params_btn.clicked.connect(self.change_system_parameters)
+        stage_layout.addWidget(params_btn)
         
         # Название этапа
         stage_name_layout = QHBoxLayout()
@@ -384,7 +422,7 @@ class MainWindow(QMainWindow):
         groups_layout.addWidget(QLabel("гр."))
         groups_layout.addStretch()
         stage_layout.addWidget(self.groups_widget)
-        self.groups_widget.setVisible(False)  # Скрываем по умолчанию
+        self.groups_widget.setVisible(False)  # Изначально скрыт
         
         # Количество партий
         parties_layout = QHBoxLayout()
@@ -403,6 +441,7 @@ class MainWindow(QMainWindow):
         stage_layout.addWidget(add_stage_btn)
         
         left_layout.addWidget(self.stage_section)
+
         # =============
         # Информация о посеве игроков
         self.seeding_info_label = QLabel("🎯 Посев игроков: 0 из 0 (0 осталось)")
@@ -647,8 +686,8 @@ class MainWindow(QMainWindow):
         
         # Правая панель
         self.right_panel = QWidget()
-        self.right_panel.setMaximumWidth(420)
-        self.right_panel.setMinimumWidth(350)
+        self.right_panel.setMaximumWidth(320)
+        self.right_panel.setMinimumWidth(300)
         right_panel_layout = QVBoxLayout(self.right_panel)
         right_panel_layout.setContentsMargins(0, 0, 0, 0)
         right_panel_layout.setSpacing(3)
@@ -2169,7 +2208,10 @@ class MainWindow(QMainWindow):
                     self.current_sex = "woman"
                 else:
                     self.current_sex = "man"
-                
+
+                # Обновляем меню финалов
+                self.update_finals_menu_after_selection()
+
                 # ОБНОВЛЯЕМ АКТИВНОСТЬ ВКЛАДОК (после выбора соревнования)
                 self.update_tabs_enabled()
                 
@@ -2206,155 +2248,22 @@ class MainWindow(QMainWindow):
                     """)
                 QTimer.singleShot(2000, reset_label)
 # ==================================================
-    def _on_tab_changed(self, index):
-        """Смена вкладки"""
-        self.current_tab_index = index
-        
-        # ОБНОВЛЯЕМ ЛЕВУЮ ПАНЕЛЬ ПРИ СМЕНЕ ВКЛАДКИ
-        self.update_left_panel_for_tab(index)
-        
-        # Управление отображением правой панели в зависимости от вкладки
-        if index == 0:  # Вкладка Титул
-            self.competitions_label.setVisible(True)
-            self.list_widget.setVisible(True)
-            self.search_label.setVisible(False)
-            self.search_results_list.setVisible(False)
-            self.filters_widget.setVisible(True)
-            
-            # Убеждаемся, что форма создания скрыта, а информация видна
-            if hasattr(self, 'new_comp_frame'):
-                self.new_comp_frame.setVisible(False)
-            if hasattr(self, 'info_group'):
-                self.info_group.setVisible(True)
-            # Скрываем секцию создания этапа
-            if hasattr(self, 'stage_section'):
-                self.stage_section.setVisible(False)
-            
-            # Загружаем список соревнований
-            self.load_titles_list()
-            
-        elif index == 1:  # Вкладка Участники
-            self.competitions_label.setVisible(False)
-            self.list_widget.setVisible(False)
-            self.search_label.setVisible(True)
-            self.search_results_list.setVisible(True)
-            self.filters_widget.setVisible(False)
-            
-            # Скрываем секцию создания этапа
-            if hasattr(self, 'stage_section'):
-                self.stage_section.setVisible(False)
-            # Активируем поле поиска
-            if hasattr(self, 'fio_edit'):
-                self.fio_edit.setEnabled(True)
-            
-            # Загружаем участников для текущего соревнования
-            if self.current_title_id:
-                self.load_participants_for_title()
-            else:
-                self.players_model.setData([])
-                self.table_header.setText("👥 Список участников - выберите соревнование из списка справа")
-            
-            # Изменяем размеры для увеличения таблицы
-            QTimer.singleShot(100, self.resize_table_for_participants)
-            
-        elif index == 2:  # Вкладка Команды
-            self.competitions_label.setVisible(True)
-            self.list_widget.setVisible(True)
-            self.search_label.setVisible(False)
-            self.search_results_list.setVisible(False)
-            self.filters_widget.setVisible(False)
-            self.competitions_label.setText("🏆 Команды")
-            
-            if self.current_title_id:
-                self.load_teams_for_title()
-            else:
-                self.list_widget.clear()
-                # Скрываем секцию создания этапа
-            if hasattr(self, 'stage_section'):
-                self.stage_section.setVisible(False) 
-
-        elif index == 3:  # Вкладка Пары
-            self.competitions_label.setVisible(True)
-            self.list_widget.setVisible(True)
-            self.search_label.setVisible(False)
-            self.search_results_list.setVisible(False)
-            self.filters_widget.setVisible(False)
-            self.competitions_label.setText("🤝 Пары")
-            
-            if self.current_title_id:
-                self.load_doubles_for_title()
-            else:
-                self.list_widget.clear()
-
-             # Скрываем секцию создания этапа
-            if hasattr(self, 'stage_section'):
-                self.stage_section.setVisible(False) 
-
-        elif index == 4:  # Вкладка Система
-            self.competitions_label.setVisible(True)
-            self.list_widget.setVisible(True)
-            self.search_label.setVisible(False)
-            self.search_results_list.setVisible(False)
-            self.filters_widget.setVisible(False)
-            self.competitions_label.setText("⚙️ Система")
-            
-            # Показываем секцию создания этапа
-            if hasattr(self, 'stage_section'):
-                self.stage_section.setVisible(True)
-            
-            # Обновляем информацию о посеве
-            self.update_seeding_info()
-            
-            # Обновляем информацию о системе
-            if self.current_title_id:
-                self.update_stages_info()
-            else:
-                self.list_widget.clear()
-                if hasattr(self, 'stages_info'):
-                    self.stages_info.setText("Нет выбранного соревнования")
-                
-        elif index == 5:  # Вкладка Результаты
-            self.competitions_label.setVisible(True)
-            self.list_widget.setVisible(True)
-            self.search_label.setVisible(False)
-            self.search_results_list.setVisible(False)
-            self.filters_widget.setVisible(False)
-            self.competitions_label.setText("📊 Результаты")
-            
-            if self.current_title_id:
-                self.load_results_for_title()
-            else:
-                self.list_widget.clear()
-            # Скрываем секцию создания этапа
-            if hasattr(self, 'stage_section'):
-                self.stage_section.setVisible(False) 
-
-        elif index == 6:  # Вкладка Рейтинг
-            self.competitions_label.setVisible(True)
-            self.list_widget.setVisible(True)
-            self.search_label.setVisible(False)
-            self.search_results_list.setVisible(False)
-            self.filters_widget.setVisible(False)
-            self.competitions_label.setText("⭐ Рейтинг")
-            self.list_widget.clear()
-
-            # Скрываем секцию создания этапа
-            if hasattr(self, 'stage_section'):
-                self.stage_section.setVisible(False) 
-
-        elif index == 7:  # Вкладка Дополнительно
-            self.competitions_label.setVisible(True)
-            self.list_widget.setVisible(True)
-            self.search_label.setVisible(False)
-            self.search_results_list.setVisible(False)
-            self.filters_widget.setVisible(False)
-            self.competitions_label.setText("ℹ️ Дополнительно")
-            self.list_widget.clear()
-            # Скрываем секцию создания этапа
-            if hasattr(self, 'stage_section'):
-                self.stage_section.setVisible(False)
-        # Устанавливаем высоту для текущей вкладки
-        self.set_tab_height(index)
+    def update_finals_menu_after_selection(self):
+        """Обновление меню финалов после выбора соревнования"""
+        # Находим меню "Соревнования" -> "Жеребьевка" -> "Финалы"
+        for action in self.menuBar().actions():
+            if action.text() == "Соревнования":
+                competitions_menu = action.menu()
+                for sub_action in competitions_menu.actions():
+                    if sub_action.text() == "🎲 Жеребьевка":
+                        drawing_menu = sub_action.menu()
+                        for final_sub_action in drawing_menu.actions():
+                            if final_sub_action.text() == "Финалы":
+                                finals_menu = final_sub_action.menu()
+                                self.update_finals_menu(finals_menu)
+                                break
+                        break
+                break
 # ==================================================================
     def on_tab_changed(self, index):
         """Смена вкладки"""
@@ -3519,6 +3428,11 @@ class MainWindow(QMainWindow):
     
     def new_competition(self):
         """Создание нового соревнования с выбором типа и загрузкой рейтингов"""
+        # Сбрасываем параметры системы для нового соревнования
+        if hasattr(self, 'system_tables'):
+            delattr(self, 'system_tables')
+        if hasattr(self, 'match_time'):
+            delattr(self, 'match_time')
         # Сначала спрашиваем тип соревнования
         dialog_type = QDialog(self)
         dialog_type.setWindowTitle("Выбор типа соревнования")
@@ -3631,6 +3545,21 @@ class MainWindow(QMainWindow):
                                 f"📅 Дата рейтинга: {rating_date_str}\n"
                                 f"🏆 Тип соревнования: {self.selected_tournament_type}\n\n"
                                 f"Теперь заполните информацию о соревновании.")
+# ========= просмотр соревнований ============
+    # def view_full_competition(self):
+    #     pass
+
+    # def view_player_listing(self):
+    #     """просмотр списка в PDF"""
+    #     from models import Player
+    #     # if view_sort == "По рейтингу":
+    #     player_list = Player.select().where(Player.title_id == self.current_title_id).order_by(Player.rank.desc())  # сортировка по рейтингу
+    #         # elif view_sort == "По алфавиту": 
+    #         #     player_list_x = Player.select().where(Player.title_id == self.title_current_id).order_by(Player.player) # сортировка по алфавиту
+    #         # elif view_sort == "По месту":
+    #         #     player_list_x = Player.select().where(Player.title_id == title_id()).order_by(Player.mesto)  # сортировка по месту
+    #         # player_list = player_list_x.select().where(Player.player != "x")
+    #     self.list_player_pdf(player_list)
 #===========================
     def create_menu_bar(self):
         """Создание меню"""
@@ -3650,6 +3579,33 @@ class MainWindow(QMainWindow):
         
         competitions_menu.addSeparator()
         
+        # Жеребьевка - подменю
+        drawing_menu = competitions_menu.addMenu("🎲 Жеребьевка")
+        
+        # Квалификация
+        qualification_action = QAction("Квалификация", self)
+        qualification_action.triggered.connect(lambda: self.run_drawing_for_stage("Квалификация"))
+        drawing_menu.addAction(qualification_action)
+        
+        # Полуфиналы - подменю
+        semifinals_menu = drawing_menu.addMenu("Полуфиналы")
+        
+        semifinal_1_action = QAction("1-й полуфинал", self)
+        semifinal_1_action.triggered.connect(lambda: self.run_drawing_for_stage("1-й полуфинал"))
+        semifinals_menu.addAction(semifinal_1_action)
+        
+        semifinal_2_action = QAction("2-й полуфинал", self)
+        semifinal_2_action.triggered.connect(lambda: self.run_drawing_for_stage("2-й полуфинал"))
+        semifinals_menu.addAction(semifinal_2_action)
+        
+        # Финалы - подменю
+        finals_menu = drawing_menu.addMenu("Финалы")
+        
+        # Динамически добавляем финалы
+        self.update_finals_menu(finals_menu)
+        
+        competitions_menu.addSeparator()
+        
         # Система - подменю
         system_menu = competitions_menu.addMenu("⚙️ Система")
         
@@ -3660,16 +3616,6 @@ class MainWindow(QMainWindow):
         edit_system_action = QAction("Редактировать", self)
         edit_system_action.triggered.connect(self.edit_system_settings)
         system_menu.addAction(edit_system_action)
-        
-        competitions_menu.addSeparator()
-        
-        exit_action = QAction("Выход", self)
-        exit_action.triggered.connect(self.close)
-        competitions_menu.addAction(exit_action)
-        # # Редактировать
-        # edit_system_action = QAction("Редактировать", self)
-        # edit_system_action.triggered.connect(self.edit_system_settings)
-        # system_menu.addAction(edit_system_action)
         
         competitions_menu.addSeparator()
         
@@ -3692,10 +3638,40 @@ class MainWindow(QMainWindow):
         
         # Просмотр
         view_menu = menubar.addMenu("Просмотр")
+        # fullscreen_action = QAction("Полный экран", self)
+        # fullscreen_action.triggered.connect(self.toggle_fullscreen)
+        # view_menu.addAction(fullscreen_action)
+    
+        # Список участников
+        participants_list_action = QAction("📋 Список участников (PDF)", self)
+        participants_list_action.triggered.connect(self.export_participants_to_pdf)
+        view_menu.addAction(participants_list_action)
+        
+        # Расписание (если есть система)
+        schedule_action = QAction("📅 Расписание (PDF)", self)
+        schedule_action.triggered.connect(self.export_schedule_to_pdf)
+        view_menu.addAction(schedule_action)
+        
+        view_menu.addSeparator()
+        
         fullscreen_action = QAction("Полный экран", self)
         fullscreen_action.triggered.connect(self.toggle_fullscreen)
         view_menu.addAction(fullscreen_action)
+
+# ======= мой вариант =================
+        # # сепаратор
+        # view_menu.addSeparator()
         
+        # # подменю просмотр полного соревнования
+        # view_full_comp_action = QAction("Полное соревнование", self)
+        # view_full_comp_action.triggered.connect(self.view_full_competition)
+        # view_menu.addAction(view_full_comp_action)
+
+        # # подменю просомтр списка участников
+        # player_listing_action = QAction("Список участников", self)
+        # player_listing_action.triggered.connect(self.view_player_listing)
+        # view_menu.addAction(player_listing_action)
+# ====================================================        
         # Рейтинг
         rating_menu = menubar.addMenu("Рейтинг")
         rating_action = QAction("Показать рейтинг", self)
@@ -6960,6 +6936,14 @@ class MainWindow(QMainWindow):
         if not self.check_players_status():
             return
         
+        # Запрашиваем параметры системы (только один раз)
+        if not hasattr(self, 'system_tables') or not hasattr(self, 'match_time'):
+            tables, match_time = self.get_system_parameters()
+            if tables is None or match_time is None:
+                return  # Пользователь отменил ввод параметров
+            self.system_tables = tables
+            self.match_time = match_time
+        
         # Получаем данные из формы
         stage_name = self.system_stage.currentText().strip()
         if not stage_name:
@@ -7444,121 +7428,11 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось добавить этап: {str(e)}")    
 # ==================================
-    def _update_stages_info(self):
-        """Обновление информационного окна со списком этапов (формат 2 строки)"""
-        try:
-            from models import System, Player, Title
-
-            if not hasattr(self, 'stages_info') or self.stages_info is None:
-                return
-            
-            if not self.current_title_id:
-                self.stages_info.setText("Нет выбранного соревнования")
-                return
-            
-            title = Title.get_or_none(Title.id == self.current_title_id)
-            title_name = title.name if title else "Неизвестное соревнование"
-            
-            systems = System.select().where(System.title_id == self.current_title_id).order_by(System.id)
-            
-            self.stages_info.clear()
-            
-            if systems.count() == 0:
-                self.stages_info.setText(f"🏆 СОРЕВНОВАНИЕ: {title_name}\n\n{'=' * 60}\n\n❌ Нет добавленных этапов")
-                return
-            
-            info_text = f"🏆 СОРЕВНОВАНИЕ: {title_name.upper()}. СИСТЕМА ПРОВЕДЕНИЯ.\n"
-            info_text += "=" * 70 + "\n\n"
-            
-            previous_stage = None
-            current_place = 1
-            total_all_games = 0
-
-            
-            
-            for idx, system in enumerate(systems, 1):
-                total_players = Player.select().where(Player.title_id == self.current_title_id).count()
-                
-                if total_players == 0:
-                    distribution_text = "нет участников"
-                    total_games = 0
-                    stage_display = system.stage
-                    places_display = ""
-                else:
-                    groups_count = system.total_group if system.total_group else 1
-                    
-                    # Для полуфинала
-                    if "полуфинал" in system.stage.lower() and previous_stage and "Квалификация" in previous_stage.stage:
-                        players_in_semifinal = previous_stage.total_group * previous_stage.mesta_exit
-                        players_per_group = previous_stage.mesta_exit * 2
-                        group_sizes = [players_per_group] * groups_count
-                        distribution_text = self.calculate_group_distribution(players_in_semifinal, groups_count)
-                        total_games = self.calculate_semifinal_games_count(groups_count, players_per_group, previous_stage)
-                        stage_display = system.stage
-                        places_display = ""
-                        
-                    # Для финала
-                    elif self.is_final_stage(system.stage):
-                        players_in_final = system.max_player
-                        start_place = current_place
-                        end_place = current_place + players_in_final - 1
-                        
-                        distribution_text = f"{players_in_final} чел."
-                        
-                        # Получаем количество игр из БД или рассчитываем
-                        if system.kol_game_string:
-                            import re
-                            games_match = re.search(r'(\d+)', system.kol_game_string)
-                            total_games = int(games_match.group(1)) if games_match else 0
-                        else:
-                            if "Круговая" in system.type_table:
-                                total_games = (players_in_final * (players_in_final - 1)) // 2
-                            else:
-                                total_games = self.calculate_olympic_games(players_in_final)
-                        
-                        stage_display = system.stage
-                        places_display = f" | места {start_place}-{end_place}"
-                        current_place += players_in_final
-                        
-                    else:
-                        # Для квалификации и других этапов
-                        group_sizes = self.calculate_group_sizes(total_players, groups_count)
-                        distribution_text = self.calculate_group_distribution(total_players, groups_count)
-                        total_games = self.calculate_total_games(
-                            system.type_table, total_players, groups_count, group_sizes,
-                            system.stage, previous_stage
-                        )
-                        stage_display = system.stage
-                        places_display = ""
-                
-                # Подсчитываем общее количество игр
-                total_all_games += total_games
-                
-                # 1-я строка: номер этапа, название, места
-                info_text += f"┌─ 📌 ЭТАП {idx}: {stage_display}{places_display}\n"
-                # 2-я строка: тип таблицы, распределение, количество игр
-                info_text += f"└─ 📊 {system.type_table} | {distribution_text} | {total_games} игр\n"
-                # info_text += "\n"
-                
-                previous_stage = system
-            
-            # Подчеркивание и сумма игр всех этапов
-            # no_choice_player = f"{total_players - distribution_text} НЕ РАСПРЕДЕЛЕННЫХ ИГРОКОВ ПО ФИНАЛАМ."
-            info_text += "─" * 70 + "\n"
-            info_text += f"🏆 ВСЕГО НА СОРЕВНОВАНИИ: {total_all_games} ИГР.\n"
-            
-            self.stages_info.setText(info_text)
-            
-        except Exception as e:
-            print(f"Ошибка обновления информации об этапах: {e}")
-            import traceback
-            traceback.print_exc()
-            self.stages_info.setText(f"Ошибка: {str(e)}")
-
     def update_stages_info(self):
         """Обновление информационного окна со списком этапов (формат 2 строки с выравниванием)"""
         try:
             from models import System, Player, Title
+            import math
             
             if not self.current_title_id:
                 self.stages_info.setText("Нет выбранного соревнования")
@@ -7575,12 +7449,17 @@ class MainWindow(QMainWindow):
                 self.stages_info.setText(f"🏆 СОРЕВНОВАНИЕ: {title_name}\n\n{'=' * 60}\n\n❌ Нет добавленных этапов")
                 return
             
-            info_text = f"🏆 СОРЕВНОВАНИЕ: {title_name.upper()}. СИСТЕМА ПРОВЕДЕНИЯ.\n"
-            info_text += "=" * 70 + "\n\n"
+            # Получаем параметры системы
+            tables = getattr(self, 'system_tables', 4)
+            match_time = getattr(self, 'match_time', 15)
+            
+            info_text = f"🏆 СОРЕВНОВАНИЕ: {title_name.upper()}. СИСТЕМА ПРОВЕДЕНИЯ. | 🏓 Столов: {tables} | ⏱️ Время на матч: {match_time} мин.\n"
+            info_text += "=" * 110 + "\n\n"
             
             previous_stage = None
             current_place = 1
             total_all_games = 0
+            total_time_minutes = 0
             
             # Определяем максимальную ширину для выравнивания
             max_games_width = 0
@@ -7596,7 +7475,6 @@ class MainWindow(QMainWindow):
                     if "полуфинал" in system.stage.lower() and previous_stage and "Квалификация" in previous_stage.stage:
                         players_in_semifinal = previous_stage.total_group * previous_stage.mesta_exit
                         players_per_group = previous_stage.mesta_exit * 2
-                        group_sizes = [players_per_group] * groups_count
                         games = self.calculate_semifinal_games_count(groups_count, players_per_group, previous_stage)
                     elif self.is_final_stage(system.stage):
                         if system.kol_game_string:
@@ -7619,7 +7497,7 @@ class MainWindow(QMainWindow):
             
             # Определяем максимальную ширину для выравнивания
             max_games_width = max([len(str(g)) for g in temp_games_list]) if temp_games_list else 0
-            max_games_width = max(max_games_width, 5)  # Минимум 5 символов
+            max_games_width = max(max_games_width, 30)
             
             # Второй проход: выводим с выравниванием
             previous_stage = None
@@ -7631,6 +7509,7 @@ class MainWindow(QMainWindow):
                     total_games = 0
                     stage_display = system.stage
                     places_display = ""
+                    stage_time = "0 мин"
                 else:
                     groups_count = system.total_group if system.total_group else 1
                     
@@ -7643,6 +7522,26 @@ class MainWindow(QMainWindow):
                         total_games = self.calculate_semifinal_games_count(groups_count, players_per_group, previous_stage)
                         stage_display = system.stage
                         places_display = ""
+                        
+                        # Расчет времени для полуфинала (с учетом туров)
+                        max_tours = self.calculate_max_tours_in_stage(group_sizes)
+                        tables_per_tour = self.calculate_tables_per_tour(group_sizes)
+                        
+                        if max_tours > 0 and tables > 0:
+                            # Если столов меньше, чем нужно на тур, добавляем дополнительные туры
+                            if tables_per_tour > tables:
+                                actual_tours = max_tours * math.ceil(tables_per_tour / tables)
+                            else:
+                                actual_tours = max_tours
+                            total_minutes = actual_tours * match_time
+                            hours = total_minutes // 60
+                            minutes = total_minutes % 60
+                            if hours > 0:
+                                stage_time = f"{hours} ч {minutes} мин"
+                            else:
+                                stage_time = f"{minutes} мин"
+                        else:
+                            stage_time = "0 мин"
                         
                     # Для финала
                     elif self.is_final_stage(system.stage):
@@ -7666,8 +7565,40 @@ class MainWindow(QMainWindow):
                         places_display = f" | места {start_place}-{end_place}"
                         current_place += players_in_final
                         
+                        # Расчет времени для финала
+                        if "Круговая" in system.type_table:
+                            # Для кругового финала используем туры
+                            max_tours = self.calculate_tours_in_group(players_in_final)
+                            tables_per_tour = players_in_final // 2
+                            if max_tours > 0 and tables > 0:
+                                if tables_per_tour > tables:
+                                    actual_tours = max_tours * math.ceil(tables_per_tour / tables)
+                                else:
+                                    actual_tours = max_tours
+                                total_minutes = actual_tours * match_time
+                                hours = total_minutes // 60
+                                minutes = total_minutes % 60
+                                if hours > 0:
+                                    stage_time = f"{hours} ч {minutes} мин"
+                                else:
+                                    stage_time = f"{minutes} мин"
+                            else:
+                                stage_time = "0 мин"
+                        else:
+                            # Для олимпийской системы
+                            if tables > 0:
+                                total_minutes = math.ceil(total_games / tables) * match_time
+                                hours = total_minutes // 60
+                                minutes = total_minutes % 60
+                                if hours > 0:
+                                    stage_time = f"{hours} ч {minutes} мин"
+                                else:
+                                    stage_time = f"{minutes} мин"
+                            else:
+                                stage_time = "0 мин"
+                        
                     else:
-                        # Для квалификации и других этапов
+                        # Для квалификации
                         group_sizes = self.calculate_group_sizes(total_players, groups_count)
                         distribution_text = self.calculate_group_distribution(total_players, groups_count)
                         total_games = self.calculate_total_games(
@@ -7676,24 +7607,60 @@ class MainWindow(QMainWindow):
                         )
                         stage_display = system.stage
                         places_display = ""
+                        
+                        # Расчет времени для квалификации (с учетом туров)
+                        max_tours = self.calculate_max_tours_in_stage(group_sizes)
+                        tables_per_tour = self.calculate_tables_per_tour(group_sizes)
+                        
+                        if max_tours > 0 and tables > 0:
+                            # Если столов меньше, чем нужно на тур, добавляем дополнительные туры
+                            if tables_per_tour > tables:
+                                actual_tours = max_tours * math.ceil(tables_per_tour / tables)
+                            else:
+                                actual_tours = max_tours
+                            total_minutes = actual_tours * match_time
+                            hours = total_minutes // 60
+                            minutes = total_minutes % 60
+                            if hours > 0:
+                                stage_time = f"{hours} ч {minutes} мин"
+                            else:
+                                stage_time = f"{minutes} мин"
+                        else:
+                            stage_time = "0 мин"
                 
                 # Подсчитываем общее количество игр
                 total_all_games += total_games
-                
+
+                # # подсчитываем общее время игр
+                # total_all_time += stage_time
                 # Выравниваем количество игр по правому краю
                 games_str = str(total_games)
                 games_padded = games_str.rjust(max_games_width)
                 
                 # 1-я строка: номер этапа, название, места
                 info_text += f"┌─ 📌 ЭТАП {idx}: {stage_display}{places_display}\n"
-                # 2-я строка: тип таблицы, распределение, количество игр (выровнено)
-                info_text += f"└─ 📊 {system.type_table} | {distribution_text} | {games_padded} игр\n"
+                # 2-я строка: тип таблицы, распределение, количество игр, время
+                info_text += f"└─ 📊 {system.type_table} | {distribution_text} | {games_padded} игр | ⏱️ {stage_time}\n"
+                
+                # # Добавляем информацию о турах для групповых этапов
+                # if "Круговая" in system.type_table and not self.is_final_stage(system.stage):
+                #     if 'group_sizes' in locals():
+                #         info_text += f"      🎯 Туров: {max_tours} | Столов в туре: {tables_per_tour}\n"
                 
                 previous_stage = system
             
+            # Подсчет общего времени
+
+            total_hours = total_time_minutes // 60
+            total_minutes = total_time_minutes % 60
+            if total_hours > 0:
+                total_time_str = f"{total_hours} ч {total_minutes} мин"
+            else:
+                total_time_str = f"{total_minutes} мин"
+            
             # Подчеркивание и сумма игр всех этапов
             info_text += "─" * 70 + "\n"
-            info_text += f"🏆 ВСЕГО НА СОРЕВНОВАНИИ: {total_all_games} ИГР.\n"
+            info_text += f"🏆 ВСЕГО НА СОРЕВНОВАНИИ: {total_all_games} ИГР | ⏱️ ОБЩЕЕ ВРЕМЯ: {total_time_str}\n"
             
             self.stages_info.setText(info_text)
             
@@ -8167,7 +8134,7 @@ class MainWindow(QMainWindow):
                                     f"(Из {last_stage.total_group} групп выходит по {last_stage.mesta_exit} чел.)")
  # ==================================                             
     def perform_drawing(self):
-        """Проведение жеребьевки квалификации"""
+        """Проведение жеребьевки квалификации с выбором типа"""
         # Проверяем, есть ли этапы для жеребьевки
         stages = System.select().where(System.title_id == self.current_title_id)
         qualification = None
@@ -8180,32 +8147,19 @@ class MainWindow(QMainWindow):
         if not qualification:
             QMessageBox.warning(self, "Ошибка", "Нет этапа квалификации для жеребьевки")
             return
+
+        # Выбор типа жеребьевки
+        drawing_type = self.get_drawing_type()
+        if drawing_type is None:
+            return  # Пользователь отменил
         
-        # Проверяем, все ли игроки распределены по финалам
-        total_players = Player.select().where(Player.title_id == self.current_title_id).count()
-        seeded_players = 0
-        for s in stages:
-            if self.is_final_stage(s.stage):
-                seeded_players += s.max_player
-        
-        if seeded_players < total_players:
-            reply = QMessageBox.question(self, "Внимание", 
-                                        f"Не все игроки распределены по финалам!\n"
-                                        f"Распределено: {seeded_players} из {total_players}\n\n"
-                                        f"Все равно провести жеребьевку?",
-                                        QMessageBox.Yes | QMessageBox.No)
-            if reply == QMessageBox.No:
-                return
-        
-        # Заполняем таблицу Choice
-        self.fill_choice_table()
-        
-        QMessageBox.information(self, "Жеребьевка", 
-                            f"Проведение жеребьевки для этапа: {qualification.stage}\n"
-                            f"Количество групп: {qualification.total_group}\n"
-                            f"Участников в группе: {qualification.max_player}\n\n"
-                            f"Таблица Choice успешно заполнена!")
-    
+        if drawing_type == "auto":
+            self.auto_drawing(qualification)
+        else:
+            self.hide()
+            self.manual_drawing_for_stage(stage)
+            self.show()
+
     def calculate_semifinal_games(self, groups_count, players_per_group, exit_count):
         """
         Расчет количества игр в полуфинале с учетом уже сыгранных встреч
@@ -9015,6 +8969,1204 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось заполнить Choice: {str(e)}")
 
+    def calculate_stage_time(self, total_games, tables, match_time):
+        """Расчет времени этапа в минутах"""
+        if total_games == 0 or tables == 0:
+            return 0
+        import math
+        return math.ceil(total_games / tables) * match_time
+
+    def format_time(self, minutes):
+        """Форматирование времени в часы и минуты"""
+        if minutes < 60:
+            return f"{minutes} мин"
+        else:
+            hours = minutes // 60
+            mins = minutes % 60
+            if mins == 0:
+                return f"{hours} ч"
+            else:
+                return f"{hours} ч {mins} мин"
+
+    def get_system_parameters(self):
+        """Запрос параметров системы (количество столов, время на матч)"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Параметры системы")
+        dialog.setModal(True)
+        dialog.setMinimumWidth(400)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # Заголовок
+        title_label = QLabel("Настройка параметров проведения соревнования")
+        title_label.setStyleSheet("font-weight: bold; font-size: 13px; margin-bottom: 10px;")
+        layout.addWidget(title_label)
+        
+        # Количество столов
+        tables_layout = QHBoxLayout()
+        tables_layout.addWidget(QLabel("Количество столов:"))
+        tables_spin = QSpinBox()
+        tables_spin.setMinimum(1)
+        tables_spin.setMaximum(50)
+        tables_spin.setValue(4)
+        tables_spin.setMinimumWidth(100)
+        tables_layout.addWidget(tables_spin)
+        tables_layout.addStretch()
+        layout.addLayout(tables_layout)
+        
+        # Время на матч
+        time_layout = QHBoxLayout()
+        time_layout.addWidget(QLabel("Время на один матч (минут):"))
+        time_spin = QSpinBox()
+        time_spin.setMinimum(1)
+        time_spin.setMaximum(180)
+        time_spin.setValue(15)
+        time_spin.setMinimumWidth(100)
+        time_layout.addWidget(time_spin)
+        time_layout.addWidget(QLabel("мин."))
+        time_layout.addStretch()
+        layout.addLayout(time_layout)
+        
+        # Дополнительная информация
+        info_label = QLabel("Время будет рассчитано автоматически для каждого этапа")
+        info_label.setStyleSheet("color: gray; font-size: 10px; margin-top: 10px;")
+        layout.addWidget(info_label)
+        
+        layout.addSpacing(10)
+        
+        # Кнопки
+        btn_layout = QHBoxLayout()
+        ok_btn = QPushButton("OK")
+        ok_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 5px;")
+        ok_btn.clicked.connect(dialog.accept)
+        cancel_btn = QPushButton("Отмена")
+        cancel_btn.setStyleSheet("background-color: #f44336; color: white; padding: 5px;")
+        cancel_btn.clicked.connect(dialog.reject)
+        btn_layout.addWidget(ok_btn)
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+        
+        result = dialog.exec_()
+        
+        if result == QDialog.Accepted:
+            return tables_spin.value(), time_spin.value()
+        else:
+            return None, None
+
+    def change_system_parameters(self):
+        """Изменение параметров системы (столы, время)"""
+        # Сохраняем текущие значения для восстановления при отмене
+        old_tables = getattr(self, 'system_tables', 4)
+        old_time = getattr(self, 'match_time', 15)
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Параметры системы")
+        dialog.setModal(True)
+        dialog.setMinimumWidth(400)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # Заголовок
+        title_label = QLabel("Настройка параметров проведения соревнования")
+        title_label.setStyleSheet("font-weight: bold; font-size: 13px; margin-bottom: 10px;")
+        layout.addWidget(title_label)
+        
+        # Количество столов
+        tables_layout = QHBoxLayout()
+        tables_layout.addWidget(QLabel("Количество столов:"))
+        tables_spin = QSpinBox()
+        tables_spin.setMinimum(1)
+        tables_spin.setMaximum(50)
+        tables_spin.setValue(old_tables)
+        tables_spin.setMinimumWidth(100)
+        tables_layout.addWidget(tables_spin)
+        tables_layout.addStretch()
+        layout.addLayout(tables_layout)
+        
+        # Время на матч
+        time_layout = QHBoxLayout()
+        time_layout.addWidget(QLabel("Время на один матч (минут):"))
+        time_spin = QSpinBox()
+        time_spin.setMinimum(1)
+        time_spin.setMaximum(180)
+        time_spin.setValue(old_time)
+        time_spin.setMinimumWidth(100)
+        time_layout.addWidget(time_spin)
+        time_layout.addWidget(QLabel("мин."))
+        time_layout.addStretch()
+        layout.addLayout(time_layout)
+        
+        # Дополнительная информация
+        info_label = QLabel("Время будет рассчитано автоматически для каждого этапа")
+        info_label.setStyleSheet("color: gray; font-size: 10px; margin-top: 10px;")
+        layout.addWidget(info_label)
+        
+        layout.addSpacing(10)
+        
+        # Кнопки
+        btn_layout = QHBoxLayout()
+        ok_btn = QPushButton("OK")
+        ok_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 5px;")
+        ok_btn.clicked.connect(dialog.accept)
+        cancel_btn = QPushButton("Отмена")
+        cancel_btn.setStyleSheet("background-color: #f44336; color: white; padding: 5px;")
+        cancel_btn.clicked.connect(dialog.reject)
+        btn_layout.addWidget(ok_btn)
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+        
+        if dialog.exec_() == QDialog.Accepted:
+            self.system_tables = tables_spin.value()
+            self.match_time = time_spin.value()
+            # Обновляем информацию в окне
+            self.update_stages_info()
+            QMessageBox.information(self, "Успех", 
+                                f"Параметры обновлены:\n"
+                                f"🏓 Столов: {self.system_tables}\n"
+                                f"⏱️ Время на матч: {self.match_time} мин.")
+        
+    def calculate_tables_per_tour(self, group_sizes):
+        """Расчет количества столов, необходимых для одного тура"""
+        total_tables = 0
+        for size in group_sizes:
+            if size >= 2:
+                # В группе с n игроками в туре играет n // 2 пар
+                total_tables += size // 2
+        return total_tables
+
+    def calculate_max_tours_in_stage(self, group_sizes):
+        """Расчет максимального количества туров в этапе (по самой большой группе)"""
+        if not group_sizes:
+            return 0
+        max_players = max(group_sizes)
+        return self.calculate_tours_in_group(max_players)
+
+    def calculate_tours_in_group(self, players_count):
+        """Расчет количества туров в группе в зависимости от количества игроков"""
+        if players_count <= 1:
+            return 0
+        elif players_count == 2:
+            return 1
+        elif players_count == 3:
+            return 3  # 3 тура: 1-3, 1-2, 2-3
+        elif players_count == 4:
+            return 3  # 3 тура: (1-3,2-4), (1-4,2-3), (1-2,3-4)
+        elif players_count == 5:
+            return 5
+        elif players_count == 6:
+            return 5
+        elif players_count == 7:
+            return 7
+        elif players_count == 8:
+            return 7
+        else:
+            # Для большего количества игроков: количество туров = players_count - 1 (для нечетного)
+            # или players_count - 1 (для четного)
+            return players_count - 1 if players_count % 2 == 0 else players_count
+
+    def get_drawing_type(self):
+        """Запрос типа жеребьевки (ручная или автоматическая)"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Выбор типа жеребьевки")
+        dialog.setModal(True)
+        dialog.setFixedSize(400, 200)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # Заголовок
+        title_label = QLabel("Выберите способ проведения жеребьевки")
+        title_label.setStyleSheet("font-weight: bold; font-size: 13px; margin-bottom: 10px;")
+        layout.addWidget(title_label)
+        
+        layout.addSpacing(10)
+        
+        # Кнопки выбора
+        auto_btn = QPushButton("🎲 Автоматическая жеребьевка")
+        auto_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                padding: 12px;
+                font-size: 12px;
+                font-weight: bold;
+                border-radius: 5px;
+                margin: 5px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        
+        manual_btn = QPushButton("✏️ Ручная жеребьевка")
+        manual_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                padding: 12px;
+                font-size: 12px;
+                font-weight: bold;
+                border-radius: 5px;
+                margin: 5px;
+            }
+            QPushButton:hover {
+                background-color: #1976D2;
+            }
+        """)
+        
+        auto_btn.clicked.connect(lambda: self.set_drawing_type_and_accept(dialog, "auto"))
+        manual_btn.clicked.connect(lambda: self.set_drawing_type_and_accept(dialog, "manual"))
+        
+        layout.addWidget(auto_btn)
+        layout.addWidget(manual_btn)
+        
+        # Сохраняем результат
+        self.drawing_type = None
+        
+        if dialog.exec_() == QDialog.Accepted:
+            return self.drawing_type
+        return None
+
+    def set_drawing_type_and_accept(self, dialog, drawing_type):
+        """Установка типа жеребьевки и закрытие диалога"""
+        self.drawing_type = drawing_type
+        dialog.accept()
+
+    def update_finals_menu(self, finals_menu):
+        """Обновление меню финалов (динамически)"""
+        # Очищаем меню
+        finals_menu.clear()
+        
+        if not self.current_title_id:
+            # Если нет выбранного соревнования, добавляем заглушку
+            no_finals_action = QAction("Нет доступных финалов", self)
+            no_finals_action.setEnabled(False)
+            finals_menu.addAction(no_finals_action)
+            return
+        
+        # Получаем все финалы для текущего соревнования
+        finals = System.select().where(
+            (System.title_id == self.current_title_id) &
+            (System.stage.contains("финал")) &
+            (~System.stage.contains("полуфинал"))
+        ).order_by(System.id)
+        
+        if finals.count() == 0:
+            no_finals_action = QAction("Нет доступных финалов", self)
+            no_finals_action.setEnabled(False)
+            finals_menu.addAction(no_finals_action)
+        else:
+            for final in finals:
+                final_action = QAction(final.stage, self)
+                final_action.triggered.connect(lambda checked, f=final: self.run_drawing_for_final(f))
+                finals_menu.addAction(final_action)
+
+    def run_drawing_for_stage(self, stage_name):
+        """Запуск жеребьевки для указанного этапа"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+        
+        # Находим этап в системе
+        stage = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == stage_name)
+        )
+        
+        if not stage:
+            QMessageBox.warning(self, "Ошибка", f"Этап '{stage_name}' не найден в системе")
+            return
+        
+        # Проверяем, есть ли уже жеребьевка для этого этапа
+        if stage.choice_flag == 1:
+            reply = QMessageBox.question(self, "Подтверждение", 
+                                        f"Для этапа '{stage_name}' уже проведена жеребьевка.\n"
+                                        f"Провести заново?",
+                                        QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.No:
+                return
+        
+        # Запускаем жеребьевку
+        self.drawing_for_stage(stage)
+
+    def run_drawing_for_final(self, final):
+        """Запуск жеребьевки для финала"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+        
+        # Проверяем, есть ли уже жеребьевка для этого финала
+        if final.choice_flag == 1:
+            reply = QMessageBox.question(self, "Подтверждение", 
+                                        f"Для этапа '{final.stage}' уже проведена жеребьевка.\n"
+                                        f"Провести заново?",
+                                        QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.No:
+                return
+        
+        # Запускаем жеребьевку для финала
+        self.drawing_for_stage(final)
+
+    def drawing_for_stage(self, stage):
+        """Проведение жеребьевки для конкретного этапа"""
+        # Выбор типа жеребьевки
+        drawing_type = self.get_drawing_type()
+        if drawing_type is None:
+            return
+        
+        if drawing_type == "auto":
+            self.auto_drawing_for_stage(stage)
+        else:
+            self.manual_drawing_for_stage(stage)
+
+    def auto_drawing_for_stage(self, stage):
+        """Автоматическая жеребьевка для указанного этапа"""
+        try:
+            # Удаляем существующие записи Choice для этого этапа, если нужно
+            if stage.choice_flag == 1:
+                # Обновляем статус
+                pass
+            
+            # Заполняем таблицу Choice для этого этапа
+            self.fill_choice_table_for_stage(stage)
+            
+            # Обновляем статус системы
+            stage.choice_flag = 1
+            stage.save()
+            
+            QMessageBox.information(self, "Автоматическая жеребьевка", 
+                                f"✅ Жеребьевка для этапа '{stage.stage}' успешно проведена!\n\n"
+                                f"📊 Параметры жеребьевки:\n"
+                                f"   • Количество групп: {stage.total_group}\n"
+                                f"   • Участников в группе: {stage.max_player}\n\n"
+                                f"Таблица Choice обновлена.")
+            
+            # Обновляем отображение информации
+            self.update_stages_info()
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Ошибка при автоматической жеребьевке: {str(e)}")
+
+    def manual_drawing_for_stage(self, stage):
+        """Ручная жеребьевка для указанного этапа"""
+        from models import Player, Coach
+        athletes = []
+
+        # Создаем диалог для ручной жеребьевки
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"Ручная жеребьевка - {stage.stage}")
+        dialog.setModal(True)
+        dialog.setMinimumWidth(800)
+        dialog.setMinimumHeight(600)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # Заголовок
+        title_label = QLabel(f"Ручная жеребьевка - {stage.stage}")
+        title_label.setStyleSheet("font-weight: bold; font-size: 14px; margin-bottom: 10px;")
+        layout.addWidget(title_label)
+        
+        # Информация о группах
+        info_label = QLabel(f"Количество групп: {stage.total_group} | "
+                        f"Участников в группе: {stage.max_player}")
+        info_label.setStyleSheet("color: gray; margin-bottom: 10px;")
+        layout.addWidget(info_label)
+        
+        # =======================
+        # Получаем список игроков
+        players = Player.select().where(Player.title_id == self.current_title_id).order_by(Player.rank.desc())
+        players_list = list(players)
+        for pl in players_list:
+            id = pl.id
+            player = pl.fio
+            rank = pl.rank
+            region = pl.region
+            coaches = Coach.get(Coach.id == pl.coach_id)
+            coach = coaches.coach
+            gamer = [id, player, rank, region, coach]
+            athletes.append(gamer)
+        
+        num_groups = stage.total_group
+        id_title = self.current_title_id
+        #========================
+        num_id_player = manual_choice.choice_group_manual(self, athletes, num_groups, id_title, parent=None)
+
+        self.save_manual_drawing_for_stage(num_id_player, stage)
+
+    def fill_choice_table_for_stage(self, stage):
+        """Заполнение таблицы Choice для конкретного этапа"""
+        try:
+            # Удаляем существующие записи Choice для этого соревнования (если нужно заново)
+            Choice.delete().where(Choice.title_id == self.current_title_id).execute()
+            
+            # Получаем всех игроков соревнования
+            players = Player.select().where(Player.title_id == self.current_title_id)
+            
+            # Распределяем игроков змейкой
+            total_players = players.count()
+            groups = stage.total_group
+            
+            # Сортируем игроков по рейтингу
+            players_sorted = players.order_by(Player.rank.desc())
+            players_list = list(players_sorted)
+            
+            # Распределение змейкой
+            assignments = []
+            for i in range(total_players):
+                group_num = i % groups
+                if (i // groups) % 2 == 1:
+                    group_num = groups - 1 - group_num
+                assignments.append(group_num + 1)
+            
+            # Создаем записи в Choice
+            for i, player in enumerate(players_list):
+                group_num = assignments[i]
+                
+                # Получаем тренера
+                coach_name = ""
+                if player.coach_id:
+                    coach = Coach.get_or_none(Coach.id == player.coach_id)
+                    if coach:
+                        coach_name = coach.coach
+                
+                Choice.create(
+                    player_choice=player.id,
+                    family=player.fio or player.player,
+                    region=player.region or "",
+                    coach=coach_name,
+                    rank=player.rank or 0,
+                    basic="основная",
+                    group=f"Группа {group_num}",
+                    posev_group=i + 1,
+                    mesto_group=0,
+                    title_id=self.current_title_id,
+                    sex=player.sex
+                )
+            
+        except Exception as e:
+            raise Exception(f"Ошибка заполнения Choice: {str(e)}")
+
+    def auto_assign_players_for_stage(self, table, players_list, stage):
+        """Автоматическое распределение игроков для указанного этапа"""
+        total_players = len(players_list)
+        groups = stage.total_group
+        
+        # Распределение змейкой
+        assignments = []
+        for i in range(total_players):
+            group_num = i % groups
+            if (i // groups) % 2 == 1:
+                group_num = groups - 1 - group_num
+            assignments.append(group_num + 1)
+        
+        # Обновляем comboBox
+        for row, group_num in enumerate(assignments):
+            combo = table.cellWidget(row, 1)
+            combo.setCurrentIndex(group_num)
+
+    def save_manual_drawing_for_stage(self, num_id_player, stage):
+        """Сохранение ручной жеребьевки для указанного этапа"""
+        systems = System.select().where((System.title_id == self.current_title_id) and (System.stage == stage.stage)).get()
+        try:
+                   
+            for pl in num_id_player:
+                id = pl['id_player']
+                group = f"{pl['group']} группа"
+                posev = pl['seed_num']
+                Choice.update(group=group, posev_group=posev).where(Choice.player_choice_id == id).execute()
+
+            # Обновляем статус системы
+            systems.choice_flag = 1
+            systems.save()
+            
+            QMessageBox.information(self, "Успех", f"Жеребьевка для этапа '{stage.stage}' сохранена!")
+            self.update_stages_info()
+
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Ошибка при сохранении: {str(e)}")
+# ========= Создание PDF файлов ===========
+
+# ========== AI вариант PDF ============        
+    def export_participants_to_pdf(self):
+        """Экспорт списка участников в PDF с выбором сортировки"""
+        from reportlab.platypus import Table
+        from reportlab.platypus import Paragraph
+
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+        
+        # Выбор типа сортировки
+        sorting_type = self.get_sorting_type()
+        if sorting_type is None:
+            return  # Пользователь отменил
+        
+        try:
+            # Получаем данные о соревновании
+            title = Title.get(Title.id == self.current_title_id)
+            
+            # Создаем папку table_pdf, если её нет
+            pdf_dir = "table_pdf"
+            if not os.path.exists(pdf_dir):
+                os.makedirs(pdf_dir)
+            
+            # Используем короткое имя из Title
+            short_name = title.short_name_comp if title.short_name_comp else title.name
+            if not short_name:
+                short_name = "competition"
+            import re
+            clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
+            clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
+            
+            # Сортируем список участников в зависимости от выбора
+            if sorting_type == "alpha":
+                # Сортировка по алфавиту
+                player_list = Player.select().where(Player.title_id == self.current_title_id).order_by(Player.player.asc())
+                file_suffix = "alf"
+            else:
+                # Сортировка по рейтингу
+                player_list = Player.select().where(Player.title_id == self.current_title_id).order_by(Player.rank.desc())
+                file_suffix = "rating"
+            
+            # Путь к файлу
+            file_path = os.path.join(pdf_dir, f"{clean_name}_player_list_{file_suffix}.pdf")
+            
+            if player_list.count() == 0:
+                QMessageBox.warning(self, "Ошибка", "Нет участников для экспорта")
+                return
+            
+            # Получаем параметры
+            gamer = title.gamer if title.gamer else "Участники"
+            otc = title.otchestvo if title.otchestvo else 0
+            
+            # Подготовка данных для таблицы
+            elements = []
+            n = 0
+            
+            for player in player_list:
+                n += 1
+                # Формируем ФИО с отчеством или без
+                if otc == 1:
+                    patronymic_text = ""
+                    if player.patronymic_id:
+                        try:
+                            patronymic = Patronymic.get(Patronymic.id == player.patronymic_id)
+                            patronymic_text = patronymic.patronymic
+                        except:
+                            pass
+                    full_name = f"{player.player} {patronymic_text}".strip()
+                else:
+                    full_name = player.player
+                
+                # Форматируем дату
+                birth_date = player.bday.strftime("%d.%m.%Y") if player.bday else "---"
+                
+                # Получаем тренера
+                coach_text = ""
+                if player.coach_id:
+                    try:
+                        coach = Coach.get(Coach.id == player.coach_id)
+                        coach_text = coach.coach
+                    except:
+                        pass
+# ==================================================                
+                # Подготовка стилей перенос длинной строки
+                styles = getSampleStyleSheet()
+                custom_style = styles['Normal'].fontName = 'DejaVuSerif'
+                custom_style = styles['Normal'].fontSize = 6
+                custom_style = styles["Normal"].clone("CustomStyle")
+                custom_style.wordWrap = 'LTR' # Перенос слов (LTR - Left-To-Right)
+                custom_style.leading = 6 # Межстрочный интервал
+                
+                data_row = [
+                    str(n),
+                    Paragraph(full_name, custom_style),
+                    birth_date,
+                    str(player.rank) if player.rank else "0",
+                    player.city or "",
+                    Paragraph(player.region or "", custom_style),
+                    player.razryad or "",
+                    Paragraph(coach_text, custom_style),
+                ]
+                elements.append(data_row)
+            
+            # Добавляем заголовок таблицы
+            headers = ["№", "ФИО", "Дата рожд.", "R", "Город", "Субъект РФ", "Разряд", "Тренер(ы)"]
+            elements.insert(0, headers)
+            
+            # Создаем таблицу
+            table = Table(elements, repeatRows=1)
+            
+            # Настраиваем ширину колонок
+            col_widths = [0.8*cm, 5.0*cm, 1.6*cm, 0.8*cm, 2.5*cm, 3.2*cm, 1.1*cm, 4.0*cm]
+            table._argW = col_widths
+            
+            # Стиль таблицы
+            table_style = TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSerif'),
+                ('FONTSIZE', (0, 0), (-1, -1), 7),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+                ('TOPPADDING', (0, 0), (-1, -1), 2),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('BACKGROUND', (0, 0), (8, 0), colors.yellow),
+                ('TEXTCOLOR', (0, 0), (8, 0), colors.darkblue),
+                ('LINEABOVE', (0, 0), (-1, -1), 0.5, colors.blue),
+                ('INNERGRID', (0, 0), (-1, -1), 0.2, colors.grey),
+                ('BOX', (0, 0), (-1, -1), 0.5, colors.black),
+            ])
+            
+            table.setStyle(table_style)
+# ==========================================            
+            # Создаем PDF документ
+            doc = SimpleDocTemplate(file_path, pagesize=A4,
+                                    topMargin=15*mm, bottomMargin=10*mm,
+                                    leftMargin=5*mm, rightMargin=5*mm)
+           
+            # =========стиль заголовка ===========
+            story = []
+            h3 = PS("normal", fontSize=12, fontName="DejaVuSerif-Italic", leftIndent=180,
+            firstLineIndent = 10, textColor="green")  # стиль параграфа
+            h3.spaceAfter = 10  # промежуток после заголовка
+            story.append(Paragraph(f'Список участников. {gamer}', h3))
+            story.append(table)
+            
+            # Добавляем информацию о сортировке в заголовок
+            sort_text = "по алфавиту" if sorting_type == "alpha" else "по рейтингу"
+            
+            # story = []
+            # story.append(Paragraph(f'Список участников. {gamer} (сортировка: {sort_text})', title_style))
+            # story.append(Spacer(1, 10*mm))
+            # story.append(table)
+            
+            # Строим документ с использованием функции заголовка
+            doc.build(story, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
+            
+            QMessageBox.information(self, "Успех", 
+                                f"Список участников успешно сохранен в PDF:\n{file_path}\n"
+                                f"Сортировка: {sort_text}")
+            
+            # Предлагаем открыть файл
+            reply = QMessageBox.question(self, "Открыть файл", 
+                                        "Открыть созданный PDF файл?",
+                                        QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                if sys.platform == 'win32':
+                    os.startfile(file_path)
+                else:
+                    os.system(f'open "{file_path}"')
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")
+# ===============================================
+    def _export_participants_to_pdf(self):
+        """Экспорт списка участников в PDF с использованием reportlab"""
+        from reportlab.platypus import Table
+        from reportlab.platypus import Paragraph
+
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+        
+        try:
+            # Получаем данные о соревновании
+            title = Title.get(Title.id == self.current_title_id)
+            
+            # Создаем папку table_pdf, если её нет
+            pdf_dir = "table_pdf"
+            if not os.path.exists(pdf_dir):
+                os.makedirs(pdf_dir)
+            
+            # Используем короткое имя из Title
+            short_name = title.short_name_comp if title.short_name_comp else title.name
+            if not short_name:
+                short_name = "competition"
+            import re
+            clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
+            clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
+            
+            # Путь к файлу
+            file_path = os.path.join(pdf_dir, f"{clean_name}_player_list.pdf")
+            
+            # Получаем параметры
+            gamer = title.gamer if title.gamer else "Участники"
+            otc = title.otchestvo if title.otchestvo else 0
+            
+            # Получаем список участников
+            player_list = Player.select().where(Player.title_id == self.current_title_id).order_by(Player.player)
+            
+            if player_list.count() == 0:
+                QMessageBox.warning(self, "Ошибка", "Нет участников для экспорта")
+                return
+            
+            # Подготовка данных для таблицы
+            elements = []
+            n = 0
+            
+            for player in player_list:
+                n += 1
+                # Формируем ФИО с отчеством или без
+                if otc == 1:
+                    patronymic_text = ""
+                    if player.patronymic_id:
+                        try:
+                            patronymic = Patronymic.get(Patronymic.id == player.patronymic_id)
+                            patronymic_text = patronymic.patronymic
+                        except:
+                            pass
+                    full_name = f"{player.player} {patronymic_text}".strip()
+                else:
+                    full_name = player.player
+                
+                # Форматируем дату
+                birth_date = player.bday.strftime("%d.%m.%Y") if player.bday else "---"
+                
+                # Получаем тренера
+                coach_text = ""
+                if player.coach_id:
+                    try:
+                        coach = Coach.get(Coach.id == player.coach_id)
+                        coach_text = coach.coach
+                    except:
+                        pass
+                
+                # Создаем ячейки с переносом текста
+                from reportlab.platypus import Paragraph
+                # from reportlab.lib.styles import ParagraphStyle
+                
+                 # Подготовка стилей перенос длинной строки
+                styles = getSampleStyleSheet()
+                custom_style = styles['Normal'].fontName = 'DejaVuSerif'
+                custom_style = styles['Normal'].fontSize = 6
+                custom_style = styles["Normal"].clone("CustomStyle")
+                custom_style.wordWrap = 'LTR' # Перенос слов (LTR - Left-To-Right)
+                custom_style.leading = 6 # Межстрочный интервал
+                
+                data_row = [
+                    str(n),
+                    Paragraph(full_name, custom_style),
+                    birth_date,
+                    str(player.rank) if player.rank else "0",
+                    player.city or "",
+                    Paragraph(player.region or "", custom_style),
+                    player.razryad or "",
+                    Paragraph(coach_text, custom_style),
+                    # str(player.mesto) if player.mesto else ""
+                ]
+                elements.append(data_row)
+            
+            # Добавляем заголовок таблицы
+            headers = ["№", "ФИО", "Дата рожд.", "R", "Город", "Субъект РФ", "Разряд", "Тренер(ы)"]
+            elements.insert(0, headers)
+            
+            # Создаем таблицу
+            table = Table(elements, repeatRows=1)
+            
+            # Настраиваем ширину колонок
+            col_widths = [0.8*cm, 5.0*cm, 1.6*cm, 0.8*cm, 2.5*cm, 3.2*cm, 1.1*cm, 4.0*cm]
+            table._argW = col_widths
+            
+            # Стиль таблицы
+            table_style = TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSerif'),
+                ('FONTSIZE', (0, 0), (-1, -1), 7),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+                ('TOPPADDING', (0, 0), (-1, -1), 2),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('BACKGROUND', (0, 0), (8, 0), colors.yellow),
+                ('TEXTCOLOR', (0, 0), (8, 0), colors.darkblue),
+                ('LINEABOVE', (0, 0), (-1, -1), 0.5, colors.blue),
+                ('INNERGRID', (0, 0), (-1, -1), 0.2, colors.grey),
+                ('BOX', (0, 0), (-1, -1), 0.5, colors.black),
+            ])
+            
+            table.setStyle(table_style)
+            
+            # Создаем PDF документ
+            doc = SimpleDocTemplate(file_path, pagesize=A4,
+                                    topMargin=15*mm, bottomMargin=10*mm,
+                                    leftMargin=5*mm, rightMargin=5*mm)
+           
+            # =========стиль заголовка ===========
+            story = []
+            h3 = PS("normal", fontSize=12, fontName="DejaVuSerif-Italic", leftIndent=180,
+            firstLineIndent = 10, textColor="green")  # стиль параграфа
+            h3.spaceAfter = 10  # промежуток после заголовка
+            story.append(Paragraph(f'Список участников. {gamer}', h3))
+            story.append(table)
+                        
+            # Строим документ с использованием функции заголовка
+            doc.build(story, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
+            
+            QMessageBox.information(self, "Успех", 
+                                f"Список участников успешно сохранен в PDF:\n{file_path}")
+            
+            # Предлагаем открыть файл
+            reply = QMessageBox.question(self, "Открыть файл", 
+                                        "Открыть созданный PDF файл?",
+                                        QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                if sys.platform == 'win32':
+                    os.startfile(file_path)
+                else:
+                    os.system(f'open "{file_path}"')
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")
+
+    def get_sorting_type(self):
+        """Запрос типа сортировки для списка участников"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Сортировка списка участников")
+        dialog.setModal(True)
+        dialog.setFixedSize(400, 200)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # Заголовок
+        title_label = QLabel("Выберите способ сортировки списка участников")
+        title_label.setStyleSheet("font-weight: bold; font-size: 13px; margin-bottom: 10px;")
+        layout.addWidget(title_label)
+        
+        layout.addSpacing(10)
+        
+        # Кнопки выбора
+        alpha_btn = QPushButton("🔤 По алфавиту (А-Я)")
+        alpha_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                padding: 12px;
+                font-size: 12px;
+                font-weight: bold;
+                border-radius: 5px;
+                margin: 5px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        
+        rating_btn = QPushButton("📊 По рейтингу (по убыванию)")
+        rating_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                padding: 12px;
+                font-size: 12px;
+                font-weight: bold;
+                border-radius: 5px;
+                margin: 5px;
+            }
+            QPushButton:hover {
+                background-color: #1976D2;
+            }
+        """)
+        
+        self.sorting_type = None
+        
+        def set_alpha():
+            self.sorting_type = "alpha"
+            dialog.accept()
+        
+        def set_rating():
+            self.sorting_type = "rating"
+            dialog.accept()
+        
+        alpha_btn.clicked.connect(set_alpha)
+        rating_btn.clicked.connect(set_rating)
+        
+        layout.addWidget(alpha_btn)
+        layout.addWidget(rating_btn)
+        
+        if dialog.exec_() == QDialog.Accepted:
+            return self.sorting_type
+        return None
+# =============================================
+    def func_zagolovok(self, canvas, doc):
+        """создание заголовка страниц для PDF"""
+        pagesizeW = doc.width
+        pagesizeH = doc.height
+        
+        # Определяем ориентацию страницы
+        if pagesizeH > pagesizeW:
+            pv = A4
+        else:
+            pv = landscape(A4)
+        (width, height) = pv
+        
+        # Получаем данные о соревновании
+        if not hasattr(self, 'current_title_id') or not self.current_title_id:
+            return
+        
+        try:
+            title = Title.get(Title.id == self.current_title_id)
+            
+            nz = title.name if title.name else ""
+            ind = title.perenos if hasattr(title, 'perenos') else 0
+            ms = title.mesto if title.mesto else ""
+            sr = f"среди {title.sredi} {title.vozrast}" if title.sredi else ""
+            
+            # Формируем дату
+            data_comp = ""
+            if title.data_start:
+                data_comp = title.data_start.strftime("%d.%m.%Y")
+                if title.data_end and title.data_end != title.data_start:
+                    data_comp += f" - {title.data_end.strftime('%d.%m.%Y')}"
+            
+            # Определяем текущую вкладку
+            current_button = "0"
+            if hasattr(self, 'tab_widget'):
+                tb = self.tab_widget.currentIndex()
+                # if tb == 7:  # Вкладка дополнительно
+                #     from PyQt5.QtWidgets import QRadioButton
+                #     for i in self.findChildren(QRadioButton):
+                #         if i.isChecked():
+                #             current_button = i.text()
+                #             break
+            
+            canvas.saveState()
+            
+            # Устанавливаем шрифт (если DejaVu недоступен, используем Helvetica)
+            try:
+                canvas.setFont("DejaVuSerif-Italic", 11)
+            except:
+                canvas.setFont("Helvetica", 11)
+            
+            canvas.setFillColor(black)
+
+            # Центральный текст титула
+            if ind > 0 and pv == A4:
+                nz_list = nz.split()
+                if len(nz_list) > ind:
+                    word = nz_list[ind]
+                    s1 = nz.find(word) + len(word)
+                    strline1 = nz[:s1]
+                    strline2 = nz[s1 + 1:]
+                    canvas.drawCentredString(width / 2.0, height - 1.1 * cm, strline1)
+                    canvas.drawCentredString(width / 2.0, height - 1.5 * cm, strline2)
+                    try:
+                        canvas.setFont("DejaVuSerif-Italic", 11)
+                    except:
+                        canvas.setFont("Helvetica", 11)
+                    canvas.drawCentredString(width / 2.0, height - 1.9 * cm, sr)
+                    try:
+                        canvas.setFont("DejaVuSerif-Italic", 10)
+                    except:
+                        canvas.setFont("Helvetica", 10)
+                else:
+                    canvas.drawCentredString(width / 2.0, height - 1.1 * cm, nz)
+                    canvas.drawCentredString(width / 2.0, height - 1.5 * cm, sr)
+                    try:
+                        canvas.setFont("DejaVuSerif-Italic", 11)
+                    except:
+                        canvas.setFont("Helvetica", 11)
+            else:
+                canvas.drawCentredString(width / 2.0, height - 1.1 * cm, nz)
+                canvas.drawCentredString(width / 2.0, height - 1.5 * cm, sr)
+                try:
+                    canvas.setFont("DejaVuSerif-Italic", 11)
+                except:
+                    canvas.setFont("Helvetica", 11)
+            
+            
+
+            # Текст титула по основным
+            canvas.drawRightString(width - 1 * cm, height - 1.9 * cm, f"г. {ms}")
+            canvas.drawString(0.8 * cm, height - 1.9 * cm, data_comp)
+            
+            # Текст судейской коллегии
+            try:
+                canvas.setFont("DejaVuSerif-Italic", 10)
+            except:
+                canvas.setFont("Helvetica", 10)
+            
+            canvas.setFillColor(blue)
+            
+            if pv == landscape(A4):
+                main_referee_collegia = (f"Гл. судья: судья {title.kat_ref} ______________ {title.referee}   "
+                                        f"Гл. секретарь: судья {title.kat_sec} ______________ {title.secretary}")
+                if current_button == "3":
+                    canvas.drawCentredString(width / 2.0, height - 15 * cm, main_referee_collegia)
+                else:
+                    canvas.drawCentredString(width / 2.0, height - 20 * cm, main_referee_collegia)
+            else:
+                main_referee = f"Гл. судья: судья {title.kat_ref} ______________ {title.referee}"
+                if current_button == "1":
+                    canvas.drawString(2 * cm, 20 * cm, main_referee)
+                elif current_button == "2":
+                    # Сдвигает подпись судьи относительно количества регионов
+                    regions_list = []
+                    players = Player.select().where(Player.title_id == self.current_title_id)
+                    for k in players:
+                        region = k.region
+                        if region:
+                            regions_list.append(region)
+                    regions_set = set(regions_list)
+                    count = len(regions_set)
+                    canvas.drawString(2 * cm, ((29 - count) * cm), main_referee)
+                else:
+                    main_secretary = f"Гл. секретарь: судья {title.kat_sec} ______________ {title.secretary}"
+                    canvas.drawString(2 * cm, 1.8 * cm, main_referee)
+                    canvas.drawString(2 * cm, 0.8 * cm, main_secretary)
+            
+            canvas.restoreState()
+            
+        except Exception as e:
+            print(f"Ошибка в func_zagolovok: {e}")
+            canvas.restoreState()
+# =========================================
+    def export_schedule_to_pdf(self):
+        """Экспорт расписания соревнований в PDF"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+        
+        try:
+            title = Title.get(Title.id == self.current_title_id)
+            
+            # Получаем этапы системы
+            stages = []
+            for stage in System.select().where(System.title_id == self.current_title_id).order_by(System.id):
+                stages.append({
+                    'id': stage.id,
+                    'stage': stage.stage,
+                    'total_group': stage.total_group,
+                    'max_player': stage.max_player,
+                    'type_table': stage.type_table
+                })
+            
+            if len(stages) == 0:
+                QMessageBox.warning(self, "Ошибка", "Система проведения не настроена")
+                return
+            
+            # Получаем данные Choice
+            choices_data = []
+            for choice in Choice.select().where(Choice.title_id == self.current_title_id).order_by(Choice.group):
+                try:
+                    player = Player.get(Player.id == choice.player_choice.id)
+                    choices_data.append({
+                        'id': choice.id,
+                        'player_id': player.id,
+                        'fio': player.fio,
+                        'rank': player.rank,
+                        'group': choice.group
+                    })
+                except:
+                    pass
+            
+            # Создаем папку table_pdf, если её нет
+            pdf_dir = "table_pdf"
+            if not os.path.exists(pdf_dir):
+                os.makedirs(pdf_dir)
+            
+            # Используем короткое имя из Title
+            short_name = title.short_name_comp if title.short_name_comp else title.name
+            if not short_name:
+                short_name = "competition"
+            import re
+            clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
+            clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
+            
+            default_path = os.path.join(pdf_dir, f"schedule_{clean_name}_{QDate.currentDate().toString('yyyy_MM_dd')}.pdf")
+            
+            file_path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Сохранить расписание",
+                default_path,
+                "PDF files (*.pdf)"
+            )
+            
+            if not file_path:
+                return
+            
+            doc = SimpleDocTemplate(file_path, pagesize=landscape(A4),
+                                    topMargin=20*mm, bottomMargin=20*mm,
+                                    leftMargin=15*mm, rightMargin=15*mm)
+            
+            styles = getSampleStyleSheet()
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontSize=16,
+                alignment=1,
+                spaceAfter=20
+            )
+            
+            elements = []
+            
+            # Заголовок
+            elements.append(Paragraph(f"Расписание соревнований", title_style))
+            elements.append(Paragraph(f"{title.name}", styles['Heading2']))
+            elements.append(Spacer(1, 10*mm))
+            
+            # Данные по этапам
+            for idx, stage in enumerate(stages, 1):
+                elements.append(Paragraph(f"Этап {idx}: {stage['stage']}", styles['Heading3']))
+                elements.append(Spacer(1, 5*mm))
+                
+                if len(choices_data) > 0:
+                    # Группируем по группам
+                    groups = {}
+                    for choice in choices_data:
+                        group_name = choice['group']
+                        if group_name not in groups:
+                            groups[group_name] = []
+                        groups[group_name].append(choice)
+                    
+                    for group_name, group_choices in groups.items():
+                        elements.append(Paragraph(f"{group_name}", styles['Heading4']))
+                        
+                        # Таблица участников группы
+                        data = [['№', 'ФИО', 'Рейтинг']]
+                        for i, choice in enumerate(group_choices, 1):
+                            data.append([str(i), choice['fio'], str(choice['rank'])])
+                        
+                        table = Table(data)
+                        table.setStyle(TableStyle([
+                            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                            ('FONTSIZE', (0, 0), (-1, -1), 9),
+                        ]))
+                        elements.append(table)
+                        elements.append(Spacer(1, 5*mm))
+                else:
+                    elements.append(Paragraph("Жеребьевка не проведена", styles['Normal']))
+                
+                elements.append(Spacer(1, 10*mm))
+            
+            doc.build(elements)
+            
+            QMessageBox.information(self, "Успех", f"Расписание сохранено в PDF:\n{file_path}")
+            
+            reply = QMessageBox.question(self, "Открыть файл", 
+                                        "Открыть созданный PDF файл?",
+                                        QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                if sys.platform == 'win32':
+                    os.startfile(file_path)
+                else:
+                    os.system(f'open "{file_path}"')
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")
+
+    def register_fonts(self):
+        """Регистрация русских шрифтов для PDF"""
+        try:
+            # Путь к шрифту DejaVu (если есть)
+            font_path = "C:/Windows/Fonts/arial.ttf"
+            if os.path.exists(font_path):
+                pdfmetrics.registerFont(TTFont('Arial', font_path))
+        except:
+            pass
 
 # =================================
 class RatingLoaderThread(QThread):
@@ -9649,4 +10801,14 @@ def main():
 
 
 if __name__ == "__main__":
+
+    registerFontFamily('DejaVuSerif', normal='DejaVuSerif',
+                   bold='DejaVuSerif-Bold', italic='DejaVuSerif-Italic')
+    outpath = os.path.join(os.getcwd(), 'font')
+    pdfmetrics.registerFont(TTFont('DejaVuSans', os.path.join(outpath, 'DejaVuSans.ttf')))
+    pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', os.path.join(outpath, 'DejaVuSans-Bold.ttf')))
+    pdfmetrics.registerFont(TTFont('DejaVuSerif', os.path.join(outpath, 'DejaVuSerif.ttf')))
+    pdfmetrics.registerFont(TTFont('DejaVuSerif-Bold', os.path.join(outpath, 'DejaVuSerif-Bold.ttf')))
+    pdfmetrics.registerFont(TTFont('DejaVuSerif-Italic', os.path.join(outpath, 'DejaVuSerif-Italic.ttf')))
+
     main()

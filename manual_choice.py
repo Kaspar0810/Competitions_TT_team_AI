@@ -1281,9 +1281,9 @@ class ChoiceGroupManual(QDialog):
         return results
 
 
-def load_existing_draw_from_db(self):
+def load_existing_draw_from_db(id_title):
     """Загрузка существующей жеребьевки из базы данных через Peewee"""
-    choices = Choice.select().where(Choice.title_id == self)
+    choices = Choice.select().where(Choice.title_id == id_title)
     try:
         results = choices.select().order_by(Choice.group, Choice.posev_group)
         return list(results) if results.exists() else None
@@ -1295,7 +1295,7 @@ def load_existing_draw_from_db(self):
 def clear_db_before_choice(self):
     """очищает базу данных -Game_list- и -Result- перед повторной жеребьевкой групп"""
 
-    systems = System.select().where((System.stage == "Предварительный") & (System.title_id == self)).get()
+    systems = System.select().where((System.stage == "Квалификация") & (System.title_id == self)).get()
     id_system = systems.id
 
     gamelist = Game_list.select().where((Game_list.title_id == self) & (Game_list.system_id == id_system))
@@ -1311,7 +1311,7 @@ def clear_db_before_choice(self):
         Choice.update(group = None, posev_group=None).where(Choice.id == i).execute()
 
 
-def choice_group_manual(athletes, num_groups, id_title, parent=None):
+def choice_group_manual(self, athletes, num_groups, id_title, parent=None):
     """
     Функция для вызова ручной жеребьевки
     
@@ -1323,9 +1323,10 @@ def choice_group_manual(athletes, num_groups, id_title, parent=None):
     Returns:
         list: список результатов или None если отмена
     """
+    existing_data = None
     if num_groups < 2 or num_groups > 32:
         raise ValueError("Количество групп должно быть от 2 до 32")
-    system = System.select().where((System.title_id == id_title) & (System.stage == "Предварительный")).get()  # находит system id последнего
+    system = System.select().where((System.title_id == id_title) and (System.stage == "Квалификация")).get()  # находит system id последнего
     check_flag = system.choice_flag
     if check_flag is True:
         # Проверяем, есть ли уже жеребьевка в базе данных

@@ -40,9 +40,8 @@ import pandas as pd
 
 from datetime import datetime
 
-# =========================
 import manual_choice
-# =======================
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -9321,11 +9320,6 @@ class MainWindow(QMainWindow):
     def auto_drawing_for_stage(self, stage):
         """Автоматическая жеребьевка для указанного этапа"""
         try:
-            # Удаляем существующие записи Choice для этого этапа, если нужно
-            if stage.choice_flag == 1:
-                # Обновляем статус
-                pass
-            
             # Заполняем таблицу Choice для этого этапа
             self.fill_choice_table_for_stage(stage)
             
@@ -9333,12 +9327,15 @@ class MainWindow(QMainWindow):
             stage.choice_flag = 1
             stage.save()
             
+            # Заполняем таблицу Result после жеребьевки
+            self.fill_results_after_drawing()
+            
             QMessageBox.information(self, "Автоматическая жеребьевка", 
                                 f"✅ Жеребьевка для этапа '{stage.stage}' успешно проведена!\n\n"
                                 f"📊 Параметры жеребьевки:\n"
                                 f"   • Количество групп: {stage.total_group}\n"
                                 f"   • Участников в группе: {stage.max_player}\n\n"
-                                f"Таблица Choice обновлена.")
+                                f"Таблицы Choice и Result обновлены.")
             
             # Обновляем отображение информации
             self.update_stages_info()
@@ -9477,10 +9474,16 @@ class MainWindow(QMainWindow):
             # Обновляем статус системы
             systems.choice_flag = 1
             systems.save()
-            
-            QMessageBox.information(self, "Успех", f"Жеребьевка для этапа '{stage.stage}' сохранена!")
-            self.update_stages_info()
 
+            # Заполняем таблицу Result после жеребьевки
+            self.fill_results_after_drawing()
+            
+            QMessageBox.information(self, "Успех", 
+                                f"Жеребьевка для этапа '{stage.stage}' сохранена!\n"
+                                f"Таблицы Choice и Result обновлены.")
+            self.update_stages_info()
+            self.dialog.accept()
+        
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка при сохранении: {str(e)}")
 # ========= Создание PDF файлов ===========
@@ -9632,12 +9635,7 @@ class MainWindow(QMainWindow):
             
             # Добавляем информацию о сортировке в заголовок
             sort_text = "по алфавиту" if sorting_type == "alpha" else "по рейтингу"
-            
-            # story = []
-            # story.append(Paragraph(f'Список участников. {gamer} (сортировка: {sort_text})', title_style))
-            # story.append(Spacer(1, 10*mm))
-            # story.append(table)
-            
+                        
             # Строим документ с использованием функции заголовка
             doc.build(story, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
             
@@ -9922,12 +9920,6 @@ class MainWindow(QMainWindow):
             current_button = "0"
             if hasattr(self, 'tab_widget'):
                 tb = self.tab_widget.currentIndex()
-                # if tb == 7:  # Вкладка дополнительно
-                #     from PyQt5.QtWidgets import QRadioButton
-                #     for i in self.findChildren(QRadioButton):
-                #         if i.isChecked():
-                #             current_button = i.text()
-                #             break
             
             canvas.saveState()
             
@@ -10022,6 +10014,9 @@ class MainWindow(QMainWindow):
 # =========================================
     def export_schedule_to_pdf(self):
         """Экспорт расписания соревнований в PDF"""
+        from reportlab.platypus import Table
+        from reportlab.platypus import Paragraph
+
         if not self.current_title_id:
             QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
             return
@@ -10167,7 +10162,270 @@ class MainWindow(QMainWindow):
                 pdfmetrics.registerFont(TTFont('Arial', font_path))
         except:
             pass
+# ======================================================       
+    def tours_list(self, players_count):
+        """туры таблиц по кругу в зависимости от кол-во участников"""
+        # cp = players_count - 3 (индекс в списке туров)
+        cp = max(0, players_count - 3)
+        
+        tr = [[['1-3'], ['1-2'], ['2-3']],
+            [['1-3', '2-4'], ['1-2', '3-4'], ['2-3', '1-4']],
+            [['2-4', '1-5'], ['1-4', '3-5'], ['1-3', '2-5'], ['2-3', '4-5'], ['1-2', '3-4']],
+            [['2-4', '1-5', '3-6'], ['1-4', '2-6', '3-5'], ['1-3', '2-5', '4-6'], ['2-3', '1-6', '4-5'],
+                ['1-2', '3-4', '5-6']],
+            [['2-6', '3-5', '1-7'], ['2-5', '1-6', '4-7'], ['1-5', '4-6', '3-7'], ['4-5', '2-7', '3-6'],
+                ['1-3', '2-4', '5-7'], ['1-4', '2-3', '6-7'], ['1-2', '3-4', '5-6']],
+            [['2-6', '3-5', '1-7', '4-8'], ['2-5', '1-6', '3-8', '4-7'], ['1-5', '2-8', '4-6', '3-7'],
+                ['1-8', '4-5', '2-7', '3-6'], ['1-3', '2-4', '5-7', '6-8'], ['1-4', '2-3', '6-7', '5-8'],
+                ['1-2', '3-4', '5-6', '7-8']],
+            [['1-9', '2-8', '3-7', '4-6'], ['5-9', '1-8', '2-7', '3-6'], ['4-9', '5-8', '1-7', '2-6'],
+                ['3-9', '4-8', '5-7', '1-6'], ['2-4', '1-5', '3-8', '7-9'], ['4-1', '5-3', '9-2', '8-6'],
+                ['1-3', '2-5', '4-7', '6-9'], ['3-2', '5-4', '8-9', '7-6'], ['1-2', '3-4', '5-6', '7-8']],
+            [['1-9', '2-8', '3-7', '4-6', '5-10'], ['5-9', '1-8', '2-7', '3-6', '4-10'], ['4-9', '5-8', '1-7', '2-6', '3-10'],
+                ['3-9', '4-8', '5-7', '1-6', '2-10'], ['2-4', '1-5', '3-8', '7-9', '6-10'], ['4-1', '5-3', '9-2', '8-6', '7-10'],
+                ['1-3', '2-5', '4-7', '6-9', '8-10'], ['3-2', '5-4', '8-9', '7-6', '1-10'], ['1-2', '3-4', '5-6', '7-8', '9-10']],
+            [['1-11', '2-10', '3-9', '4-8', '5-7'], ['6-11', '1-10', '2-9', '3-8', '4-7'], ['5-11', '6-10', '1-9', '2-8', '3-7'],
+                ['4-11', '5-10', '6-9', '1-8', '2-7'], ['3-11', '4-10', '5-9', '6-8', '1-7'], ['2-11', '3-10', '4-9', '5-8', '6-7'],
+                ['2-4', '1-5', '3-6', '7-10', '9-11'], ['1-4', '2-6', '3-5', '8-10', '7-11'], ['1-3', '2-5', '4-6', '7-9', '8-11'],
+                ['2-3', '1-6', '4-5', '8-9', '10-11'], ['1-2', '3-4', '5-6', '7-8', '9-10']],
+            [['1-11', '2-10', '3-9', '4-8', '5-7', '6-12'], ['6-11', '1-10', '2-9', '3-8', '4-7', '5-12'],
+                ['5-11', '6-10', '1-9', '2-8', '3-7', '4-12'], ['4-11', '5-10', '6-9', '1-8', '2-7', '3-12'],
+                ['3-11', '4-10', '5-9', '6-8', '1-7', '2-12'], ['2-11', '3-10', '4-9', '5-8', '6-7', '1-12'],
+                ['2-4', '1-5', '3-6', '7-10', '9-11', '8-12'], ['1-4', '2-6', '3-5', '8-10', '7-11', '9-12'],
+                ['1-3', '2-5', '4-6', '7-9', '8-11', '10-12'], ['2-3', '1-6', '4-5', '8-9', '10-11', '7-12'],
+                ['1-2', '3-4', '5-6', '7-8', '9-10', '11-12']],
+            [['1-13', '2-12', '3-11', '4-10', '5-9', '6-8'], ['7-13', '1-12', '2-11', '3-10', '4-9', '5-8'],
+                ['6-13', '7-12', '1-11', '2-10', '3-9', '4-8'], ['5-13', '6-12', '7-11', '1-10', '2-9', '3-8'],
+                ['4-13', '5-12', '6-11', '7-10', '1-9', '2-8'], ['3-13', '4-12', '5-11', '6-10', '7-9', '1-8'],
+                ['1-7', '2-6', '3-5', '4-11', '9-13', '10-12'], ['1-6', '2-5', '4-7', '3-12', '8-11', '10-13'],
+                ['1-4', '2-7', '3-6', '5-10', '8-13', '9-12'], ['1-5', '3-7', '4-6', '2-13', '8-12', '9-11'],
+                ['1-3', '2-4', '5-7', '6-9', '8-10', '11-13'], ['2-3', '4-5', '6-7', '8-9', '10-11', '12-13'],
+                ['1-2', '3-4', '5-6', '7-8', '9-10', '11-12']],
+            [['1-13', '2-12', '3-11', '4-10', '5-9', '6-8', '7-14'], ['7-13', '1-12', '2-11', '3-10', '4-9', '5-8', '6-14'],
+                ['6-13', '7-12', '1-11', '2-10', '3-9', '4-8', '5-14'], ['5-13', '6-12', '7-11', '1-10', '2-9', '3-8', '4-14'],
+                ['4-13', '5-12', '6-11', '7-10', '1-9', '2-8', '3-14'], ['3-13', '4-12', '5-11', '6-10', '7-9', '1-8', '2-14'],
+                ['1-7', '2-6', '3-5', '4-11', '9-13', '10-12', '8-14'], ['1-6', '2-5', '4-7', '3-12', '8-11', '10-13', '9-14'],
+                ['1-4', '2-7', '3-6', '5-10', '8-13', '9-12', '11-14'], ['1-5', '3-7', '4-6', '2-13', '8-12', '9-11', '10-14'],
+                ['1-3', '2-4', '5-7', '6-9', '8-10', '11-13', '12-14'], ['2-3', '4-5', '6-7', '8-9', '10-11', '12-13', '1-14'],
+                ['1-2', '3-4', '5-6', '7-8', '9-10', '11-12', '13-14']],
+            [['1-15', '2-14', '3-13', '4-12', '5-11', '6-10', '7-9'], ['8-15', '1-14', '2-13', '3-12', '4-11', '5-10', '6-9'],
+                ['8-15', '1-14', '2-13', '3-12', '4-11', '5-10', '6-9'], ['7-15', '8-14', '1-13', '2-12', '3-11', '4-10', '5-9'],
+                ['6-15', '7-14', '8-13', '1-12', '2-11', '3-10', '4-9'], ['5-15', '6-14', '7-13', '8-12', '1-11', '2-10', '3-9'],
+                ['4-15', '5-14', '6-13', '7-12', '8-11', '1-10', '2-9'], ['3-15', '4-14', '5-13', '6-12', '7-11', '8-10', '1-9'],
+                ['2-15', '3-14', '4-13', '5-12', '6-11', '7-10', '8-9'], ['1-7', '2-6', '3-5', '4-8', '9-13', '12-14', '11-15'],
+                ['1-6', '2-5', '3-8', '4-7', '9-14', '10-13', '12-15'], ['1-5', '2-8', '3-7', '4-6', '9-15', '10-14', '11-13'],
+                ['1-4', '2-7', '3-6', '5-8', '9-12', '10-15', '11-14'], ['1-3', '2-4', '5-7', '6-8', '9-11', '10-12', '13-15'],
+                ['1-8', '2-3', '4-5', '6-7', '10-11', '12-13', '14-15'], ['1-2', '3-4', '5-6', '7-8', '9-10', '11-12', '13-14']],
+            [['1-15', '2-14', '3-13', '4-12', '5-11', '6-10', '7-9', '8-16'],
+                ['8-15', '1-14', '2-13', '3-12', '4-11', '5-10', '6-9', '7-16'],
+                ['7-15', '8-14', '1-13', '2-12', '3-11', '4-10', '5-9', '6-16'],
+                ['6-15', '7-14', '8-13', '1-12', '2-11', '3-10', '4-9', '5-16'],
+                ['5-15', '6-14', '7-13', '8-12', '1-11', '2-10', '3-9', '4-16'],
+                ['4-15', '5-14', '6-13', '7-12', '8-11', '1-10', '2-9', '3-16'],
+                ['3-15', '4-14', '5-13', '6-12', '7-11', '8-10', '1-9', '2-16'],
+                ['2-15', '3-14', '4-13', '5-12', '6-11', '7-10', '8-9', '1-16'],
+                ['1-7', '2-6', '3-5', '4-8', '9-13', '12-14', '11-15', '10-16'],
+                ['1-6', '2-5', '3-8', '4-7', '9-14', '10-13', '12-15', '11-16'],
+                ['1-5', '2-8', '3-7', '4-6', '9-15', '10-14', '11-13', '12-16'],
+                ['1-4', '2-7', '3-6', '5-8', '9-12', '10-15', '11-14', '13-16'],
+                ['1-3', '2-4', '5-7', '6-8', '9-11', '10-12', '13-15', '14-16'],
+                ['1-8', '2-3', '4-5', '6-7', '10-11', '12-13', '14-15', '9-16'],
+                ['1-2', '3-4', '5-6', '7-8', '9-10', '11-12', '13-14', '15-16']],
+            [['2-17', '3-16', '4-15', '5-14', '6-13', '7-12', '8-11','9-10'],
+                ['1-17', '2-15', '3-14', '4-13', '5-12', '6-11', '7-10','8-9'],
+                ['1-16', '15-17', '2-13', '3-12', '4-11', '5-10', '6-9','7-8'],
+                ['1-15', '14-16', '13-17', '2-11', '3-10', '4-9', '5-8','6-7'],
+                ['1-14', '13-15', '12-16', '11-17', '2-9', '3-8', '4-7','5-6'],
+                ['1-13', '12-14', '11-15', '10-16', '9-17', '2-7', '3-6','4-5'],
+                ['1-12', '11-13', '10-14', '9-15', '8-16', '7-17', '2-5','3-4'],
+                ['1-11', '10-12', '9-13', '8-14', '7-15', '6-16', '5-17', '2-3'],
+                ['1-10', '9-11', '8-12', '7-13', '6-14', '5-15', '4-16', '3-17'],
+                ['1-9', '8-10', '7-11', '6-12', '5-13', '4-14', '3-15', '2-16'],
+                ['1-8', '7-9', '6-10', '5-11', '4-12', '3-13', '2-14', '16-17'],
+                ['1-7', '6-8', '5-9', '4-10', '3-11', '2-12', '14-17','15-16'],
+                ['1-6', '5-7', '4-8', '3-9', '2-10', '12-17', '13-16','14-15'],
+                ['1-5', '4-6', '3-7', '2-8', '10-17', '11-16', '12-15','13-14'],
+                ['1-4', '3-5', '2-6', '8-17', '9-16', '10-15', '11-14','12-13'],
+                ['1-3', '2-4', '6-17', '7-16', '8-15', '9-14', '10-13','11-12'],
+                ['1-2', '4-17', '5-16', '6-15', '7-14', '8-13', '9-12','10-11']]
+        ]
+        
+        if cp < len(tr):
+            return tr[cp]
+        else:
+            # Для большего количества участников возвращаем последний вариант
+            return tr[-1]
+    
+    def write_drawing_results_to_result(self, group_players, stage_name, group_number, system_id):
+        """Запись результатов жеребьевки в таблицу Result"""
+        try:
+            players_count = len(group_players)
+            
+            # Получаем туры для данного количества участников
+            tours = self.tours_list(players_count)
+            
+            if not tours:
+                print(f"Нет расписания туров для {players_count} участников")
+                return
+            
+            for tour_idx, tour_matches in enumerate(tours, 1):
+                # tour_matches - список пар для одного тура, например ['1-3', '2-4']
+                for match in tour_matches:
+                    # Разбираем пару, например '1-3'
+                    players_pair = match.split('-')
+                    if len(players_pair) == 2:
+                        try:
+                            player1_idx = int(players_pair[0]) - 1  # переводим в индекс массива (0-based)
+                            player2_idx = int(players_pair[1]) - 1
+                            
+                            # Получаем игроков по индексам
+                            if player1_idx < len(group_players) and player2_idx < len(group_players):
+                                player1 = group_players[player1_idx]
+                                player2 = group_players[player2_idx]
+                                
+                                # Формируем ФИО с городом
+                                player1_fio_city = f"{player1.fio} ({player1.city})" if player1.city else player1.fio
+                                player2_fio_city = f"{player2.fio} ({player2.city})" if player2.city else player2.fio
+                                
+                                # Создаем запись в таблице Result
+                                Result.create(
+                                    system_stage=stage_name,
+                                    number_group=str(group_number),
+                                    tours=str(tour_idx),
+                                    player1=player1_fio_city,
+                                    player2=player2_fio_city,
+                                    winner=None,
+                                    points_win=None,
+                                    score_in_game=None,
+                                    score_win=None,
+                                    loser=None,
+                                    points_loser=None,
+                                    score_loser=None,
+                                    title_id=self.current_title_id,
+                                    round="",
+                                    system_id=system_id,
+                                    sex=self.current_sex if self.current_sex else "man",
+                                    schedule_date=None,
+                                    schedule_time=None,
+                                    schedule_table="",
+                                    stage_net=""
+                                )
+                        except (ValueError, IndexError) as e:
+                            print(f"Ошибка при обработке пары {match}: {e}")
+                            continue
+            
+            print(f"Создано результатов для группы {group_number}: {len(tours)} туров")
+            
+        except Exception as e:
+            print(f"Ошибка записи результатов: {e}")
 
+    def fill_results_after_drawing(self):
+        """Заполнение таблицы Result после жеребьевки квалификации"""
+        if not self.current_title_id:
+            return
+        
+        try:
+            # Получаем все записи Choice для этого соревнования
+            choices = Choice.select().where(Choice.title_id == self.current_title_id).order_by(Choice.group)
+            
+            if choices.count() == 0:
+                QMessageBox.warning(self, "Ошибка", "Нет данных жеребьевки для заполнения результатов")
+                return
+            
+            # Группируем по группам
+            groups = {}
+            for choice in choices:
+                group_name = choice.group
+                if group_name not in groups:
+                    groups[group_name] = []
+                groups[group_name].append(choice)
+            
+            # Получаем систему для определения типа таблицы
+            system = System.get_or_none(System.title_id == self.current_title_id)
+            system_stage = system.stage if system else "Квалификация"
+            
+            # Очищаем существующие результаты для этого этапа
+            Result.delete().where(
+                (Result.title_id == self.current_title_id) &
+                (Result.system_stage == system_stage)
+            ).execute()
+            
+            total_matches = 0
+            
+            # Для каждой группы создаем туры
+            for group_name, group_choices in groups.items():
+                # Извлекаем номер группы
+                # import re
+                # group_num = re.findall(r'\d+', group_name)
+                # group_num = group_num[0] if group_num else "1"
+                group_num = group_name
+
+                players_count = len(group_choices)
+                
+                # Сортируем игроков для получения номеров
+                group_choices.sort(key=lambda x: x.posev_group)
+                
+                # Создаем словарь для отображения номера на данные игрока
+                player_data = {}
+                for idx, choice in enumerate(group_choices, 1):
+                    player = Player.get(Player.id == choice.player_choice.id)
+                    player_data[str(idx)] = {
+                        'fio': player.fio_city,
+                        # 'city': player.city,
+                        'player_obj': player
+                    }
+                
+                # Получаем туры для этого количества игроков
+                tours = self.tours_list(players_count)
+                
+                if tours and len(tours) > 0:
+                    tour_list = tours[0]  # Первый элемент - список туров
+                    
+                    for tour_idx, tour_matches in enumerate(tour_list, 1):
+                        for match in tour_matches:
+                            # Разбиваем пару
+                            if '-' in match:
+                                p1_num, p2_num = match.split('-')
+                                p1_num = p1_num.strip()
+                                p2_num = p2_num.strip()
+                                
+                                if p1_num in player_data and p2_num in player_data:
+                                    p1 = player_data[p1_num]
+                                    p2 = player_data[p2_num]
+                                    
+                                    # Создаем запись в Result
+                                    Result.create(
+                                        system_stage=system_stage,
+                                        number_group=group_num,
+                                        tours=str(tour_idx),
+                                        player1=f"{p1['fio_city']}",
+                                        player2=f"{p2['fio_city']}",
+                                        winner=None,
+                                        points_win=0,
+                                        score_in_game=None,
+                                        score_win=None,
+                                        loser=None,
+                                        points_loser=0,
+                                        score_loser=None,
+                                        title_id=self.current_title_id,
+                                        round=str(tour_idx),
+                                        system_id=system.id if system else 1,
+                                        sex=self.current_sex if self.current_sex else "man",
+                                        schedule_date=None,
+                                        schedule_time=None,
+                                        schedule_table="",
+                                        stage_net="group"
+                                    )
+                                    total_matches += 1
+            
+            QMessageBox.information(self, "Успех", 
+                                f"Таблица Result заполнена!\n"
+                                f"Всего матчей создано: {total_matches}")
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "Ошибка", f"Не удалось заполнить результаты: {str(e)}")
 # =================================
 class RatingLoaderThread(QThread):
     progress = pyqtSignal(int)

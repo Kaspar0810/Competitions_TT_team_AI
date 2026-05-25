@@ -86,20 +86,23 @@ class MainWindow(QMainWindow):
                     ["🗑️ Удалить", "🔍 Поиск"],
                     ["📤 Экспорт", "🗑️ Очистить"]
                 ],
-                "filters": ["Сортировка", "Фильтры", "Заявки"]},  # Добавлена секция заявок
+                "filters": ["Сортировка", "Фильтры", "Заявки"]},
             2: {"title": "Команды", "description": "Управление командами",
                 "buttons": ["➕ Добавить", "✏️ Редактировать", "🗑️ Удалить", "⭐ Рейтинг"]},
             3: {"title": "Пары", "description": "Формирование пар",
                 "buttons": ["🎲 Сформировать", "🔄 Разбить", "📊 Посев"]},
             4: {"title": "Система", "description": "Настройки системы проведения",
-                "buttons": ["⚙️ Настройки", "📐 Параметры", "🔄 Сброс"]},
+                "buttons": [
+                    ["🔍 Поиск в Choice", "📊 Статистика"],
+                    ["🗑️ Очистить", "📋 Отчет"]
+                ]},
             5: {"title": "Результаты", "description": "Ввод и просмотр результатов",
                 "buttons": ["📥 Загрузить", "📤 Экспорт", "🗑️ Очистить", "🧮 Рассчитать"]},
             6: {"title": "Рейтинг", "description": "Рейтинг участников",
                 "buttons": ["🔄 Обновить", "🏆 Топ-10", "📊 Расчёт"]},
             7: {"title": "Дополнительно", "description": "Дополнительные настройки",
                 "buttons": ["📝 Заметки", "❓ Справка", "ℹ️ О программе"]},
-            }
+        }
         
         self.current_competition_buttons = []
         self.current_tab_index = 0
@@ -2185,22 +2188,33 @@ class MainWindow(QMainWindow):
             self.current_title_id = title_id
             title = Title.get_or_none(Title.id == title_id)
             if title:
-                # Обновляем информацию на вкладке Титул
-                self.comp_name_label.setText(title.name or "-")
-                self.comp_short_name_label.setText(title.short_name_comp or "-")
-                self.comp_full_name_label.setText(title.full_name_comp or "-")
-                self.comp_sredi_label.setText(title.sredi or "-")
-                self.comp_vozrast_label.setText(title.vozrast or "-")
-                self.comp_type_info_label.setText(title.vid_turnira or "-")
+                # Если есть текущее соревнование, предлагаем его сохранить
+                if self.current_title_id and self.current_title_id != title_id:
+                    reply = QMessageBox.question(self, "Сохранение", 
+                                                "Сохранить текущее соревнование перед переходом?",
+                                                QMessageBox.Yes | QMessageBox.No)
+                    if reply == QMessageBox.Yes:
+                        self.save_current_competition()
                 
-                start = title.data_start.strftime("%d.%m.%Y") if title.data_start else "---"
-                end = title.data_end.strftime("%d.%m.%Y") if title.data_end else "---"
-                self.comp_dates_label.setText(f"{start} - {end}")
-                self.comp_mesto_label.setText(title.mesto or "-")
-                self.comp_referee_label.setText(title.referee or "-")
-                self.comp_referee_category_label.setText(title.kat_ref or "-")
-                self.comp_secretary_label.setText(title.secretary or "-")
-                self.comp_secretary_category_label.setText(title.kat_sec or "-")
+                self.current_title_id = title_id
+                title = Title.get_or_none(Title.id == title_id)
+                if title:
+                    # Обновляем информацию на вкладке Титул
+                    self.comp_name_label.setText(title.name or "-")
+                    self.comp_short_name_label.setText(title.short_name_comp or "-")
+                    self.comp_full_name_label.setText(title.full_name_comp or "-")
+                    self.comp_sredi_label.setText(title.sredi or "-")
+                    self.comp_vozrast_label.setText(title.vozrast or "-")
+                    self.comp_type_info_label.setText(title.vid_turnira or "-")
+                    
+                    start = title.data_start.strftime("%d.%m.%Y") if title.data_start else "---"
+                    end = title.data_end.strftime("%d.%m.%Y") if title.data_end else "---"
+                    self.comp_dates_label.setText(f"{start} - {end}")
+                    self.comp_mesto_label.setText(title.mesto or "-")
+                    self.comp_referee_label.setText(title.referee or "-")
+                    self.comp_referee_category_label.setText(title.kat_ref or "-")
+                    self.comp_secretary_label.setText(title.secretary or "-")
+                    self.comp_secretary_category_label.setText(title.kat_sec or "-")
                 
                 # Определяем пол по умолчанию
                 if "девушки" in title.name.lower() or "дев" in title.name.lower():
@@ -2213,14 +2227,20 @@ class MainWindow(QMainWindow):
 
                 # ОБНОВЛЯЕМ АКТИВНОСТЬ ВКЛАДОК (после выбора соревнования)
                 self.update_tabs_enabled()
-                
+              
                 # Обновляем кнопки категорий
                 self.create_category_buttons()
                 
                 # Загружаем участников (если вкладка Участники активна)
                 if self.tab_widget.isTabEnabled(1):
                     self.load_participants_for_title()
-                
+             
+                # Если текущая вкладка - Система, обновляем информацию
+                if self.current_tab_index == 4:
+                    self.update_stages_info()
+                    # Обновляем кнопки на левой панели (чтобы убрать дублирование)
+                    self.update_left_panel_for_tab(4)
+  
                 # Обновляем заголовок списка
                 self.competitions_label.setText(f"🏆 Текущее: {title.name[:40]}...")
                 self.competitions_label.setStyleSheet("""
@@ -2284,16 +2304,13 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'filters_widget'):
                 self.filters_widget.setVisible(True)
             
-            # Убеждаемся, что форма создания скрыта, а информация видна
             if hasattr(self, 'new_comp_frame'):
                 self.new_comp_frame.setVisible(False)
             if hasattr(self, 'info_group'):
                 self.info_group.setVisible(True)
-            # Скрываем секцию создания этапа
             if hasattr(self, 'stage_section'):
                 self.stage_section.setVisible(False)
             
-            # Загружаем список соревнований
             self.load_titles_list()
             
         elif index == 1:  # Вкладка Участники
@@ -2308,14 +2325,11 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'filters_widget'):
                 self.filters_widget.setVisible(False)
             
-            # Скрываем секцию создания этапа
             if hasattr(self, 'stage_section'):
                 self.stage_section.setVisible(False)
-            # Активируем поле поиска
             if hasattr(self, 'fio_edit'):
                 self.fio_edit.setEnabled(True)
             
-            # Загружаем участников для текущего соревнования
             if self.current_title_id:
                 self.load_participants_for_title()
             else:
@@ -2324,55 +2338,8 @@ class MainWindow(QMainWindow):
                 if hasattr(self, 'table_header'):
                     self.table_header.setText("👥 Список участников - выберите соревнование из списка справа")
             
-            # Изменяем размеры для увеличения таблицы
             QTimer.singleShot(100, self.resize_table_for_participants)
             
-        elif index == 2:  # Вкладка Команды
-            if hasattr(self, 'competitions_label'):
-                self.competitions_label.setVisible(True)
-            if hasattr(self, 'list_widget'):
-                self.list_widget.setVisible(True)
-            if hasattr(self, 'search_label'):
-                self.search_label.setVisible(False)
-            if hasattr(self, 'search_results_list'):
-                self.search_results_list.setVisible(False)
-            if hasattr(self, 'filters_widget'):
-                self.filters_widget.setVisible(False)
-            if hasattr(self, 'competitions_label'):
-                self.competitions_label.setText("🏆 Команды")
-            
-            if hasattr(self, 'stage_section'):
-                self.stage_section.setVisible(False)
-            
-            if self.current_title_id:
-                self.load_teams_for_title()
-            else:
-                if hasattr(self, 'list_widget'):
-                    self.list_widget.clear()
-                    
-        elif index == 3:  # Вкладка Пары
-            if hasattr(self, 'competitions_label'):
-                self.competitions_label.setVisible(True)
-            if hasattr(self, 'list_widget'):
-                self.list_widget.setVisible(True)
-            if hasattr(self, 'search_label'):
-                self.search_label.setVisible(False)
-            if hasattr(self, 'search_results_list'):
-                self.search_results_list.setVisible(False)
-            if hasattr(self, 'filters_widget'):
-                self.filters_widget.setVisible(False)
-            if hasattr(self, 'competitions_label'):
-                self.competitions_label.setText("🤝 Пары")
-            
-            if hasattr(self, 'stage_section'):
-                self.stage_section.setVisible(False)
-            
-            if self.current_title_id:
-                self.load_doubles_for_title()
-            else:
-                if hasattr(self, 'list_widget'):
-                    self.list_widget.clear()
-                    
         elif index == 4:  # Вкладка Система
             if hasattr(self, 'competitions_label'):
                 self.competitions_label.setVisible(True)
@@ -2402,7 +2369,7 @@ class MainWindow(QMainWindow):
                     self.list_widget.clear()
                 if hasattr(self, 'stages_info'):
                     self.stages_info.setText("Нет выбранного соревнования")
-                    
+    # ========================================================                    
         elif index == 5:  # Вкладка Результаты
             if hasattr(self, 'competitions_label'):
                 self.competitions_label.setVisible(True)
@@ -2810,6 +2777,9 @@ class MainWindow(QMainWindow):
 
     def update_left_panel_for_tab(self, tab_index):
         """Обновление левой панели в зависимости от вкладки (полная очистка)"""
+        # Сбрасываем флаг фильтров
+        self._filters_added = False
+
         # ПОЛНОСТЬЮ ОЧИЩАЕМ ЛЕВУЮ ПАНЕЛЬ
         for i in reversed(range(self.dynamic_filters_layout.count())):
             item = self.dynamic_filters_layout.itemAt(i)
@@ -2854,8 +2824,8 @@ class MainWindow(QMainWindow):
                         QPushButton:hover { background-color: #45a049; }
                     """)
                     
-                    # Привязываем функции для вкладки Участники
-                    if tab_index == 1:
+                    # Привязываем функции для разных вкладок
+                    if tab_index == 1:  # Участники
                         if btn_text == "➕ Добавить":
                             btn.clicked.connect(self.add_player_from_form)
                         elif btn_text == "✏️ Редактировать":
@@ -2868,8 +2838,18 @@ class MainWindow(QMainWindow):
                             btn.clicked.connect(self.export_players)
                         elif btn_text == "🗑️ Очистить":
                             btn.clicked.connect(self.clear_player_form)
-                    # Для вкладки Титул
-                    elif tab_index == 0:
+                    
+                    elif tab_index == 4:  # Система
+                        if btn_text == "🔍 Поиск в Choice":
+                            btn.clicked.connect(self.search_in_choice_table)
+                        elif btn_text == "📊 Статистика":
+                            btn.clicked.connect(self.show_choice_statistics)
+                        elif btn_text == "🗑️ Очистить":
+                            btn.clicked.connect(self.clear_choice_table)
+                        elif btn_text == "📋 Отчет":
+                            btn.clicked.connect(self.export_choice_report)
+                    
+                    elif tab_index == 0:  # Титул
                         if btn_text == "📋 Создать новое":
                             btn.clicked.connect(self.new_competition)
                     
@@ -2896,10 +2876,7 @@ class MainWindow(QMainWindow):
                     QPushButton:hover { background-color: #45a049; }
                 """)
                 
-                if tab_index == 0:  # Титул
-                    if btn_text == "📋 Создать новое":
-                        btn.clicked.connect(self.new_competition)
-                elif tab_index == 2:  # Команды
+                if tab_index == 2:  # Команды
                     if btn_text == "➕ Добавить":
                         btn.clicked.connect(self.add_team)
                     elif btn_text == "✏️ Редактировать":
@@ -2930,7 +2907,7 @@ class MainWindow(QMainWindow):
         # Добавляем фильтры ТОЛЬКО для вкладки Участники
         if tab_index == 1:
             self.add_participant_filters()
-    
+        
         self.dynamic_filters_layout.addStretch()
 
     def add_player_from_form(self):
@@ -3427,6 +3404,13 @@ class MainWindow(QMainWindow):
     
     def new_competition(self):
         """Создание нового соревнования с выбором типа и загрузкой рейтингов"""
+        # Если есть текущее соревнование, предлагаем его сохранить
+        if self.current_title_id:
+            reply = QMessageBox.question(self, "Сохранение", 
+                                        "Сохранить текущее соревнование перед созданием нового?",
+                                        QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                self.save_current_competition()
         # Сбрасываем параметры системы для нового соревнования
         if hasattr(self, 'system_tables'):
             delattr(self, 'system_tables')
@@ -3637,9 +3621,6 @@ class MainWindow(QMainWindow):
         
         # Просмотр
         view_menu = menubar.addMenu("Просмотр")
-        # fullscreen_action = QAction("Полный экран", self)
-        # fullscreen_action.triggered.connect(self.toggle_fullscreen)
-        # view_menu.addAction(fullscreen_action)
     
         # Список участников
         participants_list_action = QAction("📋 Список участников (PDF)", self)
@@ -3657,19 +3638,6 @@ class MainWindow(QMainWindow):
         fullscreen_action.triggered.connect(self.toggle_fullscreen)
         view_menu.addAction(fullscreen_action)
 
-# ======= мой вариант =================
-        # # сепаратор
-        # view_menu.addSeparator()
-        
-        # # подменю просмотр полного соревнования
-        # view_full_comp_action = QAction("Полное соревнование", self)
-        # view_full_comp_action.triggered.connect(self.view_full_competition)
-        # view_menu.addAction(view_full_comp_action)
-
-        # # подменю просомтр списка участников
-        # player_listing_action = QAction("Список участников", self)
-        # player_listing_action.triggered.connect(self.view_player_listing)
-        # view_menu.addAction(player_listing_action)
 # ====================================================        
         # Рейтинг
         rating_menu = menubar.addMenu("Рейтинг")
@@ -3687,6 +3655,13 @@ class MainWindow(QMainWindow):
         export_action = QAction("📤 Экспортировать", self)
         export_action.triggered.connect(self.export_database)
         db_menu.addAction(export_action)
+        
+        db_menu.addSeparator()
+        
+        # Сохранить текущее соревнование
+        save_competition_action = QAction("💾 Сохранить текущее соревнование", self)
+        save_competition_action.triggered.connect(self.save_current_competition)
+        db_menu.addAction(save_competition_action)
         
         # Помощь
         help_menu = menubar.addMenu("Помощь")
@@ -3708,12 +3683,45 @@ class MainWindow(QMainWindow):
                          "Панель управления соревнованиями\n"
                          "Версия 3.0\n\n"
                          "Работа с базой данных MySQL\n"
-                         "© 2024")
+                         "© 2026")
     
     def closeEvent(self, event):
-        close_db()
-        event.accept()
-#==============================================
+        """Событие закрытия окна - сохранение базы данных"""
+        try:
+            # Спрашиваем пользователя о сохранении
+            reply = QMessageBox.question(self, "Сохранение базы данных", 
+                                        "Сохранить резервную копию базы данных перед выходом?",
+                                        QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel)
+            
+            if reply == QMessageBox.Cancel:
+                event.ignore()
+                return
+            
+            if reply == QMessageBox.Yes:
+                # Создаем папку backup_db, если её нет
+                backup_dir = "backup_db"
+                if not os.path.exists(backup_dir):
+                    os.makedirs(backup_dir)
+                
+                # Формируем имя файла с текущей датой и временем
+                from datetime import datetime
+                timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+                backup_file = os.path.join(backup_dir, f"backup_{timestamp}.sql")
+                
+                # Экспортируем базу данных
+                self.export_database_internal(backup_file, None)
+                
+                QMessageBox.information(self, "Успех", f"База данных сохранена в:\n{backup_file}")
+            
+            # Закрываем соединение с БД
+            close_db()
+            event.accept()
+            
+        except Exception as e:
+            print(f"Ошибка при сохранении БД: {e}")
+            close_db()
+            event.accept()
+    #==============================================
     def filter_by_alphabet(self):
         """Сортировка по алфавиту"""
         if not self.current_title_id:
@@ -6011,6 +6019,9 @@ class MainWindow(QMainWindow):
     
     def add_participant_filters(self):
         """Добавление фильтров для вкладки Участники"""
+        # Проверяем, есть ли уже фильтры
+        if hasattr(self, '_filters_added') and self._filters_added:
+            return
         # Разделитель
         line = QFrame()
         line.setFrameShape(QFrame.HLine)
@@ -6466,8 +6477,8 @@ class MainWindow(QMainWindow):
         """)
         
         QMessageBox.information(self, "Сброс фильтров", "Показаны все активные участники")
-
-    def export_database(self):
+# ==========================
+    def _export_database(self):
         """Экспорт базы данных в файл"""
         try:
             # Создаем диалог выбора места сохранения
@@ -6549,6 +6560,46 @@ class MainWindow(QMainWindow):
             # Если произошла ошибка, пробуем встроенный экспорт
             self.export_database_internal(file_path, None)
 
+    def export_database(self):
+        """Экспорт базы данных в файл"""
+        try:
+            # Создаем диалог выбора места сохранения
+            backup_dir = "backup_db"
+            if not os.path.exists(backup_dir):
+                os.makedirs(backup_dir)
+            
+            from datetime import datetime
+            default_name = f"backup_{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}.sql"
+            default_path = os.path.join(backup_dir, default_name)
+            
+            file_path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Экспорт базы данных",
+                default_path,
+                "SQL files (*.sql);;All files (*.*)"
+            )
+            
+            if not file_path:
+                return
+            
+            # Показываем прогресс-бар
+            progress = QProgressDialog("Экспорт базы данных...", "Отмена", 0, 100, self)
+            progress.setWindowModality(Qt.WindowModal)
+            progress.show()
+            
+            try:
+                self.export_database_internal(file_path, progress)
+                progress.setValue(100)
+                QMessageBox.information(self, "Успех", 
+                                    f"База данных успешно экспортирована в файл:\n{file_path}")
+            except Exception as e:
+                QMessageBox.critical(self, "Ошибка", f"Не удалось экспортировать базу данных: {str(e)}")
+            finally:
+                progress.close()
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Ошибка: {str(e)}")
+# =======================================
     def import_database(self):
         """Импорт базы данных из файла бэкапа"""
         try:
@@ -7034,6 +7085,7 @@ class MainWindow(QMainWindow):
             label_string = ""
             choice_flag = 0
             source_stage = ""
+            
         # === ПОЛУФИНАЛЫ ===
         elif "полуфинал" in stage_name.lower():
             if not previous_stage or "Квалификация" not in previous_stage.stage:
@@ -8879,7 +8931,7 @@ class MainWindow(QMainWindow):
         """Заполнение таблицы Choice игроками соревнования"""
         if not self.current_title_id:
             return
-        
+      
         try:
             # Проверяем, есть ли уже записи в Choice для этого соревнования
             existing_choices = Choice.select().where(Choice.title_id == self.current_title_id).count()
@@ -8893,77 +8945,78 @@ class MainWindow(QMainWindow):
                     return
                 # Удаляем существующие записи
                 Choice.delete().where(Choice.title_id == self.current_title_id).execute()
-            
-            # Получаем всех игроков соревнования
-            players = Player.select().where(Player.title_id == self.current_title_id)
-            
-            # Получаем систему для определения групп
-            systems = System.select().where(System.title_id == self.current_title_id).order_by(System.id)
-            
-            # Находим квалификацию
-            qualification = None
-            for system in systems:
-                if "Квалификация" in system.stage and "полуфинал" not in system.stage:
-                    qualification = system
-                    break
-            
-            if not qualification:
-                QMessageBox.warning(self, "Ошибка", "Не найдена квалификация для заполнения Choice")
-                return
-            
-            # Распределяем игроков по группам
-            total_players = players.count()
-            groups = qualification.total_group
-            players_per_group = total_players // groups
-            remainder = total_players % groups
-            
-            # Сортируем игроков по рейтингу для посева
-            players_sorted = players.order_by(Player.rank.desc())
-            
-            group_counter = 1
-            player_index = 0
-            players_list = list(players_sorted)
-            
-            for i in range(groups):
-                # Определяем размер группы
-                current_group_size = players_per_group + (1 if i < remainder else 0)
+            else:
                 
-                for j in range(current_group_size):
-                    if player_index < len(players_list):
-                        player = players_list[player_index]
-                        
-                        # Получаем тренера
-                        coach_name = ""
-                        if player.coach_id:
-                            coach = Coach.get_or_none(Coach.id == player.coach_id)
-                            if coach:
-                                coach_name = coach.coach
-                        
-                        # Получаем регион
-                        region_name = player.region if player.region else ""
-                        
-                        # Создаем запись в Choice
-                        Choice.create(
-                            player_choice=player.id,
-                            family=player.fio or player.player,
-                            region=region_name,
-                            coach=coach_name,
-                            rank=player.rank or 0,
-                            basic=None,
-                            group=None,
-                            posev_group=None,
-                            mesto_group=0,
-                            title_id=self.current_title_id,
-                            sex=player.sex
-                        )
-                        player_index += 1
+                # Получаем всех игроков соревнования
+                players = Player.select().where(Player.title_id == self.current_title_id)
                 
-                group_counter += 1
-            
-            QMessageBox.information(self, "Успех", 
-                                f"Таблица Choice заполнена.\n"
-                                f"Всего игроков: {player_index}\n"
-                                f"Количество групп: {groups}")
+                # Получаем систему для определения групп
+                systems = System.select().where(System.title_id == self.current_title_id).order_by(System.id)
+                
+                # Находим квалификацию
+                qualification = None
+                for system in systems:
+                    if "Квалификация" in system.stage and "полуфинал" not in system.stage:
+                        qualification = system
+                        break
+                
+                if not qualification:
+                    QMessageBox.warning(self, "Ошибка", "Не найдена квалификация для заполнения Choice")
+                    return
+                
+                # Распределяем игроков по группам
+                total_players = players.count()
+                groups = qualification.total_group
+                players_per_group = total_players // groups
+                remainder = total_players % groups
+                
+                # Сортируем игроков по рейтингу для посева
+                players_sorted = players.order_by(Player.rank.desc())
+                
+                group_counter = 1
+                player_index = 0
+                players_list = list(players_sorted)
+                
+                for i in range(groups):
+                    # Определяем размер группы
+                    current_group_size = players_per_group + (1 if i < remainder else 0)
+                    
+                    for j in range(current_group_size):
+                        if player_index < len(players_list):
+                            player = players_list[player_index]
+                            
+                            # Получаем тренера
+                            coach_name = ""
+                            if player.coach_id:
+                                coach = Coach.get_or_none(Coach.id == player.coach_id)
+                                if coach:
+                                    coach_name = coach.coach
+                            
+                            # Получаем регион
+                            region_name = player.region if player.region else ""
+                            
+                            # Создаем запись в Choice
+                            Choice.create(
+                                player_choice=player.id,
+                                family=player.fio or player.player,
+                                region=region_name,
+                                coach=coach_name,
+                                rank=player.rank or 0,
+                                basic=None,
+                                group=None,
+                                posev_group=None,
+                                mesto_group=0,
+                                title_id=self.current_title_id,
+                                sex=player.sex
+                            )
+                            player_index += 1
+                    
+                    group_counter += 1
+                
+                QMessageBox.information(self, "Успех", 
+                                    f"Таблица Choice заполнена.\n"
+                                    f"Всего игроков: {player_index}\n"
+                                    f"Количество групп: {groups}")
             
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось заполнить Choice: {str(e)}")
@@ -9431,7 +9484,7 @@ class MainWindow(QMainWindow):
                     region=player.region or "",
                     coach=coach_name,
                     rank=player.rank or 0,
-                    basic="основная",
+                    basic="",
                     group=f"Группа {group_num}",
                     posev_group=i + 1,
                     mesto_group=0,
@@ -9482,7 +9535,7 @@ class MainWindow(QMainWindow):
                                 f"Жеребьевка для этапа '{stage.stage}' сохранена!\n"
                                 f"Таблицы Choice и Result обновлены.")
             self.update_stages_info()
-            self.dialog.accept()
+            # self.dialog.accept()
         
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка при сохранении: {str(e)}")
@@ -10256,7 +10309,7 @@ class MainWindow(QMainWindow):
             # Для большего количества участников возвращаем последний вариант
             return tr[-1]
     
-    def write_drawing_results_to_result(self, group_players, stage_name, group_number, system_id):
+    def _write_drawing_results_to_result(self, group_players, stage_name, group_number, system_id):
         """Запись результатов жеребьевки в таблицу Result"""
         try:
             players_count = len(group_players)
@@ -10318,7 +10371,7 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             print(f"Ошибка записи результатов: {e}")
-
+# ============
     def fill_results_after_drawing(self):
         """Заполнение таблицы Result после жеребьевки квалификации"""
         if not self.current_title_id:
@@ -10349,15 +10402,17 @@ class MainWindow(QMainWindow):
                 (Result.title_id == self.current_title_id) &
                 (Result.system_stage == system_stage)
             ).execute()
-            
+            # Очищаем существующие результаты для этого этапа
+            Game_list.delete().where(
+                (Game_list.title_id == self.current_title_id) &
+                (Game_list.system_id == system.id)
+            ).execute()
+        
             total_matches = 0
             
             # Для каждой группы создаем туры
             for group_name, group_choices in groups.items():
                 # Извлекаем номер группы
-                # import re
-                # group_num = re.findall(r'\d+', group_name)
-                # group_num = group_num[0] if group_num else "1"
                 group_num = group_name
 
                 players_count = len(group_choices)
@@ -10371,7 +10426,6 @@ class MainWindow(QMainWindow):
                     player = Player.get(Player.id == choice.player_choice.id)
                     player_data[str(idx)] = {
                         'fio': player.fio_city,
-                        # 'city': player.city,
                         'player_obj': player
                     }
                 
@@ -10379,54 +10433,490 @@ class MainWindow(QMainWindow):
                 tours = self.tours_list(players_count)
                 
                 if tours and len(tours) > 0:
-                    tour_list = tours[0]  # Первый элемент - список туров
-                    
-                    for tour_idx, tour_matches in enumerate(tour_list, 1):
-                        for match in tour_matches:
-                            # Разбиваем пару
-                            if '-' in match:
-                                p1_num, p2_num = match.split('-')
-                                p1_num = p1_num.strip()
-                                p2_num = p2_num.strip()
-                                
-                                if p1_num in player_data and p2_num in player_data:
-                                    p1 = player_data[p1_num]
-                                    p2 = player_data[p2_num]
+                    round = 0
+                    for tour in tours: # цикл заполнения db таблиц -Result-
+                        round += 1
+                        for match in tour:
+                            znak = match.find("-")
+                            p1_num = str(match[:znak])  # игрок под номером в группе
+                            p2_num = str(match[znak + 1:])  # игрок под номером в группе
+                            p1 = player_data[p1_num]
+                            p2 = player_data[p2_num]
                                     
-                                    # Создаем запись в Result
-                                    Result.create(
-                                        system_stage=system_stage,
-                                        number_group=group_num,
-                                        tours=str(tour_idx),
-                                        player1=f"{p1['fio_city']}",
-                                        player2=f"{p2['fio_city']}",
-                                        winner=None,
-                                        points_win=0,
-                                        score_in_game=None,
-                                        score_win=None,
-                                        loser=None,
-                                        points_loser=0,
-                                        score_loser=None,
-                                        title_id=self.current_title_id,
-                                        round=str(tour_idx),
-                                        system_id=system.id if system else 1,
-                                        sex=self.current_sex if self.current_sex else "man",
-                                        schedule_date=None,
-                                        schedule_time=None,
-                                        schedule_table="",
-                                        stage_net="group"
-                                    )
-                                    total_matches += 1
+                            # Создаем запись в Result
+                            Result.create(
+                                system_stage=system_stage,
+                                number_group=group_num,
+                                tours=match,
+                                player1=f"{p1['fio']}",
+                                player2=f"{p2['fio']}",
+                                winner=None,
+                                points_win=0,
+                                score_in_game=None,
+                                score_win=None,
+                                loser=None,
+                                points_loser=0,
+                                score_loser=None,
+                                title_id=self.current_title_id,
+                                round=round,
+                                system_id=system.id if system else 1,
+                                sex=self.current_sex if self.current_sex else "man",
+                                schedule_date=None,
+                                schedule_time=None,
+                                schedule_table="",
+                                stage_net=""
+                            )
+                            total_matches += 1
+                # ===============================
+                # Потом заполняем Game_list (информация о игроках в группах)
+                for idx, player in enumerate(group_choices, 1):
+                    Game_list.create(
+                        number_group=player.group,
+                        rank_num_player=player.posev_group,  # номер посева в группе
+                        player_group=player.player_choice_id,
+                        system_id=system.id if system else 1,
+                        title_id=self.current_title_id,
+                        sex=self.current_sex if self.current_sex else "man",
+                        player_double_id=None,
+                        team_id=None
+                    )
+            # =================================
             
             QMessageBox.information(self, "Успех", 
-                                f"Таблица Result заполнена!\n"
+                                f"Таблица Result и Game_list заполнены!\n"
                                 f"Всего матчей создано: {total_matches}")
             
         except Exception as e:
             import traceback
             traceback.print_exc()
             QMessageBox.critical(self, "Ошибка", f"Не удалось заполнить результаты: {str(e)}")
-# =================================
+
+    def save_current_competition(self):
+        """Сохранение текущего соревнования"""
+        if not self.current_title_id:
+            return
+        
+        try:
+            title = Title.get_by_id(self.current_title_id)
+            
+            reply = QMessageBox.question(self, "Сохранение соревнования", 
+                                        f"Сохранить резервную копию соревнования '{title.name}'?",
+                                        QMessageBox.Yes | QMessageBox.No)
+            
+            if reply == QMessageBox.Yes:
+                # Создаем папку backup_db, если её нет
+                backup_dir = "backup_db"
+                if not os.path.exists(backup_dir):
+                    os.makedirs(backup_dir)
+                
+                # Формируем имя файла
+                short_name = title.short_name_comp if title.short_name_comp else title.name
+                import re
+                clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
+                clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
+                
+                from datetime import datetime
+                timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+                backup_file = os.path.join(backup_dir, f"{clean_name}_{timestamp}.sql")
+                
+                # Экспортируем базу данных
+                self.export_database_internal(backup_file, None)
+                
+                QMessageBox.information(self, "Успех", f"Соревнование сохранено в:\n{backup_file}")
+                
+        except Exception as e:
+            print(f"Ошибка сохранения соревнования: {e}")
+
+    def export_database_internal(self, file_path, progress=None):
+        """Встроенный экспорт базы данных (без mysqldump)"""
+        try:
+            from models import (
+                Title, Coach, Region, City, Patronymic, Player, Players_full,
+                R_list_m, R_list_d, R1_list_m, R1_list_d, Referee, Team,
+                Players_double, Choice, Result, System, Choice_Team, Game_list,
+                Choice_double_player, Delete_player, db
+            )
+            from datetime import datetime, date
+            
+            models = [
+                Title, Coach, Region, City, Patronymic, Player, Players_full,
+                R_list_m, R_list_d, R1_list_m, R1_list_d, Referee, Team,
+                Players_double, Choice, Result, System, Choice_Team, Game_list,
+                Choice_double_player, Delete_player
+            ]
+            
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(f"-- Backup created at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(f"-- Database: {db.database}\n\n")
+                
+                for i, model in enumerate(models):
+                    if progress and progress.wasCanceled():
+                        break
+                    
+                    if progress:
+                        progress.setValue(i)
+                        progress.setLabelText(f"Экспорт таблицы: {model._meta.table_name}")
+                    
+                    table_name = model._meta.table_name
+                    f.write(f"-- Table structure for table {table_name}\n")
+                    f.write(f"DROP TABLE IF EXISTS `{table_name}`;\n")
+                    
+                    # Получаем колонки таблицы
+                    columns = []
+                    for field_name, field in model._meta.fields.items():
+                        # Получаем имя колонки (db_column или column или name)
+                        if hasattr(field, 'db_column') and field.db_column:
+                            col_name = field.db_column
+                        elif hasattr(field, 'column'):
+                            col_name = field.column
+                        else:
+                            col_name = field_name
+                        
+                        # Получаем тип поля
+                        if hasattr(field, 'field_type'):
+                            col_type = field.field_type
+                        else:
+                            col_type = str(type(field).__name__).upper()
+                        
+                        col_def = f"`{col_name}` {col_type}"
+                        
+                        # Primary Key
+                        if field.primary_key:
+                            col_def += " PRIMARY KEY AUTO_INCREMENT"
+                        
+                        # NOT NULL
+                        if not field.null and not field.primary_key:
+                            col_def += " NOT NULL"
+                        
+                        # DEFAULT
+                        if field.default is not None and not callable(field.default):
+                            if isinstance(field.default, str):
+                                col_def += f" DEFAULT '{field.default}'"
+                            else:
+                                col_def += f" DEFAULT {field.default}"
+                        
+                        columns.append(col_def)
+                    
+                    create_sql = f"CREATE TABLE `{table_name}` (\n  " + ",\n  ".join(columns) + "\n);"
+                    f.write(f"{create_sql}\n\n")
+                    
+                    # Получаем данные
+                    try:
+                        query = model.select()
+                        rows = list(query)
+                        
+                        if rows:
+                            for row in rows:
+                                values = []
+                                for field_name, field in model._meta.fields.items():
+                                    val = getattr(row, field_name)
+                                    if val is None:
+                                        values.append('NULL')
+                                    elif isinstance(val, str):
+                                        val = val.replace("'", "''")
+                                        values.append(f"'{val}'")
+                                    elif isinstance(val, (datetime, date)):
+                                        values.append(f"'{val}'")
+                                    elif isinstance(val, bool):
+                                        values.append('1' if val else '0')
+                                    else:
+                                        values.append(str(val))
+                                
+                                # Получаем имена колонок
+                                col_names = []
+                                for field_name, field in model._meta.fields.items():
+                                    if hasattr(field, 'db_column') and field.db_column:
+                                        col_names.append(f"`{field.db_column}`")
+                                    elif hasattr(field, 'column'):
+                                        col_names.append(f"`{field.column}`")
+                                    else:
+                                        col_names.append(f"`{field_name}`")
+                                
+                                f.write(f"INSERT INTO `{table_name}` ({','.join(col_names)}) VALUES ({','.join(values)});\n")
+                            f.write("\n")
+                    except Exception as e:
+                        print(f"Ошибка экспорта данных из {table_name}: {e}")
+                        f.write(f"-- Ошибка экспорта данных: {e}\n\n")
+            
+            if progress:
+                progress.setValue(len(models))
+                
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            raise e
+# ===============================        
+    def search_in_choice_table(self):
+        """Поиск информации в таблице Choice"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+        
+        # Проверяем существование таблицы Choice
+        try:
+            # Проверяем, есть ли записи в Choice для текущего соревнования
+            choices_count = Choice.select().where(Choice.title_id == self.current_title_id).count()
+            
+            if choices_count == 0:
+                QMessageBox.information(self, "Информация", 
+                                    "Таблица Choice пуста.\n"
+                                    "Сначала проведите жеребьевку квалификации.")
+                return
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Ошибка доступа к таблице Choice: {str(e)}")
+            return
+        
+        # Создаем диалог поиска
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Поиск в таблице Choice")
+        dialog.setModal(True)
+        dialog.setMinimumWidth(650)
+        dialog.setMinimumHeight(550)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # Заголовок
+        title_label = QLabel("Поиск участников в жеребьевке (таблица Choice)")
+        title_label.setStyleSheet("font-weight: bold; font-size: 13px; margin-bottom: 10px;")
+        layout.addWidget(title_label)
+        
+        # Поле для ввода поискового запроса
+        search_layout = QHBoxLayout()
+        search_layout.addWidget(QLabel("Поиск:"))
+        search_edit = QLineEdit()
+        search_edit.setPlaceholderText("Введите ФИО, регион, тренера или группу...")
+        search_edit.setMinimumWidth(300)
+        search_layout.addWidget(search_edit)
+        layout.addLayout(search_layout)
+        
+        # Выбор типа поиска
+        type_layout = QHBoxLayout()
+        type_layout.addWidget(QLabel("Тип поиска:"))
+        search_type_combo = QComboBox()
+        search_type_combo.addItems(["Везде", "По ФИО", "По региону", "По тренеру", "По группе", "По рейтингу"])
+        type_layout.addWidget(search_type_combo)
+        type_layout.addStretch()
+        layout.addLayout(type_layout)
+        
+        # Кнопки
+        buttons_layout = QHBoxLayout()
+        search_btn = QPushButton("🔍 Найти")
+        search_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 5px;")
+        clear_btn = QPushButton("🗑️ Очистить")
+        clear_btn.setStyleSheet("background-color: #FF9800; color: white; padding: 5px;")
+        close_btn = QPushButton("Закрыть")
+        close_btn.setStyleSheet("background-color: #f44336; color: white; padding: 5px;")
+        buttons_layout.addWidget(search_btn)
+        buttons_layout.addWidget(clear_btn)
+        buttons_layout.addWidget(close_btn)
+        layout.addLayout(buttons_layout)
+        
+        # Результаты поиска
+        result_label = QLabel("Результаты поиска:")
+        result_label.setStyleSheet("font-weight: bold; margin-top: 10px;")
+        layout.addWidget(result_label)
+        
+        result_list = QListWidget()
+        result_list.setStyleSheet("""
+            QListWidget {
+                min-height: 350px;
+                border: 1px solid #ccc;
+                border-radius: 3px;
+                font-size: 11px;
+            }
+            QListWidget::item {
+                padding: 8px;
+                border-bottom: 1px solid #eee;
+            }
+            QListWidget::item:selected {
+                background-color: #4CAF50;
+                color: white;
+            }
+        """)
+        layout.addWidget(result_list)
+        
+        def perform_search():
+            search_text = search_edit.text().strip().lower()
+            search_type = search_type_combo.currentText()
+            
+            if not search_text:
+                QMessageBox.warning(dialog, "Ошибка", "Введите текст для поиска")
+                return
+            
+            result_list.clear()
+            
+            try:
+                # Получаем все записи Choice для текущего соревнования
+                choices = Choice.select().where(Choice.title_id == self.current_title_id)
+                
+                results = []
+                for choice in choices:
+                    # Получаем данные игрока
+                    player = Player.get_or_none(Player.id == choice.player_choice.id)
+                    if not player:
+                        continue
+                    
+                    match = False
+                    highlight_text = ""
+                    
+                    # Приводим все к нижнему регистру для сравнения
+                    family_lower = choice.family.lower() if choice.family else ""
+                    region_lower = choice.region.lower() if choice.region else ""
+                    coach_lower = choice.coach.lower() if choice.coach else ""
+                    group_lower = choice.group.lower() if choice.group else ""
+                    rank_str = str(choice.rank)
+                    
+                    if search_type == "Везде":
+                        if (search_text in family_lower or
+                            search_text in region_lower or
+                            search_text in coach_lower or
+                            search_text in group_lower or
+                            search_text == rank_str):
+                            match = True
+                            if search_text in family_lower:
+                                highlight_text = f"ФИО: {choice.family}"
+                            elif search_text in region_lower:
+                                highlight_text = f"Регион: {choice.region}"
+                            elif search_text in coach_lower:
+                                highlight_text = f"Тренер: {choice.coach}"
+                            elif search_text in group_lower:
+                                highlight_text = f"Группа: {choice.group}"
+                            elif search_text == rank_str:
+                                highlight_text = f"Рейтинг: {choice.rank}"
+                    
+                    elif search_type == "По ФИО":
+                        if search_text in family_lower:
+                            match = True
+                            highlight_text = f"ФИО: {choice.family}"
+                    
+                    elif search_type == "По региону":
+                        if search_text in region_lower:
+                            match = True
+                            highlight_text = f"Регион: {choice.region}"
+                    
+                    elif search_type == "По тренеру":
+                        if search_text in coach_lower:
+                            match = True
+                            highlight_text = f"Тренер: {choice.coach}"
+                    
+                    elif search_type == "По группе":
+                        if search_text in group_lower:
+                            match = True
+                            highlight_text = f"Группа: {choice.group}"
+                    
+                    elif search_type == "По рейтингу":
+                        if search_text == rank_str:
+                            match = True
+                            highlight_text = f"Рейтинг: {choice.rank}"
+                    
+                    if match:
+                        results.append({
+                            'id': choice.id,
+                            'family': choice.family,
+                            'region': choice.region,
+                            'coach': choice.coach,
+                            'rank': choice.rank,
+                            'group': choice.group,
+                            'posev_group': choice.posev_group,
+                            'mesto_group': choice.mesto_group,
+                            'highlight': highlight_text
+                        })
+                
+                if results:
+                    for r in results:
+                        item_text = f"""🏅 {r['family']}
+    📍 Регион: {r['region']}
+    👨‍🏫 Тренер: {r['coach']}
+    📊 Рейтинг: {r['rank']}
+    🏆 Группа: {r['group']} (посев: {r['posev_group']}, место: {r['mesto_group'] or 'не определено'})
+    🔍 Найдено по: {r['highlight']}"""
+                        item = QListWidgetItem(item_text)
+                        item.setData(Qt.UserRole, r['id'])
+                        result_list.addItem(item)
+                    
+                    result_label.setText(f"Результаты поиска: найдено {len(results)} участников")
+                else:
+                    result_list.addItem("Ничего не найдено")
+                    result_label.setText("Результаты поиска: ничего не найдено")
+                    
+            except Exception as e:
+                QMessageBox.critical(dialog, "Ошибка", f"Ошибка поиска: {str(e)}")
+        
+        def clear_search():
+            search_edit.clear()
+            search_type_combo.setCurrentIndex(0)
+            result_list.clear()
+            result_label.setText("Результаты поиска:")
+        
+        search_btn.clicked.connect(perform_search)
+        clear_btn.clicked.connect(clear_search)
+        close_btn.clicked.connect(dialog.reject)
+        search_edit.returnPressed.connect(perform_search)
+        
+        dialog.exec_()
+# ================================
+    def show_choice_statistics(self):
+        """Показать статистику по таблице Choice"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+        
+        try:
+            total_players = Choice.select().where(Choice.title_id == self.current_title_id).count()
+            
+            # Группировка по группам
+            from collections import Counter
+            groups_counter = Counter()
+            regions_counter = Counter()
+            
+            choices = Choice.select().where(Choice.title_id == self.current_title_id)
+            
+            for choice in choices:
+                groups_counter[choice.group] += 1
+                if choice.region:
+                    regions_counter[choice.region] += 1
+            
+            stats_text = f"📊 СТАТИСТИКА ЖЕРЕБЬЕВКИ\n"
+            stats_text += "=" * 40 + "\n\n"
+            stats_text += f"👥 Всего участников: {total_players}\n\n"
+            
+            stats_text += "🏆 РАСПРЕДЕЛЕНИЕ ПО ГРУППАМ:\n"
+            for group, count in sorted(groups_counter.items()):
+                stats_text += f"   • {group}: {count} чел.\n"
+            
+            if regions_counter:
+                stats_text += "\n📍 РАСПРЕДЕЛЕНИЕ ПО РЕГИОНАМ:\n"
+                for region, count in regions_counter.most_common(10):
+                    stats_text += f"   • {region}: {count} чел.\n"
+            
+            QMessageBox.information(self, "Статистика", stats_text)
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Ошибка: {str(e)}")
+
+    def clear_choice_table(self):
+        """Очистка таблицы Choice для текущего соревнования"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+        
+        reply = QMessageBox.question(self, "Подтверждение", 
+                                    "Очистить таблицу Choice для текущего соревнования?\n"
+                                    "Все данные жеребьевки будут удалены!",
+                                    QMessageBox.Yes | QMessageBox.No)
+        
+        if reply == QMessageBox.Yes:
+            try:
+                deleted = Choice.delete().where(Choice.title_id == self.current_title_id).execute()
+                QMessageBox.information(self, "Успех", f"Удалено {deleted} записей из Choice")
+                self.update_stages_info()
+            except Exception as e:
+                QMessageBox.critical(self, "Ошибка", f"Ошибка: {str(e)}")
+
+    def export_choice_report(self):
+        """Экспорт отчета по жеребьевке в PDF"""
+        QMessageBox.information(self, "Экспорт", "Функция экспорта отчета в разработке")
+    # =================================
 class RatingLoaderThread(QThread):
     progress = pyqtSignal(int)
     status = pyqtSignal(str)

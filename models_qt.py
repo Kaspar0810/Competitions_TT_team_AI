@@ -173,28 +173,16 @@ class TeamsTableModel(QAbstractTableModel):
                 return self._headers[section]
         return None
 
-
 class ResultsTableModel(QAbstractTableModel):
-    """Модель для отображения результатов"""
-    
-    def __init__(self, title_id=None, parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
         self._data = []
-        self.title_id = title_id
-        self._headers = ['ID', 'Этап', 'Группа', 'Игрок 1', 'Игрок 2', 
-                        'Победитель', 'Счёт', 'Раунд']
-        self.load_data()
+        self._headers = ['ID', 'Этап', 'Группа', 'Тур', 'Игрок 1', 'Игрок 2', 'Победитель', 'Счет', 'Очки']
     
-    def load_data(self):
-        try:
-            query = Result.select().order_by(Result.id)
-            if self.title_id:
-                query = query.where(Result.title_id == self.title_id)
-            self._data = list(query)
-            self.layoutChanged.emit()
-        except Exception as e:
-            print(f"Ошибка загрузки результатов: {e}")
-            self._data = []
+    def setData(self, data):
+        self.beginResetModel()
+        self._data = data
+        self.endResetModel()
     
     def rowCount(self, parent=QModelIndex()):
         return len(self._data)
@@ -206,38 +194,38 @@ class ResultsTableModel(QAbstractTableModel):
         if not index.isValid() or role != Qt.DisplayRole:
             return None
         
-        try:
-            result = self._data[index.row()]
-            col = index.column()
-            
-            if col == 0:
-                return str(result.id)
-            elif col == 1:
-                return result.system_stage or ""
-            elif col == 2:
-                return result.number_group or ""
-            elif col == 3:
-                return result.player1 or ""
-            elif col == 4:
-                return result.player2 or ""
-            elif col == 5:
-                return result.winner or ""
-            elif col == 6:
-                return result.score_in_game or ""
-            elif col == 7:
-                return result.round or ""
-            
-            return ""
-        except Exception as e:
-            print(f"Ошибка получения данных результата: {e}")
-            return ""
+        if index.row() >= len(self._data):
+            return None
+        
+        item = self._data[index.row()]
+        col = index.column()
+        
+        if col == 0:  # ID
+            return str(item.get('id', ''))
+        elif col == 1:  # Этап
+            return item.get('stage', '')
+        elif col == 2:  # Группа
+            return item.get('group', '')
+        elif col == 3:  # Тур
+            return item.get('tour', '')
+        elif col == 4:  # Игрок 1
+            return item.get('player1', '')
+        elif col == 5:  # Игрок 2
+            return item.get('player2', '')
+        elif col == 6:  # Победитель
+            return item.get('winner', '')
+        elif col == 7:  # Счет
+            return item.get('score', '')
+        elif col == 8:  # Очки
+            return item.get('points', '')
+        
+        return None
     
     def headerData(self, section, orientation, role=Qt.DisplayRole):
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
             if section < len(self._headers):
                 return self._headers[section]
         return None
-
 
 class DoublePlayersTableModel(QAbstractTableModel):
     """Модель для отображения пар игроков"""

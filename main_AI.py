@@ -16,6 +16,7 @@ from PyQt5.QtGui import QFont, QColor, QIntValidator
 from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QCompleter
 from PyQt5.QtCore import QStringListModel
+from PyQt5.QtWidgets import QStackedWidget
 
 from reportlab.pdfbase.pdfmetrics import registerFontFamily
 from reportlab.lib import colors
@@ -97,7 +98,7 @@ class MainWindow(QMainWindow):
                     ["🗑️ Очистить", "📋 Отчет"]
                 ]},
             5: {"title": "Результаты", "description": "Ввод и просмотр результатов",
-                "buttons": ["📥 Загрузить", "📤 Экспорт", "🗑️ Очистить", "🧮 Рассчитать"]},
+                "buttons": ["🎯 Выбрать этап", "🔄 Обновить", "📊 Фильтры", "📤 Экспорт"]},  # <-- Исправлено: простой список
             6: {"title": "Рейтинг", "description": "Рейтинг участников",
                 "buttons": ["🔄 Обновить", "🏆 Топ-10", "📊 Расчёт"]},
             7: {"title": "Дополнительно", "description": "Дополнительные настройки",
@@ -178,7 +179,7 @@ class MainWindow(QMainWindow):
     def load_teams_for_title(self):
         """Загрузка команд для выбранного соревнования"""
         if not self.current_title_id:
-            self.teams_model.setData([])
+            self.teams_table_view.setModel(None)
             return
         
         try:
@@ -192,16 +193,20 @@ class MainWindow(QMainWindow):
                     'coach_team': team.coach_team or "",
                     'r_sum': team.r_sum or 0
                 })
+            
+            # Создаем простую модель для таблицы команд
+            from PyQt5.QtCore import QStringListModel
+            # Здесь нужно использовать вашу модель для команд
             self.teams_model.setData(teams_data)
-            self.table_view.setModel(self.teams_model)
-            self.table_header.setText(f"🏆 Команды - {len(teams_data)} шт.")
+            self.teams_table_view.setModel(self.teams_model)
+            
         except Exception as e:
             print(f"Ошибка загрузки команд: {e}")
 
     def load_doubles_for_title(self):
         """Загрузка пар для выбранного соревнования"""
         if not self.current_title_id:
-            self.double_players_model.setData([])
+            self.doubles_table_view.setModel(None)
             return
         
         try:
@@ -217,9 +222,10 @@ class MainWindow(QMainWindow):
                     'posev': double.posev or 0,
                     'mesto': double.mesto or 0
                 })
+            
             self.double_players_model.setData(doubles_data)
-            self.table_view.setModel(self.double_players_model)
-            self.table_header.setText(f"🤝 Пары - {len(doubles_data)} шт.")
+            self.doubles_table_view.setModel(self.double_players_model)
+            
         except Exception as e:
             print(f"Ошибка загрузки пар: {e}")
 
@@ -769,19 +775,18 @@ class MainWindow(QMainWindow):
         top_layout.setStretch(0, 2)
         top_layout.setStretch(1, 1)
 
-
-# =========== добавил
         self.list_widget.itemClicked.connect(self.on_title_selected)
         self.add_context_menu_to_list()  # Добавляем контекстное меню
         right_panel_layout.addWidget(self.list_widget)
-
-        # ========== Нижняя часть с таблицей ==========
+#============================================================
+    
+    # ========== Нижняя часть с таблицей ==========
         self.bottom_widget = QWidget()
         bottom_layout = QVBoxLayout(self.bottom_widget)
         bottom_layout.setContentsMargins(5, 5, 5, 5)
         bottom_layout.setSpacing(5)
         
-        # Заголовок таблицы
+        # Заголовок таблицы (общий для всех таблиц)
         self.table_header = QLabel("👥 Список участников")
         self.table_header.setStyleSheet("""
             background-color: #2196F3;
@@ -792,6 +797,9 @@ class MainWindow(QMainWindow):
             border-radius: 3px;
         """)
         bottom_layout.addWidget(self.table_header)
+        
+        # Контейнер для таблиц (stacked widget)
+        self.table_container = QStackedWidget()
         
         # Таблица участников
         self.table_view = QTableView()
@@ -816,30 +824,103 @@ class MainWindow(QMainWindow):
                 border: none;
             }
         """)
-        
-        # Уменьшаем высоту строк
         self.table_view.verticalHeader().setDefaultSectionSize(22)
-        self.table_view.verticalHeader().setMinimumSectionSize(18)
-        
-        # В методе init_ui, после установки модели:
         self.table_view.setModel(self.players_model)
-
-        # Показываем первую колонку (№) и настраиваем её ширину
-        self.table_view.setColumnHidden(0, False)  # Показываем колонку с номером
-        self.table_view.setColumnWidth(0, 40)      # Ширина колонки №
-
-        # Настройка остальных колонок
-        self.table_view.setColumnWidth(1, 180)  # ФИО
-        self.table_view.setColumnWidth(2, 90)   # Дата рождения
-        self.table_view.setColumnWidth(3, 60)   # Рейтинг
-        self.table_view.setColumnWidth(4, 120)  # Город
-        self.table_view.setColumnWidth(5, 120)  # Регион
-        self.table_view.setColumnWidth(6, 90)   # Разряд
-        self.table_view.setColumnWidth(7, 150)  # Тренер
-
-        # Растягиваем последнюю колонку
+        self.table_view.setColumnHidden(0, False)
+        self.table_view.setColumnWidth(0, 40)
+        self.table_view.setColumnWidth(1, 180)
+        self.table_view.setColumnWidth(2, 90)
+        self.table_view.setColumnWidth(3, 60)
+        self.table_view.setColumnWidth(4, 120)
+        self.table_view.setColumnWidth(5, 120)
+        self.table_view.setColumnWidth(6, 90)
+        self.table_view.setColumnWidth(7, 150)
         self.table_view.horizontalHeader().setStretchLastSection(True)
-
+        self.table_view.setSelectionMode(QTableView.ExtendedSelection)
+        
+        # Таблица результатов
+        self.results_table_view = QTableView()
+        self.results_table_view.setSelectionBehavior(QTableView.SelectRows)
+        self.results_table_view.setAlternatingRowColors(True)
+        self.results_table_view.setShowGrid(True)
+        self.results_table_view.setStyleSheet("""
+            QTableView {
+                font-size: 10px;
+                gridline-color: #ddd;
+                selection-background-color: #a0c4ff;
+            }
+            QTableView::item {
+                padding: 2px;
+            }
+            QHeaderView::section {
+                background-color: #FF9800;
+                color: white;
+                padding: 4px;
+                font-weight: bold;
+                font-size: 10px;
+                border: none;
+            }
+        """)
+        self.results_table_view.verticalHeader().setDefaultSectionSize(22)
+        self.results_table_view.setModel(self.results_table_model)
+        self.results_table_view.doubleClicked.connect(self.on_match_double_clicked)
+        self.results_table_view.setSelectionMode(QTableView.SingleSelection)
+        
+        # Таблица команд
+        self.teams_table_view = QTableView()
+        self.teams_table_view.setSelectionBehavior(QTableView.SelectRows)
+        self.teams_table_view.setAlternatingRowColors(True)
+        self.teams_table_view.setShowGrid(True)
+        self.teams_table_view.setStyleSheet("""
+            QTableView {
+                font-size: 10px;
+                gridline-color: #ddd;
+                selection-background-color: #a0c4ff;
+            }
+            QHeaderView::section {
+                background-color: #9C27B0;
+                color: white;
+                padding: 4px;
+                font-weight: bold;
+                font-size: 10px;
+                border: none;
+            }
+        """)
+        self.teams_table_view.verticalHeader().setDefaultSectionSize(22)
+        self.teams_table_view.setModel(self.teams_model)
+        
+        # Таблица пар
+        self.doubles_table_view = QTableView()
+        self.doubles_table_view.setSelectionBehavior(QTableView.SelectRows)
+        self.doubles_table_view.setAlternatingRowColors(True)
+        self.doubles_table_view.setShowGrid(True)
+        self.doubles_table_view.setStyleSheet("""
+            QTableView {
+                font-size: 10px;
+                gridline-color: #ddd;
+                selection-background-color: #a0c4ff;
+            }
+            QHeaderView::section {
+                background-color: #4CAF50;
+                color: white;
+                padding: 4px;
+                font-weight: bold;
+                font-size: 10px;
+                border: none;
+            }
+        """)
+        self.doubles_table_view.verticalHeader().setDefaultSectionSize(22)
+        self.doubles_table_view.setModel(self.double_players_model)
+        
+        # Добавляем все таблицы в stacked widget
+        self.table_container.addWidget(self.table_view)      # индекс 0
+        self.table_container.addWidget(self.results_table_view)  # индекс 1
+        self.table_container.addWidget(self.teams_table_view)    # индекс 2
+        self.table_container.addWidget(self.doubles_table_view)  # индекс 3
+        
+        bottom_layout.addWidget(self.table_container)
+        
+# ===========================================================================
         # В init_ui, после создания table_view:
         self.table_view.setSelectionMode(QTableView.ExtendedSelection)  # Множественное выделение
         self.table_view.setSelectionBehavior(QTableView.SelectRows)  # Выделение строк
@@ -863,7 +944,7 @@ class MainWindow(QMainWindow):
             2: 180,  # Команды
             3: 180,  # Пары
             4: 600,  # Система
-            5: 220,  # Результаты
+            5: 600,  # Результаты
             6: 180,  # Рейтинг
             7: 200   # Дополнительно
         }
@@ -1904,63 +1985,646 @@ class MainWindow(QMainWindow):
         return tab_widget
 #=====================================
     def create_results_tab(self):
-        """Вкладка Результаты"""
+        """Вкладка Результаты - ввод результатов матчей (компактная версия)"""
         tab_widget = QWidget()
         main_layout = QVBoxLayout(tab_widget)
-        main_layout.setSpacing(8)
-        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.setSpacing(5)
+        main_layout.setContentsMargins(5, 5, 5, 5)
         
-        input_style = """
-            QLineEdit, QComboBox {
-                max-height: 26px;
-                padding: 3px 5px;
-                font-size: 10px;
-                border: 1px solid #ccc;
+        # Информационная панель о текущем этапе (уменьшенная высота)
+        info_frame = QFrame()
+        info_frame.setStyleSheet("""
+            QFrame {
+                background-color: #e3f2fd;
                 border-radius: 3px;
+                padding: 3px;
             }
+        """)
+        info_layout = QHBoxLayout(info_frame)
+        info_layout.setSpacing(10)
+        info_layout.setContentsMargins(5, 2, 5, 2)
+        
+        self.current_stage_label = QLabel("Этап: Не выбран")
+        self.current_stage_label.setStyleSheet("font-weight: bold; font-size: 11px;")
+        info_layout.addWidget(self.current_stage_label)
+        
+        self.current_match_label = QLabel("Матч: 0/0")
+        self.current_match_label.setStyleSheet("color: gray; font-size: 10px;")
+        info_layout.addWidget(self.current_match_label)
+        info_layout.addStretch()
+        
+        main_layout.addWidget(info_frame)
+        
+        # Группа ввода результатов (компактная сетка)
+        input_group = QGroupBox("Ввод результата матча")
+        input_group.setStyleSheet("""
             QGroupBox {
                 font-weight: bold;
                 font-size: 11px;
-                border: 1px solid #ccc;
+                border: 1px solid #4CAF50;
                 border-radius: 5px;
-                margin-top: 10px;
+                margin-top: 8px;
             }
             QGroupBox::title {
                 subcontrol-origin: margin;
                 left: 10px;
                 padding: 0 5px 0 5px;
+                color: #4CAF50;
             }
-        """
+        """)
         
-        group = QGroupBox("📊 Ввод результатов матча")
-        group_layout = QFormLayout(group)
-        group_layout.setSpacing(8)
-        group_layout.setContentsMargins(10, 15, 10, 10)
+        # Используем GridLayout для компактного расположения
+        grid_layout = QGridLayout(input_group)
+        grid_layout.setSpacing(6)
+        grid_layout.setContentsMargins(8, 12, 8, 8)
         
-        self.result_player1 = QLineEdit()
-        self.result_player1.setPlaceholderText("Игрок 1")
-        self.result_player1.setStyleSheet(input_style)
-        group_layout.addRow("Игрок 1:", self.result_player1)
+        # Заголовки
+        grid_layout.addWidget(QLabel("Статус"), 0, 0)
+        grid_layout.addWidget(QLabel("Игрок"), 0, 1)
+        grid_layout.addWidget(QLabel("Общий счет"), 0, 2)
         
-        self.result_score1 = QLineEdit()
-        self.result_score1.setPlaceholderText("Счёт")
-        self.result_score1.setStyleSheet(input_style)
-        group_layout.addRow("Счёт 1:", self.result_score1)
+        # Заголовки для партий (уменьшенные)
+        self.parties_count = 5  # по умолчанию
+        self.score_edits_p1 = []
+        self.score_edits_p2 = []
+        self.score_labels = []
         
-        self.result_player2 = QLineEdit()
-        self.result_player2.setPlaceholderText("Игрок 2")
-        self.result_player2.setStyleSheet(input_style)
-        group_layout.addRow("Игрок 2:", self.result_player2)
+        for i in range(7):
+            label = QLabel(f"П{i+1}")
+            label.setAlignment(Qt.AlignCenter)
+            label.setMaximumWidth(35)
+            label.setStyleSheet("font-size: 9px;")
+            grid_layout.addWidget(label, 0, 3 + i)
+            self.score_labels.append(label)
         
-        self.result_score2 = QLineEdit()
-        self.result_score2.setPlaceholderText("Счёт")
-        self.result_score2.setStyleSheet(input_style)
-        group_layout.addRow("Счёт 2:", self.result_score2)
+        # Ряд 1: Игрок 1
+        # Статус
+        self.player1_status = QComboBox()
+        self.player1_status.addItems(["Играет", "Не явка", "Травма", "Дискв."])
+        self.player1_status.setMaximumWidth(80)
+        self.player1_status.setStyleSheet("font-size: 10px;")
+        grid_layout.addWidget(self.player1_status, 1, 0)
         
-        main_layout.addWidget(group)
-        main_layout.addStretch()
+        # ФИО игрока 1 (увеличенное поле)
+        self.player1_name = QLineEdit()
+        self.player1_name.setReadOnly(True)
+        self.player1_name.setPlaceholderText("Двойной клик для выбора")
+        self.player1_name.setMinimumWidth(200)
+        self.player1_name.mouseDoubleClickEvent = self.select_player1
+        grid_layout.addWidget(self.player1_name, 1, 1)
+        
+        # Общий счет
+        self.total_score1 = QLineEdit()
+        self.total_score1.setPlaceholderText("0")
+        self.total_score1.setMaximumWidth(50)
+        self.total_score1.setStyleSheet("font-size: 10px;")
+        grid_layout.addWidget(self.total_score1, 1, 2)
+        
+        # Поля для счетов игрока 1 (уменьшенные)
+        for i in range(7):
+            edit = QLineEdit()
+            edit.setMaximumWidth(35)
+            edit.setPlaceholderText("0")
+            edit.setEnabled(False)
+            edit.setStyleSheet("font-size: 10px;")
+            grid_layout.addWidget(edit, 1, 3 + i)
+            self.score_edits_p1.append(edit)
+        
+        # Ряд 2: Игрок 2
+        # Статус
+        self.player2_status = QComboBox()
+        self.player2_status.addItems(["Играет", "Не явка", "Травма", "Дискв."])
+        self.player2_status.setMaximumWidth(80)
+        self.player2_status.setStyleSheet("font-size: 10px;")
+        grid_layout.addWidget(self.player2_status, 2, 0)
+        
+        # ФИО игрока 2 (увеличенное поле)
+        self.player2_name = QLineEdit()
+        self.player2_name.setReadOnly(True)
+        self.player2_name.setPlaceholderText("Двойной клик для выбора")
+        self.player2_name.setMinimumWidth(200)
+        self.player2_name.mouseDoubleClickEvent = self.select_player2
+        grid_layout.addWidget(self.player2_name, 2, 1)
+        
+        # Общий счет
+        self.total_score2 = QLineEdit()
+        self.total_score2.setPlaceholderText("0")
+        self.total_score2.setMaximumWidth(50)
+        self.total_score2.setStyleSheet("font-size: 10px;")
+        grid_layout.addWidget(self.total_score2, 2, 2)
+        
+        # Поля для счетов игрока 2 (уменьшенные)
+        for i in range(7):
+            edit = QLineEdit()
+            edit.setMaximumWidth(35)
+            edit.setPlaceholderText("0")
+            edit.setEnabled(False)
+            edit.setStyleSheet("font-size: 10px;")
+            grid_layout.addWidget(edit, 2, 3 + i)
+            self.score_edits_p2.append(edit)
+        
+        # Кнопки (вертикально)
+        buttons_widget = QWidget()
+        buttons_widget.setMaximumWidth(100)
+        buttons_layout = QVBoxLayout(buttons_widget)
+        buttons_layout.setSpacing(8)
+        buttons_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.save_btn = QPushButton("💾 Сохранить")
+        self.save_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                padding: 6px 12px;
+                font-size: 10px;
+                font-weight: bold;
+                border-radius: 3px;
+            }
+            QPushButton:hover { background-color: #45a049; }
+        """)
+        self.save_btn.clicked.connect(self.save_match_result_compact)
+        buttons_layout.addWidget(self.save_btn)
+        
+        self.clear_btn = QPushButton("🗑️ Очистить")
+        self.clear_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #FF9800;
+                color: white;
+                padding: 6px 12px;
+                font-size: 10px;
+                font-weight: bold;
+                border-radius: 3px;
+            }
+            QPushButton:hover { background-color: #F57C00; }
+        """)
+        self.clear_btn.clicked.connect(self.clear_result_form_compact)
+        buttons_layout.addWidget(self.clear_btn)
+        
+        # Добавляем кнопки в сетку
+        grid_layout.addWidget(buttons_widget, 0, 10, 3, 1, Qt.AlignTop)
+        
+        main_layout.addWidget(input_group)
+        
+        # Таблица результатов (единственное окно для отображения матчей)
+        table_group = QGroupBox("📋 Результаты матчей")
+        table_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                font-size: 11px;
+                border: 1px solid #2196F3;
+                border-radius: 5px;
+                margin-top: 8px;
+            }
+            QGroupBox::title {
+                color: #2196F3;
+            }
+        """)
+        table_layout = QVBoxLayout(table_group)
+        table_layout.setSpacing(3)
+        table_layout.setContentsMargins(5, 8, 5, 5)
+        
+        self.results_table = QTableView()
+        self.results_table.setSelectionBehavior(QTableView.SelectRows)
+        self.results_table.setAlternatingRowColors(True)
+        self.results_table.setSelectionMode(QTableView.SingleSelection)
+        self.results_table.doubleClicked.connect(self.on_match_double_clicked)
+        self.results_table.setStyleSheet("""
+            QTableView {
+                font-size: 10px;
+                gridline-color: #ddd;
+            }
+            QHeaderView::section {
+                background-color: #2196F3;
+                color: white;
+                padding: 3px;
+                font-weight: bold;
+                font-size: 10px;
+            }
+        """)
+        table_layout.addWidget(self.results_table)
+        
+        main_layout.addWidget(table_group)
+        
+        # Загружаем модель для таблицы
+        self.results_table_model = ResultsTableModel()
+        self.results_table.setModel(self.results_table_model)
+        
+        # Скрываем ненужные колонки (ID и Этап)
+        self.results_table.setColumnHidden(0, True)  # ID
+        self.results_table.setColumnHidden(1, True)  # Этап
+        
+        # Настраиваем ширину колонок
+        self.results_table.setColumnWidth(2, 50)   # Группа
+        self.results_table.setColumnWidth(3, 40)   # Тур
+        self.results_table.setColumnWidth(4, 180)  # Игрок 1
+        self.results_table.setColumnWidth(5, 180)  # Игрок 2
+        self.results_table.setColumnWidth(6, 100)  # Победитель
+        self.results_table.setColumnWidth(7, 120)  # Счет
+        self.results_table.setColumnWidth(8, 60)   # Очки
+        
+        # Переменные для хранения текущего матча
+        self.current_matches = []
+        self.current_match_index = 0
         
         return tab_widget
+# =================================
+    def select_player1(self, event):
+        """Выбор игрока для поля Игрок 1 двойным кликом"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+        
+        # Получаем список участников
+        players = Player.select().where(Player.title_id == self.current_title_id).order_by(Player.player)
+        
+        if players.count() == 0:
+            QMessageBox.warning(self, "Ошибка", "Нет участников")
+            return
+        
+        # Создаем диалог со списком
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Выбор игрока 1")
+        dialog.setModal(True)
+        dialog.setMinimumWidth(400)
+        
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel("Выберите игрока:"))
+        
+        list_widget = QListWidget()
+        for player in players:
+            item_text = f"{player.fio} | {player.city} | Рейтинг: {player.rank}"
+            item = QListWidgetItem(item_text)
+            item.setData(Qt.UserRole, player.id)
+            list_widget.addItem(item)
+        
+        layout.addWidget(list_widget)
+        
+        btn_layout = QHBoxLayout()
+        ok_btn = QPushButton("Выбрать")
+        ok_btn.clicked.connect(dialog.accept)
+        cancel_btn = QPushButton("Отмена")
+        cancel_btn.clicked.connect(dialog.reject)
+        btn_layout.addWidget(ok_btn)
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+        
+        if dialog.exec_() == QDialog.Accepted:
+            selected = list_widget.currentItem()
+            if selected:
+                player_id = selected.data(Qt.UserRole)
+                player = Player.get_by_id(player_id)
+                self.player1_name.setText(player.fio)
+                self.player1_name.setProperty("player_id", player_id)
+
+    def select_player2(self, event):
+        """Выбор игрока для поля Игрок 2 двойным кликом"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+        
+        players = Player.select().where(Player.title_id == self.current_title_id).order_by(Player.player)
+        
+        if players.count() == 0:
+            QMessageBox.warning(self, "Ошибка", "Нет участников")
+            return
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Выбор игрока 2")
+        dialog.setModal(True)
+        dialog.setMinimumWidth(400)
+        
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel("Выберите игрока:"))
+        
+        list_widget = QListWidget()
+        for player in players:
+            item_text = f"{player.fio} | {player.city} | Рейтинг: {player.rank}"
+            item = QListWidgetItem(item_text)
+            item.setData(Qt.UserRole, player.id)
+            list_widget.addItem(item)
+        
+        layout.addWidget(list_widget)
+        
+        btn_layout = QHBoxLayout()
+        ok_btn = QPushButton("Выбрать")
+        ok_btn.clicked.connect(dialog.accept)
+        cancel_btn = QPushButton("Отмена")
+        cancel_btn.clicked.connect(dialog.reject)
+        btn_layout.addWidget(ok_btn)
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+        
+        if dialog.exec_() == QDialog.Accepted:
+            selected = list_widget.currentItem()
+            if selected:
+                player_id = selected.data(Qt.UserRole)
+                player = Player.get_by_id(player_id)
+                self.player2_name.setText(player.fio)
+                self.player2_name.setProperty("player_id", player_id)
+# ======================
+    def load_matches_for_stage(self, stage_name):
+        """Загрузка матчей для выбранного этапа"""
+        if not self.current_title_id:
+            return
+        
+        try:
+            # Получаем все матчи для выбранного этапа
+            self.current_matches = list(Result.select().where(
+                (Result.title_id == self.current_title_id) &
+                (Result.system_stage == stage_name)
+            ).order_by(Result.number_group, Result.tours))
+            
+            self.current_match_index = 0
+            self.current_stage_label.setText(f"Этап: {stage_name}")
+            
+            # Получаем количество партий из системы первого матча
+            if self.current_matches:
+                system = System.get_or_none(System.id == self.current_matches[0].system_id)
+                if system:
+                    parties_count = system.score_flag if system.score_flag else 5
+                    self.update_scores_fields_compact(parties_count)
+                    self.parties_count = parties_count
+                
+                self.current_match_label.setText(f"Матч: 1/{len(self.current_matches)}")
+                self.load_match_for_editing(0)
+            else:
+                self.current_match_label.setText("Матч: 0/0")
+                self.clear_result_form_compact()
+                
+            # Обновляем таблицу
+            self.load_results_table_for_stage(stage_name)
+            
+        except Exception as e:
+            print(f"Ошибка загрузки матчей: {e}")
+# ======================
+    def load_match_for_editing(self, index):
+        """Загрузка матча для редактирования"""
+        if index < 0 or index >= len(self.current_matches):
+            return
+        
+        match = self.current_matches[index]
+        self.current_match_index = index
+        self.current_match_label.setText(f"Матч: {index + 1}/{len(self.current_matches)}")
+        
+        # Заполняем информацию об игроках
+        self.player1_name.setText(match.player1)
+        self.player2_name.setText(match.player2)
+        
+        # Очищаем поля
+        self.clear_result_form_compact()
+        
+        # Если уже есть результат, загружаем его
+        if match.score_in_game:
+            self.parse_and_load_scores_compact(match.score_in_game)
+
+    def parse_and_load_scores_compact(self, score_string):
+        """Парсинг строки счета и загрузка в поля"""
+        try:
+            parts = score_string.split(',')
+            for i, part in enumerate(parts):
+                if i >= self.parties_count:
+                    break
+                scores = part.strip().split(':')
+                if len(scores) == 2:
+                    self.score_edits_p1[i].setText(scores[0])
+                    self.score_edits_p2[i].setText(scores[1])
+        except Exception as e:
+            print(f"Ошибка парсинга счета: {e}")
+
+    def save_match_result_compact(self):
+        """Сохранение результата матча (компактная версия)"""
+        if not self.current_matches:
+            QMessageBox.warning(self, "Ошибка", "Нет выбранного матча")
+            return
+        
+        match = self.current_matches[self.current_match_index]
+        
+        try:
+            # Собираем счета
+            player1_wins = 0
+            player2_wins = 0
+            scores_list = []
+            
+            # Получаем количество партий из системы
+            system = System.get_or_none(System.id == match.system_id)
+            parties_count = system.score_flag if system.score_flag else 5
+            self.update_scores_fields_compact(parties_count)
+            
+            for i in range(parties_count):
+                score1 = self.score_edits_p1[i].text().strip()
+                score2 = self.score_edits_p2[i].text().strip()
+                
+                if score1 and score2:
+                    try:
+                        s1 = int(score1)
+                        s2 = int(score2)
+                        scores_list.append(f"{s1}:{s2}")
+                        if s1 > s2:
+                            player1_wins += 1
+                        else:
+                            player2_wins += 1
+                    except ValueError:
+                        QMessageBox.warning(self, "Ошибка", f"Неверный формат счета в партии {i+1}")
+                        return
+            
+            # Определяем победителя
+            status1 = self.player1_status.currentText()
+            status2 = self.player2_status.currentText()
+            
+            if status1 != "Играет" and status2 != "Играет":
+                QMessageBox.warning(self, "Ошибка", "Оба игрока не могут иметь статус 'Не играет'")
+                return
+            
+            winner_name = ""
+            winner_score = ""
+            loser_name = ""
+            loser_score = ""
+            
+            if status1 != "Играет":
+                winner_name = match.player2
+                winner_score = "техническая победа"
+                loser_name = match.player1
+                loser_score = "техническое поражение"
+                player2_wins = parties_count
+                player1_wins = 0
+            elif status2 != "Играет":
+                winner_name = match.player1
+                winner_score = "техническая победа"
+                loser_name = match.player2
+                loser_score = "техническое поражение"
+                player1_wins = parties_count
+                player2_wins = 0
+            else:
+                if player1_wins > player2_wins:
+                    winner_name = match.player1
+                    winner_score = f"{player1_wins}:{player2_wins}"
+                    loser_name = match.player2
+                    loser_score = f"{player2_wins}:{player1_wins}"
+                elif player2_wins > player1_wins:
+                    winner_name = match.player2
+                    winner_score = f"{player2_wins}:{player1_wins}"
+                    loser_name = match.player1
+                    loser_score = f"{player1_wins}:{player2_wins}"
+                else:
+                    QMessageBox.warning(self, "Ошибка", "Ничья не может быть в теннисе")
+                    return
+            
+            score_in_game = ", ".join(scores_list) if scores_list else ""
+            
+            # Обновляем запись
+            match.winner = winner_name
+            match.points_win = player1_wins if winner_name == match.player1 else player2_wins
+            match.score_in_game = score_in_game
+            match.score_win = winner_score
+            match.loser = loser_name
+            match.points_loser = player2_wins if winner_name == match.player1 else player1_wins
+            match.score_loser = loser_score
+            match.save()
+            
+            QMessageBox.information(self, "Успех", "Результат сохранен")
+            
+            # Обновляем таблицу
+            self.load_results_table_for_stage(match.system_stage)
+            
+            # Очищаем форму
+            self.clear_result_form_compact()
+            
+            # Обновляем информацию о матчах
+            self.load_matches_for_stage(match.system_stage)
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить результат: {str(e)}")
+
+    def clear_result_form_compact(self):
+        """Очистка формы (компактная версия)"""
+        self.total_score1.clear()
+        self.total_score2.clear()
+        for i in range(7):
+            self.score_edits_p1[i].clear()
+            self.score_edits_p2[i].clear()
+        self.player1_status.setCurrentIndex(0)
+        self.player2_status.setCurrentIndex(0)
+
+    # def next_match_compact(self):
+    #     """Переход к следующему матчу"""
+    #     if self.current_match_index + 1 < len(self.current_matches):
+    #         self.current_match_index += 1
+    #         self.load_match_for_editing(self.current_match_index)
+    #     else:
+    #         QMessageBox.information(self, "Информация", "Это последний матч")
+
+    def update_scores_fields_compact(self, parties_count):
+        """Обновление количества полей для ввода счетов"""
+        for i in range(7):
+            # Показываем/скрываем поля в зависимости от количества партий
+            visible = i < parties_count
+            self.score_edits_p1[i].setVisible(visible)
+            self.score_edits_p2[i].setVisible(visible)
+            self.score_labels[i].setVisible(visible)
+            
+            if visible:
+                self.score_edits_p1[i].setEnabled(True)
+                self.score_edits_p2[i].setEnabled(True)
+            else:
+                self.score_edits_p1[i].clear()
+                self.score_edits_p2[i].clear()
+                self.score_edits_p1[i].setEnabled(False)
+                self.score_edits_p2[i].setEnabled(False)
+# ===============================
+    def load_results_table_for_stage(self, stage_name):
+        """Загрузка таблицы результатов для выбранного этапа"""
+        if not self.current_title_id:
+            return
+        
+        try:
+            results = Result.select().where(
+                (Result.title_id == self.current_title_id) &
+                (Result.system_stage == stage_name)
+            ).order_by(Result.number_group, Result.tours)
+            
+            data = []
+            for result in results:
+                winner_text = result.winner if result.winner else "—"
+                score_text = result.score_in_game if result.score_in_game else "—"
+                
+                data.append({
+                    'id': result.id,
+                    'stage': result.system_stage,
+                    'group': f"Гр.{result.number_group}",
+                    'tour': f"Тур {result.tours}",
+                    'player1': result.player1,
+                    'player2': result.player2,
+                    'winner': winner_text,
+                    'score': score_text,
+                    'points': f"{result.points_win}:{result.points_loser}" if result.points_win else "—"
+                })
+            
+            self.results_table_model.setData(data)
+            
+            # Обновляем заголовок таблицы
+            total_matches = len(data)
+            played_matches = sum(1 for r in results if r.winner)
+            self.table_header.setText(f"📊 {stage_name} - Результаты матчей ({played_matches}/{total_matches})")
+            
+        except Exception as e:
+            print(f"Ошибка загрузки таблицы: {e}")
+# =============================
+    def on_match_double_clicked(self, index):
+        """Обработка двойного клика по строке таблицы для редактирования"""
+        row = index.row()
+        model = self.results_table.model()
+        
+        if row < model.rowCount():
+            # Получаем данные из модели
+            group = model.data(model.index(row, 2))
+            tour = model.data(model.index(row, 3))
+            player1 = model.data(model.index(row, 4))
+            player2 = model.data(model.index(row, 5))
+            winner = model.data(model.index(row, 6))
+            score = model.data(model.index(row, 7))
+            
+            # Заполняем поля игроков
+            self.player1_name.setText(player1)
+            self.player2_name.setText(player2)
+            
+            # Очищаем поля счетов
+            self.clear_result_form_compact()
+            
+            # Обновляем информацию о матче
+            self.current_match_label.setText(f"Матч: {row + 1}/{model.rowCount()}")
+            
+            # Если матч уже сыгран, загружаем счета
+            if winner != "—" and score != "—":
+                self.parse_and_load_scores_compact(score)
+                
+                # Устанавливаем победителя в статус (опционально)
+                if winner == player1:
+                    self.player1_status.setCurrentText("Играет")
+                    # Устанавливаем общий счет
+                    if ":" in score:
+                        parts = score.split(',')
+                        if parts:
+                            first_game = parts[0].split(':')
+                            if len(first_game) == 2:
+                                self.total_score1.setText(first_game[0])
+                                self.total_score2.setText(first_game[1])
+                elif winner == player2:
+                    self.player2_status.setCurrentText("Играет")
+                    if ":" in score:
+                        parts = score.split(',')
+                        if parts:
+                            first_game = parts[0].split(':')
+                            if len(first_game) == 2:
+                                self.total_score1.setText(first_game[0])
+                                self.total_score2.setText(first_game[1])
+            
+            # Находим соответствующий матч в списке current_matches
+            for i, match in enumerate(self.current_matches):
+                if match.player1 == player1 and match.player2 == player2:
+                    self.current_match_index = i
+                    break
+            
+            QMessageBox.information(self, "Загрузка", f"Загружен матч: {player1} vs {player2}")
 
     def create_rating_tab(self):
         """Вкладка Рейтинг"""
@@ -2010,7 +2674,7 @@ class MainWindow(QMainWindow):
         main_layout.addStretch()
         
         return tab_widget
-
+# ====================================
     def create_extra_tab(self):
         """Вкладка Дополнительно"""
         tab_widget = QWidget()
@@ -2288,150 +2952,101 @@ class MainWindow(QMainWindow):
         """Смена вкладки"""
         self.current_tab_index = index
         
-        # ОБНОВЛЯЕМ ЛЕВУЮ ПАНЕЛЬ ПРИ СМЕНЕ ВКЛАДКИ
+        # ОБНОВЛЯЕМ ЛЕВУЮ ПАНЕЛЬ
         self.update_left_panel_for_tab(index)
         
-        # Управление отображением правой панели в зависимости от вкладки
-        if index == 0:  # Вкладка Титул
-            if hasattr(self, 'competitions_label'):
-                self.competitions_label.setVisible(True)
-            if hasattr(self, 'list_widget'):
-                self.list_widget.setVisible(True)
-            if hasattr(self, 'search_label'):
-                self.search_label.setVisible(False)
-            if hasattr(self, 'search_results_list'):
-                self.search_results_list.setVisible(False)
-            if hasattr(self, 'filters_widget'):
-                self.filters_widget.setVisible(True)
-            
-            if hasattr(self, 'new_comp_frame'):
-                self.new_comp_frame.setVisible(False)
-            if hasattr(self, 'info_group'):
-                self.info_group.setVisible(True)
-            if hasattr(self, 'stage_section'):
-                self.stage_section.setVisible(False)
-            
-            self.load_titles_list()
-            
-        elif index == 1:  # Вкладка Участники
-            if hasattr(self, 'competitions_label'):
-                self.competitions_label.setVisible(False)
-            if hasattr(self, 'list_widget'):
-                self.list_widget.setVisible(False)
-            if hasattr(self, 'search_label'):
-                self.search_label.setVisible(True)
-            if hasattr(self, 'search_results_list'):
-                self.search_results_list.setVisible(True)
-            if hasattr(self, 'filters_widget'):
-                self.filters_widget.setVisible(False)
-            
-            if hasattr(self, 'stage_section'):
-                self.stage_section.setVisible(False)
-            if hasattr(self, 'fio_edit'):
-                self.fio_edit.setEnabled(True)
-            
+        # Переключаем таблицу в зависимости от вкладки
+        if index == 1:  # Участники
+            self.table_container.setCurrentWidget(self.table_view)
+            self.table_header.setText("👥 Список участников")
+            self.table_header.setStyleSheet("""
+                background-color: #2196F3;
+                color: white;
+                padding: 6px;
+                font-weight: bold;
+                font-size: 11px;
+                border-radius: 3px;
+            """)
             if self.current_title_id:
                 self.load_participants_for_title()
             else:
-                if hasattr(self, 'players_model'):
-                    self.players_model.setData([])
-                if hasattr(self, 'table_header'):
-                    self.table_header.setText("👥 Список участников - выберите соревнование из списка справа")
-            
+                self.players_model.setData([])
+                self.table_header.setText("👥 Список участников - выберите соревнование из списка справа")
             QTimer.singleShot(100, self.resize_table_for_participants)
             
-        elif index == 4:  # Вкладка Система
-            if hasattr(self, 'competitions_label'):
-                self.competitions_label.setVisible(True)
-            if hasattr(self, 'list_widget'):
-                self.list_widget.setVisible(True)
-            if hasattr(self, 'search_label'):
-                self.search_label.setVisible(False)
-            if hasattr(self, 'search_results_list'):
-                self.search_results_list.setVisible(False)
-            if hasattr(self, 'filters_widget'):
-                self.filters_widget.setVisible(False)
-            if hasattr(self, 'competitions_label'):
-                self.competitions_label.setText("⚙️ Система")
+        elif index == 5:  # Результаты
+            self.table_container.setCurrentWidget(self.results_table_view)
+            self.table_header.setText("📊 Результаты матчей")
+            self.table_header.setStyleSheet("""
+                background-color: #FF9800;
+                color: white;
+                padding: 6px;
+                font-weight: bold;
+                font-size: 11px;
+                border-radius: 3px;
+            """)
             
-            # Показываем секцию создания этапа
-            if hasattr(self, 'stage_section'):
-                self.stage_section.setVisible(True)
+            # Скрываем ненужные колонки
+            self.results_table_view.setColumnHidden(0, True)  # ID
+            self.results_table_view.setColumnHidden(1, True)  # Этап
             
-            # Обновляем информацию о посеве
-            self.update_seeding_info()
-            
-            # Обновляем информацию о системе
-            if self.current_title_id:
-                self.update_stages_info()
-            else:
-                if hasattr(self, 'list_widget'):
-                    self.list_widget.clear()
-                if hasattr(self, 'stages_info'):
-                    self.stages_info.setText("Нет выбранного соревнования")
-    # ========================================================                    
-        elif index == 5:  # Вкладка Результаты
-            if hasattr(self, 'competitions_label'):
-                self.competitions_label.setVisible(True)
-            if hasattr(self, 'list_widget'):
-                self.list_widget.setVisible(True)
-            if hasattr(self, 'search_label'):
-                self.search_label.setVisible(False)
-            if hasattr(self, 'search_results_list'):
-                self.search_results_list.setVisible(False)
-            if hasattr(self, 'filters_widget'):
-                self.filters_widget.setVisible(False)
-            if hasattr(self, 'competitions_label'):
-                self.competitions_label.setText("📊 Результаты")
-            
-            if hasattr(self, 'stage_section'):
-                self.stage_section.setVisible(False)
+            # Настраиваем ширину колонок
+            self.results_table_view.setColumnWidth(2, 60)   # Группа
+            self.results_table_view.setColumnWidth(3, 50)   # Тур
+            self.results_table_view.setColumnWidth(4, 180)  # Игрок 1
+            self.results_table_view.setColumnWidth(5, 180)  # Игрок 2
+            self.results_table_view.setColumnWidth(6, 100)  # Победитель
+            self.results_table_view.setColumnWidth(7, 120)  # Счет
+            self.results_table_view.setColumnWidth(8, 60)   # Очки
             
             if self.current_title_id:
-                self.load_results_for_title()
-            else:
-                if hasattr(self, 'list_widget'):
-                    self.list_widget.clear()
-                    
-        elif index == 6:  # Вкладка Рейтинг
-            if hasattr(self, 'competitions_label'):
-                self.competitions_label.setVisible(True)
-            if hasattr(self, 'list_widget'):
-                self.list_widget.setVisible(True)
-            if hasattr(self, 'search_label'):
-                self.search_label.setVisible(False)
-            if hasattr(self, 'search_results_list'):
-                self.search_results_list.setVisible(False)
-            if hasattr(self, 'filters_widget'):
-                self.filters_widget.setVisible(False)
-            if hasattr(self, 'competitions_label'):
-                self.competitions_label.setText("⭐ Рейтинг")
+                # Загружаем результаты для текущего этапа
+                if hasattr(self, 'current_stage') and self.current_stage:
+                    self.load_results_table_for_stage(self.current_stage)
             
-            if hasattr(self, 'stage_section'):
-                self.stage_section.setVisible(False)
-            
-            if hasattr(self, 'list_widget'):
-                self.list_widget.clear()
+        elif index == 2:  # Команды
+            self.table_container.setCurrentWidget(self.teams_table_view)
+            self.table_header.setText("🏆 Список команд")
+            self.table_header.setStyleSheet("""
+                background-color: #9C27B0;
+                color: white;
+                padding: 6px;
+                font-weight: bold;
+                font-size: 11px;
+                border-radius: 3px;
+            """)
+            if self.current_title_id:
+                self.load_teams_for_title()
                 
-        elif index == 7:  # Вкладка Дополнительно
-            if hasattr(self, 'competitions_label'):
-                self.competitions_label.setVisible(True)
-            if hasattr(self, 'list_widget'):
-                self.list_widget.setVisible(True)
-            if hasattr(self, 'search_label'):
-                self.search_label.setVisible(False)
-            if hasattr(self, 'search_results_list'):
-                self.search_results_list.setVisible(False)
-            if hasattr(self, 'filters_widget'):
-                self.filters_widget.setVisible(False)
-            if hasattr(self, 'competitions_label'):
-                self.competitions_label.setText("ℹ️ Дополнительно")
+        elif index == 3:  # Пары
+            self.table_container.setCurrentWidget(self.doubles_table_view)
+            self.table_header.setText("🤝 Список пар")
+            self.table_header.setStyleSheet("""
+                background-color: #4CAF50;
+                color: white;
+                padding: 6px;
+                font-weight: bold;
+                font-size: 11px;
+                border-radius: 3px;
+            """)
+            if self.current_title_id:
+                self.load_doubles_for_title()
+        
+        # Для остальных вкладок
+        else:
+            # Показываем таблицу участников (или можно скрыть)
+            self.table_container.setCurrentWidget(self.table_view)
+            if index == 0:  # Титул
+                self.table_header.setText("📋 Информация о соревновании")
+            elif index == 4:  # Система
+                self.table_header.setText("⚙️ Система проведения")
+            elif index == 6:  # Рейтинг
+                self.table_header.setText("⭐ Рейтинг участников")
+            elif index == 7:  # Дополнительно
+                self.table_header.setText("ℹ️ Дополнительная информация")
             
-            if hasattr(self, 'stage_section'):
-                self.stage_section.setVisible(False)
-            
-            if hasattr(self, 'list_widget'):
-                self.list_widget.clear()
+            # Очищаем таблицу
+            self.players_model.setData([])
         
         # Устанавливаем высоту для текущей вкладки
         self.set_tab_height(index)
@@ -2774,19 +3389,15 @@ class MainWindow(QMainWindow):
                     
             except Exception as e:
                 QMessageBox.critical(self, "Ошибка", f"Ошибка поиска: {str(e)}")
-
+#=============================
     def update_left_panel_for_tab(self, tab_index):
         """Обновление левой панели в зависимости от вкладки (полная очистка)"""
-        # Сбрасываем флаг фильтров
-        self._filters_added = False
-
         # ПОЛНОСТЬЮ ОЧИЩАЕМ ЛЕВУЮ ПАНЕЛЬ
         for i in reversed(range(self.dynamic_filters_layout.count())):
             item = self.dynamic_filters_layout.itemAt(i)
             if item.widget():
                 item.widget().deleteLater()
             elif item.layout():
-                # Очищаем вложенные layout
                 while item.layout().count():
                     child = item.layout().takeAt(0)
                     if child.widget():
@@ -2802,7 +3413,7 @@ class MainWindow(QMainWindow):
         
         # Проверяем, является ли список кнопок двумерным (для рядов)
         if buttons and isinstance(buttons[0], list):
-            # Создаем ряды кнопок
+            # Создаем ряды кнопок (как для Участников)
             for row_buttons in buttons:
                 row_layout = QHBoxLayout()
                 row_layout.setSpacing(10)
@@ -2824,7 +3435,7 @@ class MainWindow(QMainWindow):
                         QPushButton:hover { background-color: #45a049; }
                     """)
                     
-                    # Привязываем функции для разных вкладок
+                    # Привязываем функции
                     if tab_index == 1:  # Участники
                         if btn_text == "➕ Добавить":
                             btn.clicked.connect(self.add_player_from_form)
@@ -2838,7 +3449,6 @@ class MainWindow(QMainWindow):
                             btn.clicked.connect(self.export_players)
                         elif btn_text == "🗑️ Очистить":
                             btn.clicked.connect(self.clear_player_form)
-                    
                     elif tab_index == 4:  # Система
                         if btn_text == "🔍 Поиск в Choice":
                             btn.clicked.connect(self.search_in_choice_table)
@@ -2848,7 +3458,6 @@ class MainWindow(QMainWindow):
                             btn.clicked.connect(self.clear_choice_table)
                         elif btn_text == "📋 Отчет":
                             btn.clicked.connect(self.export_choice_report)
-                    
                     elif tab_index == 0:  # Титул
                         if btn_text == "📋 Создать новое":
                             btn.clicked.connect(self.new_competition)
@@ -2857,7 +3466,7 @@ class MainWindow(QMainWindow):
                 
                 self.dynamic_filters_layout.addLayout(row_layout)
         else:
-            # Обычное отображение (для других вкладок)
+            # Обычное отображение (для других вкладок, включая Результаты)
             for btn_text in buttons:
                 btn = QPushButton(btn_text)
                 btn.setMinimumHeight(32)
@@ -2876,7 +3485,10 @@ class MainWindow(QMainWindow):
                     QPushButton:hover { background-color: #45a049; }
                 """)
                 
-                if tab_index == 2:  # Команды
+                if tab_index == 0:  # Титул
+                    if btn_text == "📋 Создать новое":
+                        btn.clicked.connect(self.new_competition)
+                elif tab_index == 2:  # Команды
                     if btn_text == "➕ Добавить":
                         btn.clicked.connect(self.add_team)
                     elif btn_text == "✏️ Редактировать":
@@ -2893,14 +3505,28 @@ class MainWindow(QMainWindow):
                     elif btn_text == "📊 Посев":
                         btn.clicked.connect(self.seeding_pairs)
                 elif tab_index == 5:  # Результаты
-                    if btn_text == "📥 Загрузить":
-                        btn.clicked.connect(self.load_results)
+                    if btn_text == "🎯 Выбрать этап":
+                        btn.clicked.connect(self.select_stage_for_results)
+                    elif btn_text == "🔄 Обновить":
+                        btn.clicked.connect(self.refresh_results_data)
+                    elif btn_text == "📊 Фильтры":
+                        btn.clicked.connect(self.show_results_filters)
                     elif btn_text == "📤 Экспорт":
-                        btn.clicked.connect(self.export_results)
-                    elif btn_text == "🗑️ Очистить":
-                        btn.clicked.connect(self.clear_results)
-                    elif btn_text == "🧮 Рассчитать":
-                        btn.clicked.connect(self.calculate_results)
+                        btn.clicked.connect(self.export_results_to_pdf)
+                elif tab_index == 6:  # Рейтинг
+                    if btn_text == "🔄 Обновить":
+                        btn.clicked.connect(self.update_rating)
+                    elif btn_text == "🏆 Топ-10":
+                        btn.clicked.connect(self.show_top10)
+                    elif btn_text == "📊 Расчёт":
+                        btn.clicked.connect(self.calculate_rating)
+                elif tab_index == 7:  # Дополнительно
+                    if btn_text == "📝 Заметки":
+                        btn.clicked.connect(self.show_notes)
+                    elif btn_text == "❓ Справка":
+                        btn.clicked.connect(self.show_help)
+                    elif btn_text == "ℹ️ О программе":
+                        btn.clicked.connect(self.about_dialog)
                 
                 self.dynamic_filters_layout.addWidget(btn)
         
@@ -2909,7 +3535,7 @@ class MainWindow(QMainWindow):
             self.add_participant_filters()
         
         self.dynamic_filters_layout.addStretch()
-
+# =======================================
     def add_player_from_form(self):
         """Добавление участника из формы на вкладке Участники"""
         if not self.current_title_id:
@@ -10916,6 +11542,360 @@ class MainWindow(QMainWindow):
     def export_choice_report(self):
         """Экспорт отчета по жеребьевке в PDF"""
         QMessageBox.information(self, "Экспорт", "Функция экспорта отчета в разработке")
+
+    def load_matches_list(self):
+        """Загрузка списка матчей для выбора"""
+        self.match_combo.clear()
+        
+        if not self.current_title_id:
+            return
+        
+        try:
+            # Получаем все результаты для текущего соревнования
+            results = Result.select().where(
+                (Result.title_id == self.current_title_id) &
+                (Result.winner.is_null(True))  # Только несыгранные матчи
+            ).order_by(Result.system_stage, Result.number_group, Result.tours)
+            
+            for result in results:
+                # Формируем название матча
+                match_text = f"{result.system_stage} | Гр.{result.number_group} | Тур {result.tours} | {result.player1} vs {result.player2}"
+                self.match_combo.addItem(match_text, result.id)
+            
+            if self.match_combo.count() > 0:
+                self.match_combo.setCurrentIndex(0)
+                self.current_stage_label.setText(f"Текущий этап: {results[0].system_stage}")
+                
+                # Получаем количество партий из системы
+                system = System.get_or_none(System.id == results[0].system_id)
+                if system:
+                    score_flag = system.score_flag if system.score_flag else 5
+                    self.update_scores_fields(score_flag)
+                    self.current_stage_info.setText(f"Количество партий: {score_flag}")
+            
+            # Обновляем таблицу результатов
+            self.load_results_table()
+            
+        except Exception as e:
+            print(f"Ошибка загрузки матчей: {e}")
+
+    def update_scores_fields(self, parties_count):
+        """Обновление количества полей для ввода счетов"""
+        # Активируем/деактивируем поля в зависимости от количества партий
+        for i in range(7):
+            self.player1_scores[i].setEnabled(i < parties_count)
+            self.player2_scores[i].setEnabled(i < parties_count)
+            if i >= parties_count:
+                self.player1_scores[i].clear()
+                self.player2_scores[i].clear()
+
+    def on_match_selected(self, index):
+        """Выбор матча из списка"""
+        if index < 0:
+            return
+        
+        result_id = self.match_combo.currentData()
+        if result_id:
+            self.load_match_data(result_id)
+
+    def load_match_data(self, result_id):
+        """Загрузка данных выбранного матча"""
+        try:
+            result = Result.get_by_id(result_id)
+            
+            # Заполняем информацию об игроках
+            self.player1_name.setText(result.player1)
+            self.player2_name.setText(result.player2)
+            
+            # Очищаем счета
+            self.total_score.clear()
+            for i in range(7):
+                self.player1_scores[i].clear()
+                self.player2_scores[i].clear()
+            
+            # Если уже есть результат, загружаем его
+            if result.score_in_game:
+                self.parse_and_load_scores(result.score_in_game)
+            
+            # Сбрасываем статусы
+            self.player1_status.setCurrentIndex(0)
+            self.player2_status.setCurrentIndex(0)
+            
+            # Получаем количество партий из системы
+            system = System.get_or_none(System.id == result.system_id)
+            if system:
+                self.update_scores_fields(system.score_flag)
+                self.current_stage_info.setText(f"Количество партий: {system.score_flag}")
+            
+            # Обновляем заголовок этапа
+            self.current_stage_label.setText(f"Текущий этап: {result.system_stage}")
+            
+        except Exception as e:
+            print(f"Ошибка загрузки матча: {e}")
+
+    def parse_and_load_scores(self, score_string):
+        """Парсинг строки счета и загрузка в поля"""
+        try:
+            # Формат: "3:1, 11:9, 9:11, 11:7, 11:5"
+            parts = score_string.split(',')
+            for i, part in enumerate(parts):
+                if i >= 7:
+                    break
+                scores = part.strip().split(':')
+                if len(scores) == 2:
+                    self.player1_scores[i].setText(scores[0])
+                    self.player2_scores[i].setText(scores[1])
+        except Exception as e:
+            print(f"Ошибка парсинга счета: {e}")
+
+    def save_match_result(self):
+        """Сохранение результата матча"""
+        result_id = self.match_combo.currentData()
+        if not result_id:
+            QMessageBox.warning(self, "Ошибка", "Выберите матч")
+            return
+        
+        try:
+            result = Result.get_by_id(result_id)
+            
+            # Собираем счета
+            player1_wins = 0
+            player2_wins = 0
+            scores_list = []
+            
+            # Получаем количество партий из системы
+            system = System.get_or_none(System.id == result.system_id)
+            parties_count = system.score_flag if system.score_flag else 5
+            
+            for i in range(parties_count):
+                score1 = self.player1_scores[i].text().strip()
+                score2 = self.player2_scores[i].text().strip()
+                
+                if score1 and score2:
+                    try:
+                        s1 = int(score1)
+                        s2 = int(score2)
+                        scores_list.append(f"{s1}:{s2}")
+                        if s1 > s2:
+                            player1_wins += 1
+                        else:
+                            player2_wins += 1
+                    except ValueError:
+                        QMessageBox.warning(self, "Ошибка", f"Неверный формат счета в партии {i+1}")
+                        return
+            
+            # Определяем победителя
+            winner_name = ""
+            winner_score = ""
+            loser_name = ""
+            loser_score = ""
+            score_in_game = ", ".join(scores_list) if scores_list else ""
+            
+            # Проверяем статусы игроков
+            status1 = self.player1_status.currentText()
+            status2 = self.player2_status.currentText()
+            
+            if status1 != "Играет" and status2 != "Играет":
+                QMessageBox.warning(self, "Ошибка", "Оба игрока не могут иметь статус 'Не играет'")
+                return
+            
+            if status1 != "Играет":
+                winner_name = result.player2
+                winner_score = "техническая победа"
+                loser_name = result.player1
+                loser_score = "техническое поражение"
+                player2_wins = parties_count
+                player1_wins = 0
+            elif status2 != "Играет":
+                winner_name = result.player1
+                winner_score = "техническая победа"
+                loser_name = result.player2
+                loser_score = "техническое поражение"
+                player1_wins = parties_count
+                player2_wins = 0
+            else:
+                if player1_wins > player2_wins:
+                    winner_name = result.player1
+                    winner_score = f"{player1_wins}:{player2_wins}"
+                    loser_name = result.player2
+                    loser_score = f"{player2_wins}:{player1_wins}"
+                elif player2_wins > player1_wins:
+                    winner_name = result.player2
+                    winner_score = f"{player2_wins}:{player1_wins}"
+                    loser_name = result.player1
+                    loser_score = f"{player1_wins}:{player2_wins}"
+                else:
+                    QMessageBox.warning(self, "Ошибка", "Ничья не может быть в теннисе")
+                    return
+            
+            # Формируем общий счет
+            total_score_text = self.total_score.text().strip()
+            if not total_score_text and scores_list:
+                total_score_text = f"{player1_wins}:{player2_wins}"
+            
+            # Обновляем запись в Result
+            result.winner = winner_name
+            result.points_win = player1_wins if winner_name == result.player1 else player2_wins
+            result.score_in_game = score_in_game
+            result.score_win = winner_score
+            result.loser = loser_name
+            result.points_loser = player2_wins if winner_name == result.player1 else player1_wins
+            result.score_loser = loser_score
+            result.save()
+            
+            QMessageBox.information(self, "Успех", "Результат сохранен")
+            
+            # Обновляем списки
+            self.load_matches_list()
+            self.load_results_table()
+            self.clear_result_form()
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить результат: {str(e)}")
+
+    def clear_result_form(self):
+        """Очистка формы ввода результатов"""
+        self.player1_name.clear()
+        self.player2_name.clear()
+        self.total_score.clear()
+        for i in range(7):
+            self.player1_scores[i].clear()
+            self.player2_scores[i].clear()
+        self.player1_status.setCurrentIndex(0)
+        self.player2_status.setCurrentIndex(0)
+
+    def next_match(self):
+        """Переход к следующему матчу"""
+        current_index = self.match_combo.currentIndex()
+        if current_index >= 0 and current_index < self.match_combo.count() - 1:
+            self.match_combo.setCurrentIndex(current_index + 1)
+        else:
+            QMessageBox.information(self, "Информация", "Это последний матч")
+
+    def load_results_table(self):
+        """Загрузка таблицы результатов"""
+        if not self.current_title_id:
+            return
+        
+        try:
+            results = Result.select().where(Result.title_id == self.current_title_id).order_by(
+                Result.system_stage, Result.number_group, Result.tours
+            )
+            
+            data = []
+            for result in results:
+                winner_text = result.winner if result.winner else "—"
+                score_text = result.score_in_game if result.score_in_game else "—"
+                
+                data.append({
+                    'id': result.id,
+                    'stage': result.system_stage,
+                    'group': result.number_group,
+                    'tour': result.tours,
+                    'player1': result.player1,
+                    'player2': result.player2,
+                    'winner': winner_text,
+                    'score': score_text,
+                    'points': f"{result.points_win}:{result.points_loser}" if result.points_win else "—"
+                })
+            
+            self.results_table_model.setData(data)
+            
+        except Exception as e:
+            print(f"Ошибка загрузки таблицы результатов: {e}")
+# ===================
+    def select_stage_for_results(self):
+        """Выбор этапа для ввода результатов"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+        
+        # Получаем список этапов
+        stages = System.select().where(System.title_id == self.current_title_id).order_by(System.id)
+        
+        if stages.count() == 0:
+            QMessageBox.warning(self, "Ошибка", "Нет добавленных этапов")
+            return
+        
+        # Создаем диалог выбора
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Выбор этапа")
+        dialog.setModal(True)
+        dialog.setMinimumWidth(400)
+        
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel("Выберите этап для ввода результатов:"))
+        
+        list_widget = QListWidget()
+        for stage in stages:
+            # Считаем количество сыгранных матчей
+            total_matches = Result.select().where(
+                (Result.title_id == self.current_title_id) &
+                (Result.system_stage == stage.stage)
+            ).count()
+            
+            played_matches = Result.select().where(
+                (Result.title_id == self.current_title_id) &
+                (Result.system_stage == stage.stage) &
+                (Result.winner.is_null(False))
+            ).count()
+            
+            # Определяем тип этапа для иконки
+            if "Финал" in stage.stage:
+                icon = "🏆"
+            elif "полуфинал" in stage.stage:
+                icon = "🎯"
+            else:
+                icon = "📋"
+            
+            progress = f"({played_matches}/{total_matches})" if total_matches > 0 else ""
+            item_text = f"{icon} {stage.stage} | Групп: {stage.total_group} | {progress}"
+            item = QListWidgetItem(item_text)
+            item.setData(Qt.UserRole, stage.stage)
+            
+            # Подсвечиваем этапы, где есть несыгранные матчи
+            if played_matches < total_matches:
+                item.setForeground(QColor(255, 0, 0))
+            
+            list_widget.addItem(item)
+        
+        layout.addWidget(list_widget)
+        
+        btn_layout = QHBoxLayout()
+        ok_btn = QPushButton("Выбрать")
+        ok_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 5px;")
+        ok_btn.clicked.connect(dialog.accept)
+        cancel_btn = QPushButton("Отмена")
+        cancel_btn.setStyleSheet("background-color: #f44336; color: white; padding: 5px;")
+        cancel_btn.clicked.connect(dialog.reject)
+        btn_layout.addWidget(ok_btn)
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+        
+        if dialog.exec_() == QDialog.Accepted:
+            selected = list_widget.currentItem()
+            if selected:
+                stage_name = selected.data(Qt.UserRole)
+                self.current_stage = stage_name
+                self.load_matches_for_stage(stage_name)
+                # Обновляем таблицу результатов
+                self.load_results_table_for_stage(stage_name)
+# =============================
+    def refresh_results_data(self):
+        """Обновление данных результатов"""
+        if hasattr(self, 'current_matches') and self.current_matches:
+            stage_name = self.current_matches[0].system_stage if self.current_matches else None
+            if stage_name:
+                self.load_matches_for_stage(stage_name)
+                QMessageBox.information(self, "Обновление", "Данные обновлены")
+
+    def show_results_filters(self):
+        """Показать фильтры для результатов"""
+        QMessageBox.information(self, "Фильтры", "Фильтры результатов (в разработке)")
+
+    def export_results_to_pdf(self):
+        """Экспорт результатов в PDF"""
+        QMessageBox.information(self, "Экспорт", "Экспорт результатов в PDF (в разработке)")
     # =================================
 class RatingLoaderThread(QThread):
     progress = pyqtSignal(int)

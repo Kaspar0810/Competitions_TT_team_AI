@@ -944,7 +944,7 @@ class MainWindow(QMainWindow):
             2: 180,  # Команды
             3: 180,  # Пары
             4: 600,  # Система
-            5: 600,  # Результаты
+            5: 180,  # Результаты
             6: 180,  # Рейтинг
             7: 200   # Дополнительно
         }
@@ -2068,9 +2068,9 @@ class MainWindow(QMainWindow):
         # ФИО игрока 1 (увеличенное поле)
         self.player1_name = QLineEdit()
         self.player1_name.setReadOnly(True)
-        self.player1_name.setPlaceholderText("Двойной клик для выбора")
+        self.player1_name.setPlaceholderText("")
         self.player1_name.setMinimumWidth(200)
-        self.player1_name.mouseDoubleClickEvent = self.select_player1
+        # self.player1_name.mouseDoubleClickEvent = self.select_player1
         grid_layout.addWidget(self.player1_name, 1, 1)
         
         # Общий счет
@@ -2101,9 +2101,9 @@ class MainWindow(QMainWindow):
         # ФИО игрока 2 (увеличенное поле)
         self.player2_name = QLineEdit()
         self.player2_name.setReadOnly(True)
-        self.player2_name.setPlaceholderText("Двойной клик для выбора")
+        self.player2_name.setPlaceholderText("")
         self.player2_name.setMinimumWidth(200)
-        self.player2_name.mouseDoubleClickEvent = self.select_player2
+        # self.player2_name.mouseDoubleClickEvent = self.select_player2
         grid_layout.addWidget(self.player2_name, 2, 1)
         
         # Общий счет
@@ -2164,24 +2164,24 @@ class MainWindow(QMainWindow):
         grid_layout.addWidget(buttons_widget, 0, 10, 3, 1, Qt.AlignTop)
         
         main_layout.addWidget(input_group)
-        
-        # Таблица результатов (единственное окно для отображения матчей)
-        table_group = QGroupBox("📋 Результаты матчей")
-        table_group.setStyleSheet("""
-            QGroupBox {
-                font-weight: bold;
-                font-size: 11px;
-                border: 1px solid #2196F3;
-                border-radius: 5px;
-                margin-top: 8px;
-            }
-            QGroupBox::title {
-                color: #2196F3;
-            }
-        """)
-        table_layout = QVBoxLayout(table_group)
-        table_layout.setSpacing(3)
-        table_layout.setContentsMargins(5, 8, 5, 5)
+#=============================================        
+        # # Таблица результатов (единственное окно для отображения матчей)
+        # table_group = QGroupBox("📋 Результаты матчей")
+        # table_group.setStyleSheet("""
+        #     QGroupBox {
+        #         font-weight: bold;
+        #         font-size: 11px;
+        #         border: 1px solid #2196F3;
+        #         border-radius: 5px;
+        #         margin-top: 8px;
+        #     }
+        #     QGroupBox::title {
+        #         color: #2196F3;
+        #     }
+        # """)
+        # table_layout = QVBoxLayout(table_group)
+        # table_layout.setSpacing(3)
+        # table_layout.setContentsMargins(5, 8, 5, 5)
         
         self.results_table = QTableView()
         self.results_table.setSelectionBehavior(QTableView.SelectRows)
@@ -2201,9 +2201,9 @@ class MainWindow(QMainWindow):
                 font-size: 10px;
             }
         """)
-        table_layout.addWidget(self.results_table)
+        # table_layout.addWidget(self.results_table)
         
-        main_layout.addWidget(table_group)
+        # main_layout.addWidget(table_group)
         
         # Загружаем модель для таблицы
         self.results_table_model = ResultsTableModel()
@@ -2228,99 +2228,99 @@ class MainWindow(QMainWindow):
         
         return tab_widget
 # =================================
-    def select_player1(self, event):
-        """Выбор игрока для поля Игрок 1 двойным кликом"""
-        if not self.current_title_id:
-            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
-            return
+    # def select_player1(self, event):
+    #     """Выбор игрока для поля Игрок 1 двойным кликом"""
+    #     if not self.current_title_id:
+    #         QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+    #         return
         
-        # Получаем список участников
-        players = Player.select().where(Player.title_id == self.current_title_id).order_by(Player.player)
+    #     # Получаем список участников
+    #     players = Player.select().where(Player.title_id == self.current_title_id).order_by(Player.player)
         
-        if players.count() == 0:
-            QMessageBox.warning(self, "Ошибка", "Нет участников")
-            return
+    #     if players.count() == 0:
+    #         QMessageBox.warning(self, "Ошибка", "Нет участников")
+    #         return
         
-        # Создаем диалог со списком
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Выбор игрока 1")
-        dialog.setModal(True)
-        dialog.setMinimumWidth(400)
+    #     # Создаем диалог со списком
+    #     dialog = QDialog(self)
+    #     dialog.setWindowTitle("Выбор игрока 1")
+    #     dialog.setModal(True)
+    #     dialog.setMinimumWidth(400)
         
-        layout = QVBoxLayout(dialog)
-        layout.addWidget(QLabel("Выберите игрока:"))
+    #     layout = QVBoxLayout(dialog)
+    #     layout.addWidget(QLabel("Выберите игрока:"))
         
-        list_widget = QListWidget()
-        for player in players:
-            item_text = f"{player.fio} | {player.city} | Рейтинг: {player.rank}"
-            item = QListWidgetItem(item_text)
-            item.setData(Qt.UserRole, player.id)
-            list_widget.addItem(item)
+    #     list_widget = QListWidget()
+    #     for player in players:
+    #         item_text = f"{player.fio} | {player.city} | Рейтинг: {player.rank}"
+    #         item = QListWidgetItem(item_text)
+    #         item.setData(Qt.UserRole, player.id)
+    #         list_widget.addItem(item)
         
-        layout.addWidget(list_widget)
+    #     layout.addWidget(list_widget)
         
-        btn_layout = QHBoxLayout()
-        ok_btn = QPushButton("Выбрать")
-        ok_btn.clicked.connect(dialog.accept)
-        cancel_btn = QPushButton("Отмена")
-        cancel_btn.clicked.connect(dialog.reject)
-        btn_layout.addWidget(ok_btn)
-        btn_layout.addWidget(cancel_btn)
-        layout.addLayout(btn_layout)
+    #     btn_layout = QHBoxLayout()
+    #     ok_btn = QPushButton("Выбрать")
+    #     ok_btn.clicked.connect(dialog.accept)
+    #     cancel_btn = QPushButton("Отмена")
+    #     cancel_btn.clicked.connect(dialog.reject)
+    #     btn_layout.addWidget(ok_btn)
+    #     btn_layout.addWidget(cancel_btn)
+    #     layout.addLayout(btn_layout)
         
-        if dialog.exec_() == QDialog.Accepted:
-            selected = list_widget.currentItem()
-            if selected:
-                player_id = selected.data(Qt.UserRole)
-                player = Player.get_by_id(player_id)
-                self.player1_name.setText(player.fio)
-                self.player1_name.setProperty("player_id", player_id)
+    #     if dialog.exec_() == QDialog.Accepted:
+    #         selected = list_widget.currentItem()
+    #         if selected:
+    #             player_id = selected.data(Qt.UserRole)
+    #             player = Player.get_by_id(player_id)
+    #             self.player1_name.setText(player.fio)
+    #             self.player1_name.setProperty("player_id", player_id)
 
-    def select_player2(self, event):
-        """Выбор игрока для поля Игрок 2 двойным кликом"""
-        if not self.current_title_id:
-            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
-            return
+    # def select_player2(self, event):
+    #     """Выбор игрока для поля Игрок 2 двойным кликом"""
+    #     if not self.current_title_id:
+    #         QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+    #         return
         
-        players = Player.select().where(Player.title_id == self.current_title_id).order_by(Player.player)
+    #     players = Player.select().where(Player.title_id == self.current_title_id).order_by(Player.player)
         
-        if players.count() == 0:
-            QMessageBox.warning(self, "Ошибка", "Нет участников")
-            return
+    #     if players.count() == 0:
+    #         QMessageBox.warning(self, "Ошибка", "Нет участников")
+    #         return
         
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Выбор игрока 2")
-        dialog.setModal(True)
-        dialog.setMinimumWidth(400)
+    #     dialog = QDialog(self)
+    #     dialog.setWindowTitle("Выбор игрока 2")
+    #     dialog.setModal(True)
+    #     dialog.setMinimumWidth(400)
         
-        layout = QVBoxLayout(dialog)
-        layout.addWidget(QLabel("Выберите игрока:"))
+    #     layout = QVBoxLayout(dialog)
+    #     layout.addWidget(QLabel("Выберите игрока:"))
         
-        list_widget = QListWidget()
-        for player in players:
-            item_text = f"{player.fio} | {player.city} | Рейтинг: {player.rank}"
-            item = QListWidgetItem(item_text)
-            item.setData(Qt.UserRole, player.id)
-            list_widget.addItem(item)
+    #     list_widget = QListWidget()
+    #     for player in players:
+    #         item_text = f"{player.fio} | {player.city} | Рейтинг: {player.rank}"
+    #         item = QListWidgetItem(item_text)
+    #         item.setData(Qt.UserRole, player.id)
+    #         list_widget.addItem(item)
         
-        layout.addWidget(list_widget)
+    #     layout.addWidget(list_widget)
         
-        btn_layout = QHBoxLayout()
-        ok_btn = QPushButton("Выбрать")
-        ok_btn.clicked.connect(dialog.accept)
-        cancel_btn = QPushButton("Отмена")
-        cancel_btn.clicked.connect(dialog.reject)
-        btn_layout.addWidget(ok_btn)
-        btn_layout.addWidget(cancel_btn)
-        layout.addLayout(btn_layout)
+    #     btn_layout = QHBoxLayout()
+    #     ok_btn = QPushButton("Выбрать")
+    #     ok_btn.clicked.connect(dialog.accept)
+    #     cancel_btn = QPushButton("Отмена")
+    #     cancel_btn.clicked.connect(dialog.reject)
+    #     btn_layout.addWidget(ok_btn)
+    #     btn_layout.addWidget(cancel_btn)
+    #     layout.addLayout(btn_layout)
         
-        if dialog.exec_() == QDialog.Accepted:
-            selected = list_widget.currentItem()
-            if selected:
-                player_id = selected.data(Qt.UserRole)
-                player = Player.get_by_id(player_id)
-                self.player2_name.setText(player.fio)
-                self.player2_name.setProperty("player_id", player_id)
+    #     if dialog.exec_() == QDialog.Accepted:
+    #         selected = list_widget.currentItem()
+    #         if selected:
+    #             player_id = selected.data(Qt.UserRole)
+    #             player = Player.get_by_id(player_id)
+    #             self.player2_name.setText(player.fio)
+    #             self.player2_name.setProperty("player_id", player_id)
 # ======================
     def load_matches_for_stage(self, stage_name):
         """Загрузка матчей для выбранного этапа"""
@@ -3003,6 +3003,9 @@ class MainWindow(QMainWindow):
                 # Загружаем результаты для текущего этапа
                 if hasattr(self, 'current_stage') and self.current_stage:
                     self.load_results_table_for_stage(self.current_stage)
+            # скрываем вкладку создание эатапа        
+            self.stage_section.setVisible(False)
+            self.seeding_info_label.hide()
             
         elif index == 2:  # Команды
             self.table_container.setCurrentWidget(self.teams_table_view)

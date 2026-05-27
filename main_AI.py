@@ -3127,15 +3127,11 @@ class MainWindow(QMainWindow):
         try:
             player1_wins = 0
             player2_wins = 0
-            player1_scores = []
-            player2_scores = []
             has_error = False
             error_messages = []
             # ===============
             pl1_win = []
-            pl1_los = []
             pl2_win = []
-            pl2_los = []
             
             system = System.get_or_none(System.id == match.system_id)
             parties_count = system.score_flag if system.score_flag else 5
@@ -3154,15 +3150,11 @@ class MainWindow(QMainWindow):
                         if s1 > s2:
                             player1_wins += 1
                             pl1_win.append(s2)
-                            pl1_los.append(s2 * (-1))
-                            pl2_los.append(s2)
                             pl2_win.append(s2 * (-1))
                         else:
                             player2_wins += 1
-                            pl1_win.append(s1)
-                            pl1_los.append(s1 * (-1))
-                            pl2_los.append(s1)
-                            pl2_win.append(s1 * (-1))
+                            pl1_win.append(s1 * (-1))
+                            pl2_win.append(s1)
                             
 
                         if player1_wins == math.ceil(parties_count / 2) or player2_wins == math.ceil(parties_count / 2):
@@ -3228,58 +3220,25 @@ class MainWindow(QMainWindow):
                     loser_name = match.player2
                     points_win = 2
                     points_loser = 1
-                    # winner_scores = player1_scores
-                    # loser_scores = player2_scores
                 else:
                     winner_name = match.player2
                     loser_name = match.player1
                     points_win = 2
                     points_loser = 1
-                    # winner_scores = player2_scores
-                    # loser_scores = player1_scores
-# ========================================== 
+ 
                 # Объединяем в строки 
                 if player1_wins > player2_wins:
-                    score_win = (','.join(pl1_win))
+                    pl1_win_str = [str(num) for num in pl1_win]
+                    score_win = ','.join(pl1_win_str)
                 else:
-                    score_win = (','.join(pl2_win)) 
-
-                # # Формируем score_win: для победителя - его очки в партиях
-                # # Формат: (5, 7, -4, 9) где:
-                # # - положительные числа - очки, набранные победителем в партии
-                # # - отрицательные числа - на сколько проиграл победитель в этой партии
-                # score_win_parts = []
-                # for i in range(parties_count):
-                #     if i < len(winner_scores) and i < len(loser_scores):
-                #         if winner_scores[i] > loser_scores[i]:
-                #             # Победитель выиграл партию - пишем его очки
-                #             score_win_parts.append(str(winner_scores[i]))
-                #         else:
-                #             # Победитель проиграл партию - пишем разницу со знаком минус
-                #             diff = winner_scores[i] - loser_scores[i]
-                #             score_win_parts.append(str(diff))
-                #     else:
-                #         score_win_parts.append("0")
-                
-                # # Формируем score_loser: для проигравшего - его очки в партиях
-                # # Формат: (3, 5, 7, 9) где:
-                # # - положительные числа - очки, набранные проигравшим в партии
-                # score_loser_parts = []
-                # for i in range(parties_count):
-                #     if i < len(loser_scores):
-                #         score_loser_parts.append(str(loser_scores[i]))
-                #     else:
-                #         score_loser_parts.append("0")
-# ====================================================            
-            # # Объединяем в строки
-            # score_win = ", ".join(score_win_parts)
-            # score_loser = ", ".join(score_loser_parts)
-            
+                    pl2_win_str = [str(num) for num in pl2_win]
+                    score_win = ','.join(pl2_win_str)
+           
             # Обновляем запись в Result
             match.winner = winner_name
             match.points_win = points_win
             match.score_in_game = score_in_game
-            match.score_win = score_win
+            match.score_win = f"({score_win})"
             match.loser = loser_name
             match.points_loser = points_loser
             match.score_loser = score_loser_game

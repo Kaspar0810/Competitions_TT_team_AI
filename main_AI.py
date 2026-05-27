@@ -38,6 +38,7 @@ from models_qt import (
 )
 from datetime import *
 import pandas as pd
+import math
 
 from datetime import datetime
 
@@ -2068,13 +2069,13 @@ class MainWindow(QMainWindow):
         # ФИО игрока 1 (увеличенное поле)
         self.player1_name = QLineEdit()
         self.player1_name.setReadOnly(True)
-        self.player1_name.setPlaceholderText("0")
+        self.player1_name.setPlaceholderText("")
         self.player1_name.setMinimumWidth(200)
         grid_layout.addWidget(self.player1_name, 1, 1)
         
         # Общий счет
         self.total_score1 = QLineEdit()
-        self.total_score1.setPlaceholderText("0")
+        self.total_score1.setPlaceholderText("")
         self.total_score1.setMaximumWidth(50)
         self.total_score1.setStyleSheet("font-size: 10px;")
         grid_layout.addWidget(self.total_score1, 1, 2)
@@ -2117,7 +2118,7 @@ class MainWindow(QMainWindow):
         # ФИО игрока 2 (увеличенное поле)
         self.player2_name = QLineEdit()
         self.player2_name.setReadOnly(True)
-        self.player2_name.setPlaceholderText("0")
+        self.player2_name.setPlaceholderText("")
         self.player2_name.setMinimumWidth(200)
         grid_layout.addWidget(self.player2_name, 2, 1)
         
@@ -2769,16 +2770,6 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить результат: {str(e)}")
-
-    def _clear_result_form_compact(self):
-        """Очистка формы (компактная версия)"""
-        self.total_score1.clear()
-        self.total_score2.clear()
-        for i in range(7):
-            self.score_edits_p1[i].clear()
-            self.score_edits_p2[i].clear()
-        self.player1_status.setCurrentIndex(0)
-        self.player2_status.setCurrentIndex(0)
 
     def clear_result_form_compact(self):
         """Очистка формы (компактная версия)"""
@@ -12238,40 +12229,26 @@ class MainWindow(QMainWindow):
         """Экспорт результатов в PDF"""
         QMessageBox.information(self, "Экспорт", "Экспорт результатов в PDF (в разработке)")
 
-    def _move_to_next_field(self, current_row, current_col):
-        """Переход к следующему полю ввода по Enter"""
-        parties = self.parties_count
-        
-        if current_row == 1:  # Игрок 1
-            if current_col < parties - 1:
-                # Переход к следующей партии игрока 1
-                self.score_edits_p1[current_col + 1].setFocus()
-            else:
-                # После последней партии игрока 1 переходим к первой партии игрока 2
-                self.score_edits_p2[0].setFocus()
-        else:  # Игрок 2
-            if current_col < parties - 1:
-                # Переход к следующей партии игрока 2
-                self.score_edits_p2[current_col + 1].setFocus()
-            else:
-                # После последней партии переходим на кнопку Сохранить
-                self.save_btn.setFocus()
-
     def move_to_next_field(self, current_row, current_col):
         """Переход к следующему полю ввода по Enter"""
         parties = self.parties_count
-        
+        all_score_1 = 0
+        all_score_2 = 0
+        all_score_1 = int(self.total_score1.text())
+        all_score_2 = int(self.total_score2.text())
+
         if current_row == 1:  # Игрок 1
             if current_col < parties - 1:
-                # Переход к следующей партии игрока 1 (П1-1 → П1-2 → ...)
-                self.score_edits_p1[current_col + 1].setFocus()
-            else:
-                # После последней партии игрока 1 переходим к ПЕРВОЙ партии игрока 2
-                self.score_edits_p2[0].setFocus()
+                # Переход к этой же партии игрока 2 (П1-1 → П1-2 → ...)
+                self.score_edits_p2[current_col].setFocus()
         else:  # Игрок 2
             if current_col < parties - 1:
-                # Переход к следующей партии игрока 2 (П2-1 → П2-2 → ...)
-                self.score_edits_p2[current_col + 1].setFocus()
+                if all_score_1 == math.ceil(parties/2) or all_score_2 == math.ceil(parties/2):
+                    # После последней партии переходим на кнопку Сохранить
+                    self.save_btn.setFocus()
+                else:
+                    # Переход к следующей партии игрока 1 (П2-1 → П2-2 → ...)
+                    self.score_edits_p1[current_col + 1].setFocus()
             else:
                 # После последней партии переходим на кнопку Сохранить
                 self.save_btn.setFocus()
@@ -12306,14 +12283,10 @@ class MainWindow(QMainWindow):
             
             # Подсветка победителя (только после того, как кто-то набрал необходимое количество побед)
             if player1_wins >= required_wins:
-                self.total_score1.setStyleSheet("background-color: #90EE90; color: black; font-weight: bold;")
-                self.total_score2.setStyleSheet("")
                 # Также подсвечиваем фамилию победителя
                 self.player1_name.setStyleSheet("background-color: #90EE90; color: black; font-weight: bold;")
                 self.player2_name.setStyleSheet("background-color: #f0f0f0;")
             elif player2_wins >= required_wins:
-                self.total_score2.setStyleSheet("background-color: #90EE90; color: black; font-weight: bold;")
-                self.total_score1.setStyleSheet("")
                 self.player2_name.setStyleSheet("background-color: #90EE90; color: black; font-weight: bold;")
                 self.player1_name.setStyleSheet("background-color: #f0f0f0;")
             else:

@@ -135,6 +135,10 @@ class MainWindow(QMainWindow):
         # Загружаем последнее соревнование (если есть)
         self.load_last_competition()
 
+        # Для фильтра по игроку
+        self.player_filter_text = ""
+        self.player_filter_list = []  # Список всех игроков для автодополнения
+
     def showEvent(self, event):
         """Событие при первом отображении окна"""
         super().showEvent(event)
@@ -12530,8 +12534,8 @@ class MainWindow(QMainWindow):
             
             data = []
             for result in results:
-                winner_text = result.winner if result.winner else "—"
-                score_text = result.score_in_game if result.score_in_game else "—"
+                winner_text = result.winner if result.winner else ""
+                score_text = result.score_in_game if result.score_in_game else ""
                 
                 data.append({
                     'id': result.id,
@@ -12542,7 +12546,7 @@ class MainWindow(QMainWindow):
                     'player2': result.player2,
                     'winner': winner_text,
                     'score': score_text,
-                    'points': f"{result.points_win}:{result.points_loser}" if result.points_win else "—"
+                    'points': result.score_win
                 })
             
             self.results_table_model.setData(data)
@@ -12912,8 +12916,8 @@ class MainWindow(QMainWindow):
                 return False, f"При счете 10 и более разница должна быть 2 очка. Текущий счет: {s1}:{s2}"
         
         return True, ""
-# =============================================
-    def update_left_panel_for_results_tab(self):
+# ==================== 2805==рабочий ====
+    def _update_left_panel_for_results_tab(self):
         """Обновление левой панели для вкладки Результаты"""
         # Очищаем панель
         for i in reversed(range(self.dynamic_filters_layout.count())):
@@ -13038,7 +13042,192 @@ class MainWindow(QMainWindow):
         self.dynamic_filters_layout.addWidget(export_btn)
         
         self.dynamic_filters_layout.addStretch()
-
+# ===============================
+    def update_left_panel_for_results_tab(self):
+        """Обновление левой панели для вкладки Результаты"""
+        # Очищаем панель
+        for i in reversed(range(self.dynamic_filters_layout.count())):
+            item = self.dynamic_filters_layout.itemAt(i)
+            if item.widget():
+                item.widget().deleteLater()
+            elif item.layout():
+                while item.layout().count():
+                    child = item.layout().takeAt(0)
+                    if child.widget():
+                        child.widget().deleteLater()
+        
+        # Заголовок
+        self.action_title.setText("🔧 Результаты")
+        self.action_description.setText("Фильтрация и управление результатами")
+        
+        # Кнопка выбора этапа
+        stage_btn = QPushButton("🎯 Выбрать этап")
+        stage_btn.setMinimumHeight(35)
+        stage_btn.setStyleSheet(self.get_button_style())
+        stage_btn.clicked.connect(self.select_stage_for_results)
+        self.dynamic_filters_layout.addWidget(stage_btn)
+        
+        # Разделитель
+        line = QFrame()
+        line.setFrameShape(QFrame.HLine)
+        line.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
+        self.dynamic_filters_layout.addWidget(line)
+        
+        # ===== ФИЛЬТР ПО ИГРОКУ =====
+        filter_title = QLabel("🔍 Фильтр по игроку")
+        filter_title.setStyleSheet("font-weight: bold; font-size: 12px; margin-top: 5px;")
+        self.dynamic_filters_layout.addWidget(filter_title)
+        
+        # Поле для ввода с автодополнением
+        self.player_filter_edit = QLineEdit()
+        self.player_filter_edit.setPlaceholderText("Введите фамилию игрока...")
+        self.player_filter_edit.setStyleSheet("""
+            QLineEdit {
+                padding: 8px;
+                font-size: 11px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                min-height: 32px;
+            }
+            QLineEdit:focus {
+                border: 2px solid #4CAF50;
+            }
+        """)
+        self.player_filter_edit.textChanged.connect(self.on_player_filter_text_changed)
+        self.player_filter_edit.returnPressed.connect(self.apply_player_filter)
+        self.dynamic_filters_layout.addWidget(self.player_filter_edit)
+        
+        # Создаем QCompleter для автодополнения
+        self.player_filter_completer = QCompleter()
+        self.player_filter_completer.setCaseSensitivity(Qt.CaseInsensitive)
+        self.player_filter_completer.setFilterMode(Qt.MatchContains)
+        self.player_filter_completer.setCompletionMode(QCompleter.PopupCompletion)
+        self.player_filter_edit.setCompleter(self.player_filter_completer)
+        
+        # Кнопка сброса фильтра по игроку
+        reset_player_btn = QPushButton("🗑️ Сбросить фильтр игрока")
+        reset_player_btn.setMinimumHeight(30)
+        reset_player_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #FF9800;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 5px;
+                font-size: 10px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #F57C00; }
+        """)
+        reset_player_btn.clicked.connect(self.reset_player_filter)
+        self.dynamic_filters_layout.addWidget(reset_player_btn)
+        
+        # Разделитель
+        line2 = QFrame()
+        line2.setFrameShape(QFrame.HLine)
+        line2.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
+        self.dynamic_filters_layout.addWidget(line2)
+        
+        # ===== ФИЛЬТРЫ ПО ГРУППАМ =====
+        group_title = QLabel("📊 Фильтры по группам")
+        group_title.setStyleSheet("font-weight: bold; font-size: 12px; margin-top: 5px;")
+        self.dynamic_filters_layout.addWidget(group_title)
+        
+        # ComboBox для выбора группы
+        group_layout = QHBoxLayout()
+        group_layout.addWidget(QLabel("Группа:"))
+        self.group_filter_combo = QComboBox()
+        self.group_filter_combo.addItem("Все группы")
+        self.group_filter_combo.currentTextChanged.connect(self.apply_group_filter)
+        group_layout.addWidget(self.group_filter_combo, 1)
+        self.dynamic_filters_layout.addLayout(group_layout)
+        
+        # ComboBox для выбора тура
+        tour_layout = QHBoxLayout()
+        tour_layout.addWidget(QLabel("Тур:"))
+        self.tour_filter_combo = QComboBox()
+        self.tour_filter_combo.addItem("Все туры")
+        self.tour_filter_combo.currentTextChanged.connect(self.apply_tour_filter)
+        tour_layout.addWidget(self.tour_filter_combo, 1)
+        self.dynamic_filters_layout.addLayout(tour_layout)
+        
+        # Разделитель
+        line3 = QFrame()
+        line3.setFrameShape(QFrame.HLine)
+        line3.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
+        self.dynamic_filters_layout.addWidget(line3)
+        
+        # ===== ФИЛЬТРЫ ПО СТАТУСУ =====
+        status_title = QLabel("🎯 Статус матчей")
+        status_title.setStyleSheet("font-weight: bold; font-size: 12px; margin-top: 5px;")
+        self.dynamic_filters_layout.addWidget(status_title)
+        
+        # Кнопки статуса
+        status_layout = QHBoxLayout()
+        status_layout.setSpacing(10)
+        
+        self.btn_all_matches = QPushButton("📋 Все")
+        self.btn_all_matches.setCheckable(True)
+        self.btn_all_matches.setChecked(True)
+        self.btn_all_matches.clicked.connect(lambda: self.set_status_filter("all"))
+        status_layout.addWidget(self.btn_all_matches)
+        
+        self.btn_played_matches = QPushButton("✅ Сыгранные")
+        self.btn_played_matches.setCheckable(True)
+        self.btn_played_matches.clicked.connect(lambda: self.set_status_filter("played"))
+        status_layout.addWidget(self.btn_played_matches)
+        
+        self.btn_unplayed_matches = QPushButton("⏳ Не сыгранные")
+        self.btn_unplayed_matches.setCheckable(True)
+        self.btn_unplayed_matches.clicked.connect(lambda: self.set_status_filter("unplayed"))
+        status_layout.addWidget(self.btn_unplayed_matches)
+        
+        self.dynamic_filters_layout.addLayout(status_layout)
+        
+        # Разделитель
+        line4 = QFrame()
+        line4.setFrameShape(QFrame.HLine)
+        line4.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
+        self.dynamic_filters_layout.addWidget(line4)
+        
+        # ===== КНОПКИ ДЕЙСТВИЙ =====
+        # Кнопка обновления
+        refresh_btn = QPushButton("🔄 Обновить таблицу")
+        refresh_btn.setMinimumHeight(35)
+        refresh_btn.setStyleSheet(self.get_button_style())
+        refresh_btn.clicked.connect(self.refresh_results_data)
+        self.dynamic_filters_layout.addWidget(refresh_btn)
+        
+        # Кнопка сброса всех фильтров
+        reset_all_btn = QPushButton("🗑️ Сбросить все фильтры")
+        reset_all_btn.setMinimumHeight(35)
+        reset_all_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #f44336;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 8px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #D32F2F; }
+        """)
+        reset_all_btn.clicked.connect(self.reset_results_filters)
+        self.dynamic_filters_layout.addWidget(reset_all_btn)
+        
+        # Кнопка экспорта
+        export_btn = QPushButton("📤 Экспорт в PDF")
+        export_btn.setMinimumHeight(35)
+        export_btn.setStyleSheet(self.get_button_style())
+        export_btn.clicked.connect(self.export_results_to_pdf)
+        self.dynamic_filters_layout.addWidget(export_btn)
+        
+        self.dynamic_filters_layout.addStretch()
+        
+        # Загружаем список игроков для автодополнения
+        self.load_players_for_filter()
+# ================================
     def get_button_style(self):
         """Стиль для кнопок"""
         return """
@@ -13170,7 +13359,125 @@ class MainWindow(QMainWindow):
             # Разблокируем сигналы в случае ошибки
             self.group_filter_combo.blockSignals(False)
             self.tour_filter_combo.blockSignals(False)
+# ===== для фильтра по игроку ====
+    def on_player_filter_text_changed(self, text):
+        """Обработчик изменения текста в поле фильтра по игроку"""
+        if len(text) >= 2:
+            # Фильтруем список для автодополнения
+            filtered = [p for p in self.player_filter_list if text.lower() in p.lower()]
+            model = QStringListModel(filtered[:20])  # Ограничиваем 20 результатами
+            self.player_filter_completer.setModel(model)
+        else:
+            # Показываем все имена при пустом поле
+            model = QStringListModel(self.player_filter_list[:50])
+            self.player_filter_completer.setModel(model)
 
+    def apply_player_filter(self):
+        """Применение фильтра по игроку"""
+        self.player_filter_text = self.player_filter_edit.text().strip()
+        
+        if self.player_filter_text:
+            # Обновляем информационную строку
+            self.filter_info_label.setText(f"🔍 Фильтр по игроку: {self.player_filter_text}")
+            
+            # Применяем фильтр ко всем этапам
+            self.load_filtered_results_all_stages()
+        else:
+            # Сбрасываем фильтр
+            self.reset_player_filter()
+
+    def reset_player_filter(self):
+        """Сброс фильтра по игроку"""
+        self.player_filter_edit.clear()
+        self.player_filter_text = ""
+        self.filter_info_label.setText("🔍 Фильтры не применены")
+        
+        # Восстанавливаем текущий этап без фильтра
+        if self.current_stage:
+            self.load_results_table_for_stage(self.current_stage)
+        else:
+            self.load_filtered_results_all_stages()
+
+    def load_players_for_filter(self):
+        """Загрузка списка всех игроков для автодополнения"""
+        if not self.current_title_id:
+            return
+        
+        try:
+            # Получаем всех игроков из результатов (уникальные)
+            players = set()
+            
+            # Ищем во всех результатах соревнования
+            results = Result.select().where(Result.title_id == self.current_title_id)
+            
+            for result in results:
+                if result.player1:
+                    # Извлекаем ФИО без города
+                    player1 = result.player1.split(' (')[0] if ' (' in result.player1 else result.player1
+                    players.add(player1)
+                if result.player2:
+                    player2 = result.player2.split(' (')[0] if ' (' in result.player2 else result.player2
+                    players.add(player2)
+            
+            self.player_filter_list = sorted(list(players))
+            
+            # Обновляем QCompleter
+            model = QStringListModel(self.player_filter_list)
+            self.player_filter_completer.setModel(model)
+            
+        except Exception as e:
+            print(f"Ошибка загрузки списка игроков: {e}")
+
+    def load_filtered_results_all_stages(self):
+        """Загрузка результатов, отфильтрованных по игроку, по всем этапам"""
+        if not self.current_title_id or not self.player_filter_text:
+            return
+        
+        try:
+            search_text = self.player_filter_text.lower()
+            
+            # Ищем во всех результатах соревнования
+            query = Result.select().where(Result.title_id == self.current_title_id)
+            
+            # Фильтруем по игроку (поиск в player1 или player2)
+            filtered_results = []
+            for result in query:
+                player1_clean = result.player1.split(' (')[0] if ' (' in result.player1 else result.player1
+                player2_clean = result.player2.split(' (')[0] if ' (' in result.player2 else result.player2
+                
+                if search_text in player1_clean.lower() or search_text in player2_clean.lower():
+                    filtered_results.append(result)
+            
+            # Формируем данные для таблицы
+            data = []
+            for result in filtered_results:
+                winner_text = result.winner if result.winner else ""
+                score_text = result.score_in_game if result.score_in_game else ""
+                
+                data.append({
+                    'id': result.id,
+                    'stage': result.system_stage,
+                    'group': result.number_group,
+                    'tour': result.tours,
+                    'player1': result.player1,
+                    'player2': result.player2,
+                    'winner': winner_text,
+                    'score': score_text,
+                    'points': result.score_win
+                })
+            
+            self.results_table_model.setData(data)
+            
+            # # Обновляем информацию
+            # total_matches = len(filtered_results)
+            # played_matches = sum(1 for r in filtered_results if r.winner)
+            # percent = (played_matches / total_matches * 100) if total_matches > 0 else 0
+            
+            # self.current_stage_label.setText(f"🔍 Поиск по игроку: {self.player_filter_text}")
+            # self.progress_label.setText(f"📊 Найдено матчей: {total_matches} | Сыграно: {played_matches} ({percent:.1f}%)")
+            
+        except Exception as e:
+            print(f"Ошибка фильтрации по игроку: {e}")
     # =================================
 class RatingLoaderThread(QThread):
     progress = pyqtSignal(int)

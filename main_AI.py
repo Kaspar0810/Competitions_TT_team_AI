@@ -110,6 +110,11 @@ class MainWindow(QMainWindow):
         self.current_tab_index = 0
         self.is_fullscreen = False
         
+        self.current_stage = None  # Текущий выбранный этап
+        self.current_group_filter = None  # Фильтр по группе
+        self.current_tour_filter = None  # Фильтр по туру
+        self.current_status_filter = "all"  # all, played, unplayed
+
         # Для редактирования участников
         self.editing_player_id = None
         
@@ -1997,7 +2002,7 @@ class MainWindow(QMainWindow):
         self.load_system_data()
         
         return tab_widget
-#=====================================
+#===================================== рабочая 2805
     def create_results_tab(self):
         """Вкладка Результаты - ввод результатов матчей (компактная версия)"""
         tab_widget = QWidget()
@@ -2029,7 +2034,19 @@ class MainWindow(QMainWindow):
         info_layout.addStretch()
         
         main_layout.addWidget(info_frame)
-
+# =========== proba =============
+# # Строка с информацией о фильтрах и прогрессе
+        self.filter_info_label = QLabel("")
+        self.filter_info_label.setStyleSheet("color: #666; font-size: 11px;")
+        info_layout.addWidget(self.filter_info_label)
+        
+#         # Строка с прогрессом
+#         self.progress_label = QLabel("")
+#         self.progress_label.setStyleSheet("color: #2196F3; font-size: 11px; font-weight: bold;")
+#         info_layout.addWidget(self.progress_label)
+        
+#         main_layout.addWidget(info_frame)
+# =========================
         # Добавьте в create_results_tab после info_frame:
         self.status_label = QLabel("")
         self.status_label.setStyleSheet("color: red; font-size: 11px;")
@@ -2231,276 +2248,7 @@ class MainWindow(QMainWindow):
         self.current_match_index = 0
         
         return tab_widget
- # ============================   
-    def __create_results_tab(self):
-        """Вкладка Результаты - ввод результатов матчей (компактная версия)"""
-        tab_widget = QWidget()
-        main_layout = QVBoxLayout(tab_widget)
-        main_layout.setSpacing(8)
-        main_layout.setContentsMargins(5, 5, 5, 5)
-        
-        # Информационная панель о текущем этапе
-        info_frame = QFrame()
-        info_frame.setStyleSheet("""
-            QFrame {
-                background-color: #e3f2fd;
-                border-radius: 5px;
-                padding: 5px;
-            }
-        """)
-        info_layout = QHBoxLayout(info_frame)
-        info_layout.setSpacing(15)
-        info_layout.setContentsMargins(10, 5, 10, 5)
-        
-        self.current_stage_label = QLabel("Этап: Не выбран")
-        self.current_stage_label.setStyleSheet("font-weight: bold; font-size: 12px;")
-        info_layout.addWidget(self.current_stage_label)
-        
-        self.current_match_label = QLabel("Матч: 0/0")
-        self.current_match_label.setStyleSheet("color: gray; font-size: 11px;")
-        info_layout.addWidget(self.current_match_label)
-        info_layout.addStretch()
-        
-        main_layout.addWidget(info_frame)
-        
-        # Группа ввода результатов
-        input_group = QGroupBox("Ввод результата матча")
-        input_group.setStyleSheet("""
-            QGroupBox {
-                font-weight: bold;
-                font-size: 12px;
-                border: 2px solid #4CAF50;
-                border-radius: 8px;
-                margin-top: 10px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 8px 0 8px;
-                color: #4CAF50;
-            }
-        """)
-        
-        grid_layout = QGridLayout(input_group)
-        grid_layout.setSpacing(10)
-        grid_layout.setContentsMargins(12, 15, 12, 12)
-        
-        # Заголовки (увеличенный шрифт)
-        header_font = QFont()
-        header_font.setPointSize(11)
-        header_font.setBold(True)
-        
-        status_header = QLabel("Статус")
-        status_header.setFont(header_font)
-        grid_layout.addWidget(status_header, 0, 0)
-        
-        player_header = QLabel("Игрок")
-        player_header.setFont(header_font)
-        grid_layout.addWidget(player_header, 0, 1)
-        
-        total_header = QLabel("Общий счет")
-        total_header.setFont(header_font)
-        grid_layout.addWidget(total_header, 0, 2)
-        
-        # Заголовки для партий
-        self.parties_count = 5
-        self.score_edits_p1 = []
-        self.score_edits_p2 = []
-        self.score_labels = []
-        
-        for i in range(7):
-            label = QLabel(f"П{i+1}")
-            label.setAlignment(Qt.AlignCenter)
-            label.setMaximumWidth(45)
-            label.setFont(header_font)
-            grid_layout.addWidget(label, 0, 3 + i)
-            self.score_labels.append(label)
-        
-        # Увеличенный стиль для полей ввода
-        input_style = """
-            QLineEdit, QComboBox {
-                font-size: 14px;
-                padding: 8px;
-                min-height: 32px;
-                border: 1px solid #ccc;
-                border-radius: 4px;
-            }
-            QLineEdit:focus, QComboBox:focus {
-                border: 2px solid #4CAF50;
-            }
-            QLineEdit:read-only {
-                background-color: #f5f5f5;
-                color: #333;
-            }
-        """
-        
-        # Ряд 1: Игрок 1
-        self.player1_status = QComboBox()
-        self.player1_status.addItems(["Играет", "Не явка", "Травма", "Дискв."])
-        self.player1_status.setMinimumWidth(100)
-        self.player1_status.setStyleSheet(input_style)
-        self.player1_status.currentTextChanged.connect(self.update_total_score)
-        grid_layout.addWidget(self.player1_status, 1, 0)
-        
-        self.player1_name = QLineEdit()
-        self.player1_name.setReadOnly(True)
-        self.player1_name.setPlaceholderText("")
-        self.player1_name.setMinimumWidth(220)
-        self.player1_name.setStyleSheet(input_style)
-        grid_layout.addWidget(self.player1_name, 1, 1)
-        
-        self.total_score1 = QLineEdit()
-        self.total_score1.setPlaceholderText("")
-        self.total_score1.setMaximumWidth(70)
-        self.total_score1.setStyleSheet(input_style)
-        self.total_score1.setReadOnly(True)
-        grid_layout.addWidget(self.total_score1, 1, 2)
-        
-        # Поля для счетов игрока 1
-        for i in range(7):
-            edit = QLineEdit()
-            edit.setMaximumWidth(55)
-            edit.setPlaceholderText("")
-            edit.setEnabled(False)
-            edit.setStyleSheet(input_style)
-            edit.textChanged.connect(self.update_total_score)
-            edit.returnPressed.connect(lambda col=i: self.move_to_next_field(1, col))
-            grid_layout.addWidget(edit, 1, 3 + i)
-            self.score_edits_p1.append(edit)
-        
-        # Ряд 2: Игрок 2
-        self.player2_status = QComboBox()
-        self.player2_status.addItems(["Играет", "Не явка", "Травма", "Дискв."])
-        self.player2_status.setMinimumWidth(100)
-        self.player2_status.setStyleSheet(input_style)
-        self.player2_status.currentTextChanged.connect(self.update_total_score)
-        grid_layout.addWidget(self.player2_status, 2, 0)
-        
-        self.player2_name = QLineEdit()
-        self.player2_name.setReadOnly(True)
-        self.player2_name.setPlaceholderText("")
-        self.player2_name.setMinimumWidth(220)
-        self.player2_name.setStyleSheet(input_style)
-        grid_layout.addWidget(self.player2_name, 2, 1)
-        
-        self.total_score2 = QLineEdit()
-        self.total_score2.setPlaceholderText("")
-        self.total_score2.setMaximumWidth(70)
-        self.total_score2.setStyleSheet(input_style)
-        self.total_score2.setReadOnly(True)
-        grid_layout.addWidget(self.total_score2, 2, 2)
-        
-        # Поля для счетов игрока 2
-        for i in range(7):
-            edit = QLineEdit()
-            edit.setMaximumWidth(55)
-            edit.setPlaceholderText("")
-            edit.setEnabled(False)
-            edit.setStyleSheet(input_style)
-            edit.textChanged.connect(self.update_total_score)
-            edit.returnPressed.connect(lambda col=i: self.move_to_next_field(2, col))
-            grid_layout.addWidget(edit, 2, 3 + i)
-            self.score_edits_p2.append(edit)
-        
-        # Кнопки (вертикально)
-        buttons_widget = QWidget()
-        buttons_widget.setMaximumWidth(120)
-        buttons_layout = QVBoxLayout(buttons_widget)
-        buttons_layout.setSpacing(10)
-        buttons_layout.setContentsMargins(0, 0, 0, 0)
-        
-        self.save_btn = QPushButton("💾 Сохранить")
-        self.save_btn.setMinimumHeight(40)
-        self.save_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;
-                color: white;
-                padding: 8px 15px;
-                font-size: 12px;
-                font-weight: bold;
-                border-radius: 5px;
-            }
-            QPushButton:hover { background-color: #45a049; }
-        """)
-        self.save_btn.clicked.connect(self.save_match_result_compact)
-        buttons_layout.addWidget(self.save_btn)
-        
-        self.clear_btn = QPushButton("🗑️ Очистить")
-        self.clear_btn.setMinimumHeight(40)
-        self.clear_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #FF9800;
-                color: white;
-                padding: 8px 15px;
-                font-size: 12px;
-                font-weight: bold;
-                border-radius: 5px;
-            }
-            QPushButton:hover { background-color: #F57C00; }
-        """)
-        self.clear_btn.clicked.connect(self.clear_result_form_compact)
-        buttons_layout.addWidget(self.clear_btn)
-        
-        grid_layout.addWidget(buttons_widget, 0, 10, 3, 1, Qt.AlignTop)
-        
-        main_layout.addWidget(input_group)
-        
-        # # Таблица результатов (увеличенная)
-        # self.results_table = QTableView()
-        # self.results_table.setSelectionBehavior(QTableView.SelectRows)
-        # self.results_table.setAlternatingRowColors(True)
-        # self.results_table.setSelectionMode(QTableView.SingleSelection)
-        # self.results_table.doubleClicked.connect(self.on_match_double_clicked)
-        # self.results_table.setStyleSheet("""
-        #     QTableView {
-        #         font-size: 12px;
-        #         gridline-color: #ddd;
-        #         alternate-background-color: #f9f9f9;
-        #     }
-        #     QHeaderView::section {
-        #         background-color: #2196F3;
-        #         color: white;
-        #         padding: 8px;
-        #         font-weight: bold;
-        #         font-size: 12px;
-        #         border: none;
-        #     }
-        #     QTableView::item {
-        #         padding: 6px;
-        #     }
-        # """)
-        
-        # main_layout.addWidget(self.results_table)
-        
-        # # Загружаем модель для таблицы
-        # self.results_table_model = ResultsTableModel()
-        # self.results_table.setModel(self.results_table_model)
-        
-        # # Скрываем ненужные колонки
-        # self.results_table.setColumnHidden(0, True)  # ID
-        # self.results_table.setColumnHidden(1, True)  # Этап
-        
-        # # Настраиваем ширину колонок
-        # self.results_table.setColumnWidth(2, 80)   # Группа
-        # self.results_table.setColumnWidth(3, 60)   # Тур
-        # self.results_table.setColumnWidth(4, 220)  # Игрок 1
-        # self.results_table.setColumnWidth(5, 220)  # Игрок 2
-        # self.results_table.setColumnWidth(6, 150)  # Победитель
-        # self.results_table.setColumnWidth(7, 180)  # Счет
-        # self.results_table.setColumnWidth(8, 100)  # Очки
-        
-        # # Устанавливаем политику растяжения последней колонки
-        # self.results_table.horizontalHeader().setStretchLastSection(True)
-        
-        # # Увеличиваем высоту строк
-        # self.results_table.verticalHeader().setDefaultSectionSize(35)
-        
-        self.current_matches = []
-        self.current_match_index = 0
-        
-        return tab_widget
-
-# ================================   
+# ============================   
     def _create_results_tab(self):
         """Вкладка Результаты - ввод результатов матчей (компактная версия)"""
         tab_widget = QWidget()
@@ -2508,29 +2256,40 @@ class MainWindow(QMainWindow):
         main_layout.setSpacing(5)
         main_layout.setContentsMargins(5, 5, 5, 5)
         
-        # Информационная панель о текущем этапе
+        # Информационная панель о текущем этапе и фильтрах
         info_frame = QFrame()
         info_frame.setStyleSheet("""
             QFrame {
                 background-color: #e3f2fd;
                 border-radius: 3px;
-                padding: 3px;
+                padding: 5px;
             }
         """)
-        info_layout = QHBoxLayout(info_frame)
-        info_layout.setSpacing(10)
-        info_layout.setContentsMargins(5, 2, 5, 2)
+        info_layout = QVBoxLayout(info_frame)
+        info_layout.setSpacing(3)
+        info_layout.setContentsMargins(5, 5, 5, 5)
         
+        # Верхняя строка с этапом и статистикой
         self.current_stage_label = QLabel("Этап: Не выбран")
         self.current_stage_label.setStyleSheet("font-weight: bold; font-size: 12px;")
         info_layout.addWidget(self.current_stage_label)
         
-        self.current_match_label = QLabel("Матч: 0/0")
-        self.current_match_label.setStyleSheet("color: gray; font-size: 12px;")
-        info_layout.addWidget(self.current_match_label)
-        info_layout.addStretch()
+        # Строка с информацией о фильтрах и прогрессе
+        self.filter_info_label = QLabel("")
+        self.filter_info_label.setStyleSheet("color: #666; font-size: 11px;")
+        info_layout.addWidget(self.filter_info_label)
+        
+        # Строка с прогрессом
+        self.progress_label = QLabel("")
+        self.progress_label.setStyleSheet("color: #2196F3; font-size: 11px; font-weight: bold;")
+        info_layout.addWidget(self.progress_label)
         
         main_layout.addWidget(info_frame)
+        
+        # Статус сообщения
+        self.status_label = QLabel("")
+        self.status_label.setStyleSheet("color: red; font-size: 11px;")
+        main_layout.addWidget(self.status_label)
         
         # Группа ввода результатов
         input_group = QGroupBox("Ввод результата матча")
@@ -2550,17 +2309,17 @@ class MainWindow(QMainWindow):
             }
         """)
         
+        # Используем GridLayout для компактного расположения
         grid_layout = QGridLayout(input_group)
-        grid_layout = QGridLayout()
-        grid_layout.setSpacing(6)
-        grid_layout.setContentsMargins(8, 12, 8, 8)
+        grid_layout.setSpacing(2)
+        grid_layout.setContentsMargins(4, 4, 4, 4)
         
         # Заголовки
         grid_layout.addWidget(QLabel("Статус"), 0, 0)
         grid_layout.addWidget(QLabel("Игрок"), 0, 1)
         grid_layout.addWidget(QLabel("Общий счет"), 0, 2)
         
-        # Заголовки для партий
+        # Заголовки для партий (уменьшенные)
         self.parties_count = 5
         self.score_edits_p1 = []
         self.score_edits_p2 = []
@@ -2570,7 +2329,7 @@ class MainWindow(QMainWindow):
             label = QLabel(f"П{i+1}")
             label.setAlignment(Qt.AlignCenter)
             label.setMaximumWidth(35)
-            label.setStyleSheet("font-size: 9px;")
+            label.setStyleSheet("font-size: 14px;")
             grid_layout.addWidget(label, 0, 3 + i)
             self.score_labels.append(label)
         
@@ -2578,7 +2337,7 @@ class MainWindow(QMainWindow):
         self.player1_status = QComboBox()
         self.player1_status.addItems(["Играет", "Не явка", "Травма", "Дискв."])
         self.player1_status.setMaximumWidth(80)
-        self.player1_status.setStyleSheet("font-size: 10px;")
+        self.player1_status.setStyleSheet("font-size: 14px;")
         self.player1_status.currentTextChanged.connect(self.update_total_score)
         grid_layout.addWidget(self.player1_status, 1, 0)
         
@@ -2591,40 +2350,26 @@ class MainWindow(QMainWindow):
         self.total_score1 = QLineEdit()
         self.total_score1.setPlaceholderText("")
         self.total_score1.setMaximumWidth(50)
-        self.total_score1.setStyleSheet("font-size: 10px;")
-        self.total_score1.setReadOnly(True)
+        self.total_score1.setStyleSheet("font-size: 14px;")
         grid_layout.addWidget(self.total_score1, 1, 2)
-        
-        # # Поля для счетов игрока 1
-        # for i in range(7):
-        #     edit = QLineEdit()
-        #     edit.setMaximumWidth(35)
-        #     edit.setPlaceholderText("")
-        #     edit.setEnabled(False)
-        #     edit.setStyleSheet("font-size: 12px;")
-        #     edit.textChanged.connect(self.update_total_score)
-        #     edit.returnPressed.connect(lambda row=1, col=i: self.move_to_next_field(row, col))
-        #     grid_layout.addWidget(edit, 1, 3 + i)
-        #     self.score_edits_p1.append(edit)
-        
+
         # Поля для счетов игрока 1
         for i in range(7):
-            edit = QLineEdit()
-            edit.setMaximumWidth(35)
-            edit.setPlaceholderText("")
-            edit.setEnabled(False)
-            edit.setStyleSheet("font-size: 12px;")
-            edit.textChanged.connect(self.update_total_score)
-            # ВАЖНО: используем lambda с захватом i
-            edit.returnPressed.connect(lambda col=i: self.move_to_next_field(1, col))
-            grid_layout.addWidget(edit, 1, 3 + i)
-            self.score_edits_p1.append(edit)
-
+            edit1 = QLineEdit()
+            edit1.setMaximumWidth(35)
+            edit1.setPlaceholderText("")
+            edit1.setEnabled(False)
+            edit1.setStyleSheet("font-size: 14px;")
+            edit1.textChanged.connect(self.update_total_score)
+            edit1.returnPressed.connect(lambda col=i: self.move_to_next_field(1, col))
+            grid_layout.addWidget(edit1, 1, 3 + i)
+            self.score_edits_p1.append(edit1)
+        
         # Ряд 2: Игрок 2
         self.player2_status = QComboBox()
         self.player2_status.addItems(["Играет", "Не явка", "Травма", "Дискв."])
         self.player2_status.setMaximumWidth(80)
-        self.player2_status.setStyleSheet("font-size: 12px;")
+        self.player2_status.setStyleSheet("font-size: 14px;")
         self.player2_status.currentTextChanged.connect(self.update_total_score)
         grid_layout.addWidget(self.player2_status, 2, 0)
         
@@ -2637,36 +2382,22 @@ class MainWindow(QMainWindow):
         self.total_score2 = QLineEdit()
         self.total_score2.setPlaceholderText("")
         self.total_score2.setMaximumWidth(50)
-        self.total_score2.setStyleSheet("font-size: 10px;")
-        self.total_score2.setReadOnly(True)
+        self.total_score2.setStyleSheet("font-size: 14px;")
         grid_layout.addWidget(self.total_score2, 2, 2)
         
-        # # Поля для счетов игрока 2
-        # for i in range(7):
-        #     edit = QLineEdit()
-        #     edit.setMaximumWidth(35)
-        #     edit.setPlaceholderText("")
-        #     edit.setEnabled(False)
-        #     edit.setStyleSheet("font-size: 10px;")
-        #     edit.textChanged.connect(self.update_total_score)
-        #     edit.returnPressed.connect(lambda row=2, col=i: self.move_to_next_field(row, col))
-        #     grid_layout.addWidget(edit, 2, 3 + i)
-        #     self.score_edits_p2.append(edit)
-
         # Поля для счетов игрока 2
         for i in range(7):
-            edit = QLineEdit()
-            edit.setMaximumWidth(35)
-            edit.setPlaceholderText("")
-            edit.setEnabled(False)
-            edit.setStyleSheet("font-size: 10px;")
-            edit.textChanged.connect(self.update_total_score)
-            # ВАЖНО: используем lambda с захватом i
-            edit.returnPressed.connect(lambda col=i: self.move_to_next_field(2, col))
-            grid_layout.addWidget(edit, 2, 3 + i)
-            self.score_edits_p2.append(edit)
-
-        # Кнопки
+            edit2 = QLineEdit()
+            edit2.setMaximumWidth(35)
+            edit2.setPlaceholderText("")
+            edit2.setEnabled(False)
+            edit2.setStyleSheet("font-size: 14px;")
+            edit2.textChanged.connect(self.update_total_score)
+            edit2.returnPressed.connect(lambda col=i: self.move_to_next_field(2, col))
+            grid_layout.addWidget(edit2, 2, 3 + i)
+            self.score_edits_p2.append(edit2)  
+        
+        # Кнопки (вертикально)
         buttons_widget = QWidget()
         buttons_widget.setMaximumWidth(100)
         buttons_layout = QVBoxLayout(buttons_widget)
@@ -2706,7 +2437,7 @@ class MainWindow(QMainWindow):
         grid_layout.addWidget(buttons_widget, 0, 10, 3, 1, Qt.AlignTop)
         
         main_layout.addWidget(input_group)
-# ======================================================        
+        
         # # Таблица результатов
         # self.results_table = QTableView()
         # self.results_table.setSelectionBehavior(QTableView.SelectRows)
@@ -2729,27 +2460,28 @@ class MainWindow(QMainWindow):
         
         # main_layout.addWidget(self.results_table)
         
-        # Устанавливаем модель
+        # # Загружаем модель для таблицы
         # self.results_table_model = ResultsTableModel()
         # self.results_table.setModel(self.results_table_model)
         
         # # Скрываем ненужные колонки
-        # self.results_table.setColumnHidden(0, True)
-        # self.results_table.setColumnHidden(1, True)
+        # self.results_table.setColumnHidden(0, True)  # ID
+        # self.results_table.setColumnHidden(1, True)  # Этап
         
         # # Настраиваем ширину колонок
-        # self.results_table.setColumnWidth(2, 50)
-        # self.results_table.setColumnWidth(3, 40)
-        # self.results_table.setColumnWidth(4, 180)
-        # self.results_table.setColumnWidth(5, 180)
-        # self.results_table.setColumnWidth(6, 100)
-        # self.results_table.setColumnWidth(7, 120)
-        # self.results_table.setColumnWidth(8, 60)
+        # self.results_table.setColumnWidth(2, 60)   # Группа
+        # self.results_table.setColumnWidth(3, 50)   # Тур
+        # self.results_table.setColumnWidth(4, 180)  # Игрок 1
+        # self.results_table.setColumnWidth(5, 180)  # Игрок 2
+        # self.results_table.setColumnWidth(6, 100)  # Победитель
+        # self.results_table.setColumnWidth(7, 120)  # Счет
+        # self.results_table.setColumnWidth(8, 60)   # Очки
         
+        # Переменные для хранения текущего матча
         self.current_matches = []
         self.current_match_index = 0
         
-        return tab_widget          
+        return tab_widget   
 # ======================
     def load_matches_for_stage(self, stage_name):
         """Загрузка матчей для выбранного этапа"""
@@ -3241,7 +2973,7 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить результат: {str(e)}")
-# ======================= новый вариант с не явкой ======================
+# ======================= новый вариант с не явкой работает 2805======================
     def save_match_result_compact(self):
         """Сохранение результата матча с правильным форматом и обработкой неявок"""
 
@@ -3478,8 +3210,8 @@ class MainWindow(QMainWindow):
                 self.score_edits_p2[i].clear()
                 self.score_edits_p1[i].setEnabled(False)
                 self.score_edits_p2[i].setEnabled(False)
-# ===============================
-    def load_results_table_for_stage(self, stage_name):
+# =============================== рабочая 2805
+    def _load_results_table_for_stage(self, stage_name):
         """Загрузка таблицы результатов для выбранного этапа"""
         if not self.current_title_id:
             return
@@ -3520,63 +3252,64 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             print(f"Ошибка загрузки таблицы: {e}")
-# =============================
-    def _on_match_double_clicked(self, index):
-        """Обработка двойного клика по строке таблицы для редактирования"""
-        row = index.row()
-        model = self.results_table.model()
+
+    def load_results_table_for_stage(self, stage_name):
+        """Загрузка таблицы результатов для выбранного этапа с фильтрацией"""
+        if not self.current_title_id:
+            return
         
-        if row < model.rowCount():
-            # Получаем данные из модели
-            group = model.data(model.index(row, 2))
-            tour = model.data(model.index(row, 3))
-            player1 = model.data(model.index(row, 4))
-            player2 = model.data(model.index(row, 5))
-            winner = model.data(model.index(row, 6))
-            score = model.data(model.index(row, 7))
+        try:
+            # Базовый запрос
+            query = Result.select().where(
+                (Result.title_id == self.current_title_id) &
+                (Result.system_stage == stage_name)
+            )
             
-            # Заполняем поля игроков
-            self.player1_name.setText(player1)
-            self.player2_name.setText(player2)
+            # Применяем фильтр по группе
+            if self.current_group_filter:
+                # Извлекаем номер группы из строки "Гр.X"
+                group_num = self.current_group_filter
+                query = query.where(Result.number_group == group_num)
             
-            # Очищаем поля счетов
-            self.clear_result_form_compact()
+            # Применяем фильтр по туру
+            if self.current_tour_filter and self.current_tour_filter != "Все туры":
+                round_num = self.current_tour_filter
+                query = query.where(Result.round == round_num)
             
-            # Обновляем информацию о матче
-            self.current_match_label.setText(f"Матч: {row + 1}/{model.rowCount()}")
+            # Применяем фильтр по статусу
+            if self.current_status_filter == "played":
+                query = query.where(Result.winner.is_null(False))
+            elif self.current_status_filter == "unplayed":
+                query = query.where(Result.winner.is_null(True))
             
-            # Если матч уже сыгран, загружаем счета
-            if winner != "—" and score != "—":
-                self.parse_and_load_scores_compact(score)
+            # Сортировка
+            query = query.order_by(Result.number_group, Result.tours)
+            
+            data = []
+            for result in query:
+                winner_text = result.winner if result.winner else ""
+                score_text = result.score_in_game if result.score_in_game else ""
                 
-                # Устанавливаем победителя в статус (опционально)
-                if winner == player1:
-                    self.player1_status.setCurrentText("Играет")
-                    # Устанавливаем общий счет
-                    if ":" in score:
-                        parts = score.split(',')
-                        if parts:
-                            first_game = parts[0].split(':')
-                            if len(first_game) == 2:
-                                self.total_score1.setText(first_game[0])
-                                self.total_score2.setText(first_game[1])
-                elif winner == player2:
-                    self.player2_status.setCurrentText("Играет")
-                    if ":" in score:
-                        parts = score.split(',')
-                        if parts:
-                            first_game = parts[0].split(':')
-                            if len(first_game) == 2:
-                                self.total_score1.setText(first_game[0])
-                                self.total_score2.setText(first_game[1])
+                data.append({
+                    'id': result.id,
+                    'stage': result.system_stage,
+                    'group': result.number_group,
+                    'tour': result.tours,
+                    'player1': result.player1,
+                    'player2': result.player2,
+                    'winner': winner_text,
+                    'score': score_text,
+                    'points': result.score_win
+                })
             
-            # Находим соответствующий матч в списке current_matches
-            for i, match in enumerate(self.current_matches):
-                if match.player1 == player1 and match.player2 == player2:
-                    self.current_match_index = i
-                    break
+            self.results_table_model.setData(data)
             
-            # QMessageBox.information(self, "Загрузка", f"Загружен матч: {player1} vs {player2}")
+            # Обновляем ComboBoxы
+            self.update_filter_combos(stage_name)
+            
+        except Exception as e:
+            print(f"Ошибка загрузки таблицы: {e}")
+# =============================
 
     def on_match_double_clicked(self, index):
         """Обработка двойного клика по строке таблицы для загрузки матча"""
@@ -3986,6 +3719,7 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(100, self.resize_table_for_participants)
             
         elif index == 5:  # Результаты
+           # ======= 2805
             self.table_container.setCurrentWidget(self.results_table_view)
             self.table_header.setText("📊 Результаты матчей")
             self.table_header.setStyleSheet("""
@@ -4017,9 +3751,10 @@ class MainWindow(QMainWindow):
             self.results_table_view.setColumnWidth(8, 60)   # Очки по партиям
             self.table_view.horizontalHeader().setStretchLastSection(True)
             self.table_view.verticalHeader().setDefaultSectionSize(30)
-
-
-            
+# новое
+            # Обновляем левую панель
+            self.update_left_panel_for_results_tab()
+# ====================            
             if self.current_title_id:
                 # Загружаем результаты для текущего этапа
                 if hasattr(self, 'current_stage') and self.current_stage:
@@ -4030,6 +3765,57 @@ class MainWindow(QMainWindow):
             self.seeding_info_label.hide()
             # скрываем фильтр соревнований      
             self.filters_widget.setVisible(False)
+            # ================== конец 2805 ====
+
+        #     # В методе on_tab_changed, для index == 5 (Результаты):
+        # elif index == 5:  # Результаты
+        #     # Переключаем таблицу
+        #     self.table_container.setCurrentWidget(self.results_table)
+        #     self.table_header.setText("📊 Результаты матчей")
+        #     self.table_header.setStyleSheet("""
+        #         background-color: #FF9800;
+        #         color: white;
+        #         padding: 6px;
+        #         font-weight: bold;
+        #         font-size: 11px;
+        #         border-radius: 3px;
+        #     """)
+        #     # растягиваем колонки по содержимому, последнюю на всю щшрину
+        #     header = self.results_table_view.horizontalHeader()
+        #     for i in range(self.results_table_view.model().columnCount() - 1):
+        #         header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
+        #     header.setSectionResizeMode(self.results_table_view.model().columnCount() - 1, QHeaderView.Stretch)
+        #     # Скрываем ненужные колонки
+        #     self.results_table_view.setColumnHidden(0, True)  # ID
+        #     self.results_table_view.setColumnHidden(1, True)  # Этап
+            
+        #     # Настраиваем ширину колонок
+        #     self.results_table_view.setColumnWidth(2, 60)   # Группа
+        #     self.results_table_view.setColumnWidth(3, 50)   # Встреча
+        #     self.results_table_view.setColumnWidth(4, 180)  # Игрок 1
+        #     self.results_table_view.setColumnWidth(5, 180)  # Игрок 2
+        #     self.results_table_view.setColumnWidth(6, 180)  # Победитель
+        #     self.results_table_view.setColumnWidth(7, 120)  # Общий счет
+        #     self.results_table_view.setColumnWidth(8, 60)   # Очки по партиям
+        #     self.table_view.horizontalHeader().setStretchLastSection(True)
+        #     self.table_view.verticalHeader().setDefaultSectionSize(30)
+
+        #     # Обновляем левую панель
+        #     self.update_left_panel_for_results_tab()
+            
+        #     if self.current_title_id:
+        #         # Если есть выбранный этап, загружаем его
+        #         if hasattr(self, 'current_stage') and self.current_stage:
+        #             self.load_results_table_for_stage(self.current_stage)
+        #         else:
+        #             # Показываем диалог выбора этапа
+        #             QTimer.singleShot(100, self.select_stage_for_results)
+            
+        #     # Скрываем секцию создания этапа
+        #     self.stage_section.setVisible(False)
+        #     self.seeding_info_label.hide()
+        #     # скрываем фильтр соревнований      
+        #     self.filters_widget.setVisible(False)
 
         elif index == 2:  # Команды
             self.table_container.setCurrentWidget(self.teams_table_view)
@@ -4077,7 +3863,6 @@ class MainWindow(QMainWindow):
         
         # Устанавливаем высоту для текущей вкладки
         self.set_tab_height(index)
-
 # =======================================================
     def format_age_to_u(self, vozrast):
         """Преобразование возраста в формат UXX"""
@@ -12831,7 +12616,7 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             print(f"Ошибка загрузки таблицы результатов: {e}")
-# ===================
+# =================== 2805 - рабочая =====
     def select_stage_for_results(self):
         """Выбор этапа для ввода результатов"""
         if not self.current_title_id:
@@ -12908,14 +12693,110 @@ class MainWindow(QMainWindow):
                 self.load_matches_for_stage(stage_name)
                 # Обновляем таблицу результатов
                 self.load_results_table_for_stage(stage_name)
-# =============================
-    def refresh_results_data(self):
+# ===========================================================
+    def _select_stage_for_results(self):
+        """Выбор этапа для ввода результатов с обновлением левой панели"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+        
+        # Получаем список этапов
+        stages = System.select().where(System.title_id == self.current_title_id).order_by(System.id)
+        
+        if stages.count() == 0:
+            QMessageBox.warning(self, "Ошибка", "Нет добавленных этапов")
+            return
+        
+        # Создаем диалог выбора
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Выбор этапа")
+        dialog.setModal(True)
+        dialog.setMinimumWidth(400)
+        
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel("Выберите этап для ввода результатов:"))
+        
+        list_widget = QListWidget()
+        for stage in stages:
+            # Считаем количество сыгранных матчей
+            total_matches = Result.select().where(
+                (Result.title_id == self.current_title_id) &
+                (Result.system_stage == stage.stage)
+            ).count()
+            
+            played_matches = Result.select().where(
+                (Result.title_id == self.current_title_id) &
+                (Result.system_stage == stage.stage) &
+                (Result.winner.is_null(False))
+            ).count()
+            
+            # Определяем тип этапа для иконки
+            if "Финал" in stage.stage:
+                icon = "🏆"
+            elif "полуфинал" in stage.stage:
+                icon = "🎯"
+            else:
+                icon = "📋"
+            
+            # progress = f"({played_matches}/{total_matches})" if total_matches > 0 else ""
+            # percent = (played_matches / total_matches * 100) if total_matches > 0 else 0
+            # item_text = f"{icon} {stage.stage} | Групп: {stage.total_group} | {progress} | {percent:.0f}%"
+            item_text = f"{icon} {stage.stage} | Групп: {stage.total_group}"
+            item = QListWidgetItem(item_text)
+            item.setData(Qt.UserRole, stage.stage)
+            
+            # Подсвечиваем этапы, где есть несыгранные матчи
+            if played_matches < total_matches:
+                item.setForeground(QColor(255, 0, 0))
+            else:
+                item.setForeground(QColor(0, 128, 0))
+            
+            list_widget.addItem(item)
+        
+        layout.addWidget(list_widget)
+        
+        btn_layout = QHBoxLayout()
+        ok_btn = QPushButton("Выбрать")
+        ok_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 5px;")
+        ok_btn.clicked.connect(dialog.accept)
+        cancel_btn = QPushButton("Отмена")
+        cancel_btn.setStyleSheet("background-color: #f44336; color: white; padding: 5px;")
+        cancel_btn.clicked.connect(dialog.reject)
+        btn_layout.addWidget(ok_btn)
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+        
+        if dialog.exec_() == QDialog.Accepted:
+            selected = list_widget.currentItem()
+            if selected:
+                stage_name = selected.data(Qt.UserRole)
+                self.current_stage = stage_name
+                
+                # Сбрасываем фильтры при выборе нового этапа
+                self.reset_results_filters()
+                
+                # Загружаем матчи
+                self.load_matches_for_stage(stage_name)
+                
+                # Обновляем левую панель с фильтрами
+                self.update_left_panel_for_results_tab()
+                
+                # # Обновляем таблицу результатов
+                # self.load_results_table_for_stage(stage_name)
+# ============================= 2805
+    def _refresh_results_data(self):
         """Обновление данных результатов"""
         if hasattr(self, 'current_matches') and self.current_matches:
             stage_name = self.current_matches[0].system_stage if self.current_matches else None
             if stage_name:
                 self.load_matches_for_stage(stage_name)
                 QMessageBox.information(self, "Обновление", "Данные обновлены")
+    def refresh_results_data(self):
+        """Обновление данных результатов"""
+        if self.current_stage:
+            self.load_matches_for_stage(self.current_stage)
+            self.load_results_table_for_stage(self.current_stage)
+            QMessageBox.information(self, "Обновление", "Данные результатов обновлены")
 
     def show_results_filters(self):
         """Показать фильтры для результатов"""
@@ -13187,15 +13068,264 @@ class MainWindow(QMainWindow):
                 return False, f"При счете 10 и более разница должна быть 2 очка. Текущий счет: {s1}:{s2}"
         
         return True, ""
-
-    # def resize_table_for_results(self):
-    #     """Устанавливает высоту для вкладки Результаты (большая таблица)"""
-    #     self.set_tab_height(5)
+# =============================================
+    def update_left_panel_for_results_tab(self):
+        """Обновление левой панели для вкладки Результаты"""
+        # Очищаем панель
+        for i in reversed(range(self.dynamic_filters_layout.count())):
+            item = self.dynamic_filters_layout.itemAt(i)
+            if item.widget():
+                item.widget().deleteLater()
+            elif item.layout():
+                while item.layout().count():
+                    child = item.layout().takeAt(0)
+                    if child.widget():
+                        child.widget().deleteLater()
         
-    #     # Дополнительно настраиваем высоту строк таблицы
-    #     if hasattr(self, 'table_view'):
-    #         self.table_view.verticalHeader().setDefaultSectionSize(35)
-    #         self.table_view.updateGeometry()
+        # Заголовок
+        self.action_title.setText("🔧 Результаты")
+        self.action_description.setText("Фильтрация и управление результатами")
+        
+        # Кнопка выбора этапа
+        stage_btn = QPushButton("🎯 Выбрать этап")
+        stage_btn.setMinimumHeight(35)
+        stage_btn.setStyleSheet(self.get_button_style())
+        stage_btn.clicked.connect(self.select_stage_for_results)
+        self.dynamic_filters_layout.addWidget(stage_btn)
+        
+        # Разделитель
+        line = QFrame()
+        line.setFrameShape(QFrame.HLine)
+        line.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
+        self.dynamic_filters_layout.addWidget(line)
+        
+        # Заголовок фильтров
+        filter_title = QLabel("📊 Фильтры по группам")
+        filter_title.setStyleSheet("font-weight: bold; font-size: 12px; margin-top: 5px;")
+        self.dynamic_filters_layout.addWidget(filter_title)
+        
+        # ComboBox для выбора группы
+        group_layout = QHBoxLayout()
+        group_layout.addWidget(QLabel("Группа:"))
+        self.group_filter_combo = QComboBox()
+        self.group_filter_combo.addItem("Все группы")
+        self.group_filter_combo.currentTextChanged.connect(self.apply_group_filter)
+        group_layout.addWidget(self.group_filter_combo, 1)
+        self.dynamic_filters_layout.addLayout(group_layout)
+        
+        # ComboBox для выбора тура
+        tour_layout = QHBoxLayout()
+        tour_layout.addWidget(QLabel("Тур:"))
+        self.tour_filter_combo = QComboBox()
+        self.tour_filter_combo.addItem("Все туры")
+        self.tour_filter_combo.currentTextChanged.connect(self.apply_tour_filter)
+        tour_layout.addWidget(self.tour_filter_combo, 1)
+        self.dynamic_filters_layout.addLayout(tour_layout)
+        
+        # Разделитель
+        line2 = QFrame()
+        line2.setFrameShape(QFrame.HLine)
+        line2.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
+        self.dynamic_filters_layout.addWidget(line2)
+        
+        # Заголовок статуса
+        status_title = QLabel("🎯 Статус матчей")
+        status_title.setStyleSheet("font-weight: bold; font-size: 12px; margin-top: 5px;")
+        self.dynamic_filters_layout.addWidget(status_title)
+        
+        # Кнопки статуса
+        status_layout = QHBoxLayout()
+        status_layout.setSpacing(10)
+        
+        self.btn_all_matches = QPushButton("📋 Все")
+        self.btn_all_matches.setCheckable(True)
+        self.btn_all_matches.setChecked(True)
+        self.btn_all_matches.clicked.connect(lambda: self.set_status_filter("all"))
+        status_layout.addWidget(self.btn_all_matches)
+        
+        self.btn_played_matches = QPushButton("✅ Сыгранные")
+        self.btn_played_matches.setCheckable(True)
+        self.btn_played_matches.clicked.connect(lambda: self.set_status_filter("played"))
+        status_layout.addWidget(self.btn_played_matches)
+        
+        self.btn_unplayed_matches = QPushButton("⏳ Не сыгранные")
+        self.btn_unplayed_matches.setCheckable(True)
+        self.btn_unplayed_matches.clicked.connect(lambda: self.set_status_filter("unplayed"))
+        status_layout.addWidget(self.btn_unplayed_matches)
+        
+        self.dynamic_filters_layout.addLayout(status_layout)
+        
+        # Разделитель
+        line3 = QFrame()
+        line3.setFrameShape(QFrame.HLine)
+        line3.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
+        self.dynamic_filters_layout.addWidget(line3)
+        
+        # Кнопка обновления
+        refresh_btn = QPushButton("🔄 Обновить таблицу")
+        refresh_btn.setMinimumHeight(35)
+        refresh_btn.setStyleSheet(self.get_button_style())
+        refresh_btn.clicked.connect(self.refresh_results_data)
+        self.dynamic_filters_layout.addWidget(refresh_btn)
+        
+        # Кнопка сброса фильтров
+        reset_btn = QPushButton("🗑️ Сбросить фильтры")
+        reset_btn.setMinimumHeight(35)
+        reset_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #FF9800;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 8px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #F57C00; }
+        """)
+        reset_btn.clicked.connect(self.reset_results_filters)
+        self.dynamic_filters_layout.addWidget(reset_btn)
+        
+        # Кнопка экспорта
+        export_btn = QPushButton("📤 Экспорт в PDF")
+        export_btn.setMinimumHeight(35)
+        export_btn.setStyleSheet(self.get_button_style())
+        export_btn.clicked.connect(self.export_results_to_pdf)
+        self.dynamic_filters_layout.addWidget(export_btn)
+        
+        self.dynamic_filters_layout.addStretch()
+
+    def get_button_style(self):
+        """Стиль для кнопок"""
+        return """
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 8px;
+                font-size: 11px;
+                font-weight: bold;
+                text-align: left;
+                padding-left: 12px;
+            }
+            QPushButton:hover { background-color: #45a049; }
+        """
+
+    def set_status_filter(self, status):
+        """Установка фильтра по статусу матчей"""
+        self.current_status_filter = status
+        
+        # Обновляем состояние кнопок
+        self.btn_all_matches.setChecked(status == "all")
+        self.btn_played_matches.setChecked(status == "played")
+        self.btn_unplayed_matches.setChecked(status == "unplayed")
+        
+        # Применяем фильтр
+        self.apply_filters_and_refresh()
+
+    def apply_group_filter(self):
+        """Применение фильтра по группе"""
+        self.current_group_filter = self.group_filter_combo.currentText()
+        if self.current_group_filter == "Все группы":
+            self.current_group_filter = None
+        self.apply_filters_and_refresh()
+
+    def apply_tour_filter(self):
+        """Применение фильтра по туру"""
+        self.current_tour_filter = self.tour_filter_combo.currentText()
+        if self.current_tour_filter == "Все туры":
+            self.current_tour_filter = None
+        self.apply_filters_and_refresh()
+
+    def reset_results_filters(self):
+        """Сброс всех фильтров результатов"""
+        self.current_group_filter = None
+        self.current_tour_filter = None
+        self.current_status_filter = "all"
+        
+        # Сбрасываем ComboBox
+        self.group_filter_combo.setCurrentIndex(0)
+        self.tour_filter_combo.setCurrentIndex(0)
+        
+        # Сбрасываем кнопки статуса
+        self.btn_all_matches.setChecked(True)
+        self.btn_played_matches.setChecked(False)
+        self.btn_unplayed_matches.setChecked(False)
+        
+        # Обновляем таблицу
+        if self.current_stage:
+            self.load_results_table_for_stage(self.current_stage)
+
+    def apply_filters_and_refresh(self):
+        """Применение всех фильтров и обновление таблицы"""
+        if self.current_stage:
+            self.load_results_table_for_stage(self.current_stage)
+
+    def update_filter_combos(self, stage_name):
+        """Обновление списков групп и туров в фильтрах"""
+        try:
+            # Блокируем сигналы для предотвращения рекурсии
+            self.group_filter_combo.blockSignals(True)
+            self.tour_filter_combo.blockSignals(True)
+            
+            # Получаем уникальные группы
+            groups = Result.select(Result.number_group).where(
+                (Result.title_id == self.current_title_id) &
+                (Result.system_stage == stage_name)
+            ).distinct().order_by(Result.number_group)
+            
+            # Сохраняем текущее значение
+            current_group = self.group_filter_combo.currentText()
+            
+            # Обновляем ComboBox групп
+            self.group_filter_combo.clear()
+            self.group_filter_combo.addItem("Все группы")
+            for group in groups:
+                if group.number_group:
+                    self.group_filter_combo.addItem(group.number_group)
+            
+            # Восстанавливаем значение, если оно было
+            if current_group != "Все группы":
+                idx = self.group_filter_combo.findText(current_group)
+                if idx >= 0:
+                    self.group_filter_combo.setCurrentIndex(idx)
+                else:
+                    self.group_filter_combo.setCurrentIndex(0)
+            
+            # Получаем уникальные туры
+            rounds = Result.select(Result.round).where(
+                (Result.title_id == self.current_title_id) &
+                (Result.system_stage == stage_name)
+            ).distinct().order_by(Result.round)
+            
+            # Сохраняем текущее значение
+            current_tour = self.tour_filter_combo.currentText()
+            
+            # Обновляем ComboBox туров
+            self.tour_filter_combo.clear()
+            self.tour_filter_combo.addItem("Все туры")
+            for tour in rounds:
+                # if tour.tours and str(tour.tours).isdigit():
+                self.tour_filter_combo.addItem(tour.round)
+            
+            # Восстанавливаем значение, если оно было
+            if current_tour != "Все туры":
+                idx = self.tour_filter_combo.findText(current_tour)
+                if idx >= 0:
+                    self.tour_filter_combo.setCurrentIndex(idx)
+                else:
+                    self.tour_filter_combo.setCurrentIndex(0)
+            
+            # Разблокируем сигналы
+            self.group_filter_combo.blockSignals(False)
+            self.tour_filter_combo.blockSignals(False)
+            
+        except Exception as e:
+            print(f"Ошибка обновления ComboBox: {e}")
+            # Разблокируем сигналы в случае ошибки
+            self.group_filter_combo.blockSignals(False)
+            self.tour_filter_combo.blockSignals(False)
 
     # =================================
 class RatingLoaderThread(QThread):

@@ -866,6 +866,9 @@ class MainWindow(QMainWindow):
         self.results_table_view.setModel(self.results_table_model)
         self.results_table_view.doubleClicked.connect(self.on_match_double_clicked)
         self.results_table_view.setSelectionMode(QTableView.SingleSelection)
+
+        # Или растянуть все колонки пропорционально
+        # header.setSectionResizeMode(QHeaderView.Stretch)
         
         # Таблица команд
         self.teams_table_view = QTableView()
@@ -2079,7 +2082,7 @@ class MainWindow(QMainWindow):
         self.player1_status = QComboBox()
         self.player1_status.addItems(["Играет", "Не явка", "Травма", "Дискв."])
         self.player1_status.setMaximumWidth(80)
-        self.player1_status.setStyleSheet("font-size: 14px;")
+        self.player1_status.setStyleSheet("font-size: 12px;")
         self.player1_status.currentTextChanged.connect(self.update_total_score)
         grid_layout.addWidget(self.player1_status, 1, 0)
         
@@ -2216,12 +2219,12 @@ class MainWindow(QMainWindow):
         
         # Настраиваем ширину колонок
         self.results_table.setColumnWidth(2, 50)   # Группа
-        self.results_table.setColumnWidth(3, 40)   # Тур
+        self.results_table.setColumnWidth(3, 40)   # Встреча
         self.results_table.setColumnWidth(4, 180)  # Игрок 1
         self.results_table.setColumnWidth(5, 180)  # Игрок 2
         self.results_table.setColumnWidth(6, 100)  # Победитель
-        self.results_table.setColumnWidth(7, 120)  # Счет
-        self.results_table.setColumnWidth(8, 60)   # Очки
+        self.results_table.setColumnWidth(7, 120)  # Общий счет
+        self.results_table.setColumnWidth(8, 60)   # Очки по партиям
         
         # Переменные для хранения текущего матча
         self.current_matches = []
@@ -2772,7 +2775,8 @@ class MainWindow(QMainWindow):
                     self.parties_count = parties_count
                 
                 self.current_match_label.setText(f"Матч: 1/{len(self.current_matches)}")
-                self.load_match_for_editing(0)
+                # загружает автоматом встречу в ввод счета
+                # self.load_match_for_editing(0)
             else:
                 self.current_match_label.setText("Матч: 0/0")
                 self.clear_result_form_compact()
@@ -3350,14 +3354,7 @@ class MainWindow(QMainWindow):
                 self.load_matches_for_stage(match.system_stage) 
 
             # Случай 4: Обычная игра (оба играют)
-            # Формируем score_in_game (общий счет в формате "3 : 1")
-            if player1_wins > player2_wins:
-                score_in_game = f"{player1_wins} : {player2_wins}"
-                score_loser_game = f"{player2_wins} : {player1_wins}"
-            else:
-                score_in_game = f"{player2_wins} : {player1_wins}"
-                score_loser_game = f"{player1_wins} : {player2_wins}"
-                
+
             # Собираем счета по партиям
             for i in range(parties_count):
                 score1 = self.score_edits_p1[i].text().strip()
@@ -3393,7 +3390,14 @@ class MainWindow(QMainWindow):
             if has_error:
                 QMessageBox.warning(self, "Ошибка ввода", "\n".join(error_messages))
                 return
-            
+             # Формируем score_in_game (общий счет в формате "3 : 1")
+            if player1_wins > player2_wins:
+                score_in_game = f"{player1_wins} : {player2_wins}"
+                score_loser_game = f"{player2_wins} : {player1_wins}"
+            else:
+                score_in_game = f"{player2_wins} : {player1_wins}"
+                score_loser_game = f"{player1_wins} : {player2_wins}"
+
             if player1_wins > player2_wins:
                 winner_name = match.player1
                 loser_name = match.player2
@@ -3427,25 +3431,15 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Успех", 
                                 f"Результат сохранен!\n"
                                 f"Победитель: {winner_name}\n"
-                                f"Счет: {score_in_game}\n"
-                                f"score_win: ({score_win})\n"
-                                f"score_loser: ({score_loser_game})")
+                                f"Счет: {score_in_game}")
             
             # Обновляем таблицу
             self.load_results_table_for_stage(match.system_stage)
             self.clear_result_form_compact()
             self.load_matches_for_stage(match.system_stage)
-            
-            # Автоматически переходим к следующему несыгранному матчу
-            for i, m in enumerate(self.current_matches):
-                if not m.winner:
-                    self.current_match_index = i
-                    self.load_match_for_editing(i)
-                    break
-        
+                    
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить результат: {str(e)}")
-
 # =======================
     def clear_result_form_compact(self):
         """Очистка формы (компактная версия)"""
@@ -3491,26 +3485,30 @@ class MainWindow(QMainWindow):
             return
         
         try:
+            # results = Result.select().where(
+            #     (Result.title_id == self.current_title_id) &
+            #     (Result.system_stage == stage_name)
+            # ).order_by(Result.number_group, Result.tours)
+            # загружает согласно турам
             results = Result.select().where(
                 (Result.title_id == self.current_title_id) &
                 (Result.system_stage == stage_name)
-            ).order_by(Result.number_group, Result.tours)
-            
+            ).order_by(Result.tours, Result.number_group)
             data = []
             for result in results:
-                winner_text = result.winner if result.winner else "—"
-                score_text = result.score_in_game if result.score_in_game else "—"
+                winner_text = result.winner if result.winner else ""
+                score_text = result.score_in_game if result.score_in_game else ""
                 
                 data.append({
                     'id': result.id,
                     'stage': result.system_stage,
-                    'group': f"Гр.{result.number_group}",
-                    'tour': f"Тур {result.tours}",
+                    'group':result.number_group,
+                    'tour': result.tours,
                     'player1': result.player1,
                     'player2': result.player2,
                     'winner': winner_text,
                     'score': score_text,
-                    'points': f"{result.points_win}:{result.points_loser}" if result.points_win else "—"
+                    'points': result.score_win
                 })
             
             self.results_table_model.setData(data)
@@ -3578,7 +3576,7 @@ class MainWindow(QMainWindow):
                     self.current_match_index = i
                     break
             
-            QMessageBox.information(self, "Загрузка", f"Загружен матч: {player1} vs {player2}")
+            # QMessageBox.information(self, "Загрузка", f"Загружен матч: {player1} vs {player2}")
 
     def on_match_double_clicked(self, index):
         """Обработка двойного клика по строке таблицы для загрузки матча"""
@@ -3628,8 +3626,10 @@ class MainWindow(QMainWindow):
                     parties_count = system.score_flag if system.score_flag else 5
                     self.update_scores_fields_compact(parties_count)
                     self.parties_count = parties_count
-            
-            QMessageBox.information(self, "Загрузка", f"Загружен матч: {player1} vs {player2}")
+
+             # Устанавливаем фокус на первую партию первого игрока
+            QTimer.singleShot(100, lambda: self.score_edits_p1[0].setFocus())
+
 
     def create_rating_tab(self):
         """Вкладка Рейтинг"""
@@ -3972,6 +3972,12 @@ class MainWindow(QMainWindow):
                 font-size: 11px;
                 border-radius: 3px;
             """)
+            # растягиваем колонки по содержимому, последнюю на всю щшрину
+            header = self.table_view.horizontalHeader()
+            for i in range(self.table_view.model().columnCount() - 1):
+                header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
+            header.setSectionResizeMode(self.table_view.model().columnCount() - 1, QHeaderView.Stretch)
+
             if self.current_title_id:
                 self.load_participants_for_title()
             else:
@@ -3990,62 +3996,40 @@ class MainWindow(QMainWindow):
                 font-size: 13px;
                 border-radius: 3px;
             """)
-            
+
+            # растягиваем колонки по содержимому, последнюю на всю щшрину
+            header = self.results_table_view.horizontalHeader()
+            for i in range(self.results_table_view.model().columnCount() - 1):
+                header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
+            header.setSectionResizeMode(self.results_table_view.model().columnCount() - 1, QHeaderView.Stretch)
+           
             # Скрываем ненужные колонки
             self.results_table_view.setColumnHidden(0, True)  # ID
             self.results_table_view.setColumnHidden(1, True)  # Этап
             
             # Настраиваем ширину колонок
             self.results_table_view.setColumnWidth(2, 60)   # Группа
-            self.results_table_view.setColumnWidth(3, 50)   # Тур
+            self.results_table_view.setColumnWidth(3, 50)   # Встреча
             self.results_table_view.setColumnWidth(4, 180)  # Игрок 1
             self.results_table_view.setColumnWidth(5, 180)  # Игрок 2
-            self.results_table_view.setColumnWidth(6, 100)  # Победитель
-            self.results_table_view.setColumnWidth(7, 120)  # Счет
-            self.results_table_view.setColumnWidth(8, 60)   # Очки
+            self.results_table_view.setColumnWidth(6, 180)  # Победитель
+            self.results_table_view.setColumnWidth(7, 120)  # Общий счет
+            self.results_table_view.setColumnWidth(8, 60)   # Очки по партиям
             self.table_view.horizontalHeader().setStretchLastSection(True)
             self.table_view.verticalHeader().setDefaultSectionSize(30)
+
+
             
             if self.current_title_id:
                 # Загружаем результаты для текущего этапа
                 if hasattr(self, 'current_stage') and self.current_stage:
                     self.load_results_table_for_stage(self.current_stage)
+                    
             # скрываем вкладку создание эатапа        
             self.stage_section.setVisible(False)
             self.seeding_info_label.hide()
-
-        # elif index == 5:  # Результаты
-        #     # Используем общую таблицу для результатов
-        #     self.table_container.setCurrentWidget(self.table_view)
-        #     self.table_view.setModel(self.results_table_model)
-            
-        #     # Настройка таблицы результатов
-        #     self.table_view.setColumnHidden(0, True)  # ID
-        #     self.table_view.setColumnHidden(1, True)  # Этап
-        #     self.table_view.setColumnWidth(2, 80)    # Группа
-        #     self.table_view.setColumnWidth(3, 60)    # Тур
-        #     self.table_view.setColumnWidth(4, 220)   # Игрок 1
-        #     self.table_view.setColumnWidth(5, 220)   # Игрок 2
-        #     self.table_view.setColumnWidth(6, 150)   # Победитель
-        #     self.table_view.setColumnWidth(7, 180)   # Счет
-        #     self.table_view.setColumnWidth(8, 100)   # Очки
-        #     self.table_view.horizontalHeader().setStretchLastSection(True)
-        #     self.table_view.verticalHeader().setDefaultSectionSize(30)
-            
-        #     self.table_header.setText("📊 Результаты матчей")
-        #     self.table_header.setStyleSheet("""
-        #         background-color: #FF9800;
-        #         color: white;
-        #         padding: 8px;
-        #         font-weight: bold;
-        #         font-size: 13px;
-        #         border-radius: 5px;
-        #     """)
-            
-        #     if self.current_title_id and hasattr(self, 'current_stage') and self.current_stage:
-        #         self.load_results_table_for_stage(self.current_stage)
-            
-        #     QTimer.singleShot(50, self.resize_table_for_results)   
+            # скрываем фильтр соревнований      
+            self.filters_widget.setVisible(False)
 
         elif index == 2:  # Команды
             self.table_container.setCurrentWidget(self.teams_table_view)
@@ -12692,7 +12676,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Ошибка парсинга счета: {e}")
 
-    def save_match_result(self):
+    def _save_match_result(self):
         """Сохранение результата матча"""
         result_id = self.match_combo.currentData()
         if not result_id:
@@ -13108,7 +13092,7 @@ class MainWindow(QMainWindow):
             
             if status1 != "Играет" and status2 != "Играет":
                 self.total_score1.setText("П")
-                self.total_score2.setText("В")
+                self.total_score2.setText("П")
                 self.player1_name.setStyleSheet("background-color: #FFB6C1;")
                 self.player2_name.setStyleSheet("background-color: #FFB6C1;")
                 return

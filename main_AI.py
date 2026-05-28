@@ -2493,7 +2493,7 @@ class MainWindow(QMainWindow):
             self.current_matches = list(Result.select().where(
                 (Result.title_id == self.current_title_id) &
                 (Result.system_stage == stage_name)
-            ).order_by(Result.number_group, Result.tours))
+            ).order_by(Result.number_group, Result.round))
             
             self.current_match_index = 0
             self.current_stage_label.setText(f"Этап: {stage_name}")
@@ -2507,8 +2507,7 @@ class MainWindow(QMainWindow):
                     self.parties_count = parties_count
                 
                 self.current_match_label.setText(f"Матч: 1/{len(self.current_matches)}")
-                # загружает автоматом встречу в ввод счета
-                # self.load_match_for_editing(0)
+ 
             else:
                 self.current_match_label.setText("Матч: 0/0")
                 self.clear_result_form_compact()
@@ -2964,12 +2963,12 @@ class MainWindow(QMainWindow):
             self.clear_result_form_compact()
             self.load_matches_for_stage(match.system_stage)
             
-            # Автоматически переходим к следующему несыгранному матчу
-            for i, m in enumerate(self.current_matches):
-                if not m.winner:
-                    self.current_match_index = i
-                    self.load_match_for_editing(i)
-                    break
+            # # Автоматически переходим к следующему несыгранному матчу
+            # for i, m in enumerate(self.current_matches):
+            #     if not m.winner:
+            #         self.current_match_index = i
+            #         self.load_match_for_editing(i)
+            #         break
             
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить результат: {str(e)}")
@@ -3217,15 +3216,12 @@ class MainWindow(QMainWindow):
             return
         
         try:
-            # results = Result.select().where(
-            #     (Result.title_id == self.current_title_id) &
-            #     (Result.system_stage == stage_name)
-            # ).order_by(Result.number_group, Result.tours)
             # загружает согласно турам
             results = Result.select().where(
                 (Result.title_id == self.current_title_id) &
                 (Result.system_stage == stage_name)
-            ).order_by(Result.tours, Result.number_group)
+            ).order_by(Result.number_group, Result.round)
+            
             data = []
             for result in results:
                 winner_text = result.winner if result.winner else ""
@@ -3283,7 +3279,7 @@ class MainWindow(QMainWindow):
                 query = query.where(Result.winner.is_null(True))
             
             # Сортировка
-            query = query.order_by(Result.number_group, Result.tours)
+            query = query.order_by(Result.number_group, Result.round)
             
             data = []
             for result in query:
@@ -12368,7 +12364,7 @@ class MainWindow(QMainWindow):
             results = Result.select().where(
                 (Result.title_id == self.current_title_id) &
                 (Result.winner.is_null(True))  # Только несыгранные матчи
-            ).order_by(Result.system_stage, Result.number_group, Result.tours)
+            ).order_by(Result.system_stage, Result.number_group, Result.round)
             
             for result in results:
                 # Формируем название матча

@@ -803,7 +803,29 @@ class MainWindow(QMainWindow):
             border-radius: 3px;
         """)
         bottom_layout.addWidget(self.table_header)
+        # === вариант предыдущий =====
+    # # Создаем QStackedWidget и добавляем в него разные конфигурации одной таблицы
+    #     self.table_stack = QStackedWidget()
         
+    #     # Создаем копии таблицы с разными настройками (используем одну модель)
+    #     self.table_view = QTableView()
+    #     self.teams_table_view = QTableView()
+    #     self.doubles_table_view = QTableView()
+    #     self.results_table_view = QTableView()
+        
+    #     # Устанавливаем модели
+    #     self.table_view.setModel(self.players_model)
+    #     self.teams_table_view.setModel(self.teams_model)
+    #     self.doubles_table_view.setModel(self.double_players_model)
+    #     self.results_table_view.setModel(self.results_model)
+        
+    #     # Настраиваем каждую таблицу
+    #     self.configure_players_table(self.table_view)
+    #     self.configure_teams_table(self.teams_table_view)
+    #     self.configure_doubles_table(self.doubles_table_view)
+    #     self.configure_results_table(self.results_table_view)
+
+        # =====
         # Контейнер для таблиц (stacked widget)
         self.table_container = QStackedWidget()
         
@@ -3753,7 +3775,12 @@ class MainWindow(QMainWindow):
         
         # ОБНОВЛЯЕМ ЛЕВУЮ ПАНЕЛЬ
         self.update_left_panel_for_tab(index)
-        
+
+        # Управление видимостью секции создания этапа
+        if hasattr(self, 'stage_section'):
+            # Показываем секцию создания этапа только на вкладке "Система" (индекс 4)
+            self.stage_section.setVisible(index == 4)
+            
         # Переключаем таблицу в зависимости от вкладки
         if index == 1:  # Участники
             self.table_container.setCurrentWidget(self.table_view)
@@ -3827,56 +3854,6 @@ class MainWindow(QMainWindow):
             # скрываем фильтр соревнований      
             self.filters_widget.setVisible(False)
             # ================== конец 2805 ====
-
-        #     # В методе on_tab_changed, для index == 5 (Результаты):
-        # elif index == 5:  # Результаты
-        #     # Переключаем таблицу
-        #     self.table_container.setCurrentWidget(self.results_table)
-        #     self.table_header.setText("📊 Результаты матчей")
-        #     self.table_header.setStyleSheet("""
-        #         background-color: #FF9800;
-        #         color: white;
-        #         padding: 6px;
-        #         font-weight: bold;
-        #         font-size: 11px;
-        #         border-radius: 3px;
-        #     """)
-        #     # растягиваем колонки по содержимому, последнюю на всю щшрину
-        #     header = self.results_table_view.horizontalHeader()
-        #     for i in range(self.results_table_view.model().columnCount() - 1):
-        #         header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
-        #     header.setSectionResizeMode(self.results_table_view.model().columnCount() - 1, QHeaderView.Stretch)
-        #     # Скрываем ненужные колонки
-        #     self.results_table_view.setColumnHidden(0, True)  # ID
-        #     self.results_table_view.setColumnHidden(1, True)  # Этап
-            
-        #     # Настраиваем ширину колонок
-        #     self.results_table_view.setColumnWidth(2, 60)   # Группа
-        #     self.results_table_view.setColumnWidth(3, 50)   # Встреча
-        #     self.results_table_view.setColumnWidth(4, 180)  # Игрок 1
-        #     self.results_table_view.setColumnWidth(5, 180)  # Игрок 2
-        #     self.results_table_view.setColumnWidth(6, 180)  # Победитель
-        #     self.results_table_view.setColumnWidth(7, 120)  # Общий счет
-        #     self.results_table_view.setColumnWidth(8, 60)   # Очки по партиям
-        #     self.table_view.horizontalHeader().setStretchLastSection(True)
-        #     self.table_view.verticalHeader().setDefaultSectionSize(30)
-
-        #     # Обновляем левую панель
-        #     self.update_left_panel_for_results_tab()
-            
-        #     if self.current_title_id:
-        #         # Если есть выбранный этап, загружаем его
-        #         if hasattr(self, 'current_stage') and self.current_stage:
-        #             self.load_results_table_for_stage(self.current_stage)
-        #         else:
-        #             # Показываем диалог выбора этапа
-        #             QTimer.singleShot(100, self.select_stage_for_results)
-            
-        #     # Скрываем секцию создания этапа
-        #     self.stage_section.setVisible(False)
-        #     self.seeding_info_label.hide()
-        #     # скрываем фильтр соревнований      
-        #     self.filters_widget.setVisible(False)
 
         elif index == 2:  # Команды
             self.table_container.setCurrentWidget(self.teams_table_view)

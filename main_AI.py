@@ -3814,7 +3814,14 @@ class MainWindow(QMainWindow):
             
         # Переключаем таблицу в зависимости от вкладки
         if index == 1:  # Участники
-            self.table_container.setCurrentWidget(self.table_view)
+            # Проверяем, есть ли table_view в стеке
+            if self.table_container.indexOf(self.table_view) >= 0:
+                self.table_container.setCurrentWidget(self.table_view)
+            else:
+                # Если нет, добавляем
+                self.table_container.addWidget(self.table_view)
+                self.table_container.setCurrentWidget(self.table_view)
+
             self.table_header.setText("👥 Список участников")
             self.table_header.setStyleSheet("""
                 background-color: #2196F3;
@@ -3825,10 +3832,10 @@ class MainWindow(QMainWindow):
                 border-radius: 3px;
             """)
             # растягиваем колонки по содержимому, последнюю на всю щшрину
-            header = self.table_view.horizontalHeader()
+            table_header = self.table_view.horizontalHeader()
             for i in range(self.table_view.model().columnCount() - 1):
-                header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
-            header.setSectionResizeMode(self.table_view.model().columnCount() - 1, QHeaderView.Stretch)
+                table_header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
+            table_header.setSectionResizeMode(self.table_view.model().columnCount() - 1, QHeaderView.Stretch)
 
             if self.current_title_id:
                 self.load_participants_for_title()
@@ -3839,6 +3846,14 @@ class MainWindow(QMainWindow):
                     
         elif index == 5:  # Результаты
             # Используем отдельную таблицу для результатов
+            # Проверяем, есть ли table_view в стеке
+            if self.table_container.indexOf(self.results_table_view) >= 0:
+                self.table_container.setCurrentWidget(self.results_table_view)
+            else:
+                # Если нет, добавляем
+                self.table_container.addWidget(self.results_table_view)
+                self.table_container.setCurrentWidget(self.results_table_view)
+
             self.table_container.setCurrentWidget(self.results_table_view)
             self.table_header.setText("📊 Результаты матчей")
             self.table_header.setStyleSheet("""
@@ -3860,6 +3875,12 @@ class MainWindow(QMainWindow):
             self.results_table_view.setColumnWidth(6, 100)  # Победитель
             self.results_table_view.setColumnWidth(7, 120)  # Счет
             self.results_table_view.setColumnWidth(8, 60)   # Очки
+
+            # Первые N-1 колонок по содержимому, последняя - на всю ширину
+            table_header = self.results_table_view.horizontalHeader()
+            for i in range(self.results_table_view.model().columnCount() - 1):
+                table_header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
+            table_header.setSectionResizeMode(self.results_table_view.model().columnCount() - 1, QHeaderView.Stretch)
             
             # Активируем кнопку просмотра (если есть выбранное соревнование)
             if hasattr(self, 'view_results_btn'):

@@ -41,6 +41,7 @@ import pandas as pd
 import math
 
 from datetime import datetime
+from PyPDF2 import PdfMerger 
 
 import manual_choice
 
@@ -11618,165 +11619,507 @@ class MainWindow(QMainWindow):
             import traceback
             traceback.print_exc()
             QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")
-# ===============================================
-    def _export_participants_to_pdf(self):
-        """Экспорт списка участников в PDF с использованием reportlab"""
-        from reportlab.platypus import Table
-        from reportlab.platypus import Paragraph
 
+# === круговые таблицы ====
+    def table_made(self, pv, stage):
+        """создание таблиц kg - количество групп(таблиц), g2 - наибольшое кол-во участников в группе
+        pv - ориентация страницы, е - если участников четно группам, т - их количество"""
+        from reportlab.platypus import Table, SimpleDocTemplate, Paragraph, Spacer
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib import colors
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle as PS
+        from reportlab.lib.units import cm
+        import os
+        
         if not self.current_title_id:
-            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
             return
         
-        try:
-            # Получаем данные о соревновании
-            title = Title.get(Title.id == self.current_title_id)
-            
-            # Создаем папку table_pdf, если её нет
-            pdf_dir = "table_pdf"
-            if not os.path.exists(pdf_dir):
-                os.makedirs(pdf_dir)
-            
-            # Используем короткое имя из Title
-            short_name = title.short_name_comp if title.short_name_comp else title.name
-            if not short_name:
-                short_name = "competition"
-            import re
-            clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
-            clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
-            
-            # Путь к файлу
-            file_path = os.path.join(pdf_dir, f"{clean_name}_player_list.pdf")
-            
-            # Получаем параметры
-            gamer = title.gamer if title.gamer else "Участники"
-            otc = title.otchestvo if title.otchestvo else 0
-            
-            # Получаем список участников
-            player_list = Player.select().where(Player.title_id == self.current_title_id).order_by(Player.player)
-            
-            if player_list.count() == 0:
-                QMessageBox.warning(self, "Ошибка", "Нет участников для экспорта")
-                return
-            
-            # Подготовка данных для таблицы
-            elements = []
-            n = 0
-            
-            for player in player_list:
-                n += 1
-                # Формируем ФИО с отчеством или без
-                if otc == 1:
-                    patronymic_text = ""
-                    if player.patronymic_id:
-                        try:
-                            patronymic = Patronymic.get(Patronymic.id == player.patronymic_id)
-                            patronymic_text = patronymic.patronymic
-                        except:
-                            pass
-                    full_name = f"{player.player} {patronymic_text}".strip()
-                else:
-                    full_name = player.player
-                
-                # Форматируем дату
-                birth_date = player.bday.strftime("%d.%m.%Y") if player.bday else "---"
-                
-                # Получаем тренера
-                coach_text = ""
-                if player.coach_id:
-                    try:
-                        coach = Coach.get(Coach.id == player.coach_id)
-                        coach_text = coach.coach
-                    except:
-                        pass
-                
-                # Создаем ячейки с переносом текста
-                from reportlab.platypus import Paragraph
-                # from reportlab.lib.styles import ParagraphStyle
-                
-                 # Подготовка стилей перенос длинной строки
-                styles = getSampleStyleSheet()
-                custom_style = styles['Normal'].fontName = 'DejaVuSerif'
-                custom_style = styles['Normal'].fontSize = 6
-                custom_style = styles["Normal"].clone("CustomStyle")
-                custom_style.wordWrap = 'LTR' # Перенос слов (LTR - Left-To-Right)
-                custom_style.leading = 6 # Межстрочный интервал
-                
-                data_row = [
-                    str(n),
-                    Paragraph(full_name, custom_style),
-                    birth_date,
-                    str(player.rank) if player.rank else "0",
-                    player.city or "",
-                    Paragraph(player.region or "", custom_style),
-                    player.razryad or "",
-                    Paragraph(coach_text, custom_style),
-                    # str(player.mesto) if player.mesto else ""
-                ]
-                elements.append(data_row)
-            
-            # Добавляем заголовок таблицы
-            headers = ["№", "ФИО", "Дата рожд.", "R", "Город", "Субъект РФ", "Разряд", "Тренер(ы)"]
-            elements.insert(0, headers)
-            
-            # Создаем таблицу
-            table = Table(elements, repeatRows=1)
-            
-            # Настраиваем ширину колонок
-            col_widths = [0.8*cm, 5.0*cm, 1.6*cm, 0.8*cm, 2.5*cm, 3.2*cm, 1.1*cm, 4.0*cm]
-            table._argW = col_widths
-            
-            # Стиль таблицы
-            table_style = TableStyle([
-                ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSerif'),
-                ('FONTSIZE', (0, 0), (-1, -1), 7),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-                ('TOPPADDING', (0, 0), (-1, -1), 2),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('BACKGROUND', (0, 0), (8, 0), colors.yellow),
-                ('TEXTCOLOR', (0, 0), (8, 0), colors.darkblue),
-                ('LINEABOVE', (0, 0), (-1, -1), 0.5, colors.blue),
-                ('INNERGRID', (0, 0), (-1, -1), 0.2, colors.grey),
-                ('BOX', (0, 0), (-1, -1), 0.5, colors.black),
-            ])
-            
-            table.setStyle(table_style)
-            
-            # Создаем PDF документ
-            doc = SimpleDocTemplate(file_path, pagesize=A4,
-                                    topMargin=15*mm, bottomMargin=10*mm,
-                                    leftMargin=5*mm, rightMargin=5*mm)
-           
-            # =========стиль заголовка ===========
-            story = []
-            h3 = PS("normal", fontSize=12, fontName="DejaVuSerif-Italic", leftIndent=180,
-            firstLineIndent = 10, textColor="green")  # стиль параграфа
-            h3.spaceAfter = 10  # промежуток после заголовка
-            story.append(Paragraph(f'Список участников. {gamer}', h3))
-            story.append(table)
+        stage_list_sf = ["Квалификация. 1-й полуфинал", "Квалификацияю 2-й полуфинал"]
+        
+        # Получаем system_id для этапа
+        system = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == stage)
+        )
+        
+        if not system:
+            QMessageBox.warning(self, "Ошибка", f"Этап '{stage}' не найден в системе")
+            return
+        
+        title = Title.get_by_id(self.current_title_id)
+        sex = title.sredi if title.sredi else "Участники"
+        
+        # Определяем параметры таблиц
+        if stage in stage_list_sf:  # если этап полуфинал
+            kg = system.total_group  # кол-во групп
+            max_pl = system.max_player
+        elif stage == "Квалификация":
+            kg = system.total_group  # кол-во групп
+            max_pl = system.max_player
+        else:  # игры в финале по кругу или одна круговая таблица
+            kg = 1
+            max_pl = system.max_player
+        
+        # Определяем ориентацию страницы
+        if pv == "альбомная":
+            page_size = landscape(A4)
+            family_col = 4.6
+            center_stage = 210
+            wcells = 20.0 / max_pl if max_pl > 0 else 1
+        else:
+            page_size = A4
+            family_col = 5.0
+            center_stage = 140
+            wcells = 10.0 / max_pl if max_pl > 0 else 1
+            wcells = round(wcells, 2)
+        
+        # Ширина столбцов
+        col = ((wcells * cm,) * max_pl)
+        
+        # кол-во столбцов в таблице и их ширина
+        cW = ((0.4 * cm, family_col * cm) + col + (0.8 * cm, 1 * cm, 1 * cm))
+        
+        # Высота строки
+        if kg == 1:
+            if max_pl > 16:
+                rH = (0.42 * cm)
+            else:
+                rH = (0.47 * cm)
+        else:
+            rH = (0.29 * cm)
+        
+        # Заголовки столбцов
+        num_columns = [str(i + 1) for i in range(max_pl)]
+        zagolovok = (['№', 'Участники/ Город'] + num_columns + ['Очки', 'Соот', 'Место'])
+        
+        # Стили для таблицы
+        tblstyle = []
+        for q in range(1, max_pl + 1):
+            # город участника курсивом
+            tblstyle.append(('FONTNAME', (1, q * 2), (1, q * 2), "DejaVuSerif-Italic"))
+            # участник жирным
+            tblstyle.append(('FONTNAME', (1, q * 2 - 1), (1, q * 2 - 1), "DejaVuSerif-Bold"))
+            # выравнивание
+            tblstyle.append(('ALIGN', (1, q * 2 - 1), (1, q * 2 - 1), 'LEFT'))
+            # объединение ячеек 1 столбца
+            tblstyle.append(('SPAN', (0, q * 2 - 1), (0, q * 2)))
+            # объединение ячеек "Очки"
+            tblstyle.append(('SPAN', (max_pl + 2, q * 2 - 1), (max_pl + 2, q * 2)))
+            # объединение ячеек "Соот"
+            tblstyle.append(('SPAN', (max_pl + 3, q * 2 - 1), (max_pl + 3, q * 2)))
+            # объединение ячеек "Место"
+            tblstyle.append(('SPAN', (max_pl + 4, q * 2 - 1), (max_pl + 4, q * 2)))
+            # объединение диагональных клеток
+            tblstyle.append(('SPAN', (q + 1, q * 2 - 1), (q + 1, q * 2)))
+            # заливка диагональных клеток
+            tblstyle.append(('BACKGROUND', (q + 1, q * 2 - 1), (q + 1, q * 2), colors.lightgreen))
+        
+        # Стили для линий сетки
+        ts_grid = []
+        for p in range(0, max_pl * 2 + 1):
+            if p % 2 == 0:
+                ts_grid.append(('LINEBELOW', (1, p + 2), (-1, p + 2), 0.25, colors.black))
+            else:
+                ts_grid.append(('LINEBELOW', (2, p), (-1, p), 0.25, colors.grey, None, (1, 1)))
+        
+        # Полный стиль таблицы
+        ts = TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), "DejaVuSerif"),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('FONTSIZE', (0, 0), (-1, -1), 6),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (max_pl + 5, 0), "DejaVuSerif-Bold"),
+            ('VALIGN', (0, 0), (max_pl + 5, 0), 'MIDDLE'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+            ('BACKGROUND', (0, 0), (max_pl + 5, 0), colors.yellow),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.darkblue),
+            ('LINEABOVE', (0, 0), (-1, 1), 1, colors.black),
+            ('INNERGRID', (0, 0), (1, -1), 0.25, colors.black),
+            ('LINEAFTER', (1, 0), (-1, -1), 0.25, colors.black),
+            ('BOX', (0, 0), (-1, -1), 2, colors.black)
+        ] + tblstyle + ts_grid)
+        
+        # Получаем данные для таблиц
+        dict_table = self.get_table_data(stage, kg, ts, zagolovok, cW, rH, max_pl)
+        
+        # Стили для заголовков
+        h1 = PS("normal", fontSize=12, fontName="DejaVuSerif-Italic",
+                leftIndent=center_stage, spacebefore=10, textColor="green")
+        
+        h2 = PS("normal", fontSize=11, fontName="DejaVuSerif-Italic",
+                leftIndent=200, spacebefore=20, textColor="brown")
+        
+        # Создаем элементы документа
+        elements = []
+        
+        if kg == 1:  # одна таблица
+            data = [[dict_table[0]]]
+            shell_table = Table(data, colWidths=[28 * cm])
+            elements.append(shell_table)
+        else:
+            if pv == "альбомная":  # альбомная страница - таблицы в ряд
+                for k in range(0, kg, 2):
+                    if k + 1 < kg:
+                        data_1 = [[dict_table[k]]]
+                        data_2 = [[dict_table[k + 1]]]
+                        tbl_1 = Table(data_1, colWidths=["*", "*"])
+                        tbl_2 = Table(data_2, colWidths=["*", "*"])
+                        tbl_1.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP')]))
+                        tbl_2.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP')]))
                         
-            # Строим документ с использованием функции заголовка
-            doc.build(story, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
+                        gr_1 = f'группа {k + 1}'
+                        gr_2 = f'группа {k + 2}'
+                        
+                        # Компоновка двух таблиц в строку
+                        col1 = [Paragraph(gr_1, h2), tbl_1]
+                        col2 = [Paragraph(gr_2, h2), tbl_2]
+                        combined = Table([[col1, col2]], colWidths=[14 * cm, 14 * cm], hAlign='CENTER')
+                        combined.setStyle(TableStyle([
+                            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                            ('LEFTPADDING', (0, 0), (-1, -1), 5),
+                            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+                        ]))
+                        elements.append(combined)
+                    else:
+                        # Нечетное количество групп - последняя таблица одна
+                        data_1 = [[dict_table[k]]]
+                        tbl_1 = Table(data_1, colWidths=["*", "*"])
+                        tbl_1.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP')]))
+                        gr_1 = f'группа {k + 1}'
+                        col1 = [Paragraph(gr_1, h2), tbl_1]
+                        combined = Table([[col1]], colWidths=["*", "*"], hAlign='LEFT')
+                        combined.setStyle(TableStyle([
+                            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                            ('LEFTPADDING', (0, 0), (-1, -1), 5),
+                            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+                        ]))
+                        elements.append(combined)
+            else:  # книжная страница - таблицы в столбец
+                for k in range(kg):
+                    data_1 = [[dict_table[k]]]
+                    tbl_1 = Table(data_1, colWidths=["*", "*"])
+                    tbl_1.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'LEFT')]))
+                    gr_1 = f'группа {k + 1}'
+                    col1 = [Paragraph(gr_1, h2), tbl_1]
+                    combined = Table([[col1]], colWidths=["*", "*"], hAlign='LEFT')
+                    combined.setStyle(TableStyle([
+                        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                        ('LEFTPADDING', (0, 0), (-1, -1), 5),
+                        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+                    ]))
+                    elements.append(combined)
+        
+        # Формируем имя файла
+        short_name = title.short_name_comp if title.short_name_comp else title.name
+        import re
+        clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
+        clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
+        
+        if stage == "Одна таблица":
+            title_text = f"Финальные соревнования. Одиночный разряд. {sex}."
+            name_table = f"table_pdf/{clean_name}_one_table.pdf"
+        elif stage == "Квалификация":
+            title_text = f"Квалификационные соревнования. {sex}."
+            name_table = f"table_pdf/{clean_name}_table_group.pdf"
+        elif stage in ["1-й полуфинал", "2-й полуфинал"]:
+            number_fin = stage[:stage.rfind("-")]
+            title_text = f"Квалификационные соревнования. {stage}. {sex}."
+            name_table = f"table_pdf/{clean_name}_{number_fin}-semifinal.pdf"
+        else:
+            # Финал
+            number_fin = stage[:stage.rfind("-")] if "-" in stage else stage
+            # Получаем начальное место для финала
+            first_mesto = self.get_final_start_place(stage)
+            last_mesto = first_mesto + max_pl - 1 if max_pl > 0 else first_mesto
+            title_text = f'Финальные соревнования.({first_mesto}-{last_mesto} место). Одиночный разряд. {sex}.'
+            name_table = f"table_pdf/{clean_name}_{number_fin}-final.pdf"
+        
+        # Создаем PDF
+        doc = SimpleDocTemplate(name_table, pagesize=page_size)
+        doc.topMargin = 1.8 * cm
+        doc.leftMargin = 1 * cm
+        
+        # Добавляем заголовок
+        elements.insert(0, Paragraph(title_text, h1))
+        
+        # Строим документ
+        doc.build(elements, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
+        
+        return name_table
+
+    def get_table_data(self, stage, kg, ts, zagolovok, cW, rH, max_pl):
+        """Получение данных для таблиц из таблиц Game_list и Result
+        Возвращает словарь: ключ - номер группы, значение - таблица (список списков)
+        """
+        from reportlab.platypus import Table
+        from collections import defaultdict
+        
+        dict_table = {}
+        
+        try:
+            # Получаем system_id для этапа
+            system = System.get_or_none(
+                (System.title_id == self.current_title_id) &
+                (System.stage == stage)
+            )
             
-            QMessageBox.information(self, "Успех", 
-                                f"Список участников успешно сохранен в PDF:\n{file_path}")
+            if not system:
+                return dict_table
             
-            # Предлагаем открыть файл
-            reply = QMessageBox.question(self, "Открыть файл", 
-                                        "Открыть созданный PDF файл?",
-                                        QMessageBox.Yes | QMessageBox.No)
-            if reply == QMessageBox.Yes:
-                if sys.platform == 'win32':
-                    os.startfile(file_path)
-                else:
-                    os.system(f'open "{file_path}"')
+            # ===== ЭТАП 1: СОЗДАЕМ ПУСТЫЕ ТАБЛИЦЫ ИЗ GAME_LIST =====
+            # Получаем всех игроков из Game_list для этого этапа
+            game_players = Game_list.select().where(
+                (Game_list.title_id == self.current_title_id) &
+                (Game_list.system_id == system.id)
+            ).order_by(Game_list.number_group, Game_list.rank_num_player)
             
+            # Группируем игроков по группам
+            groups_players = defaultdict(list)
+            for gp in game_players:
+                groups_players[gp.number_group].append(gp)
+            
+            # Создаем пустые таблицы для каждой группы
+            for group_num in range(1, kg + 1):
+                group_key = str(group_num)
+                group_players = groups_players.get(group_key, [])
+                players_count = len(group_players)
+                
+                if players_count == 0:
+                    # Если нет игроков, создаем пустую таблицу
+                    data = [zagolovok]
+                    table = Table(data, colWidths=cW, rowHeights=[rH])
+                    table.setStyle(ts)
+                    dict_table[group_num - 1] = table
+                    continue
+                
+                # Создаем данные для таблицы (2 строки на каждого игрока + заголовок)
+                data = [list(zagolovok)]  # Заголовок
+                
+                # Словарь для хранения информации об игроках
+                players_info = {}
+                
+                # Заполняем пустые строки для каждого игрока
+                for idx, gp in enumerate(group_players, 1):
+                    # Получаем данные игрока из таблицы Player
+                    player = Player.get_or_none(Player.id == gp.player_group.id)
+                    if player:
+                        # Форматируем ФИО
+                        fio_parts = player.fio.split() if player.fio else [player.player]
+                        surname = fio_parts[0] if fio_parts else ""
+                        name = fio_parts[1] if len(fio_parts) > 1 else ""
+                        patronymic = fio_parts[2] if len(fio_parts) > 2 else ""
+                        
+                        full_name = f"{surname} {name} {patronymic}".strip()
+                        city = player.city if player.city else ""
+                        
+                        players_info[gp.rank_num_player] = {
+                            'id': player.id,
+                            'full_name': full_name,
+                            'city': city,
+                            'rank_num': gp.rank_num_player,
+                            'group': gp.number_group,
+                            'wins': 0,
+                            'losses': 0,
+                            'total_points': 0,
+                            'scores': {},
+                            'matches': {}
+                        }
+                        
+                        # Верхняя строка: номер, ФИО
+                        row_top = [str(idx), full_name]
+                        # Нижняя строка: пусто, город
+                        row_bottom = ["", city]
+                        
+                        # Заполняем пустыми ячейками для всех возможных соперников
+                        for i in range(players_count):
+                            row_top.append("")
+                            row_bottom.append("")
+                        
+                        # Добавляем пустые ячейки для очков, соотношения, места
+                        row_top.extend(["", "", ""])
+                        row_bottom.extend(["", "", ""])
+                        
+                        data.append(row_top)
+                        data.append(row_bottom)
+                
+                # Сохраняем информацию о группах для второго этапа
+                dict_table[group_num - 1] = {
+                    'data': data,
+                    'players_info': players_info,
+                    'players_count': players_count,
+                    'group_players': group_players
+                }
+            
+            # ===== ЭТАП 2: ЗАПОЛНЯЕМ РЕЗУЛЬТАТАМИ ИЗ RESULT =====
+            # Получаем все результаты для этого этапа
+            results = Result.select().where(
+                (Result.title_id == self.current_title_id) &
+                (Result.system_stage == stage)
+            )
+            
+            # Создаем карту результатов для быстрого доступа
+            results_map = {}
+            for result in results:
+                # Извлекаем чистые имена без города
+                player1_clean = result.player1.split(' (')[0] if ' (' in result.player1 else result.player1
+                player2_clean = result.player2.split(' (')[0] if ' (' in result.player2 else result.player2
+                results_map[(player1_clean, player2_clean)] = result
+                results_map[(player2_clean, player1_clean)] = result
+            
+            # Для каждой группы заполняем результаты
+            for group_idx in range(kg):
+                group_data = dict_table.get(group_idx)
+                if not group_data or isinstance(group_data, Table):
+                    continue
+                
+                data = group_data['data']
+                players_info = group_data['players_info']
+                players_count = group_data['players_count']
+                group_players = group_data['group_players']
+                
+                # Создаем список игроков в порядке посева
+                sorted_players = sorted(players_info.values(), key=lambda x: x['rank_num'])
+                
+                # Обновляем словарь для быстрого доступа по имени
+                player_by_name = {}
+                for player_info in sorted_players:
+                    player_by_name[player_info['full_name']] = player_info
+                
+                # Заполняем результаты матчей
+                for result in results:
+                    # Извлекаем чистые имена
+                    player1_name = result.player1.split(' (')[0] if ' (' in result.player1 else result.player1
+                    player2_name = result.player2.split(' (')[0] if ' (' in result.player2 else result.player2
+                    
+                    # Проверяем, принадлежат ли игроки этой группе
+                    if player1_name in player_by_name and player2_name in player_by_name:
+                        player1_info = player_by_name[player1_name]
+                        player2_info = player_by_name[player2_name]
+                        
+                        # Получаем индексы игроков (1-based для отображения)
+                        idx1 = player1_info['rank_num']
+                        idx2 = player2_info['rank_num']
+                        
+                        # Определяем победителя и проигравшего
+                        if result.winner == result.player1:
+                            # Победил player1
+                            points_winner = result.points_win if result.points_win else 0
+                            points_loser = result.points_loser if result.points_loser else 0
+                            score_winner = result.score_win if result.score_win else "В"
+                            score_loser = result.score_loser if result.score_loser else "П"
+                            
+                            # Обновляем статистику игроков
+                            player1_info['wins'] += 1
+                            player1_info['total_points'] += points_winner
+                            player2_info['losses'] += 1
+                            player2_info['total_points'] += points_loser
+                            
+                            # Сохраняем результаты матчей
+                            player1_info['scores'][idx2] = str(points_winner)
+                            player1_info['matches'][idx2] = score_winner
+                            player2_info['scores'][idx1] = str(points_loser)
+                            player2_info['matches'][idx1] = score_loser
+                            
+                        elif result.winner == result.player2:
+                            # Победил player2
+                            points_winner = result.points_win if result.points_win else 0
+                            points_loser = result.points_loser if result.points_loser else 0
+                            score_winner = result.score_win if result.score_win else "В"
+                            score_loser = result.score_loser if result.score_loser else "П"
+                            
+                            # Обновляем статистику игроков
+                            player2_info['wins'] += 1
+                            player2_info['total_points'] += points_winner
+                            player1_info['losses'] += 1
+                            player1_info['total_points'] += points_loser
+                            
+                            # Сохраняем результаты матчей
+                            player2_info['scores'][idx1] = str(points_winner)
+                            player2_info['matches'][idx1] = score_winner
+                            player1_info['scores'][idx2] = str(points_loser)
+                            player1_info['matches'][idx2] = score_loser
+                        else:
+                            # Ничья или технический результат
+                            if result.score_in_game == "П : В":
+                                # Оба проиграли
+                                points_loser = result.points_loser if result.points_loser else 0
+                                player1_info['total_points'] += points_loser
+                                player2_info['total_points'] += points_loser
+                
+                # Сортируем игроков по очкам (по убыванию) для определения мест
+                sorted_by_points = sorted(players_info.values(), 
+                                        key=lambda x: (x['total_points'], x['wins']), 
+                                        reverse=True)
+                
+                # Определяем места
+                for place, player_info in enumerate(sorted_by_points, 1):
+                    player_info['place'] = place
+                
+                # Обновляем данные в таблице
+                # Сначала обновляем строки с результатами
+                for player_info in sorted_players:
+                    idx = player_info['rank_num']
+                    # Строка игрока в данных (1 строка заголовок + (idx-1)*2 строк)
+                    row_top_idx = 1 + (idx - 1) * 2  # Верхняя строка
+                    row_bottom_idx = 2 + (idx - 1) * 2  # Нижняя строка
+                    
+                    # Заполняем результаты матчей (столбцы с 2 по players_count+1)
+                    for opp_idx in range(1, players_count + 1):
+                        if opp_idx == idx:
+                            # Диагональная клетка
+                            data[row_top_idx][1 + opp_idx] = ""
+                            data[row_bottom_idx][1 + opp_idx] = ""
+                        else:
+                            # Результат матча против соперника
+                            if opp_idx in player_info['scores']:
+                                data[row_top_idx][1 + opp_idx] = player_info['scores'][opp_idx]
+                                data[row_bottom_idx][1 + opp_idx] = player_info['matches'][opp_idx]
+                            else:
+                                data[row_top_idx][1 + opp_idx] = "-"
+                                data[row_bottom_idx][1 + opp_idx] = "-"
+                    
+                    # Заполняем очки, соотношение, место
+                    ratio = f"{player_info['wins']}:{player_info['losses']}" if player_info['losses'] > 0 else f"{player_info['wins']}:0"
+                    data[row_top_idx][players_count + 2] = str(player_info['total_points'])  # Очки
+                    data[row_top_idx][players_count + 3] = ratio  # Соотношение
+                    data[row_top_idx][players_count + 4] = str(player_info.get('place', 0))  # Место
+                
+                # Создаем финальную таблицу
+                final_table = Table(data, colWidths=cW, rowHeights=[rH] * len(data))
+                final_table.setStyle(ts)
+                dict_table[group_idx] = final_table
+                
         except Exception as e:
             import traceback
             traceback.print_exc()
-            QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")
+            print(f"Ошибка получения данных для таблицы: {e}")
+            # Создаем пустую таблицу в случае ошибки
+            data = [list(zagolovok)]
+            table = Table(data, colWidths=cW)
+            table.setStyle(ts)
+            dict_table[0] = table
+        
+        return dict_table
 
+    def get_final_start_place(self, stage):
+        """Получение начального места для финала"""
+        try:
+            # Получаем все финалы до текущего
+            finals = System.select().where(
+                (System.title_id == self.current_title_id) &
+                (System.stage.contains("финал")) &
+                (~System.stage.contains("полуфинал")) &
+                (System.id < System.get(System.stage == stage).id)
+            ).order_by(System.id)
+            
+            start_place = 1
+            for final in finals:
+                start_place += final.max_player
+            
+            return start_place
+        except:
+            return 1
+# ===============================================
     def get_sorting_type(self):
         """Запрос типа сортировки для списка участников"""
         dialog = QDialog(self)
@@ -14001,10 +14344,235 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "Загрузка", f"Загружены результаты для этапа '{stage_name}'")
 
     def view_results_dialog(self):
-        """Просмотр результатов (зарезервировано)"""
-        QMessageBox.information(self, "Просмотр результатов", 
-                            "Функция просмотра результатов в разработке.\n"
-                            "Будет добавлена в следующих версиях.")
+        """Просмотр результатов в PDF для текущего этапа"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+        
+        if not hasattr(self, 'current_stage') or not self.current_stage:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите этап для просмотра")
+            return
+        
+        # Определяем тип этапа и ориентацию страницы
+        stage = self.current_stage
+        pv = "книжная"  # по умолчанию книжная
+        
+        # Для квалификации с большим количеством групп используем альбомную ориентацию
+        if stage == "Квалификация":
+            system = System.get_or_none(
+                (System.title_id == self.current_title_id) &
+                (System.stage == stage)
+            )
+            if system and system.total_group > 2:
+                pv = "книжная"
+        
+        # Создаем PDF файл
+        try:
+            # pdf_path = self.create_results_pdf(stage, pv)
+            pdf_path = self.table_made(pv, stage)
+            if pdf_path and os.path.exists(pdf_path):
+                # Открываем PDF файл
+                if sys.platform == 'win32':
+                    os.startfile(pdf_path)
+                else:
+                    os.system(f'open "{pdf_path}"')
+            else:
+                QMessageBox.warning(self, "Ошибка", "Не удалось создать PDF файл")
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Ошибка при создании PDF: {str(e)}")
+
+    def create_results_pdf(self, stage, pv="книжная"):
+        """Создание PDF файла с результатами для указанного этапа"""
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib import colors
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle as PS
+        from reportlab.lib.units import cm
+        import os
+        
+        if not self.current_title_id:
+            return None
+        
+        try:
+            # Получаем данные о соревновании
+            title = Title.get_by_id(self.current_title_id)
+            
+            # Получаем систему для этапа
+            system = System.get_or_none(
+                (System.title_id == self.current_title_id) &
+                (System.stage == stage)
+            )
+            
+            if not system:
+                QMessageBox.warning(self, "Ошибка", f"Этап '{stage}' не найден в системе")
+                return None
+            
+            # Определяем ориентацию страницы
+            if pv == "альбомная":
+                page_size = landscape(A4)
+            else:
+                page_size = A4
+            
+            # Формируем имя файла
+            short_name = title.short_name_comp if title.short_name_comp else title.name
+            import re
+            clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
+            clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
+            
+            # Создаем папку если её нет
+            pdf_dir = "competition_pdf"
+            if not os.path.exists(pdf_dir):
+                os.makedirs(pdf_dir)
+            
+            # Формируем имя файла в зависимости от этапа
+            if stage == "Квалификация":
+                filename = f"{clean_name}_qualification_results.pdf"
+            elif stage in ["1-й полуфинал", "2-й полуфинал"]:
+                filename = f"{clean_name}_{stage}_results.pdf"
+            elif "финал" in stage.lower():
+                filename = f"{clean_name}_{stage}_results.pdf"
+            else:
+                filename = f"{clean_name}_{stage}_results.pdf"
+            
+            filepath = os.path.join(pdf_dir, filename)
+            
+            # Получаем результаты для этого этапа
+            results = Result.select().where(
+                (Result.title_id == self.current_title_id) &
+                (Result.system_stage == stage)
+            ).order_by(Result.number_group, Result.tours)
+            
+            if results.count() == 0:
+                QMessageBox.warning(self, "Ошибка", f"Нет результатов для этапа '{stage}'")
+                return None
+            
+            # Создаем документ
+            doc = SimpleDocTemplate(filepath, pagesize=page_size,
+                                    topMargin=2*cm, bottomMargin=1.5*cm,
+                                    leftMargin=1.5*cm, rightMargin=1.5*cm)
+            
+            # Стили
+            styles = getSampleStyleSheet()
+            title_style = PS("TitleStyle", fontSize=14, fontName="DejaVuSerif-Bold",
+                            alignment=1, spaceAfter=20, textColor=colors.darkblue)
+            stage_style = PS("StageStyle", fontSize=12, fontName="DejaVuSerif-Bold",
+                            alignment=1, spaceAfter=10, textColor=colors.green)
+            header_style = PS("HeaderStyle", fontSize=10, fontName="DejaVuSerif-Bold",
+                            alignment=1, textColor=colors.white)
+            cell_style = PS("CellStyle", fontSize=9, fontName="DejaVuSerif")
+            
+            elements = []
+            
+            # Заголовок
+            elements.append(Paragraph(f"Результаты соревнований", title_style))
+            elements.append(Paragraph(f"{title.name}", stage_style))
+            elements.append(Paragraph(f"Этап: {stage}", stage_style))
+            elements.append(Spacer(1, 0.5*cm))
+            
+            # Группируем результаты по группам
+            groups = {}
+            for result in results:
+                group_num = result.number_group
+                if group_num not in groups:
+                    groups[group_num] = []
+                groups[group_num].append(result)
+            
+            # Сортируем группы
+            for group_num in sorted(groups.keys(), key=lambda x: int(x) if str(x).isdigit() else 0):
+                group_results = groups[group_num]
+                
+                # Заголовок группы
+                group_style = PS("GroupStyle", fontSize=11, fontName="DejaVuSerif-Bold",
+                                leftIndent=20, spaceAfter=10, textColor=colors.brown)
+                elements.append(Paragraph(f"Группа {group_num}", group_style))
+                
+                # Формируем таблицу результатов группы
+                # Собираем уникальные туры
+                tours = sorted(set([r.tours for r in group_results]), key=lambda x: int(x) if str(x).isdigit() else 0)
+                
+                # Подготовка данных для таблицы
+                # Заголовки: Игроки и туры
+                headers = ["№", "Игрок 1", "Игрок 2", "Счет", "Победитель"]
+                if len(tours) > 1:
+                    headers = ["№", "Тур", "Игрок 1", "Игрок 2", "Счет", "Победитель"]
+                
+                table_data = [headers]
+                
+                for idx, result in enumerate(group_results, 1):
+                    if len(tours) > 1:
+                        row = [
+                            str(idx),
+                            f"Тур {result.tours}",
+                            result.player1,
+                            result.player2,
+                            result.score_in_game if result.score_in_game else "—",
+                            result.winner if result.winner else "—"
+                        ]
+                    else:
+                        row = [
+                            str(idx),
+                            result.player1,
+                            result.player2,
+                            result.score_in_game if result.score_in_game else "—",
+                            result.winner if result.winner else "—"
+                        ]
+                    table_data.append(row)
+                
+                # Создаем таблицу
+                if len(tours) > 1:
+                    col_widths = [0.8*cm, 1.2*cm, 6*cm, 6*cm, 2.5*cm, 4*cm]
+                else:
+                    col_widths = [0.8*cm, 7*cm, 7*cm, 2.5*cm, 4*cm]
+                
+                table = Table(table_data, colWidths=col_widths, repeatRows=1)
+                
+                # Стиль таблицы
+                table_style = TableStyle([
+                    ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSerif'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 9),
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                    ('TOPPADDING', (0, 0), (-1, -1), 4),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                ])
+                
+                # Подсветка победителей
+                for row_idx, result in enumerate(group_results, 1):
+                    if result.winner:
+                        # Находим столбец победителя
+                        for col_idx, header in enumerate(headers):
+                            if header == "Победитель":
+                                # Подсвечиваем строку победителя
+                                table_style.add('BACKGROUND', (col_idx, row_idx), (col_idx, row_idx), colors.lightgreen)
+                                break
+                
+                table.setStyle(table_style)
+                elements.append(table)
+                elements.append(Spacer(1, 0.5*cm))
+            
+            # Добавляем информацию о времени
+            if results.count() > 0:
+                played = sum(1 for r in results if r.winner)
+                total = results.count()
+                percent = (played / total * 100) if total > 0 else 0
+                
+                info_style = PS("InfoStyle", fontSize=10, fontName="DejaVuSerif-Italic",
+                                alignment=1, spaceBefore=20, textColor=colors.gray)
+                elements.append(Paragraph(f"Всего матчей: {total} | Сыграно: {played} ({percent:.1f}%)", info_style))
+            
+            # Строим документ
+            doc.build(elements, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
+            
+            return filepath
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print(f"Ошибка создания PDF: {e}")
+            return None
     # =================================
 class RatingLoaderThread(QThread):
     progress = pyqtSignal(int)

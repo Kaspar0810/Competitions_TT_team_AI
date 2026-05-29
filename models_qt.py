@@ -177,7 +177,7 @@ class ResultsTableModel(QAbstractTableModel):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._data = []
-        self._headers = ['ID', 'Этап', 'Группа', 'Тур', 'Игрок 1', 'Игрок 2', 'Победитель', 'Счет', 'Очки']
+        self._headers = ['ID', 'Этап', 'Группа', 'Встреча', 'Игрок 1', 'Игрок 2', 'Победитель', 'Общий счет', 'Счет в матче']
     
     def setData(self, data):
         self.beginResetModel()

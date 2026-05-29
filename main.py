@@ -16082,7 +16082,6 @@ def tbl(stage, kg, ts, zagolovok, cW, rH):
         ts.add('TEXTCOLOR', (0, 0), (-1, -1), colors.darkblue)
         for m in list_cells:
             ts.add('FONTSIZE', (1, m + 1), (1, m + 1), 5)
-            # ts.add('TEXTCOLOR', (1, m + 1), (1, m + 1), colors.green)
         # ставит всю таблицу в синий цвет
         for k in tdt_all[1][i]:
             col = k[0]  # столбец очков победителя

@@ -325,6 +325,47 @@ class MainWindow(QMainWindow):
 
     def init_ui(self):
         """Инициализация интерфейса"""
+        # =========== 2905
+        # # Глобальные стили для всех ComboBox
+        # self.setStyleSheet("""
+        #     QComboBox {
+        #         combobox-popup: 0;
+        #         background-color: white;
+        #     }
+        #     QComboBox QAbstractItemView {
+        #         background-color: white;
+        #         border: 1px solid #4CAF50;
+        #         border-radius: 4px;
+        #         selection-background-color: #4CAF50;
+        #         selection-color: white;
+        #         outline: none;
+        #         padding: 2px;
+        #     }
+        #     QComboBox QAbstractItemView::item {
+        #         padding: 6px;
+        #         min-height: 28px;
+        #         border-bottom: 1px solid #eee;
+        #     }
+        #     QComboBox QAbstractItemView::item:last-child {
+        #         border-bottom: none;
+        #     }
+        #     QComboBox QAbstractItemView::item:hover {
+        #         background-color: #e8f5e9;
+        #     }
+        #     QComboBox::drop-down {
+        #         border: none;
+        #         width: 24px;
+        #     }
+        #     QComboBox::down-arrow {
+        #         image: none;
+        #         border-left: 5px solid transparent;
+        #         border-right: 5px solid transparent;
+        #         border-top: 5px solid #666;
+        #         margin-right: 8px;
+        #     }
+        # """)
+        
+        # ==========================
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
@@ -498,111 +539,340 @@ class MainWindow(QMainWindow):
         self.dynamic_filters_layout.setAlignment(Qt.AlignTop)
         self.dynamic_filters_layout.setSpacing(8)
         self.dynamic_filters_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.addWidget(self.dynamic_filters_widget)        
-        # ===== Контейнер для фильтров =====
-        self.filters_widget = QWidget()
-        filters_layout = QVBoxLayout(self.filters_widget)
-        filters_layout.setSpacing(10)
-        filters_layout.setContentsMargins(0, 10, 0, 0)
+        left_layout.addWidget(self.dynamic_filters_widget) 
+
+        # # ===== Контейнер для фильтров ===== old
+        # self.filters_widget = QWidget()
+        # filters_layout = QVBoxLayout(self.filters_widget)
+        # filters_layout.setSpacing(10)
+        # filters_layout.setContentsMargins(0, 10, 0, 0)
         
+        # # Заголовок фильтров
+        # filter_header = QLabel("🔍 Фильтры соревнований")
+        # filter_header.setStyleSheet("font-weight: bold; font-size: 13px; color: #2196F3;")
+        # filters_layout.addWidget(filter_header)
+        
+        # # Поиск по названию
+        # search_label = QLabel("Поиск по названию:")
+        # search_label.setStyleSheet("font-size: 11px; font-weight: bold; margin-top: 5px;")
+        # filters_layout.addWidget(search_label)
+        # self.search_name_edit = QLineEdit()
+        # self.search_name_edit.setPlaceholderText("Введите название...")
+        # self.search_name_edit.setStyleSheet("""
+        #     max-height: 32px; 
+        #     min-height: 30px;
+        #     padding: 5px; 
+        #     font-size: 11px;
+        #     border: 1px solid #ccc;
+        #     border-radius: 4px;
+        # """)
+        # self.search_name_edit.textChanged.connect(self.filter_competitions)
+        # filters_layout.addWidget(self.search_name_edit)
+        
+        # # Фильтр по году
+        # year_label = QLabel("Год:")
+        # year_label.setStyleSheet("font-size: 11px; font-weight: bold; margin-top: 5px;")
+        # filters_layout.addWidget(year_label)
+        # self.year_combo = QComboBox()
+
+        # # Заполним года позже, после загрузки данных
+        # self.year_combo.setStyleSheet("""
+        #     max-height: 22px; 
+        #     min-height: 20px;
+        #     font-size: 11px;
+        #     padding: 3px;
+        #     border: 1px solid #ccc;
+        #     border-radius: 4px;
+        # """)
+        # self.year_combo.currentTextChanged.connect(self.filter_competitions)
+        # filters_layout.addWidget(self.year_combo)
+        
+        # # Фильтр по месяцу
+        # month_label = QLabel("Месяц:")
+        # month_label.setStyleSheet("font-size: 11px; font-weight: bold; margin-top: 5px;")
+        # filters_layout.addWidget(month_label)
+        # self.month_combo = QComboBox()
+        # self.month_combo.addItem("Все месяцы")
+        # months = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+        #         "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"]
+        # for month in months:
+        #     self.month_combo.addItem(month)
+        # self.month_combo.setStyleSheet("""
+        #     max-height: 32px; 
+        #     min-height: 30px;
+        #     font-size: 11px;
+        #     padding: 3px;
+        #     border: 1px solid #ccc;
+        #     border-radius: 4px;
+        # """)
+        # self.month_combo.currentTextChanged.connect(self.filter_competitions)
+        # filters_layout.addWidget(self.month_combo)
+        
+        # # Фильтр по категории "Среди"
+        # sredi_label = QLabel("Категория участников:")
+        # sredi_label.setStyleSheet("font-size: 11px; font-weight: bold; margin-top: 5px;")
+        # filters_layout.addWidget(sredi_label)
+        # self.sredi_combo = QComboBox()
+        # self.sredi_combo.addItem("Все категории")
+        # self.sredi_combo.addItems(["мальчики и девочки", "юноши и девушки", "юниоры и юниорки", "мужчины и женщины"])
+        # self.sredi_combo.setStyleSheet("""
+        #     max-height: 32px; 
+        #     min-height: 30px;
+        #     font-size: 11px;
+        #     padding: 3px;
+        #     border: 1px solid #ccc;
+        #     border-radius: 4px;
+        # """)
+        # self.sredi_combo.currentTextChanged.connect(self.filter_competitions)
+        # filters_layout.addWidget(self.sredi_combo)
+        
+        # # Кнопка сброса фильтров
+        # reset_btn = QPushButton("🔄 Сбросить фильтры")
+        # reset_btn.setStyleSheet("""
+        #     QPushButton {
+        #         background-color: #FF9800;
+        #         color: white;
+        #         padding: 8px;
+        #         border-radius: 4px;
+        #         font-size: 11px;
+        #         font-weight: bold;
+        #         margin-top: 10px;
+        #     }
+        #     QPushButton:hover { background-color: #F57C00; }
+        # """)
+        # reset_btn.clicked.connect(self.reset_filters_on_title_tab)
+        # filters_layout.addWidget(reset_btn)
+        
+        # left_layout.addWidget(self.filters_widget)
+# ======================================
+# =========== новое 2905 ===============
+        # ===== КОМПАКТНЫЕ ФИЛЬТРЫ СОРЕВНОВАНИЙ =====
+        self.filters_widget = QWidget()
+        self.filters_widget.setMaximumHeight(200)
+        filters_layout = QVBoxLayout(self.filters_widget)
+        filters_layout.setSpacing(8)
+        filters_layout.setContentsMargins(0, 5, 0, 0)
+
         # Заголовок фильтров
         filter_header = QLabel("🔍 Фильтры соревнований")
-        filter_header.setStyleSheet("font-weight: bold; font-size: 13px; color: #2196F3;")
+        filter_header.setStyleSheet("font-weight: bold; font-size: 12px; color: #2196F3; margin-bottom: 5px;")
         filters_layout.addWidget(filter_header)
-        
+
         # Поиск по названию
-        search_label = QLabel("Поиск по названию:")
-        search_label.setStyleSheet("font-size: 11px; font-weight: bold; margin-top: 5px;")
-        filters_layout.addWidget(search_label)
+        search_layout = QHBoxLayout()
+        search_layout.setSpacing(5)
+        search_icon = QLabel("🔎")
+        search_icon.setMaximumWidth(20)
+        search_layout.addWidget(search_icon)
         self.search_name_edit = QLineEdit()
-        self.search_name_edit.setPlaceholderText("Введите название...")
+        self.search_name_edit.setPlaceholderText("Поиск по названию...")
         self.search_name_edit.setStyleSheet("""
-            max-height: 32px; 
-            min-height: 30px;
-            padding: 5px; 
-            font-size: 11px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
+            QLineEdit {
+                max-height: 30px; 
+                min-height: 28px;
+                padding: 4px 8px; 
+                font-size: 11px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+            }
+            QLineEdit:focus {
+                border: 1px solid #4CAF50;
+            }
         """)
         self.search_name_edit.textChanged.connect(self.filter_competitions)
-        filters_layout.addWidget(self.search_name_edit)
-        
-        # Фильтр по году
-        year_label = QLabel("Год:")
-        year_label.setStyleSheet("font-size: 11px; font-weight: bold; margin-top: 5px;")
-        filters_layout.addWidget(year_label)
-        self.year_combo = QComboBox()
+        search_layout.addWidget(self.search_name_edit)
+        filters_layout.addLayout(search_layout)
 
-        # Заполним года позже, после загрузки данных
-        self.year_combo.setStyleSheet("""
-            max-height: 32px; 
-            min-height: 30px;
-            font-size: 11px;
-            padding: 3px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        """)
+        # Горизонтальный ряд для Год и Месяц
+        row_filters = QHBoxLayout()
+        row_filters.setSpacing(10)
+
+        # Фильтр по году - горизонтально
+        year_container = QWidget()
+        year_container.setMinimumWidth(100)
+        year_layout = QHBoxLayout(year_container)
+        year_layout.setContentsMargins(0, 0, 0, 0)
+        year_layout.setSpacing(5)
+        year_label = QLabel("Год:")
+        year_label.setStyleSheet("font-size: 12px; font-weight: bold; color: #555; min-width: 30px;")
+        year_layout.addWidget(year_label)
+        self.year_combo = QComboBox()
+        self.year_combo.setMinimumWidth(80)
+        # self.year_combo.setStyleSheet("""
+        #     QComboBox {
+        #         max-height: 30px;
+        #         min-height: 28px;
+        #         font-size: 11px;
+        #         padding: 3px;
+        #         border: 1px solid #ccc;
+        #         border-radius: 4px;
+        #         background-color: white;
+        #     }
+        #     QComboBox::drop-down {
+        #         border: none;
+        #         width: 20px;
+        #     }
+        #     QComboBox::down-arrow {
+        #         image: none;
+        #         border-left: 5px solid transparent;
+        #         border-right: 5px solid transparent;
+        #         border-top: 5px solid #666;
+        #         margin-right: 5px;
+        #     }
+        #     QComboBox QAbstractItemView {
+        #         background-color: white;
+        #         border: 1px solid #4CAF50;
+        #         border-radius: 4px;
+        #         selection-background-color: #4CAF50;
+        #         selection-color: white;
+        #         outline: none;
+        #     }
+        #     QComboBox QAbstractItemView::item {
+        #         padding: 5px;
+        #         min-height: 25px;
+        #     }
+        #     QComboBox QAbstractItemView::item:hover {
+        #         background-color: #e8f5e9;
+        #     }
+        # """)
         self.year_combo.currentTextChanged.connect(self.filter_competitions)
-        filters_layout.addWidget(self.year_combo)
-        
-        # Фильтр по месяцу
+        year_layout.addWidget(self.year_combo)
+        row_filters.addWidget(year_container)
+
+        # Фильтр по месяцу - горизонтально
+        month_container = QWidget()
+        month_container.setMinimumWidth(100)
+        month_layout = QHBoxLayout(month_container)
+        month_layout.setContentsMargins(0, 0, 0, 0)
+        month_layout.setSpacing(5)
         month_label = QLabel("Месяц:")
-        month_label.setStyleSheet("font-size: 11px; font-weight: bold; margin-top: 5px;")
-        filters_layout.addWidget(month_label)
+        month_label.setStyleSheet("font-size: 12px; font-weight: bold; color: #555; min-width: 40px;")
+        month_layout.addWidget(month_label)
         self.month_combo = QComboBox()
-        self.month_combo.addItem("Все месяцы")
+        self.month_combo.addItem("Все")
         months = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
                 "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"]
         for month in months:
             self.month_combo.addItem(month)
-        self.month_combo.setStyleSheet("""
-            max-height: 32px; 
-            min-height: 30px;
-            font-size: 11px;
-            padding: 3px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        """)
+        self.month_combo.setMinimumWidth(100)
+        # self.month_combo.setStyleSheet("""
+        #     QComboBox {
+        #         max-height: 30px;
+        #         min-height: 28px;
+        #         font-size: 11px;
+        #         padding: 3px;
+        #         border: 1px solid #ccc;
+        #         border-radius: 4px;
+        #         background-color: white;
+        #     }
+        #     QComboBox::drop-down {
+        #         border: none;
+        #         width: 20px;
+        #     }
+        #     QComboBox::down-arrow {
+        #         image: none;
+        #         border-left: 5px solid transparent;
+        #         border-right: 5px solid transparent;
+        #         border-top: 5px solid #666;
+        #         margin-right: 5px;
+        #     }
+        #     QComboBox QAbstractItemView {
+        #         background-color: white;
+        #         border: 1px solid #4CAF50;
+        #         border-radius: 4px;
+        #         selection-background-color: #4CAF50;
+        #         selection-color: white;
+        #         outline: none;
+        #     }
+        #     QComboBox QAbstractItemView::item {
+        #         padding: 5px;
+        #         min-height: 25px;
+        #     }
+        #     QComboBox QAbstractItemView::item:hover {
+        #         background-color: #e8f5e9;
+        #     }
+        # """)
         self.month_combo.currentTextChanged.connect(self.filter_competitions)
-        filters_layout.addWidget(self.month_combo)
-        
-        # Фильтр по категории "Среди"
-        sredi_label = QLabel("Категория участников:")
-        sredi_label.setStyleSheet("font-size: 11px; font-weight: bold; margin-top: 5px;")
-        filters_layout.addWidget(sredi_label)
+        month_layout.addWidget(self.month_combo)
+        row_filters.addWidget(month_container)
+
+        # Добавляем растяжение, чтобы выровнять по левому краю
+        row_filters.addStretch()
+        filters_layout.addLayout(row_filters)
+
+        # Фильтр по категории "Среди" - отдельно внизу
+        sredi_container = QWidget()
+        sredi_layout = QHBoxLayout(sredi_container)
+        sredi_layout.setContentsMargins(0, 0, 0, 0)
+        sredi_layout.setSpacing(5)
+        sredi_label = QLabel("Категория:")
+        sredi_label.setStyleSheet("font-size: 12px; font-weight: bold; color: #555; min-width: 60px;")
+        sredi_layout.addWidget(sredi_label)
         self.sredi_combo = QComboBox()
         self.sredi_combo.addItem("Все категории")
         self.sredi_combo.addItems(["мальчики и девочки", "юноши и девушки", "юниоры и юниорки", "мужчины и женщины"])
-        self.sredi_combo.setStyleSheet("""
-            max-height: 32px; 
-            min-height: 30px;
-            font-size: 11px;
-            padding: 3px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        """)
+        # self.sredi_combo.setStyleSheet("""
+        #     QComboBox {
+        #         max-height: 30px;
+        #         min-height: 28px;
+        #         font-size: 11px;
+        #         padding: 3px;
+        #         border: 1px solid #ccc;
+        #         border-radius: 4px;
+        #         background-color: white;
+        #     }
+        #     QComboBox::drop-down {
+        #         border: none;
+        #         width: 20px;
+        #     }
+        #     QComboBox::down-arrow {
+        #         image: none;
+        #         border-left: 5px solid transparent;
+        #         border-right: 5px solid transparent;
+        #         border-top: 5px solid #666;
+        #         margin-right: 5px;
+        #     }
+        #     QComboBox QAbstractItemView {
+        #         background-color: white;
+        #         border: 1px solid #4CAF50;
+        #         border-radius: 4px;
+        #         selection-background-color: #4CAF50;
+        #         selection-color: white;
+        #         outline: none;
+        #     }
+        #     QComboBox QAbstractItemView::item {
+        #         padding: 6px;
+        #         min-height: 28px;
+        #     }
+        #     QComboBox QAbstractItemView::item:hover {
+        #         background-color: #e8f5e9;
+        #     }
+        # """)
         self.sredi_combo.currentTextChanged.connect(self.filter_competitions)
-        filters_layout.addWidget(self.sredi_combo)
-        
+        sredi_layout.addWidget(self.sredi_combo)
+        sredi_layout.addStretch()
+        filters_layout.addWidget(sredi_container)
+
         # Кнопка сброса фильтров
         reset_btn = QPushButton("🔄 Сбросить фильтры")
         reset_btn.setStyleSheet("""
             QPushButton {
                 background-color: #FF9800;
                 color: white;
-                padding: 8px;
+                padding: 6px;
                 border-radius: 4px;
                 font-size: 11px;
                 font-weight: bold;
-                margin-top: 10px;
+                margin-top: 5px;
+                max-height: 32px;
             }
             QPushButton:hover { background-color: #F57C00; }
         """)
         reset_btn.clicked.connect(self.reset_filters_on_title_tab)
         filters_layout.addWidget(reset_btn)
-        
+
         left_layout.addWidget(self.filters_widget)
-       
+# ======================================      
         # ===== Контейнер для формы создания соревнования =====
         self.new_comp_widget = QWidget()
         self.new_comp_widget.setVisible(False)
@@ -3940,8 +4210,11 @@ class MainWindow(QMainWindow):
             self.table_container.setCurrentWidget(self.table_view)
             if index == 0:  # Титул
                 self.table_header.setText("📋 Информация о соревновании")
+                self.filters_widget.setVisible(True)
             elif index == 4:  # Система
                 self.table_header.setText("⚙️ Система проведения")
+                # Загружаем существующие данные
+                self.load_system_data()
             elif index == 6:  # Рейтинг
                 self.table_header.setText("⭐ Рейтинг участников")
             elif index == 7:  # Дополнительно
@@ -5919,7 +6192,7 @@ class MainWindow(QMainWindow):
                     border-radius: 3px;
                 """)
 
-    def filter_competitions(self):
+    def _filter_competitions(self):
         """Фильтрация списка соревнований по критериям"""
         if not hasattr(self, 'search_name_edit'):
             return
@@ -5981,6 +6254,74 @@ class MainWindow(QMainWindow):
             print(f"Ошибка фильтрации: {e}")
             self.load_titles_list()
 
+    def filter_competitions(self):
+        """Фильтрация списка соревнований по критериям"""
+        if not hasattr(self, 'search_name_edit'):
+            return
+        
+        search_text = self.search_name_edit.text().strip().lower()
+        year_filter = self.year_combo.currentText()
+        month_filter = self.month_combo.currentText()
+        sredi_filter = self.sredi_combo.currentText()
+        
+        self.list_widget.clear()
+        
+        try:
+            titles = Title.select().order_by(Title.data_start.desc())
+            
+            filtered_titles = []
+            
+            for title in titles:
+                # Фильтр по названию
+                if search_text and search_text not in title.name.lower():
+                    continue
+                
+                # Фильтр по категории "Среди"
+                if sredi_filter != "Все категории" and title.sredi != sredi_filter:
+                    continue
+                
+                # Фильтр по году
+                if year_filter != "Все годы" and title.data_start:
+                    if str(title.data_start.year) != year_filter:
+                        continue
+                
+                # Фильтр по месяцу
+                if month_filter != "Все месяцы" and title.data_start:
+                    month_num = self.get_month_number(month_filter)
+                    if title.data_start.month != month_num:
+                        continue
+                
+                filtered_titles.append(title)
+            
+            # Отображаем отфильтрованные соревнования
+            if filtered_titles:
+                for title in filtered_titles:
+                    start_date = title.data_start.strftime("%d.%m.%Y") if title.data_start else "---"
+                    
+                    # Сокращаем длинные названия
+                    display_name = title.name[:40] + "..." if len(title.name) > 40 else title.name
+                    
+                    item_text = f"""🏆 {display_name}
+        📅 {start_date} | {title.mesto or '—'}
+        👥 {title.sredi or '—'} | {title.vozrast or '—'}"""
+                    
+                    item = QListWidgetItem(item_text)
+                    item.setData(Qt.UserRole, title.id)
+                    item.setSizeHint(QSize(0, 60))
+                    self.list_widget.addItem(item)
+            else:
+                item = QListWidgetItem("❌ Соревнования не найдены")
+                item.setFlags(Qt.NoItemFlags)
+                self.list_widget.addItem(item)
+            
+            # Показываем количество найденных
+            count = len(filtered_titles)
+            self.competitions_label.setText(f"🏆 Соревнования ({count})")
+            
+        except Exception as e:
+            print(f"Ошибка фильтрации: {e}")
+            self.load_titles_list()
+
     def get_month_number(self, month_name):
         """Преобразование названия месяца в номер"""
         months = {
@@ -5993,9 +6334,9 @@ class MainWindow(QMainWindow):
     def reset_filters_on_title_tab(self):
         """Сброс всех фильтров на вкладке Титул"""
         self.search_name_edit.clear()
-        self.year_combo.setCurrentIndex(0)
-        self.month_combo.setCurrentIndex(0)
-        self.sredi_combo.setCurrentIndex(0)
+        self.year_combo.setCurrentText("Все годы")
+        self.month_combo.setCurrentText("Все месяцы")
+        self.sredi_combo.setCurrentText("Все категории")
         self.load_titles_list()
 
     def save_new_competition(self):
@@ -6218,27 +6559,26 @@ class MainWindow(QMainWindow):
                 if title.data_start:
                     years.add(str(title.data_start.year))
             
-            # Сортируем годы
-            sorted_years = sorted(list(years), key=lambda x: int(x) if x.isdigit() else 0)
+            # Сортируем годы по убыванию
+            sorted_years = sorted(list(years), key=lambda x: int(x) if x.isdigit() else 0, reverse=True)
             
             # Обновляем comboBox
+            self.year_combo.blockSignals(True)
             self.year_combo.clear()
             self.year_combo.addItem("Все годы")
             for year in sorted_years:
                 self.year_combo.addItem(year)
+            self.year_combo.blockSignals(False)
             
-            # Устанавливаем первый год из списка (самый ранний)
-            if sorted_years:
-                self.year_combo.setCurrentText(sorted_years[0])
-                
         except Exception as e:
             print(f"Ошибка загрузки годов: {e}")
-            # Если ошибка, добавляем стандартные годы
+            self.year_combo.blockSignals(True)
             self.year_combo.clear()
             self.year_combo.addItem("Все годы")
             current_year = QDate.currentDate().year()
             for year in range(current_year - 5, current_year + 2):
                 self.year_combo.addItem(str(year))
+            self.year_combo.blockSignals(False)
 
     def on_new_referee_text_changed(self, text):
         """Поиск судьи при вводе текста"""

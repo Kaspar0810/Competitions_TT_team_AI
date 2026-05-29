@@ -2058,6 +2058,30 @@ class MainWindow(QMainWindow):
         
 #         main_layout.addWidget(info_frame)
 # =========================
+        # ===== КНОПКА ПРОСМОТР ПРИЖАТА К ПРАВОЙ СТОРОНЕ =====
+        view_buttons_layout = QHBoxLayout()
+        view_buttons_layout.addStretch()  # Растягиваем пустое пространство слева
+        view_buttons_layout.setSpacing(10)
+        
+        self.view_results_btn = QPushButton("👁️ Просмотр")
+        self.view_results_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 6px 12px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #1976D2; }
+        """)
+        self.view_results_btn.clicked.connect(self.view_results_dialog)
+        self.view_results_btn.setEnabled(False)  # Пока зарезервирована
+        view_buttons_layout.addWidget(self.view_results_btn)
+        
+        info_layout.addLayout(view_buttons_layout)
+
         # Добавьте в create_results_tab после info_frame:
         self.status_label = QLabel("")
         self.status_label.setStyleSheet("color: red; font-size: 11px;")
@@ -3711,6 +3735,9 @@ class MainWindow(QMainWindow):
                 else:
                     self.current_sex = "man"
 
+                # Обновляем меню результатов
+                self.update_results_menu()
+
                 # Обновляем меню финалов
                 self.update_finals_menu_after_selection()
 
@@ -3809,52 +3836,51 @@ class MainWindow(QMainWindow):
                 self.players_model.setData([])
                 self.table_header.setText("👥 Список участников - выберите соревнование из списка справа")
             QTimer.singleShot(100, self.resize_table_for_participants)
-            
+                    
         elif index == 5:  # Результаты
-           # ======= 2805
+            # Используем отдельную таблицу для результатов
             self.table_container.setCurrentWidget(self.results_table_view)
             self.table_header.setText("📊 Результаты матчей")
             self.table_header.setStyleSheet("""
                 background-color: #FF9800;
                 color: white;
-                padding: 8px;
+                padding: 6px;
                 font-weight: bold;
-                font-size: 13px;
+                font-size: 11px;
                 border-radius: 3px;
             """)
-
-            # растягиваем колонки по содержимому, последнюю на всю щшрину
-            header = self.results_table_view.horizontalHeader()
-            for i in range(self.results_table_view.model().columnCount() - 1):
-                header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
-            header.setSectionResizeMode(self.results_table_view.model().columnCount() - 1, QHeaderView.Stretch)
-           
-            # Скрываем ненужные колонки
+            
+            # Настраиваем колонки для таблицы результатов
             self.results_table_view.setColumnHidden(0, True)  # ID
             self.results_table_view.setColumnHidden(1, True)  # Этап
-            
-            # Настраиваем ширину колонок
             self.results_table_view.setColumnWidth(2, 60)   # Группа
-            self.results_table_view.setColumnWidth(3, 50)   # Встреча
+            self.results_table_view.setColumnWidth(3, 50)   # Тур
             self.results_table_view.setColumnWidth(4, 180)  # Игрок 1
             self.results_table_view.setColumnWidth(5, 180)  # Игрок 2
-            self.results_table_view.setColumnWidth(6, 180)  # Победитель
-            self.results_table_view.setColumnWidth(7, 120)  # Общий счет
-            self.results_table_view.setColumnWidth(8, 60)   # Очки по партиям
-            self.table_view.horizontalHeader().setStretchLastSection(True)
-            self.table_view.verticalHeader().setDefaultSectionSize(30)
-# новое
-            # Обновляем левую панель
-            self.update_left_panel_for_results_tab()
-# ====================            
+            self.results_table_view.setColumnWidth(6, 100)  # Победитель
+            self.results_table_view.setColumnWidth(7, 120)  # Счет
+            self.results_table_view.setColumnWidth(8, 60)   # Очки
+            
+            # Активируем кнопку просмотра (если есть выбранное соревнование)
+            if hasattr(self, 'view_results_btn'):
+                self.view_results_btn.setEnabled(self.current_title_id is not None)
+            
             if self.current_title_id:
-                # Загружаем результаты для текущего этапа
+                # Обновляем левую панель для результатов
+                self.update_left_panel_for_results_tab()
+                # Обновляем меню результатов
+                self.update_results_menu()
+                # Если есть выбранный этап, загружаем его
                 if hasattr(self, 'current_stage') and self.current_stage:
                     self.load_results_table_for_stage(self.current_stage)
-                    
-            # скрываем вкладку создание эатапа        
+                else:
+                    # Показываем диалог выбора этапа
+                    QTimer.singleShot(100, self.select_stage_for_results)
+            
+            # Скрываем секцию создания этапа
             self.stage_section.setVisible(False)
             self.seeding_info_label.hide()
+# =======================================================
             # скрываем фильтр соревнований      
             self.filters_widget.setVisible(False)
             # ================== конец 2805 ====
@@ -5024,7 +5050,8 @@ class MainWindow(QMainWindow):
     #         #     player_list_x = Player.select().where(Player.title_id == title_id()).order_by(Player.mesto)  # сортировка по месту
     #         # player_list = player_list_x.select().where(Player.player != "x")
     #     self.list_player_pdf(player_list)
-#===========================
+  
+# ==========================2905
     def create_menu_bar(self):
         """Создание меню"""
         menubar = self.menuBar()
@@ -5102,7 +5129,7 @@ class MainWindow(QMainWindow):
         
         # Просмотр
         view_menu = menubar.addMenu("Просмотр")
-    
+        
         # Список участников
         participants_list_action = QAction("📋 Список участников (PDF)", self)
         participants_list_action.triggered.connect(self.export_participants_to_pdf)
@@ -5115,11 +5142,47 @@ class MainWindow(QMainWindow):
         
         view_menu.addSeparator()
         
+        # ===== НОВОЕ МЕНЮ РЕЗУЛЬТАТЫ =====
+        results_view_menu = view_menu.addMenu("📊 Результаты")
+        
+        # Сохраняем ссылки на действия для последующего обновления
+        self.results_menu_actions = {}
+        
+        # 1. Одна таблица
+        self.results_menu_actions["Одна таблица"] = QAction("Одна таблица", self)
+        self.results_menu_actions["Одна таблица"].triggered.connect(lambda: self.show_results_for_stage("Одна таблица"))
+        results_view_menu.addAction(self.results_menu_actions["Одна таблица"])
+        
+        # 2. Квалификация
+        self.results_menu_actions["Квалификация"] = QAction("Квалификация", self)
+        self.results_menu_actions["Квалификация"].triggered.connect(lambda: self.show_results_for_stage("Квалификация"))
+        results_view_menu.addAction(self.results_menu_actions["Квалификация"])
+        
+        # 3. Полуфиналы - подменю
+        semifinals_results_menu = results_view_menu.addMenu("Полуфиналы")
+        
+        self.results_menu_actions["1-й полуфинал"] = QAction("1-й полуфинал", self)
+        self.results_menu_actions["1-й полуфинал"].triggered.connect(lambda: self.show_results_for_stage("1-й полуфинал"))
+        semifinals_results_menu.addAction(self.results_menu_actions["1-й полуфинал"])
+        
+        self.results_menu_actions["2-й полуфинал"] = QAction("2-й полуфинал", self)
+        self.results_menu_actions["2-й полуфинал"].triggered.connect(lambda: self.show_results_for_stage("2-й полуфинал"))
+        semifinals_results_menu.addAction(self.results_menu_actions["2-й полуфинал"])
+        
+        # 4. Финалы - подменю (динамическое)
+        self.finals_results_menu = results_view_menu.addMenu("Финалы")
+        
+        # 5. Суперфинал
+        self.results_menu_actions["Суперфинал"] = QAction("Суперфинал", self)
+        self.results_menu_actions["Суперфинал"].triggered.connect(lambda: self.show_results_for_stage("Суперфинал"))
+        results_view_menu.addAction(self.results_menu_actions["Суперфинал"])
+        
+        view_menu.addSeparator()
+        
         fullscreen_action = QAction("Полный экран", self)
         fullscreen_action.triggered.connect(self.toggle_fullscreen)
         view_menu.addAction(fullscreen_action)
 
-# ====================================================        
         # Рейтинг
         rating_menu = menubar.addMenu("Рейтинг")
         rating_action = QAction("Показать рейтинг", self)
@@ -5149,7 +5212,10 @@ class MainWindow(QMainWindow):
         about_action = QAction("О программе", self)
         about_action.triggered.connect(self.about_dialog)
         help_menu.addAction(about_action)
-    
+        
+        # Инициализируем обновление меню результатов
+        self.update_results_menu()
+
     def toggle_fullscreen(self):
         """Полноэкранный режим"""
         if self.is_fullscreen:
@@ -13478,6 +13544,106 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             print(f"Ошибка фильтрации по игроку: {e}")
+
+    # ================= новое на 2905 ====
+    def update_results_menu(self):
+        """Обновление меню результатов - активирует только те пункты, которые есть в системе"""
+        if not self.current_title_id:
+            # Если нет выбранного соревнования, отключаем все пункты
+            for action in self.results_menu_actions.values():
+                action.setEnabled(False)
+            return
+        
+        try:
+            # Получаем все этапы из системы
+            stages = System.select().where(System.title_id == self.current_title_id)
+            stage_names = [s.stage for s in stages]
+            
+            # Активируем/деактивируем пункты меню в зависимости от наличия в системе
+            for stage_name, action in self.results_menu_actions.items():
+                action.setEnabled(stage_name in stage_names)
+            
+            # Обновляем подменю финалов
+            self.update_finals_results_menu(stage_names)
+            
+            # Также обновляем меню финалов для жеребьевки
+            for action in self.menuBar().actions():
+                if action.text() == "Соревнования":
+                    competitions_menu = action.menu()
+                    for sub_action in competitions_menu.actions():
+                        if sub_action.text() == "🎲 Жеребьевка":
+                            drawing_menu = sub_action.menu()
+                            for final_sub_action in drawing_menu.actions():
+                                if final_sub_action.text() == "Финалы":
+                                    finals_menu = final_sub_action.menu()
+                                    self.update_finals_menu(finals_menu)
+                                    break
+                            break
+                    break
+                    
+        except Exception as e:
+            print(f"Ошибка обновления меню результатов: {e}")
+
+    def update_finals_results_menu(self, stage_names):
+        """Обновление подменю финалов в меню результатов"""
+        # Очищаем существующее подменю
+        self.finals_results_menu.clear()
+        
+        # Находим все финалы в системе
+        finals = [s for s in stage_names if "финал" in s.lower() and "полуфинал" not in s.lower()]
+        
+        if finals:
+            for final in sorted(finals):
+                final_action = QAction(final, self)
+                final_action.triggered.connect(lambda checked, f=final: self.show_results_for_stage(f))
+                self.finals_results_menu.addAction(final_action)
+        else:
+            no_finals_action = QAction("Нет доступных финалов", self)
+            no_finals_action.setEnabled(False)
+            self.finals_results_menu.addAction(no_finals_action)
+
+    def show_results_for_stage(self, stage_name):
+        """Показать результаты для выбранного этапа"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+        
+        # Проверяем, существует ли такой этап в системе
+        stage_exists = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == stage_name)
+        )
+        
+        if not stage_exists:
+            QMessageBox.warning(self, "Ошибка", f"Этап '{stage_name}' не найден в системе")
+            return
+        
+        # Переключаемся на вкладку Результаты
+        self.tab_widget.setCurrentIndex(5)
+        
+        # Устанавливаем текущий этап
+        self.current_stage = stage_name
+        self.current_stage_label.setText(f"📋 Этап: {stage_name}")
+        
+        # Сбрасываем фильтры
+        self.reset_results_filters()
+        
+        # Загружаем матчи для этапа
+        self.load_matches_for_stage(stage_name)
+        
+        # Загружаем таблицу результатов
+        self.load_results_table_for_stage(stage_name)
+        
+        # Обновляем список игроков для автодополнения
+        self.load_players_for_filter()
+        
+        QMessageBox.information(self, "Загрузка", f"Загружены результаты для этапа '{stage_name}'")
+
+    def view_results_dialog(self):
+        """Просмотр результатов (зарезервировано)"""
+        QMessageBox.information(self, "Просмотр результатов", 
+                            "Функция просмотра результатов в разработке.\n"
+                            "Будет добавлена в следующих версиях.")
     # =================================
 class RatingLoaderThread(QThread):
     progress = pyqtSignal(int)

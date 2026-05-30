@@ -11817,14 +11817,14 @@ class MainWindow(QMainWindow):
         
         if stage == "Одна таблица":
             title_text = f"Финальные соревнования. Одиночный разряд. {sex}."
-            name_table = f"table_pdf/{clean_name}_one_table.pdf"
+            name_table = f"{clean_name}_one_table.pdf"
         elif stage == "Квалификация":
-            title_text = f"Квалификационные соревнования. {sex}."
-            name_table = f"table_pdf/{clean_name}_table_group.pdf"
+            title_text = f"Квалификационные соревнования. среди {sex}."
+            name_table = f"{clean_name}_table_group.pdf"
         elif stage in ["1-й полуфинал", "2-й полуфинал"]:
             number_fin = stage[:stage.rfind("-")]
             title_text = f"Квалификационные соревнования. {stage}. {sex}."
-            name_table = f"table_pdf/{clean_name}_{number_fin}-semifinal.pdf"
+            name_table = f"{clean_name}_{number_fin}-semifinal.pdf"
         else:
             # Финал
             number_fin = stage[:stage.rfind("-")] if "-" in stage else stage
@@ -11832,7 +11832,7 @@ class MainWindow(QMainWindow):
             first_mesto = self.get_final_start_place(stage)
             last_mesto = first_mesto + max_pl - 1 if max_pl > 0 else first_mesto
             title_text = f'Финальные соревнования.({first_mesto}-{last_mesto} место). Одиночный разряд. {sex}.'
-            name_table = f"table_pdf/{clean_name}_{number_fin}-final.pdf"
+            name_table = f"{clean_name}_{number_fin}-final.pdf"
         
         # Создаем PDF
         doc = SimpleDocTemplate(name_table, pagesize=page_size)
@@ -11846,6 +11846,234 @@ class MainWindow(QMainWindow):
         doc.build(elements, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
         
         return name_table
+
+
+    def _get_table_data(self, stage, kg, ts, zagolovok, cW, rH, max_pl):
+        """Получение данных для таблиц из таблиц Game_list и Result
+        Возвращает словарь: ключ - номер группы, значение - таблица (список списков)
+        """
+        from reportlab.platypus import Table
+        from collections import defaultdict
+        
+        dict_table = {}
+        
+        try:
+            # Получаем system_id для этапа
+            system = System.get_or_none(
+                (System.title_id == self.current_title_id) &
+                (System.stage == stage)
+            )
+            
+            if not system:
+                return dict_table
+            
+            # ===== ЭТАП 1: СОЗДАЕМ ПУСТЫЕ ТАБЛИЦЫ ИЗ GAME_LIST =====
+            # Получаем всех игроков из Game_list для этого этапа
+            game_players = Game_list.select().where(
+                (Game_list.title_id == self.current_title_id) &
+                (Game_list.system_id == system.id)
+            ).order_by(Game_list.number_group, Game_list.rank_num_player)
+            
+            # Группируем игроков по группам
+            groups_players = defaultdict(list)
+            for gp in game_players:
+                groups_players[gp.number_group].append(gp)
+
+            # Словарь для хранения данных всех групп
+            groups_data = {}
+            
+            for group_num in range(1, kg + 1):
+                group_key = f"{group_num} группа"
+                group_players = groups_players.get(group_key, [])
+                
+                # Словарь для хранения информации об игроках
+                players_info = {}
+                
+                # Создаем пустую таблицу
+                data = [list(zagolovok)]  # Заголовок    
+                
+                # Заполняем пустые строки для каждого игрока
+                for idx, gp in enumerate(group_players, 1):
+                    # Получаем данные игрока из таблицы Player
+                    player = Player.get_or_none(Player.id == gp.player_group.id)
+                    if player:
+                        # Форматируем ФИО
+                        fio = player.fio if player.fio else ""
+                        city = player.city if player.city else ""
+                        
+                        # Сохраняем информацию об игроке
+                        players_info[idx] = {
+                            'fio': fio,
+                            'city': city,
+                            'wins': 0,
+                            'losses': 0,
+                            'total_points': 0,
+                            'scores': {},
+                            'matches': {}
+                        }
+                        
+                        # Верхняя строка: номер, ФИО
+                        row_top = [str(idx), fio]
+                        # Нижняя строка: пусто, город
+                        row_bottom = ["", city]
+                        
+                        # Заполняем пустыми ячейками для всех возможных соперников
+                        for i in range(max_pl):
+                            row_top.append("")
+                            row_bottom.append("")
+                        
+                        # Добавляем пустые ячейки для очков, соотношения, места
+                        row_top.extend(["", "", ""])
+                        row_bottom.extend(["", "", ""])
+                        
+                        data.append(row_top)
+                        data.append(row_bottom)
+                
+                # Сохраняем данные группы
+                groups_data[group_num] = {
+                    'data': data,
+                    'players_info': players_info,
+                    'players_count': len(group_players)
+                }
+            
+            # ===== ЭТАП 2: ЗАПОЛНЯЕМ РЕЗУЛЬТАТАМИ ИЗ RESULT =====
+            # Получаем все результаты для этого этапа
+            results = Result.select().where(
+                (Result.title_id == self.current_title_id) &
+                (Result.system_stage == stage)
+            )
+            
+            # Для каждой группы заполняем результаты
+            for group_num in range(1, kg + 1):
+                group_data = groups_data.get(group_num)
+                if not group_data:
+                    continue
+                
+                data = group_data['data']
+                players_info = group_data['players_info']
+                players_count = group_data['players_count']
+                
+                # Получаем результаты для этой группы
+                results_group = results.where(Result.number_group == f"{group_num} группа")
+                
+                # Сбрасываем статистику игроков перед заполнением
+                for idx in players_info:
+                    players_info[idx]['wins'] = 0
+                    players_info[idx]['losses'] = 0
+                    players_info[idx]['total_points'] = 0
+                    players_info[idx]['scores'] = {}
+                    players_info[idx]['matches'] = {}
+                
+                # Заполняем результаты матчей
+                for result in results_group:
+                    if result.winner:
+                        tour = result.tours
+                        mark = tour.find("-")
+                        if mark == -1:
+                            continue
+                        
+                        idx1 = int(tour[:mark])
+                        idx2 = int(tour[mark + 1:])
+                        
+                        point_win = result.points_win if result.points_win else 0
+                        score_win = result.score_win if result.score_win else "В"
+                        point_los = result.points_loser if result.points_loser else 0
+                        score_los = result.score_loser if result.score_loser else "П"
+                        
+                        # Определяем, кто победил
+                        if result.winner == result.player1:
+                            # Победил player1 (индекс idx1)
+                            winner_idx = idx1
+                            loser_idx = idx2
+                            winner_points = point_win
+                            winner_score = score_win
+                            loser_points = point_los
+                            loser_score = score_los
+                        elif result.winner == result.player2:
+                            # Победил player2 (индекс idx2)
+                            winner_idx = idx2
+                            loser_idx = idx1
+                            winner_points = point_win
+                            winner_score = score_win
+                            loser_points = point_los
+                            loser_score = score_los
+                        else:
+                            continue
+                        
+                        # Обновляем статистику победителя
+                        if winner_idx in players_info:
+                            players_info[winner_idx]['wins'] += 1
+                            players_info[winner_idx]['total_points'] += winner_points
+                            players_info[winner_idx]['scores'][loser_idx] = winner_points
+                            players_info[winner_idx]['matches'][loser_idx] = winner_score
+                        
+                        # Обновляем статистику проигравшего
+                        if loser_idx in players_info:
+                            players_info[loser_idx]['losses'] += 1
+                            players_info[loser_idx]['total_points'] += loser_points
+                            players_info[loser_idx]['scores'][winner_idx] = loser_points
+                            players_info[loser_idx]['matches'][winner_idx] = loser_score
+                        
+                        # Заполняем ячейки в таблице
+                        # Строка победителя
+                        row_top_winner = 1 + (winner_idx - 1) * 2
+                        row_bottom_winner = 2 + (winner_idx - 1) * 2
+                        
+                        # Строка проигравшего
+                        row_top_loser = 1 + (loser_idx - 1) * 2
+                        row_bottom_loser = 2 + (loser_idx - 1) * 2
+                        
+                        # Заполняем очки и счет победителя (столбец соперника)
+                        data[row_top_winner][loser_idx + 1] = str(winner_points)
+                        data[row_bottom_winner][loser_idx + 1] = winner_score
+                        
+                        # Заполняем очки и счет проигравшего (столбец соперника)
+                        data[row_top_loser][winner_idx + 1] = str(loser_points)
+                        data[row_bottom_loser][winner_idx + 1] = loser_score
+                
+                # Сортируем игроков по очкам (по убыванию) для определения мест
+                sorted_players = sorted(players_info.items(), 
+                                    key=lambda x: (x[1]['total_points'], x[1]['wins']), 
+                                    reverse=True)
+                
+                # Определяем места
+                for place, (idx, info) in enumerate(sorted_players, 1):
+                    players_info[idx]['place'] = place
+                
+                # Заполняем итоговые данные (очки, соотношение, место)
+                for idx, info in players_info.items():
+                    row_top_idx = 1 + (idx - 1) * 2
+                    
+                    # Расчет соотношения побед/поражений
+                    if info['losses'] > 0:
+                        ratio = f"{info['wins']}:{info['losses']}"
+                    else:
+                        ratio = f"{info['wins']}:0"
+                    
+                    # Заполняем ячейки (столбцы после результатов матчей)
+                    # max_pl + 2 - колонка "Очки"
+                    # max_pl + 3 - колонка "Соот"
+                    # max_pl + 4 - колонка "Место"
+                    data[row_top_idx][max_pl + 2] = str(info['total_points'])
+                    data[row_top_idx][max_pl + 3] = ratio
+                    data[row_top_idx][max_pl + 4] = str(info.get('place', 0))
+                
+                # Создаем финальную таблицу
+                final_table = Table(data, colWidths=cW, rowHeights=[rH] * len(data))
+                final_table.setStyle(ts)
+                dict_table[group_num - 1] = final_table
+                
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print(f"Ошибка получения данных для таблицы: {e}")
+            # Создаем пустую таблицу в случае ошибки
+            data = [list(zagolovok)]
+            table = Table(data, colWidths=cW)
+            table.setStyle(ts)
+            dict_table[0] = table
+        
+        return dict_table
 
     def get_table_data(self, stage, kg, ts, zagolovok, cW, rH, max_pl):
         """Получение данных для таблиц из таблиц Game_list и Result
@@ -11877,26 +12105,35 @@ class MainWindow(QMainWindow):
             groups_players = defaultdict(list)
             for gp in game_players:
                 groups_players[gp.number_group].append(gp)
+
+            # Словарь для хранения данных всех групп
+            groups_data = {}
             
-            # Создаем пустые таблицы для каждой группы
+            # Общее количество матчей в этапе
+            total_matches_in_stage = Result.select().where(
+                (Result.title_id == self.current_title_id) &
+                (Result.system_stage == stage)
+            ).count()
+            
+            # Количество сыгранных матчей
+            played_matches = Result.select().where(
+                (Result.title_id == self.current_title_id) &
+                (Result.system_stage == stage) &
+                (Result.winner.is_null(False))
+            ).count()
+            
+            # Флаг: все ли матчи сыграны
+            all_matches_played = (played_matches == total_matches_in_stage and total_matches_in_stage > 0)
+            
             for group_num in range(1, kg + 1):
-                group_key = str(group_num)
+                group_key = f"{group_num} группа"
                 group_players = groups_players.get(group_key, [])
-                players_count = len(group_players)
-                
-                if players_count == 0:
-                    # Если нет игроков, создаем пустую таблицу
-                    data = [zagolovok]
-                    table = Table(data, colWidths=cW, rowHeights=[rH])
-                    table.setStyle(ts)
-                    dict_table[group_num - 1] = table
-                    continue
-                
-                # Создаем данные для таблицы (2 строки на каждого игрока + заголовок)
-                data = [list(zagolovok)]  # Заголовок
                 
                 # Словарь для хранения информации об игроках
                 players_info = {}
+                
+                # Создаем пустую таблицу
+                data = [list(zagolovok)]  # Заголовок    
                 
                 # Заполняем пустые строки для каждого игрока
                 for idx, gp in enumerate(group_players, 1):
@@ -11904,20 +12141,13 @@ class MainWindow(QMainWindow):
                     player = Player.get_or_none(Player.id == gp.player_group.id)
                     if player:
                         # Форматируем ФИО
-                        fio_parts = player.fio.split() if player.fio else [player.player]
-                        surname = fio_parts[0] if fio_parts else ""
-                        name = fio_parts[1] if len(fio_parts) > 1 else ""
-                        patronymic = fio_parts[2] if len(fio_parts) > 2 else ""
-                        
-                        full_name = f"{surname} {name} {patronymic}".strip()
+                        fio = player.fio if player.fio else ""
                         city = player.city if player.city else ""
                         
-                        players_info[gp.rank_num_player] = {
-                            'id': player.id,
-                            'full_name': full_name,
+                        # Сохраняем информацию об игроке
+                        players_info[idx] = {
+                            'fio': fio,
                             'city': city,
-                            'rank_num': gp.rank_num_player,
-                            'group': gp.number_group,
                             'wins': 0,
                             'losses': 0,
                             'total_points': 0,
@@ -11926,12 +12156,12 @@ class MainWindow(QMainWindow):
                         }
                         
                         # Верхняя строка: номер, ФИО
-                        row_top = [str(idx), full_name]
+                        row_top = [str(idx), fio]
                         # Нижняя строка: пусто, город
                         row_bottom = ["", city]
                         
                         # Заполняем пустыми ячейками для всех возможных соперников
-                        for i in range(players_count):
+                        for i in range(max_pl):
                             row_top.append("")
                             row_bottom.append("")
                         
@@ -11942,12 +12172,11 @@ class MainWindow(QMainWindow):
                         data.append(row_top)
                         data.append(row_bottom)
                 
-                # Сохраняем информацию о группах для второго этапа
-                dict_table[group_num - 1] = {
+                # Сохраняем данные группы
+                groups_data[group_num] = {
                     'data': data,
                     'players_info': players_info,
-                    'players_count': players_count,
-                    'group_players': group_players
+                    'players_count': len(group_players)
                 }
             
             # ===== ЭТАП 2: ЗАПОЛНЯЕМ РЕЗУЛЬТАТАМИ ИЗ RESULT =====
@@ -11957,137 +12186,134 @@ class MainWindow(QMainWindow):
                 (Result.system_stage == stage)
             )
             
-            # Создаем карту результатов для быстрого доступа
-            results_map = {}
-            for result in results:
-                # Извлекаем чистые имена без города
-                player1_clean = result.player1.split(' (')[0] if ' (' in result.player1 else result.player1
-                player2_clean = result.player2.split(' (')[0] if ' (' in result.player2 else result.player2
-                results_map[(player1_clean, player2_clean)] = result
-                results_map[(player2_clean, player1_clean)] = result
-            
-            # Для каждой группы заполняем результаты
-            for group_idx in range(kg):
-                group_data = dict_table.get(group_idx)
-                if not group_data or isinstance(group_data, Table):
+            # Для каждой группы заполняем результаты и считаем очки
+            for group_num in range(1, kg + 1):
+                group_data = groups_data.get(group_num)
+                if not group_data:
                     continue
                 
                 data = group_data['data']
                 players_info = group_data['players_info']
                 players_count = group_data['players_count']
-                group_players = group_data['group_players']
                 
-                # Создаем список игроков в порядке посева
-                sorted_players = sorted(players_info.values(), key=lambda x: x['rank_num'])
+                # Получаем результаты для этой группы
+                results_group = results.where(Result.number_group == f"{group_num} группа")
                 
-                # Обновляем словарь для быстрого доступа по имени
-                player_by_name = {}
-                for player_info in sorted_players:
-                    player_by_name[player_info['full_name']] = player_info
+                # Сбрасываем статистику игроков перед заполнением
+                for idx in players_info:
+                    players_info[idx]['wins'] = 0
+                    players_info[idx]['losses'] = 0
+                    players_info[idx]['total_points'] = 0
+                    players_info[idx]['scores'] = {}
+                    players_info[idx]['matches'] = {}
                 
-                # Заполняем результаты матчей
-                for result in results:
-                    # Извлекаем чистые имена
-                    player1_name = result.player1.split(' (')[0] if ' (' in result.player1 else result.player1
-                    player2_name = result.player2.split(' (')[0] if ' (' in result.player2 else result.player2
-                    
-                    # Проверяем, принадлежат ли игроки этой группе
-                    if player1_name in player_by_name and player2_name in player_by_name:
-                        player1_info = player_by_name[player1_name]
-                        player2_info = player_by_name[player2_name]
+                # Заполняем результаты матчей и считаем очки
+                for result in results_group:
+                    if result.winner:
+                        tour = result.tours
+                        mark = tour.find("-")
+                        if mark == -1:
+                            continue
                         
-                        # Получаем индексы игроков (1-based для отображения)
-                        idx1 = player1_info['rank_num']
-                        idx2 = player2_info['rank_num']
+                        idx1 = int(tour[:mark])
+                        idx2 = int(tour[mark + 1:])
                         
-                        # Определяем победителя и проигравшего
+                        point_win = result.points_win if result.points_win else 0
+                        score_win = result.score_win if result.score_win else "В"
+                        point_los = result.points_loser if result.points_loser else 0
+                        score_los = result.score_loser if result.score_loser else "П"
+                        
+                        # Определяем, кто победил
                         if result.winner == result.player1:
-                            # Победил player1
-                            points_winner = result.points_win if result.points_win else 0
-                            points_loser = result.points_loser if result.points_loser else 0
-                            score_winner = result.score_win if result.score_win else "В"
-                            score_loser = result.score_loser if result.score_loser else "П"
-                            
-                            # Обновляем статистику игроков
-                            player1_info['wins'] += 1
-                            player1_info['total_points'] += points_winner
-                            player2_info['losses'] += 1
-                            player2_info['total_points'] += points_loser
-                            
-                            # Сохраняем результаты матчей
-                            player1_info['scores'][idx2] = str(points_winner)
-                            player1_info['matches'][idx2] = score_winner
-                            player2_info['scores'][idx1] = str(points_loser)
-                            player2_info['matches'][idx1] = score_loser
-                            
+                            # Победил player1 (индекс idx1)
+                            winner_idx = idx1
+                            loser_idx = idx2
+                            winner_points = point_win
+                            winner_score = score_win
+                            loser_points = point_los
+                            loser_score = score_los
                         elif result.winner == result.player2:
-                            # Победил player2
-                            points_winner = result.points_win if result.points_win else 0
-                            points_loser = result.points_loser if result.points_loser else 0
-                            score_winner = result.score_win if result.score_win else "В"
-                            score_loser = result.score_loser if result.score_loser else "П"
-                            
-                            # Обновляем статистику игроков
-                            player2_info['wins'] += 1
-                            player2_info['total_points'] += points_winner
-                            player1_info['losses'] += 1
-                            player1_info['total_points'] += points_loser
-                            
-                            # Сохраняем результаты матчей
-                            player2_info['scores'][idx1] = str(points_winner)
-                            player2_info['matches'][idx1] = score_winner
-                            player1_info['scores'][idx2] = str(points_loser)
-                            player1_info['matches'][idx2] = score_loser
+                            # Победил player2 (индекс idx2)
+                            winner_idx = idx2
+                            loser_idx = idx1
+                            winner_points = point_win
+                            winner_score = score_win
+                            loser_points = point_los
+                            loser_score = score_los
                         else:
-                            # Ничья или технический результат
-                            if result.score_in_game == "П : В":
-                                # Оба проиграли
-                                points_loser = result.points_loser if result.points_loser else 0
-                                player1_info['total_points'] += points_loser
-                                player2_info['total_points'] += points_loser
+                            continue
+                        
+                        # Обновляем статистику победителя
+                        if winner_idx in players_info:
+                            players_info[winner_idx]['wins'] += 1
+                            players_info[winner_idx]['total_points'] += winner_points
+                            players_info[winner_idx]['scores'][loser_idx] = winner_points
+                            players_info[winner_idx]['matches'][loser_idx] = winner_score
+                        
+                        # Обновляем статистику проигравшего
+                        if loser_idx in players_info:
+                            players_info[loser_idx]['losses'] += 1
+                            players_info[loser_idx]['total_points'] += loser_points
+                            players_info[loser_idx]['scores'][winner_idx] = loser_points
+                            players_info[loser_idx]['matches'][winner_idx] = loser_score
+                        
+                        # Заполняем ячейки в таблице
+                        # Строка победителя
+                        row_top_winner = 1 + (winner_idx - 1) * 2
+                        row_bottom_winner = 2 + (winner_idx - 1) * 2
+                        
+                        # Строка проигравшего
+                        row_top_loser = 1 + (loser_idx - 1) * 2
+                        row_bottom_loser = 2 + (loser_idx - 1) * 2
+                        
+                        # Заполняем очки и счет победителя (столбец соперника)
+                        data[row_top_winner][loser_idx + 1] = str(winner_points)
+                        data[row_bottom_winner][loser_idx + 1] = winner_score
+                        
+                        # Заполняем очки и счет проигравшего (столбец соперника)
+                        data[row_top_loser][winner_idx + 1] = str(loser_points)
+                        data[row_bottom_loser][winner_idx + 1] = loser_score
                 
-                # Сортируем игроков по очкам (по убыванию) для определения мест
-                sorted_by_points = sorted(players_info.values(), 
-                                        key=lambda x: (x['total_points'], x['wins']), 
+                # ===== ПОДСЧЕТ ОБЩЕГО КОЛИЧЕСТВА ОЧКОВ УЖЕ ВЫПОЛНЕН ВЫШЕ =====
+                
+                # Определяем места только если все матчи сыграны
+                if all_matches_played:
+                    # Сортируем игроков по очкам (по убыванию) для определения мест
+                    sorted_players = sorted(players_info.items(), 
+                                        key=lambda x: (x[1]['total_points'], x[1]['wins']), 
                                         reverse=True)
-                
-                # Определяем места
-                for place, player_info in enumerate(sorted_by_points, 1):
-                    player_info['place'] = place
-                
-                # Обновляем данные в таблице
-                # Сначала обновляем строки с результатами
-                for player_info in sorted_players:
-                    idx = player_info['rank_num']
-                    # Строка игрока в данных (1 строка заголовок + (idx-1)*2 строк)
-                    row_top_idx = 1 + (idx - 1) * 2  # Верхняя строка
-                    row_bottom_idx = 2 + (idx - 1) * 2  # Нижняя строка
                     
-                    # Заполняем результаты матчей (столбцы с 2 по players_count+1)
-                    for opp_idx in range(1, players_count + 1):
-                        if opp_idx == idx:
-                            # Диагональная клетка
-                            data[row_top_idx][1 + opp_idx] = ""
-                            data[row_bottom_idx][1 + opp_idx] = ""
-                        else:
-                            # Результат матча против соперника
-                            if opp_idx in player_info['scores']:
-                                data[row_top_idx][1 + opp_idx] = player_info['scores'][opp_idx]
-                                data[row_bottom_idx][1 + opp_idx] = player_info['matches'][opp_idx]
-                            else:
-                                data[row_top_idx][1 + opp_idx] = "-"
-                                data[row_bottom_idx][1 + opp_idx] = "-"
+                    # Определяем места
+                    for place, (idx, info) in enumerate(sorted_players, 1):
+                        players_info[idx]['place'] = place
+                else:
+                    # Если не все матчи сыграны, место не определяем
+                    for idx in players_info:
+                        players_info[idx]['place'] = 0
+                
+                # Заполняем итоговые данные (очки, соотношение, место)
+                for idx, info in players_info.items():
+                    row_top_idx = 1 + (idx - 1) * 2
                     
-                    # Заполняем очки, соотношение, место
-                    ratio = f"{player_info['wins']}:{player_info['losses']}" if player_info['losses'] > 0 else f"{player_info['wins']}:0"
-                    data[row_top_idx][players_count + 2] = str(player_info['total_points'])  # Очки
-                    data[row_top_idx][players_count + 3] = ratio  # Соотношение
-                    data[row_top_idx][players_count + 4] = str(player_info.get('place', 0))  # Место
+                    # Соотношение пока пустое (будет рассчитываться позже)
+                    ratio = ""
+                    
+                    # Заполняем ячейки (столбцы после результатов матчей)
+                    # max_pl + 2 - колонка "Очки"
+                    # max_pl + 3 - колонка "Соот"
+                    # max_pl + 4 - колонка "Место"
+                    data[row_top_idx][max_pl + 2] = str(info['total_points'])
+                    data[row_top_idx][max_pl + 3] = ratio  # Пустое соотношение
+                    
+                    if all_matches_played and info.get('place', 0) > 0:
+                        data[row_top_idx][max_pl + 4] = str(info['place'])
+                    else:
+                        data[row_top_idx][max_pl + 4] = ""  # Место не определено
                 
                 # Создаем финальную таблицу
                 final_table = Table(data, colWidths=cW, rowHeights=[rH] * len(data))
                 final_table.setStyle(ts)
-                dict_table[group_idx] = final_table
+                dict_table[group_num - 1] = final_table
                 
         except Exception as e:
             import traceback

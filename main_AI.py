@@ -40,6 +40,7 @@ from datetime import *
 import pandas as pd
 import math
 
+from collections import defaultdict
 from datetime import datetime
 from PyPDF2 import PdfMerger 
 
@@ -11634,7 +11635,7 @@ class MainWindow(QMainWindow):
         if not self.current_title_id:
             return
         
-        stage_list_sf = ["Квалификация. 1-й полуфинал", "Квалификацияю 2-й полуфинал"]
+        stage_list_sf = ["Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]
         
         # Получаем system_id для этапа
         system = System.get_or_none(
@@ -11847,8 +11848,7 @@ class MainWindow(QMainWindow):
         
         return name_table
 
-
-    def _get_table_data(self, stage, kg, ts, zagolovok, cW, rH, max_pl):
+    def get_table_data(self, stage, kg, ts, zagolovok, cW, rH, max_pl):
         """Получение данных для таблиц из таблиц Game_list и Result
         Возвращает словарь: ключ - номер группы, значение - таблица (список списков)
         """
@@ -11867,83 +11867,171 @@ class MainWindow(QMainWindow):
             if not system:
                 return dict_table
             
-            # ===== ЭТАП 1: СОЗДАЕМ ПУСТЫЕ ТАБЛИЦЫ ИЗ GAME_LIST =====
-            # Получаем всех игроков из Game_list для этого этапа
+            # # ===== ЭТАП 1: СОЗДАЕМ ПУСТЫЕ ТАБЛИЦЫ ИЗ GAME_LIST =====
+            # game_players = Game_list.select().where(
+            #     (Game_list.title_id == self.current_title_id) &
+            #     (Game_list.system_id == system.id)
+            # ).order_by(Game_list.number_group, Game_list.rank_num_player)
+            
+            # groups_players = defaultdict(list)
+            # for gp in game_players:
+            #     groups_players[gp.number_group].append(gp)
+
+            # groups_data = {}
+            
+            # for group_num in range(1, kg + 1):
+            #     group_key = f"{group_num} группа"
+            #     group_players = groups_players.get(group_key, [])
+                
+            #     players_info = {}
+            #     data = [list(zagolovok)]
+                
+            #     for idx, gp in enumerate(group_players, 1):
+            #         player = Player.get_or_none(Player.id == gp.player_group.id)
+            #         if player:
+            #             fio = player.fio if player.fio else ""
+            #             city = player.city if player.city else ""
+                        
+            #             players_info[idx] = {
+            #                 'fio': fio,
+            #                 'city': city,
+            #                 'wins': 0,
+            #                 'losses': 0,
+            #                 'total_points': 0,
+            #                 'scores': {},
+            #                 'matches': {},
+            #                 'place': 0,
+            #                 'ratio_points': 0
+            #             }
+                        
+            #             row_top = [str(idx), fio]
+            #             row_bottom = ["", city]
+                        
+            #             for i in range(max_pl):
+            #                 row_top.append("")
+            #                 row_bottom.append("")
+                        
+            #             row_top.extend(["", "", ""])
+            #             row_bottom.extend(["", "", ""])
+                        
+            #             data.append(row_top)
+            #             data.append(row_bottom)
+                
+            #     groups_data[group_num] = {
+            #         'data': data,
+            #         'players_info': players_info,
+            #         'players_count': len(group_players),
+            #         'total_matches_in_group': 0,  # будет заполнено позже
+            #         'played_matches_in_group': 0   # будет заполнено позже
+            #     }
+# ================= new ============
+            # ===== ЭТАП 1: СОЗДАЕМ ПУСТЫЕ ТАБЛИЦЫ ИЗ GAME_LIST С ФИКСИРОВАННЫМ ЧИСЛОМ СТРОК =====
             game_players = Game_list.select().where(
                 (Game_list.title_id == self.current_title_id) &
                 (Game_list.system_id == system.id)
             ).order_by(Game_list.number_group, Game_list.rank_num_player)
-            
-            # Группируем игроков по группам
+
             groups_players = defaultdict(list)
             for gp in game_players:
                 groups_players[gp.number_group].append(gp)
 
-            # Словарь для хранения данных всех групп
             groups_data = {}
-            
+            max_players_in_stage = max_pl  # из параметра функции
+
             for group_num in range(1, kg + 1):
                 group_key = f"{group_num} группа"
                 group_players = groups_players.get(group_key, [])
-                
-                # Словарь для хранения информации об игроках
-                players_info = {}
-                
-                # Создаем пустую таблицу
-                data = [list(zagolovok)]  # Заголовок    
-                
-                # Заполняем пустые строки для каждого игрока
-                for idx, gp in enumerate(group_players, 1):
-                    # Получаем данные игрока из таблицы Player
+
+                # Собираем реальных игроков группы с их посевом
+                players_in_group = []
+                for gp in group_players:
                     player = Player.get_or_none(Player.id == gp.player_group.id)
                     if player:
-                        # Форматируем ФИО
+                        players_in_group.append((gp.rank_num_player, player))
+                # Сортируем по номеру посева
+                players_in_group.sort(key=lambda x: x[0])
+
+                # Словарь для информации об игроках (индекс = номер посева)
+                players_info = {}
+                # Создаём таблицу с заголовком
+                data = [list(zagolovok)]
+
+                # Проходим по всем возможным местам от 1 до max_players_in_stage
+                for position in range(1, max_players_in_stage + 1):
+                    # Ищем реального игрока с таким посевом
+                    player_info = next((p for p in players_in_group if p[0] == position), None)
+                    if player_info:
+                        _, player = player_info
                         fio = player.fio if player.fio else ""
                         city = player.city if player.city else ""
-                        
-                        # Сохраняем информацию об игроке
-                        players_info[idx] = {
+                        players_info[position] = {
                             'fio': fio,
                             'city': city,
                             'wins': 0,
                             'losses': 0,
                             'total_points': 0,
                             'scores': {},
-                            'matches': {}
+                            'matches': {},
+                            'place': 0,
+                            'ratio_points': 0
                         }
-                        
-                        # Верхняя строка: номер, ФИО
-                        row_top = [str(idx), fio]
-                        # Нижняя строка: пусто, город
+                        row_top = [str(position), fio]
                         row_bottom = ["", city]
-                        
-                        # Заполняем пустыми ячейками для всех возможных соперников
-                        for i in range(max_pl):
-                            row_top.append("")
-                            row_bottom.append("")
-                        
-                        # Добавляем пустые ячейки для очков, соотношения, места
-                        row_top.extend(["", "", ""])
-                        row_bottom.extend(["", "", ""])
-                        
-                        data.append(row_top)
-                        data.append(row_bottom)
-                
+                    else:
+                        # Пустая строка для отсутствующего игрока
+                        players_info[position] = {
+                            'fio': '',
+                            'city': '',
+                            'wins': 0,
+                            'losses': 0,
+                            'total_points': 0,
+                            'scores': {},
+                            'matches': {},
+                            'place': 0,
+                            'ratio_points': 0
+                        }
+                        row_top = [str(position), ""]
+                        row_bottom = ["", ""]
+
+                    # Заполняем пустыми ячейками для всех соперников
+                    for _ in range(max_players_in_stage):
+                        row_top.append("")
+                        row_bottom.append("")
+
+                    # Добавляем колонки для очков, соотношения, места
+                    row_top.extend(["", "", ""])
+                    row_bottom.extend(["", "", ""])
+
+                    data.append(row_top)
+                    data.append(row_bottom)
+
                 # Сохраняем данные группы
                 groups_data[group_num] = {
                     'data': data,
                     'players_info': players_info,
-                    'players_count': len(group_players)
+                    'players_count': max_players_in_stage  # всегда max_pl
                 }
-            
+# ===============================            
             # ===== ЭТАП 2: ЗАПОЛНЯЕМ РЕЗУЛЬТАТАМИ ИЗ RESULT =====
-            # Получаем все результаты для этого этапа
             results = Result.select().where(
                 (Result.title_id == self.current_title_id) &
                 (Result.system_stage == stage)
             )
             
-            # Для каждой группы заполняем результаты
+            # Сначала подсчитываем количество матчей в каждой группе
+            for group_num in range(1, kg + 1):
+                group_key = f"{group_num} группа"
+                results_group = results.where(Result.number_group == group_key)
+                
+                # Общее количество матчей в группе
+                total_matches = results_group.count()
+                # Количество сыгранных матчей (где есть победитель)
+                played_matches = results_group.where(Result.winner.is_null(False)).count()
+                
+                groups_data[group_num]['total_matches_in_group'] = total_matches
+                groups_data[group_num]['played_matches_in_group'] = played_matches
+            
+            # Заполняем результаты
             for group_num in range(1, kg + 1):
                 group_data = groups_data.get(group_num)
                 if not group_data:
@@ -11952,11 +12040,15 @@ class MainWindow(QMainWindow):
                 data = group_data['data']
                 players_info = group_data['players_info']
                 players_count = group_data['players_count']
+                total_matches = group_data['total_matches_in_group']
+                played_matches = group_data['played_matches_in_group']
                 
-                # Получаем результаты для этой группы
+                # Флаг: все ли матчи в этой группе сыграны
+                all_matches_in_group_played = (played_matches == total_matches and total_matches > 0)
+                
                 results_group = results.where(Result.number_group == f"{group_num} группа")
                 
-                # Сбрасываем статистику игроков перед заполнением
+                # Сбрасываем статистику
                 for idx in players_info:
                     players_info[idx]['wins'] = 0
                     players_info[idx]['losses'] = 0
@@ -11980,25 +12072,15 @@ class MainWindow(QMainWindow):
                         point_los = result.points_loser if result.points_loser else 0
                         score_los = result.score_loser if result.score_loser else "П"
                         
-                        # Определяем, кто победил
+                        # Определяем победителя
                         if result.winner == result.player1:
-                            # Победил player1 (индекс idx1)
-                            winner_idx = idx1
-                            loser_idx = idx2
-                            winner_points = point_win
-                            winner_score = score_win
-                            loser_points = point_los
-                            loser_score = score_los
-                        elif result.winner == result.player2:
-                            # Победил player2 (индекс idx2)
-                            winner_idx = idx2
-                            loser_idx = idx1
-                            winner_points = point_win
-                            winner_score = score_win
-                            loser_points = point_los
-                            loser_score = score_los
+                            winner_idx, loser_idx = idx1, idx2
+                            winner_points, loser_points = point_win, point_los
+                            winner_score, loser_score = score_win, score_los
                         else:
-                            continue
+                            winner_idx, loser_idx = idx2, idx1
+                            winner_points, loser_points = point_win, point_los
+                            winner_score, loser_score = score_win, score_los
                         
                         # Обновляем статистику победителя
                         if winner_idx in players_info:
@@ -12015,301 +12097,44 @@ class MainWindow(QMainWindow):
                             players_info[loser_idx]['matches'][winner_idx] = loser_score
                         
                         # Заполняем ячейки в таблице
-                        # Строка победителя
                         row_top_winner = 1 + (winner_idx - 1) * 2
                         row_bottom_winner = 2 + (winner_idx - 1) * 2
-                        
-                        # Строка проигравшего
                         row_top_loser = 1 + (loser_idx - 1) * 2
                         row_bottom_loser = 2 + (loser_idx - 1) * 2
                         
-                        # Заполняем очки и счет победителя (столбец соперника)
                         data[row_top_winner][loser_idx + 1] = str(winner_points)
                         data[row_bottom_winner][loser_idx + 1] = winner_score
-                        
-                        # Заполняем очки и счет проигравшего (столбец соперника)
                         data[row_top_loser][winner_idx + 1] = str(loser_points)
                         data[row_bottom_loser][winner_idx + 1] = loser_score
                 
-                # Сортируем игроков по очкам (по убыванию) для определения мест
-                sorted_players = sorted(players_info.items(), 
-                                    key=lambda x: (x[1]['total_points'], x[1]['wins']), 
-                                    reverse=True)
-                
-                # Определяем места
-                for place, (idx, info) in enumerate(sorted_players, 1):
-                    players_info[idx]['place'] = place
-                
+                # Определяем места ТОЛЬКО если все матчи в этой группе сыграны
+                if all_matches_in_group_played:
+                    players_info = self.calculate_round_robin_standings(players_info, results_group)
+# ==================================                
                 # Заполняем итоговые данные (очки, соотношение, место)
                 for idx, info in players_info.items():
                     row_top_idx = 1 + (idx - 1) * 2
                     
-                    # Расчет соотношения побед/поражений
-                    if info['losses'] > 0:
-                        ratio = f"{info['wins']}:{info['losses']}"
+                    # Очки
+                    data[row_top_idx][max_pl + 2] = str(info['total_points'])
+                    
+                    # Соотношение (только если все матчи сыграны)
+                    if all_matches_in_group_played and info.get('ratio_points', '') != '':
+                        # Проверяем тип и преобразуем в строку
+                        ratio_value = info['ratio_points']
+                        if ratio_value is not None and str(ratio_value).strip():
+                            data[row_top_idx][max_pl + 3] = str(ratio_value)
+                        else:
+                            data[row_top_idx][max_pl + 3] = ""
                     else:
-                        ratio = f"{info['wins']}:0"
+                        data[row_top_idx][max_pl + 3] = ""  # Пустое соотношение
                     
-                    # Заполняем ячейки (столбцы после результатов матчей)
-                    # max_pl + 2 - колонка "Очки"
-                    # max_pl + 3 - колонка "Соот"
-                    # max_pl + 4 - колонка "Место"
-                    data[row_top_idx][max_pl + 2] = str(info['total_points'])
-                    data[row_top_idx][max_pl + 3] = ratio
-                    data[row_top_idx][max_pl + 4] = str(info.get('place', 0))
-                
-                # Создаем финальную таблицу
-                final_table = Table(data, colWidths=cW, rowHeights=[rH] * len(data))
-                final_table.setStyle(ts)
-                dict_table[group_num - 1] = final_table
-                
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            print(f"Ошибка получения данных для таблицы: {e}")
-            # Создаем пустую таблицу в случае ошибки
-            data = [list(zagolovok)]
-            table = Table(data, colWidths=cW)
-            table.setStyle(ts)
-            dict_table[0] = table
-        
-        return dict_table
-
-    def get_table_data(self, stage, kg, ts, zagolovok, cW, rH, max_pl):
-        """Получение данных для таблиц из таблиц Game_list и Result
-        Возвращает словарь: ключ - номер группы, значение - таблица (список списков)
-        """
-        from reportlab.platypus import Table
-        from collections import defaultdict
-        
-        dict_table = {}
-        
-        try:
-            # Получаем system_id для этапа
-            system = System.get_or_none(
-                (System.title_id == self.current_title_id) &
-                (System.stage == stage)
-            )
-            
-            if not system:
-                return dict_table
-            
-            # ===== ЭТАП 1: СОЗДАЕМ ПУСТЫЕ ТАБЛИЦЫ ИЗ GAME_LIST =====
-            # Получаем всех игроков из Game_list для этого этапа
-            game_players = Game_list.select().where(
-                (Game_list.title_id == self.current_title_id) &
-                (Game_list.system_id == system.id)
-            ).order_by(Game_list.number_group, Game_list.rank_num_player)
-            
-            # Группируем игроков по группам
-            groups_players = defaultdict(list)
-            for gp in game_players:
-                groups_players[gp.number_group].append(gp)
-
-            # Словарь для хранения данных всех групп
-            groups_data = {}
-            
-            # Общее количество матчей в этапе
-            total_matches_in_stage = Result.select().where(
-                (Result.title_id == self.current_title_id) &
-                (Result.system_stage == stage)
-            ).count()
-            
-            # Количество сыгранных матчей
-            played_matches = Result.select().where(
-                (Result.title_id == self.current_title_id) &
-                (Result.system_stage == stage) &
-                (Result.winner.is_null(False))
-            ).count()
-            
-            # Флаг: все ли матчи сыграны
-            all_matches_played = (played_matches == total_matches_in_stage and total_matches_in_stage > 0)
-            
-            for group_num in range(1, kg + 1):
-                group_key = f"{group_num} группа"
-                group_players = groups_players.get(group_key, [])
-                
-                # Словарь для хранения информации об игроках
-                players_info = {}
-                
-                # Создаем пустую таблицу
-                data = [list(zagolovok)]  # Заголовок    
-                
-                # Заполняем пустые строки для каждого игрока
-                for idx, gp in enumerate(group_players, 1):
-                    # Получаем данные игрока из таблицы Player
-                    player = Player.get_or_none(Player.id == gp.player_group.id)
-                    if player:
-                        # Форматируем ФИО
-                        fio = player.fio if player.fio else ""
-                        city = player.city if player.city else ""
-                        
-                        # Сохраняем информацию об игроке
-                        players_info[idx] = {
-                            'fio': fio,
-                            'city': city,
-                            'wins': 0,
-                            'losses': 0,
-                            'total_points': 0,
-                            'scores': {},
-                            'matches': {}
-                        }
-                        
-                        # Верхняя строка: номер, ФИО
-                        row_top = [str(idx), fio]
-                        # Нижняя строка: пусто, город
-                        row_bottom = ["", city]
-                        
-                        # Заполняем пустыми ячейками для всех возможных соперников
-                        for i in range(max_pl):
-                            row_top.append("")
-                            row_bottom.append("")
-                        
-                        # Добавляем пустые ячейки для очков, соотношения, места
-                        row_top.extend(["", "", ""])
-                        row_bottom.extend(["", "", ""])
-                        
-                        data.append(row_top)
-                        data.append(row_bottom)
-                
-                # Сохраняем данные группы
-                groups_data[group_num] = {
-                    'data': data,
-                    'players_info': players_info,
-                    'players_count': len(group_players)
-                }
-            
-            # ===== ЭТАП 2: ЗАПОЛНЯЕМ РЕЗУЛЬТАТАМИ ИЗ RESULT =====
-            # Получаем все результаты для этого этапа
-            results = Result.select().where(
-                (Result.title_id == self.current_title_id) &
-                (Result.system_stage == stage)
-            )
-            
-            # Для каждой группы заполняем результаты и считаем очки
-            for group_num in range(1, kg + 1):
-                group_data = groups_data.get(group_num)
-                if not group_data:
-                    continue
-                
-                data = group_data['data']
-                players_info = group_data['players_info']
-                players_count = group_data['players_count']
-                
-                # Получаем результаты для этой группы
-                results_group = results.where(Result.number_group == f"{group_num} группа")
-                
-                # Сбрасываем статистику игроков перед заполнением
-                for idx in players_info:
-                    players_info[idx]['wins'] = 0
-                    players_info[idx]['losses'] = 0
-                    players_info[idx]['total_points'] = 0
-                    players_info[idx]['scores'] = {}
-                    players_info[idx]['matches'] = {}
-                
-                # Заполняем результаты матчей и считаем очки
-                for result in results_group:
-                    if result.winner:
-                        tour = result.tours
-                        mark = tour.find("-")
-                        if mark == -1:
-                            continue
-                        
-                        idx1 = int(tour[:mark])
-                        idx2 = int(tour[mark + 1:])
-                        
-                        point_win = result.points_win if result.points_win else 0
-                        score_win = result.score_win if result.score_win else "В"
-                        point_los = result.points_loser if result.points_loser else 0
-                        score_los = result.score_loser if result.score_loser else "П"
-                        
-                        # Определяем, кто победил
-                        if result.winner == result.player1:
-                            # Победил player1 (индекс idx1)
-                            winner_idx = idx1
-                            loser_idx = idx2
-                            winner_points = point_win
-                            winner_score = score_win
-                            loser_points = point_los
-                            loser_score = score_los
-                        elif result.winner == result.player2:
-                            # Победил player2 (индекс idx2)
-                            winner_idx = idx2
-                            loser_idx = idx1
-                            winner_points = point_win
-                            winner_score = score_win
-                            loser_points = point_los
-                            loser_score = score_los
-                        else:
-                            continue
-                        
-                        # Обновляем статистику победителя
-                        if winner_idx in players_info:
-                            players_info[winner_idx]['wins'] += 1
-                            players_info[winner_idx]['total_points'] += winner_points
-                            players_info[winner_idx]['scores'][loser_idx] = winner_points
-                            players_info[winner_idx]['matches'][loser_idx] = winner_score
-                        
-                        # Обновляем статистику проигравшего
-                        if loser_idx in players_info:
-                            players_info[loser_idx]['losses'] += 1
-                            players_info[loser_idx]['total_points'] += loser_points
-                            players_info[loser_idx]['scores'][winner_idx] = loser_points
-                            players_info[loser_idx]['matches'][winner_idx] = loser_score
-                        
-                        # Заполняем ячейки в таблице
-                        # Строка победителя
-                        row_top_winner = 1 + (winner_idx - 1) * 2
-                        row_bottom_winner = 2 + (winner_idx - 1) * 2
-                        
-                        # Строка проигравшего
-                        row_top_loser = 1 + (loser_idx - 1) * 2
-                        row_bottom_loser = 2 + (loser_idx - 1) * 2
-                        
-                        # Заполняем очки и счет победителя (столбец соперника)
-                        data[row_top_winner][loser_idx + 1] = str(winner_points)
-                        data[row_bottom_winner][loser_idx + 1] = winner_score
-                        
-                        # Заполняем очки и счет проигравшего (столбец соперника)
-                        data[row_top_loser][winner_idx + 1] = str(loser_points)
-                        data[row_bottom_loser][winner_idx + 1] = loser_score
-                
-                # ===== ПОДСЧЕТ ОБЩЕГО КОЛИЧЕСТВА ОЧКОВ УЖЕ ВЫПОЛНЕН ВЫШЕ =====
-                
-                # Определяем места только если все матчи сыграны
-                if all_matches_played:
-                    # Сортируем игроков по очкам (по убыванию) для определения мест
-                    sorted_players = sorted(players_info.items(), 
-                                        key=lambda x: (x[1]['total_points'], x[1]['wins']), 
-                                        reverse=True)
-                    
-                    # Определяем места
-                    for place, (idx, info) in enumerate(sorted_players, 1):
-                        players_info[idx]['place'] = place
-                else:
-                    # Если не все матчи сыграны, место не определяем
-                    for idx in players_info:
-                        players_info[idx]['place'] = 0
-                
-                # Заполняем итоговые данные (очки, соотношение, место)
-                for idx, info in players_info.items():
-                    row_top_idx = 1 + (idx - 1) * 2
-                    
-                    # Соотношение пока пустое (будет рассчитываться позже)
-                    ratio = ""
-                    
-                    # Заполняем ячейки (столбцы после результатов матчей)
-                    # max_pl + 2 - колонка "Очки"
-                    # max_pl + 3 - колонка "Соот"
-                    # max_pl + 4 - колонка "Место"
-                    data[row_top_idx][max_pl + 2] = str(info['total_points'])
-                    data[row_top_idx][max_pl + 3] = ratio  # Пустое соотношение
-                    
-                    if all_matches_played and info.get('place', 0) > 0:
+                    # Место (только если все матчи сыграны)
+                    if all_matches_in_group_played and info.get('place', 0) > 0:
                         data[row_top_idx][max_pl + 4] = str(info['place'])
                     else:
                         data[row_top_idx][max_pl + 4] = ""  # Место не определено
-                
+# =========================                
                 # Создаем финальную таблицу
                 final_table = Table(data, colWidths=cW, rowHeights=[rH] * len(data))
                 final_table.setStyle(ts)
@@ -12319,7 +12144,6 @@ class MainWindow(QMainWindow):
             import traceback
             traceback.print_exc()
             print(f"Ошибка получения данных для таблицы: {e}")
-            # Создаем пустую таблицу в случае ошибки
             data = [list(zagolovok)]
             table = Table(data, colWidths=cW)
             table.setStyle(ts)
@@ -12785,69 +12609,6 @@ class MainWindow(QMainWindow):
         else:
             # Для большего количества участников возвращаем последний вариант
             return tr[-1]
-    
-    def _write_drawing_results_to_result(self, group_players, stage_name, group_number, system_id):
-        """Запись результатов жеребьевки в таблицу Result"""
-        try:
-            players_count = len(group_players)
-            
-            # Получаем туры для данного количества участников
-            tours = self.tours_list(players_count)
-            
-            if not tours:
-                print(f"Нет расписания туров для {players_count} участников")
-                return
-            
-            for tour_idx, tour_matches in enumerate(tours, 1):
-                # tour_matches - список пар для одного тура, например ['1-3', '2-4']
-                for match in tour_matches:
-                    # Разбираем пару, например '1-3'
-                    players_pair = match.split('-')
-                    if len(players_pair) == 2:
-                        try:
-                            player1_idx = int(players_pair[0]) - 1  # переводим в индекс массива (0-based)
-                            player2_idx = int(players_pair[1]) - 1
-                            
-                            # Получаем игроков по индексам
-                            if player1_idx < len(group_players) and player2_idx < len(group_players):
-                                player1 = group_players[player1_idx]
-                                player2 = group_players[player2_idx]
-                                
-                                # Формируем ФИО с городом
-                                player1_fio_city = f"{player1.fio} ({player1.city})" if player1.city else player1.fio
-                                player2_fio_city = f"{player2.fio} ({player2.city})" if player2.city else player2.fio
-                                
-                                # Создаем запись в таблице Result
-                                Result.create(
-                                    system_stage=stage_name,
-                                    number_group=str(group_number),
-                                    tours=str(tour_idx),
-                                    player1=player1_fio_city,
-                                    player2=player2_fio_city,
-                                    winner=None,
-                                    points_win=None,
-                                    score_in_game=None,
-                                    score_win=None,
-                                    loser=None,
-                                    points_loser=None,
-                                    score_loser=None,
-                                    title_id=self.current_title_id,
-                                    round="",
-                                    system_id=system_id,
-                                    sex=self.current_sex if self.current_sex else "man",
-                                    schedule_date=None,
-                                    schedule_time=None,
-                                    schedule_table="",
-                                    stage_net=""
-                                )
-                        except (ValueError, IndexError) as e:
-                            print(f"Ошибка при обработке пары {match}: {e}")
-                            continue
-            
-            print(f"Создано результатов для группы {group_number}: {len(tours)} туров")
-            
-        except Exception as e:
-            print(f"Ошибка записи результатов: {e}")
 # ============
     def fill_results_after_drawing(self):
         """Заполнение таблицы Result после жеребьевки квалификации"""
@@ -13626,15 +13387,7 @@ class MainWindow(QMainWindow):
                 self.load_matches_for_stage(stage_name)
                 # Обновляем таблицу результатов
                 self.load_results_table_for_stage(stage_name)
-
 # ============================= 2805
-    def _refresh_results_data(self):
-        """Обновление данных результатов"""
-        if hasattr(self, 'current_matches') and self.current_matches:
-            stage_name = self.current_matches[0].system_stage if self.current_matches else None
-            if stage_name:
-                self.load_matches_for_stage(stage_name)
-                QMessageBox.information(self, "Обновление", "Данные обновлены")
     def refresh_results_data(self):
         """Обновление данных результатов"""
         if self.current_stage:
@@ -13677,118 +13430,6 @@ class MainWindow(QMainWindow):
                 self.save_btn.setFocus()
                 # Автоматически сохраняем результат при нажатии Enter на последнем поле
                 self.save_match_result_compact()
-
-    def __update_total_score(self):
-        """Обновление общего счета и подсветка победителя"""
-        try:
-            player1_wins = 0
-            player2_wins = 0
-            
-            for i in range(self.parties_count):
-                score1 = self.score_edits_p1[i].text().strip()
-                score2 = self.score_edits_p2[i].text().strip()
-                
-                if score1 and score2:
-                    try:
-                        s1 = int(score1)
-                        s2 = int(score2)
-                        if s1 > s2:
-                            player1_wins += 1
-                        elif s2 > s1:
-                            player2_wins += 1
-                    except ValueError:
-                        pass
-            
-            # Обновляем общий счет
-            self.total_score1.setText(str(player1_wins))
-            self.total_score2.setText(str(player2_wins))
-            
-            # Определяем необходимое количество побед для победы в матче
-            required_wins = self.parties_count // 2 + 1
-            
-            # Подсветка победителя (только после того, как кто-то набрал необходимое количество побед)
-            if player1_wins >= required_wins:
-                # Также подсвечиваем фамилию победителя
-                self.player1_name.setStyleSheet("background-color: #90EE90; color: black; font-weight: bold;")
-                self.player2_name.setStyleSheet("background-color: #f0f0f0;")
-            elif player2_wins >= required_wins:
-                self.player2_name.setStyleSheet("background-color: #90EE90; color: black; font-weight: bold;")
-                self.player1_name.setStyleSheet("background-color: #f0f0f0;")
-            else:
-                self.total_score1.setStyleSheet("")
-                self.total_score2.setStyleSheet("")
-                self.player1_name.setStyleSheet("background-color: #f0f0f0;")
-                self.player2_name.setStyleSheet("background-color: #f0f0f0;")
-                
-        except Exception as e:
-            print(f"Ошибка обновления счета: {e}")
-
-    def _update_total_score(self):
-        """Обновление общего счета и подсветка победителя с проверкой корректности"""
-        try:
-            player1_wins = 0
-            player2_wins = 0
-            has_error = False
-            error_message = ""
-            
-            for i in range(self.parties_count):
-                score1 = self.score_edits_p1[i].text().strip()
-                score2 = self.score_edits_p2[i].text().strip()
-                
-                # Сбрасываем стиль поля
-                self.score_edits_p1[i].setStyleSheet("font-size: 14px;")
-                self.score_edits_p2[i].setStyleSheet("font-size: 14px;")
-                
-                if score1 and score2:
-                    # Проверяем корректность счета
-                    is_valid, error = self.validate_score(score1, score2)
-                    
-                    if is_valid:
-                        s1 = int(score1)
-                        s2 = int(score2)
-                        if s1 > s2:
-                            player1_wins += 1
-                        else:
-                            player2_wins += 1
-                    else:
-                        # Подсвечиваем поля с ошибкой красным
-                        self.score_edits_p1[i].setStyleSheet("font-size: 14px; background-color: #FFB6C1;")
-                        self.score_edits_p2[i].setStyleSheet("font-size: 14px; background-color: #FFB6C1;")
-                        has_error = True
-                        error_message = error
-            
-            # Обновляем общий счет
-            self.total_score1.setText(str(player1_wins))
-            self.total_score2.setText(str(player2_wins))
-            
-            # Определяем необходимое количество побед для победы в матче
-            required_wins = self.parties_count // 2 + 1
-            
-            # Подсветка победителя (только если нет ошибок)
-            if not has_error:
-                if player1_wins >= required_wins:
-                    self.total_score1.setStyleSheet("background-color: #90EE90; color: black; font-weight: bold;")
-                    self.total_score2.setStyleSheet("")
-                    self.player1_name.setStyleSheet("background-color: #90EE90; color: black; font-weight: bold;")
-                    self.player2_name.setStyleSheet("background-color: #f0f0f0;")
-                elif player2_wins >= required_wins:
-                    self.total_score2.setStyleSheet("background-color: #90EE90; color: black; font-weight: bold;")
-                    self.total_score1.setStyleSheet("")
-                    self.player2_name.setStyleSheet("background-color: #90EE90; color: black; font-weight: bold;")
-                    self.player1_name.setStyleSheet("background-color: #f0f0f0;")
-                else:
-                    self.total_score1.setStyleSheet("")
-                    self.total_score2.setStyleSheet("")
-                    self.player1_name.setStyleSheet("background-color: #f0f0f0;")
-                    self.player2_name.setStyleSheet("background-color: #f0f0f0;")
-            
-            # Если есть ошибка, показываем сообщение
-            if has_error and error_message:
-                self.status_label.setText(f"⚠️ {error_message}")
-                QTimer.singleShot(3000, lambda: self.status_label.setText(""))
-                
-        except Exception as e:
-            print(f"Ошибка обновления счета: {e}")
 
     def update_total_score(self):
         """Обновление общего счета и подсветка победителя с учетом статусов"""
@@ -14799,7 +14440,524 @@ class MainWindow(QMainWindow):
             traceback.print_exc()
             print(f"Ошибка создания PDF: {e}")
             return None
-    # =================================
+# ======= подсчет мест при крутиловке ===========
+    def resolve_two_players_tie(self, players, results_group, original_points, standings):
+        """
+        Разрешение ситуации с двумя игроками, имеющими одинаковое количество очков
+        Возвращает места (1 и 2) на основе личной встречи
+        """
+        player1_idx = players[0]['idx']
+        player2_idx = players[1]['idx']
+        
+        # Ищем результат матча между этими игроками
+        for result in results_group:
+            tour = result.tours
+            mark = tour.find("-")
+            if mark == -1:
+                continue
+            
+            idx1 = int(tour[:mark])
+            idx2 = int(tour[mark + 1:])
+            
+            if (idx1 == player1_idx and idx2 == player2_idx) or (idx1 == player2_idx and idx2 == player1_idx):
+                # Нашли матч
+                if result.winner == result.player1:
+                    winner_idx = idx1
+                else:
+                    winner_idx = idx2
+                
+                if winner_idx == player1_idx:
+                    # места
+                    return (1, 2)
+                else:
+                    return (2, 1)
+
+    def resolve_tie_by_head_to_head(self, players, results_group):
+        """
+        Разрешение ситуации с одинаковым соотношением партий
+        Используем результаты личных встреч
+        """
+        if len(players) == 2:
+            # Всего два игрока - смотрим личную встречу
+            player1_idx = players[0]['idx']
+            player2_idx = players[1]['idx']
+            
+            for result in results_group:
+                tour = result.tours
+                mark = tour.find("-")
+                if mark == -1:
+                    continue
+                
+                idx1 = int(tour[:mark])
+                idx2 = int(tour[mark + 1:])
+                
+                if (idx1 == player1_idx and idx2 == player2_idx) or (idx1 == player2_idx and idx2 == player1_idx):
+                    if result.winner == result.player1:
+                        winner_idx = idx1
+                    else:
+                        winner_idx = idx2
+                    
+                    if winner_idx == player1_idx:
+                        players[0]['place_in_group'] = 1
+                        players[1]['place_in_group'] = 2
+                    else:
+                        players[0]['place_in_group'] = 2
+                        players[1]['place_in_group'] = 1
+                    
+                    players[0]['ratio_points'] = ""
+                    players[1]['ratio_points'] = ""
+                    return players
+        
+        # Если не удалось определить или больше 2 игроков
+        for place, player in enumerate(players, 1):
+            player['place_in_group'] = place
+            player['ratio_points'] = ""
+        
+        return players
+ 
+    def calculate_round_robin_standings(self, players_info, results_group):
+        """
+        Расчет мест в круговой таблице (только для групп с полными данными)
+        """
+        from collections import defaultdict
+        import re
+        
+        if not players_info:
+            return players_info
+        
+        # Копируем данные для работы
+        standings = {}
+        for idx, info in players_info.items():
+            standings[idx] = {
+                'total_points': info['total_points'],
+                'wins': info['wins'],
+                'losses': info['losses'],
+                'idx': idx,
+                'games_won': 0,      # выигранные партии
+                'games_lost': 0,     # проигранные партии
+                'points_scored': 0,  # забитые мячи
+                'points_conceded': 0 # пропущенные мячи
+            }
+        
+        # Подсчитываем выигранные/проигранные партии и забитые/пропущенные мячи
+        for result in results_group:
+            if result.winner:
+                tour = result.tours
+                mark = tour.find("-")
+                if mark == -1:
+                    continue
+                
+                idx1 = int(tour[:mark])
+                idx2 = int(tour[mark + 1:])
+                
+                # Парсим счет матча для подсчета партий и мячей
+                if result.score_in_game:
+                    # Формат счета: "3:1" или "3 : 1"
+                    score_parts = result.score_in_game.replace(" ", "").split(":")
+                    if len(score_parts) == 2:
+                        try:
+                            games_winner = int(score_parts[0])
+                            games_loser = int(score_parts[1])
+                            
+                            # Определяем победителя
+                            if result.winner == result.player1:
+                                winner_idx = idx1
+                                loser_idx = idx2
+                            else:
+                                winner_idx = idx2
+                                loser_idx = idx1
+                            
+                            # Добавляем выигранные/проигранные партии
+                            if winner_idx in standings:
+                                standings[winner_idx]['games_won'] += games_winner
+                                standings[winner_idx]['games_lost'] += games_loser
+                            if loser_idx in standings:
+                                standings[loser_idx]['games_won'] += games_loser
+                                standings[loser_idx]['games_lost'] += games_winner
+                            
+                            # Подсчет забитых и пропущенных мячей
+                            # Парсим счета партий из score_win и score_loser
+                            self.calculate_points_scored_conceded(result, winner_idx, loser_idx, standings)
+                            
+                        except ValueError:
+                            pass
+        
+        # Сортируем игроков по очкам
+        sorted_players = sorted(standings.values(), 
+                            key=lambda x: x['total_points'], 
+                            reverse=True)
+        
+        # Группируем по очкам
+        points_groups = defaultdict(list)
+        for player in sorted_players:
+            points_groups[player['total_points']].append(player)
+        
+        # Если все очки разные
+        if len(points_groups) == len(standings):
+            for place, player in enumerate(sorted_players, 1):
+                players_info[player['idx']]['place'] = place
+                players_info[player['idx']]['ratio_points'] = ""  # Пустая строка
+            return players_info
+        
+        # Обрабатываем группы с одинаковыми очками
+        current_place = 1
+        for points, group in sorted(points_groups.items(), key=lambda x: x[0], reverse=True):
+            if len(group) == 1:
+                players_info[group[0]['idx']]['place'] = current_place
+                players_info[group[0]['idx']]['ratio_points'] = ""
+                current_place += 1
+            elif len(group) == 2:
+                # Два игрока - личная встреча
+                place_1, place_2 = self.resolve_two_players_tie(group, results_group, points, standings)
+                players_info[group[0]['idx']]['place'] = current_place + place_1 - 1
+                players_info[group[1]['idx']]['place'] = current_place + place_2 - 1
+                
+                # Соотношение партий
+                if place_1 < place_2:
+                    ratio_1 = 2
+                    ratio_2 = 1
+                else:
+                    ratio_1 = 1
+                    ratio_2 = 2
+
+                # ratio_1 = self.calculate_games_ratio(standings[group[0]['idx']])
+                # ratio_2 = self.calculate_games_ratio(standings[group[1]['idx']])
+                
+                players_info[group[0]['idx']]['ratio_points'] = ratio_1 if ratio_1 else ""
+                players_info[group[1]['idx']]['ratio_points'] = ratio_2 if ratio_2 else ""
+                
+                current_place += 2
+            else:
+                # Три и более игроков - считаем соотношение партий и мячей
+                resolved = self.resolve_multiple_players_tie(group, results_group, points, standings)
+                
+                for player_data in resolved:
+                    players_info[player_data['idx']]['place'] = current_place + player_data['place_in_group'] - 1
+                    players_info[player_data['idx']]['ratio_points'] = player_data.get('ratio_points', '')
+                
+                current_place += len(group)
+        
+        return players_info
+
+    def calculate_games_ratio(self, player_stats):
+        """Расчет соотношения выигранных/проигранных партий - возвращает строку"""
+        games_won = player_stats['games_won']
+        games_lost = player_stats['games_lost']
+        
+        if games_lost == 0:
+            if games_won == 0:
+                return ""  # Пустая строка, если нет игр
+            return str(games_won)
+        
+        # Округляем до сотых
+        ratio = games_won / games_lost
+        return f"{ratio:.2f}"
+
+    def calculate_points_ratio(self, player_stats):
+        """Расчет соотношения забитых/пропущенных мячей - возвращает строку"""
+        points_scored = player_stats['points_scored']
+        points_conceded = player_stats['points_conceded']
+        
+        if points_conceded == 0:
+            if points_scored == 0:
+                return ""  # Пустая строка, если нет мячей
+            return str(points_scored)
+        
+        # Округляем до сотых
+        ratio = points_scored / points_conceded
+        return f"{ratio:.2f}"
+
+    def resolve_multiple_players_tie(self, players, results_group, original_points, standings):
+        """
+        Разрешение ситуации с тремя и более игроками, имеющими одинаковое количество очков
+        Сначала считаем соотношение выигранных/проигранных партий
+        Если равно - считаем соотношение забитых/пропущенных мячей
+        """
+        player_indices = [p['idx'] for p in players]
+        
+        # Словарь для хранения статистики только между этими игроками
+        internal_stats = {}
+        
+        for player in players:
+            idx = player['idx']
+            internal_stats[idx] = {
+                'won': 0,
+                'lost': 0,
+                'points_scored': 0,
+                'points_conceded': 0,
+                'ratio_games': 0.0,
+                'ratio_points': 0.0
+            }
+        
+        # Собираем результаты матчей ТОЛЬКО между этими игроками
+        for result in results_group:
+            tour = result.tours
+            mark = tour.find("-")
+            if mark == -1:
+                continue
+            
+            idx1 = int(tour[:mark])
+            idx2 = int(tour[mark + 1:])
+            
+            # Проверяем, оба ли игрока в нашей группе
+            if idx1 in player_indices and idx2 in player_indices:
+                # Парсим счет матча
+                if result.score_in_game:
+                    score_parts = result.score_in_game.replace(" ", "").split(":")
+                    if len(score_parts) == 2:
+                        try:
+                            games_winner = int(score_parts[0])
+                            games_loser = int(score_parts[1])
+                            
+                            # Определяем победителя
+                            if result.winner == result.player1:
+                                winner_idx = idx1
+                                loser_idx = idx2
+                            else:
+                                winner_idx = idx2
+                                loser_idx = idx1
+                            
+                            # Добавляем партии
+                            internal_stats[winner_idx]['won'] += games_winner
+                            internal_stats[winner_idx]['lost'] += games_loser
+                            internal_stats[loser_idx]['won'] += games_loser
+                            internal_stats[loser_idx]['lost'] += games_winner
+                            
+                            # Подсчет забитых и пропущенных мячей
+                            self.calculate_internal_points_scored_conceded(
+                                result, winner_idx, loser_idx, internal_stats
+                            )
+                            
+                        except ValueError:
+                            pass
+        
+        # Рассчитываем соотношение партий для каждого игрока
+        for idx in internal_stats:
+            won = internal_stats[idx]['won']
+            lost = internal_stats[idx]['lost']
+            if lost == 0:
+                internal_stats[idx]['ratio_games'] = float(won) if won > 0 else 0.0
+            else:
+                internal_stats[idx]['ratio_games'] = won / lost
+        
+        # Сортируем игроков по соотношению партий
+        sorted_players = sorted(players, 
+                            key=lambda x: internal_stats[x['idx']]['ratio_games'], 
+                            reverse=True)
+        
+        # Проверяем, есть ли одинаковые соотношения партий
+        games_ratios = [internal_stats[p['idx']]['ratio_games'] for p in sorted_players]
+        
+        if len(set(games_ratios)) == len(sorted_players):
+            # Все соотношения партий разные - присваиваем места
+            result = []
+            for place, player in enumerate(sorted_players, 1):
+                player_copy = player.copy()
+                player_copy['place_in_group'] = place
+                # Форматируем соотношение для отображения
+                ratio_value = internal_stats[player['idx']]['ratio_games']
+                if ratio_value == 0:
+                    player_copy['ratio_points'] = "0"
+                elif ratio_value.is_integer():
+                    player_copy['ratio_points'] = str(int(ratio_value))
+                else:
+                    player_copy['ratio_points'] = f"{ratio_value:.2f}"
+                result.append(player_copy)
+            return result
+        else:
+            # Есть одинаковые соотношения партий - считаем соотношение мячей
+            # Группируем по соотношению партий
+            games_ratio_groups = defaultdict(list)
+            for player in sorted_players:
+                games_ratio_groups[internal_stats[player['idx']]['ratio_games']].append(player)
+            
+            result = []
+            current_place = 1
+            for games_ratio, group in sorted(games_ratio_groups.items(), key=lambda x: x[0], reverse=True):
+                if len(group) == 1:
+                    group[0]['place_in_group'] = current_place
+                    # Форматируем соотношение партий
+                    if games_ratio == 0:
+                        group[0]['ratio_points'] = "0"
+                    elif games_ratio.is_integer():
+                        group[0]['ratio_points'] = str(int(games_ratio))
+                    else:
+                        group[0]['ratio_points'] = f"{games_ratio:.2f}"
+                    result.append(group[0])
+                    current_place += 1
+                else:
+                    # Несколько игроков с одинаковым соотношением партий
+                    # Считаем соотношение забитых/пропущенных мячей
+                    for player in group:
+                        idx = player['idx']
+                        points_scored = internal_stats[idx]['points_scored']
+                        points_conceded = internal_stats[idx]['points_conceded']
+                        if points_conceded == 0:
+                            internal_stats[idx]['ratio_points_val'] = float(points_scored) if points_scored > 0 else 0.0
+                        else:
+                            internal_stats[idx]['ratio_points_val'] = points_scored / points_conceded
+                    
+                    # Сортируем по соотношению мячей
+                    sorted_by_points = sorted(group, 
+                                            key=lambda x: internal_stats[x['idx']]['ratio_points_val'], 
+                                            reverse=True)
+                    
+                    # Проверяем, есть ли одинаковые соотношения мячей
+                    points_ratios = [internal_stats[p['idx']]['ratio_points_val'] for p in sorted_by_points]
+                    
+                    if len(set(points_ratios)) == len(sorted_by_points):
+                        for place, player in enumerate(sorted_by_points, 1):
+                            player['place_in_group'] = current_place + place - 1
+                            # Сохраняем соотношение мячей в ratio_points
+                            ratio_value = internal_stats[player['idx']]['ratio_points_val']
+                            if ratio_value == 0:
+                                player['ratio_points'] = "0"
+                            elif ratio_value.is_integer():
+                                player['ratio_points'] = str(int(ratio_value))
+                            else:
+                                player['ratio_points'] = f"{ratio_value:.2f}"
+                            
+                            result.append(player)
+                        current_place += len(group)
+                    else:
+                        # Все равно одинаковые - используем личные встречи
+                        sub_resolved = self.resolve_tie_by_head_to_head(sorted_by_points, results_group)
+                        for sub_player in sub_resolved:
+                            sub_player['place_in_group'] = current_place + sub_player['place_in_group'] - 1
+                            result.append(sub_player)
+                        current_place += len(group)
+            
+            return sorted(result, key=lambda x: x['place_in_group'])
+# ==== 3105===============
+    def calculate_points_scored_conceded(self, result, winner_idx, loser_idx, standings):
+        score_win = result.score_win if result.score_win else ""
+        if not score_win or score_win == "т.п.":
+            return
+
+        score_win = score_win.strip('()').replace(' ', '')
+        parts = score_win.split(',')
+
+        total_winner_scored = 0
+        total_winner_conceded = 0
+        total_loser_scored = 0
+        total_loser_conceded = 0
+
+        for part in parts:
+            try:
+                diff = int(part)
+                if diff >= 0:
+                    winner_scored = 11
+                    winner_conceded = 11 - diff
+                else:
+                    winner_scored = 11 + diff
+                    winner_conceded = 11
+                loser_scored = winner_conceded
+                loser_conceded = winner_scored
+
+                total_winner_scored += winner_scored
+                total_winner_conceded += winner_conceded
+                total_loser_scored += loser_scored
+                total_loser_conceded += loser_conceded
+            except ValueError:
+                if ':' in part:
+                    w, l = map(int, part.split(':'))
+                    total_winner_scored += w
+                    total_winner_conceded += l
+                    total_loser_scored += l
+                    total_loser_conceded += w
+                else:
+                    continue
+
+        if winner_idx in standings:
+            standings[winner_idx]['points_scored'] += total_winner_scored
+            standings[winner_idx]['points_conceded'] += total_winner_conceded
+        if loser_idx in standings:
+            standings[loser_idx]['points_scored'] += total_loser_scored
+            standings[loser_idx]['points_conceded'] += total_loser_conceded
+
+    def format_ratio(self, value):
+        """Возвращает строку с десятичной дробью без лишних нулей, до 2 знаков, но если третий знак не ноль, то показывает больше."""
+        if value == 0:
+            return "0"
+        if value.is_integer():
+            return str(int(value))
+        # Пытаемся округлить до 2 знаков, но если после округления разница больше 0.001, то показываем 3 знака и т.д.
+        for digits in range(2, 6):
+            rounded = round(value, digits)
+            if abs(rounded - value) < 1e-8:
+                s = f"{value:.{digits}f}".rstrip('0').rstrip('.')
+                return s
+        return f"{value:.5f}".rstrip('0').rstrip('.')
+# ========= крутиловку из 3 со счтом в партиях считает 3105
+    def calculate_internal_points_scored_conceded(self, result, winner_idx, loser_idx, internal_stats):
+        """
+        Подсчет забитых и пропущенных мячей для внутренней группы (только между равными игроками).
+        Использует только score_win (разницы партий) для победителя матча.
+        """
+        score_win = result.score_win if result.score_win else ""
+        if not score_win or score_win == "т.п.":
+            return
+
+        # Убираем скобки и пробелы
+        score_win = score_win.strip('()').replace(' ', '')
+        parts = score_win.split(',')
+
+        total_winner_scored = 0
+        total_winner_conceded = 0
+        total_loser_scored = 0
+        total_loser_conceded = 0
+
+        for part in parts:
+            try:
+                diff = int(part)
+                if diff >= 0:
+                    if diff <= 8:
+                        # забил мячей
+                        winner_scored = 11
+                        # пропустил мячей
+                        winner_conceded = diff
+                    elif diff > 8:
+                        # забил мячей
+                        winner_scored = diff + 2
+                        # пропустил мячей
+                        winner_conceded = diff
+                else:
+                    if abs(diff) <= 8:
+                        # забил мячей
+                        winner_scored = abs(diff)
+                        # пропустил мячей
+                        winner_conceded = 11
+                    elif abs(diff) > 8:
+                        # забил мячей
+                        winner_scored = abs(diff)
+                        # пропустил мячей
+                        winner_conceded = abs(diff) + 2
+            
+                loser_scored = winner_conceded # проигравший забил мячей
+                loser_conceded = winner_scored # проигравший пропутсил мячей
+
+                total_winner_scored += winner_scored
+                total_winner_conceded += winner_conceded
+                total_loser_scored += loser_scored
+                total_loser_conceded += loser_conceded
+            except ValueError:
+                # Если не число, возможно, это полный счет вида "11:5" (на случай иного формата)
+                if ':' in part:
+                    w, l = map(int, part.split(':'))
+                    total_winner_scored += w
+                    total_winner_conceded += l
+                    total_loser_scored += l
+                    total_loser_conceded += w
+                else:
+                    continue
+
+        if winner_idx in internal_stats:
+            internal_stats[winner_idx]['points_scored'] += total_winner_scored
+            internal_stats[winner_idx]['points_conceded'] += total_winner_conceded
+        if loser_idx in internal_stats:
+            internal_stats[loser_idx]['points_scored'] += total_loser_scored
+            internal_stats[loser_idx]['points_conceded'] += total_loser_conceded
+# =================================
 class RatingLoaderThread(QThread):
     progress = pyqtSignal(int)
     status = pyqtSignal(str)

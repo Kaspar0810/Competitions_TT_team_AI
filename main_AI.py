@@ -2555,240 +2555,6 @@ class MainWindow(QMainWindow):
         self.current_match_index = 0
         
         return tab_widget
-# ============================   
-    def _create_results_tab(self):
-        """Вкладка Результаты - ввод результатов матчей (компактная версия)"""
-        tab_widget = QWidget()
-        main_layout = QVBoxLayout(tab_widget)
-        main_layout.setSpacing(5)
-        main_layout.setContentsMargins(5, 5, 5, 5)
-        
-        # Информационная панель о текущем этапе и фильтрах
-        info_frame = QFrame()
-        info_frame.setStyleSheet("""
-            QFrame {
-                background-color: #e3f2fd;
-                border-radius: 3px;
-                padding: 5px;
-            }
-        """)
-        info_layout = QVBoxLayout(info_frame)
-        info_layout.setSpacing(3)
-        info_layout.setContentsMargins(5, 5, 5, 5)
-        
-        # Верхняя строка с этапом и статистикой
-        self.current_stage_label = QLabel("Этап: Не выбран")
-        self.current_stage_label.setStyleSheet("font-weight: bold; font-size: 12px;")
-        info_layout.addWidget(self.current_stage_label)
-        
-        # Строка с информацией о фильтрах и прогрессе
-        self.filter_info_label = QLabel("")
-        self.filter_info_label.setStyleSheet("color: #666; font-size: 11px;")
-        info_layout.addWidget(self.filter_info_label)
-        
-        # Строка с прогрессом
-        self.progress_label = QLabel("")
-        self.progress_label.setStyleSheet("color: #2196F3; font-size: 11px; font-weight: bold;")
-        info_layout.addWidget(self.progress_label)
-        
-        main_layout.addWidget(info_frame)
-        
-        # Статус сообщения
-        self.status_label = QLabel("")
-        self.status_label.setStyleSheet("color: red; font-size: 11px;")
-        main_layout.addWidget(self.status_label)
-        
-        # Группа ввода результатов
-        input_group = QGroupBox("Ввод результата матча")
-        input_group.setStyleSheet("""
-            QGroupBox {
-                font-weight: bold;
-                font-size: 11px;
-                border: 1px solid #4CAF50;
-                border-radius: 5px;
-                margin-top: 8px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
-                color: #4CAF50;
-            }
-        """)
-        
-        # Используем GridLayout для компактного расположения
-        grid_layout = QGridLayout(input_group)
-        grid_layout.setSpacing(2)
-        grid_layout.setContentsMargins(4, 4, 4, 4)
-        
-        # Заголовки
-        grid_layout.addWidget(QLabel("Статус"), 0, 0)
-        grid_layout.addWidget(QLabel("Игрок"), 0, 1)
-        grid_layout.addWidget(QLabel("Общий счет"), 0, 2)
-        
-        # Заголовки для партий (уменьшенные)
-        self.parties_count = 5
-        self.score_edits_p1 = []
-        self.score_edits_p2 = []
-        self.score_labels = []
-        
-        for i in range(7):
-            label = QLabel(f"П{i+1}")
-            label.setAlignment(Qt.AlignCenter)
-            label.setMaximumWidth(35)
-            label.setStyleSheet("font-size: 14px;")
-            grid_layout.addWidget(label, 0, 3 + i)
-            self.score_labels.append(label)
-        
-        # Ряд 1: Игрок 1
-        self.player1_status = QComboBox()
-        self.player1_status.addItems(["Играет", "Не явка", "Травма", "Дискв."])
-        self.player1_status.setMaximumWidth(80)
-        self.player1_status.setStyleSheet("font-size: 14px;")
-        self.player1_status.currentTextChanged.connect(self.update_total_score)
-        grid_layout.addWidget(self.player1_status, 1, 0)
-        
-        self.player1_name = QLineEdit()
-        self.player1_name.setReadOnly(True)
-        self.player1_name.setPlaceholderText("")
-        self.player1_name.setMinimumWidth(200)
-        grid_layout.addWidget(self.player1_name, 1, 1)
-        
-        self.total_score1 = QLineEdit()
-        self.total_score1.setPlaceholderText("")
-        self.total_score1.setMaximumWidth(50)
-        self.total_score1.setStyleSheet("font-size: 14px;")
-        grid_layout.addWidget(self.total_score1, 1, 2)
-
-        # Поля для счетов игрока 1
-        for i in range(7):
-            edit1 = QLineEdit()
-            edit1.setMaximumWidth(35)
-            edit1.setPlaceholderText("")
-            edit1.setEnabled(False)
-            edit1.setStyleSheet("font-size: 14px;")
-            edit1.textChanged.connect(self.update_total_score)
-            edit1.returnPressed.connect(lambda col=i: self.move_to_next_field(1, col))
-            grid_layout.addWidget(edit1, 1, 3 + i)
-            self.score_edits_p1.append(edit1)
-        
-        # Ряд 2: Игрок 2
-        self.player2_status = QComboBox()
-        self.player2_status.addItems(["Играет", "Не явка", "Травма", "Дискв."])
-        self.player2_status.setMaximumWidth(80)
-        self.player2_status.setStyleSheet("font-size: 14px;")
-        self.player2_status.currentTextChanged.connect(self.update_total_score)
-        grid_layout.addWidget(self.player2_status, 2, 0)
-        
-        self.player2_name = QLineEdit()
-        self.player2_name.setReadOnly(True)
-        self.player2_name.setPlaceholderText("")
-        self.player2_name.setMinimumWidth(200)
-        grid_layout.addWidget(self.player2_name, 2, 1)
-        
-        self.total_score2 = QLineEdit()
-        self.total_score2.setPlaceholderText("")
-        self.total_score2.setMaximumWidth(50)
-        self.total_score2.setStyleSheet("font-size: 14px;")
-        grid_layout.addWidget(self.total_score2, 2, 2)
-        
-        # Поля для счетов игрока 2
-        for i in range(7):
-            edit2 = QLineEdit()
-            edit2.setMaximumWidth(35)
-            edit2.setPlaceholderText("")
-            edit2.setEnabled(False)
-            edit2.setStyleSheet("font-size: 14px;")
-            edit2.textChanged.connect(self.update_total_score)
-            edit2.returnPressed.connect(lambda col=i: self.move_to_next_field(2, col))
-            grid_layout.addWidget(edit2, 2, 3 + i)
-            self.score_edits_p2.append(edit2)  
-        
-        # Кнопки (вертикально)
-        buttons_widget = QWidget()
-        buttons_widget.setMaximumWidth(100)
-        buttons_layout = QVBoxLayout(buttons_widget)
-        buttons_layout.setSpacing(8)
-        buttons_layout.setContentsMargins(0, 0, 0, 0)
-        
-        self.save_btn = QPushButton("💾 Сохранить")
-        self.save_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;
-                color: white;
-                padding: 6px 12px;
-                font-size: 10px;
-                font-weight: bold;
-                border-radius: 3px;
-            }
-            QPushButton:hover { background-color: #45a049; }
-        """)
-        self.save_btn.clicked.connect(self.save_match_result_compact)
-        buttons_layout.addWidget(self.save_btn)
-        
-        self.clear_btn = QPushButton("🗑️ Очистить")
-        self.clear_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #FF9800;
-                color: white;
-                padding: 6px 12px;
-                font-size: 10px;
-                font-weight: bold;
-                border-radius: 3px;
-            }
-            QPushButton:hover { background-color: #F57C00; }
-        """)
-        self.clear_btn.clicked.connect(self.clear_result_form_compact)
-        buttons_layout.addWidget(self.clear_btn)
-        
-        grid_layout.addWidget(buttons_widget, 0, 10, 3, 1, Qt.AlignTop)
-        
-        main_layout.addWidget(input_group)
-        
-        # # Таблица результатов
-        # self.results_table = QTableView()
-        # self.results_table.setSelectionBehavior(QTableView.SelectRows)
-        # self.results_table.setAlternatingRowColors(True)
-        # self.results_table.setSelectionMode(QTableView.SingleSelection)
-        # self.results_table.doubleClicked.connect(self.on_match_double_clicked)
-        # self.results_table.setStyleSheet("""
-        #     QTableView {
-        #         font-size: 10px;
-        #         gridline-color: #ddd;
-        #     }
-        #     QHeaderView::section {
-        #         background-color: #2196F3;
-        #         color: white;
-        #         padding: 3px;
-        #         font-weight: bold;
-        #         font-size: 10px;
-        #     }
-        # """)
-        
-        # main_layout.addWidget(self.results_table)
-        
-        # # Загружаем модель для таблицы
-        # self.results_table_model = ResultsTableModel()
-        # self.results_table.setModel(self.results_table_model)
-        
-        # # Скрываем ненужные колонки
-        # self.results_table.setColumnHidden(0, True)  # ID
-        # self.results_table.setColumnHidden(1, True)  # Этап
-        
-        # # Настраиваем ширину колонок
-        # self.results_table.setColumnWidth(2, 60)   # Группа
-        # self.results_table.setColumnWidth(3, 50)   # Тур
-        # self.results_table.setColumnWidth(4, 180)  # Игрок 1
-        # self.results_table.setColumnWidth(5, 180)  # Игрок 2
-        # self.results_table.setColumnWidth(6, 100)  # Победитель
-        # self.results_table.setColumnWidth(7, 120)  # Счет
-        # self.results_table.setColumnWidth(8, 60)   # Очки
-        
-        # Переменные для хранения текущего матча
-        self.current_matches = []
-        self.current_match_index = 0
-        
-        return tab_widget   
 # ======================
     def load_matches_for_stage(self, stage_name):
         """Загрузка матчей для выбранного этапа"""
@@ -2824,223 +2590,64 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             print(f"Ошибка загрузки матчей: {e}")
-# ======================
-    def _load_match_for_editing(self, index):
-        """Загрузка матча для редактирования"""
-        if index < 0 or index >= len(self.current_matches):
-            return
-        
-        match = self.current_matches[index]
-        self.current_match_index = index
-        self.current_match_label.setText(f"Матч: {index + 1}/{len(self.current_matches)}")
-        
-        # Получаем количество партий из системы
-        system = System.get_or_none(System.id == match.system_id)
-        if system:
-            parties_count = system.score_flag if system.score_flag else 5
-            self.update_scores_fields_compact(parties_count)
-            self.parties_count = parties_count
-        
-        # Заполняем информацию об игроках
-        self.player1_name.setText(match.player1)
-        self.player2_name.setText(match.player2)
-        
-        # Очищаем поля
-        self.clear_result_form_compact()
-        
-        # Если уже есть результат, загружаем его
-        if match.score_in_game:
-            self.parse_and_load_scores_compact(match.score_in_game)
-            # Обновляем общий счет и подсветку
-            self.update_total_score()
 # =================================
-    def _load_match_for_editing(self, index):
-        """Загрузка матча для редактирования"""
-        if index < 0 or index >= len(self.current_matches):
-            return
+    # def _load_match_for_editing(self, id_match):
+    #     """Загрузка матча для редактирования с отображением статусов"""
+    #     # if index < 0 or index >= len(self.current_matches):
+    #     #     return
         
-        match = self.current_matches[index]
-        self.current_match_index = index
-        self.current_match_label.setText(f"Матч: {index + 1}/{len(self.current_matches)}")
+    #     match = self.current_matches[index]
+    #     self.current_match_index = index
+    #     self.current_match_label.setText(f"Матч: {index + 1}/{len(self.current_matches)}")
         
-        # Получаем количество партий из системы
-        system = System.get_or_none(System.id == match.system_id)
-        if system:
-            parties_count = system.score_flag if system.score_flag else 5
-            self.update_scores_fields_compact(parties_count)
-            self.parties_count = parties_count
+    #     # Получаем количество партий из системы
+    #     system = System.get_or_none(System.id == match.system_id)
+    #     if system:
+    #         parties_count = system.score_flag if system.score_flag else 5
+    #         self.update_scores_fields_compact(parties_count)
+    #         self.parties_count = parties_count
         
-        # Заполняем информацию об игроках
-        self.player1_name.setText(match.player1)
-        self.player2_name.setText(match.player2)
+    #     # Заполняем информацию об игроках
+    #     self.player1_name.setText(match.player1)
+    #     self.player2_name.setText(match.player2)
         
-        # Очищаем поля
-        self.clear_result_form_compact()
+    #     # Сбрасываем статусы по умолчанию
+    #     self.player1_status.setCurrentIndex(0)  # "Играет"
+    #     self.player2_status.setCurrentIndex(0)  # "Играет"
         
-        # Если уже есть результат, загружаем его
-        if match.score_win:
-            # Восстанавливаем счета партий из score_win
-            score_parts = match.score_win.split(", ")
-            
-            for i in range(parties_count):
-                if i < len(score_parts):
-                    val = score_parts[i]
-                    if val == "т.п.":
-                        # Техническая победа - не восстанавливаем счета
-                        pass
-                    else:
-                        try:
-                            score_val = int(val)
-                            if score_val > 0:
-                                # Победитель выиграл партию - нужно определить его очки
-                                # Для этого нужно знать очки проигравшего из score_loser
-                                if match.score_loser:
-                                    loser_parts = match.score_loser.split(", ")
-                                    if i < len(loser_parts) and loser_parts[i] != "т.п.":
-                                        loser_score = int(loser_parts[i])
-                                        # Победитель набрал score_val очков
-                                        # Проигравший набрал loser_score очков
-                                        self.score_edits_p1[i].setText(str(score_val))
-                                        self.score_edits_p2[i].setText(str(loser_score))
-                                        # Определяем, кто победитель
-                                        if match.winner == match.player1:
-                                            pass  # Уже установлено
-                                        else:
-                                            # Меняем местами
-                                            self.score_edits_p1[i].setText(str(loser_score))
-                                            self.score_edits_p2[i].setText(str(score_val))
-                        except ValueError:
-                            pass
-            
-            # Обновляем общий счет и подсветку
-            self.update_total_score()
-
-    def load_match_for_editing(self, index):
-        """Загрузка матча для редактирования с отображением статусов"""
-        if index < 0 or index >= len(self.current_matches):
-            return
+    #     # Очищаем поля
+    #     self.clear_result_form_compact()
         
-        match = self.current_matches[index]
-        self.current_match_index = index
-        self.current_match_label.setText(f"Матч: {index + 1}/{len(self.current_matches)}")
+    #     # Если уже есть результат, проверяем был ли это технический результат
+    #     if match.score_in_game:
+    #         if match.score_in_game == "В : П" or match.score_in_game == "П : В":
+    #             # Технический результат
+    #             if match.winner == match.player1:
+    #                 # Победил игрок 1
+    #                 if match.score_in_game == "В : П":
+    #                     self.player1_status.setCurrentText("Играет")
+    #                     self.player2_status.setCurrentText("Не явка")
+    #                     self.player1_name.setStyleSheet("background-color: #90EE90;")
+    #                     self.player2_name.setStyleSheet("background-color: #FFB6C1;")
+    #             elif match.winner == match.player2:
+    #                 # Победил игрок 2
+    #                 if match.score_in_game == "В : П":
+    #                     self.player1_status.setCurrentText("Не явка")
+    #                     self.player2_status.setCurrentText("Играет")
+    #                     self.player1_name.setStyleSheet("background-color: #FFB6C1;")
+    #                     self.player2_name.setStyleSheet("background-color: #90EE90;")
+    #             else:
+    #                 # Оба не явились
+    #                 self.player1_status.setCurrentText("Не явка")
+    #                 self.player2_status.setCurrentText("Не явка")
+    #                 self.player1_name.setStyleSheet("background-color: #FFB6C1;")
+    #                 self.player2_name.setStyleSheet("background-color: #FFB6C1;")
+    #         else:
+    #             # Обычная игра - загружаем счета
+    #             self.parse_and_load_scores_compact(match.score_in_game)
         
-        # Получаем количество партий из системы
-        system = System.get_or_none(System.id == match.system_id)
-        if system:
-            parties_count = system.score_flag if system.score_flag else 5
-            self.update_scores_fields_compact(parties_count)
-            self.parties_count = parties_count
-        
-        # Заполняем информацию об игроках
-        self.player1_name.setText(match.player1)
-        self.player2_name.setText(match.player2)
-        
-        # Сбрасываем статусы по умолчанию
-        self.player1_status.setCurrentIndex(0)  # "Играет"
-        self.player2_status.setCurrentIndex(0)  # "Играет"
-        
-        # Очищаем поля
-        self.clear_result_form_compact()
-        
-        # Если уже есть результат, проверяем был ли это технический результат
-        if match.score_in_game:
-            if match.score_in_game == "В : П" or match.score_in_game == "П : В":
-                # Технический результат
-                if match.winner == match.player1:
-                    # Победил игрок 1
-                    if match.score_in_game == "В : П":
-                        self.player1_status.setCurrentText("Играет")
-                        self.player2_status.setCurrentText("Не явка")
-                        self.player1_name.setStyleSheet("background-color: #90EE90;")
-                        self.player2_name.setStyleSheet("background-color: #FFB6C1;")
-                elif match.winner == match.player2:
-                    # Победил игрок 2
-                    if match.score_in_game == "В : П":
-                        self.player1_status.setCurrentText("Не явка")
-                        self.player2_status.setCurrentText("Играет")
-                        self.player1_name.setStyleSheet("background-color: #FFB6C1;")
-                        self.player2_name.setStyleSheet("background-color: #90EE90;")
-                else:
-                    # Оба не явились
-                    self.player1_status.setCurrentText("Не явка")
-                    self.player2_status.setCurrentText("Не явка")
-                    self.player1_name.setStyleSheet("background-color: #FFB6C1;")
-                    self.player2_name.setStyleSheet("background-color: #FFB6C1;")
-            else:
-                # Обычная игра - загружаем счета
-                self.parse_and_load_scores_compact(match.score_in_game)
-        
-        # Обновляем общий счет и подсветку
-        self.update_total_score()
-
-    def __load_match_for_editing(self, index):
-        """Загрузка матча для редактирования"""
-        if index < 0 or index >= len(self.current_matches):
-            return
-        
-        match = self.current_matches[index]
-        self.current_match_index = index
-        self.current_match_label.setText(f"Матч: {index + 1}/{len(self.current_matches)}")
-        
-        # Получаем количество партий из системы
-        system = System.get_or_none(System.id == match.system_id)
-        if system:
-            parties_count = system.score_flag if system.score_flag else 5
-            self.update_scores_fields_compact(parties_count)
-            self.parties_count = parties_count
-        
-        # Заполняем информацию об игроках
-        self.player1_name.setText(match.player1)
-        self.player2_name.setText(match.player2)
-        
-        # Сбрасываем статусы
-        self.player1_status.setCurrentIndex(0)
-        self.player2_status.setCurrentIndex(0)
-        
-        # Очищаем поля счетов
-        for i in range(7):
-            self.score_edits_p1[i].clear()
-            self.score_edits_p2[i].clear()
-            self.score_edits_p1[i].setEnabled(False)
-            self.score_edits_p2[i].setEnabled(False)
-        
-        # Если матч уже сыгран, загружаем результат
-        if match.winner:
-            # Проверяем, техническая ли это победа
-            if match.score_in_game in ["В : П", "П : В"]:
-                # Технический результат
-                if match.winner == match.player1:
-                    if match.score_in_game == "В : П":
-                        self.player1_status.setCurrentText("Играет")
-                        self.player2_status.setCurrentText("Не явка")
-                    else:
-                        self.player1_status.setCurrentText("Не явка")
-                        self.player2_status.setCurrentText("Играет")
-                elif match.winner == match.player2:
-                    if match.score_in_game == "В : П":
-                        self.player1_status.setCurrentText("Не явка")
-                        self.player2_status.setCurrentText("Играет")
-                    else:
-                        self.player1_status.setCurrentText("Играет")
-                        self.player2_status.setCurrentText("Не явка")
-                else:
-                    # Оба не явились
-                    self.player1_status.setCurrentText("Не явка")
-                    self.player2_status.setCurrentText("Не явка")
-            else:
-                # Обычный результат - пытаемся распарсить счета
-                self.parse_and_load_scores_compact(match.score_in_game)
-        
-        # Активируем поля ввода для незавершенного матча
-        if not match.winner:
-            for i in range(parties_count):
-                self.score_edits_p1[i].setEnabled(True)
-                self.score_edits_p2[i].setEnabled(True)
-            # Устанавливаем фокус на первую партию
-            QTimer.singleShot(100, lambda: self.score_edits_p1[0].setFocus())
-        
-        # Обновляем общий счет
-        self.update_total_score()
+    #     # Обновляем общий счет и подсветку
+    #     self.update_total_score()
 # =================================================
     def parse_and_load_scores_compact(self, score_string):
         """Парсинг строки счета и загрузка в поля"""
@@ -3050,304 +2657,13 @@ class MainWindow(QMainWindow):
                 if i >= self.parties_count:
                     break
                 scores = part.strip().split(':')
+                scores1 = scores[0].strip()
+                scores2 = scores[1].strip()
                 if len(scores) == 2:
-                    self.score_edits_p1[i].setText(scores[0])
-                    self.score_edits_p2[i].setText(scores[1])
+                    self.total_score1.setText(scores1)
+                    self.total_score2.setText(scores2)
         except Exception as e:
             print(f"Ошибка парсинга счета: {e}")
-# ============== рабочии вариант без наявки =============
-    def _save_match_result_compact(self):
-        """Сохранение результата матча с правильным форматом"""
-        if not self.current_matches:
-            QMessageBox.warning(self, "Ошибка", "Нет выбранного матча")
-            return
-        
-        if not self.player1_name.text() or not self.player2_name.text():
-            QMessageBox.warning(self, "Ошибка", "Сначала выберите матч двойным кликом из таблицы")
-            return
-        
-        match = self.current_matches[self.current_match_index]
-        
-        try:
-            player1_wins = 0
-            player2_wins = 0
-            has_error = False
-            error_messages = []
-            # ===============
-            pl1_win = []
-            pl2_win = []
-            
-            system = System.get_or_none(System.id == match.system_id)
-            parties_count = system.score_flag if system.score_flag else 5
-
-            # Определяем победителя и статусы
-            status1 = self.player1_status.currentText()
-            status2 = self.player2_status.currentText()
-
-            # Собираем счета по партиям
-            for i in range(parties_count):
-                score1 = self.score_edits_p1[i].text().strip()
-                score2 = self.score_edits_p2[i].text().strip()
-                if score1 and score2:
-                    # Проверяем корректность счета
-                    is_valid, error = self.validate_score(score1, score2)
-                    
-                    if is_valid:
-                        s1 = int(score1)
-                        s2 = int(score2)
-                        if s1 > s2:
-                            player1_wins += 1
-                            pl1_win.append(s2)
-                            pl2_win.append(s2 * (-1))
-                        else:
-                            player2_wins += 1
-                            pl1_win.append(s1 * (-1))
-                            pl2_win.append(s1)
-                            
-
-                        if player1_wins == math.ceil(parties_count / 2) or player2_wins == math.ceil(parties_count / 2):
-                            break
-                    else:
-                        has_error = True
-                        error_messages.append(f"Партия {i+1}: {error}")
-                        self.score_edits_p1[i].setStyleSheet("font-size: 12px; background-color: #FFB6C1;")
-                        self.score_edits_p2[i].setStyleSheet("font-size: 10px; background-color: #FFB6C1;")
-                else:
-                    has_error = True
-                    error_messages.append(f"Партия {i+1}: не заполнена")
-            
-            if has_error:
-                QMessageBox.warning(self, "Ошибка ввода", "\n".join(error_messages))
-                return
-            # ===========================
-            # Определяем победителя и статусы
-            status1 = self.player1_status.currentText()
-            status2 = self.player2_status.currentText()
-            
-            if status1 != "Играет" and status2 != "Играет":
-                QMessageBox.warning(self, "Ошибка", "Оба игрока не могут иметь статус 'Не играет'")
-                return
-            
-            # Формируем score_in_game (общий счет в формате "3 : 1")
-            if player1_wins > player2_wins:
-                score_in_game = f"{player1_wins} : {player2_wins}"
-                score_loser_game = f"{player2_wins} : {player1_wins}"
-            else:
-                score_in_game = f"{player2_wins} : {player1_wins}"
-                score_loser_game = f"{player1_wins} : {player2_wins}"
-# =========================================            
-            # # Определяем победителя и проигравшего
-            # if status1 != "Играет":
-            #     # Техническая победа игрока 2
-            #     winner_name = match.player2
-            #     loser_name = match.player1
-            #     points_win = 2
-            #     points_loser = 0
-            #     score_win_parts = []
-            #     score_loser_parts = []
-            #     for i in range(parties_count):
-            #         score_win_parts.append("т.п.")
-            #         score_loser_parts.append("т.п.")
-                
-            # elif status2 != "Играет":
-            #     # Техническая победа игрока 1
-            #     winner_name = match.player1
-            #     loser_name = match.player2
-            #     points_win = 2
-            #     points_loser = 0
-            #     score_win_parts = []
-            #     score_loser_parts = []
-            #     for i in range(parties_count):
-            #         score_win_parts.append("т.п.")
-            #         score_loser_parts.append("т.п.")
-# ========================================================
-                # Случай 1: Оба игрока не явились
-            if status1 != "Играет" and status2 != "Играет":
-                # Обоим 0 очков
-                match.winner = None
-                match.points_win = 0
-                match.score_in_game = "П : В"
-                match.score_win = "П : В"
-                match.loser = None
-                match.points_loser = 0
-                match.score_loser = "П : В"
-                match.save()
-                
-                QMessageBox.warning(self, "Неявка", 
-                                f"Оба игрока не явились на матч!\n"
-                                f"Обоим засчитано техническое поражение.\n"
-                                f"Счет: П : В")
-                
-                # Обновляем таблицу
-                self.load_results_table_for_stage(match.system_stage)
-                self.clear_result_form_compact()
-                self.load_matches_for_stage(match.system_stage)
-                
-                # Переход к следующему матчу
-                for i, m in enumerate(self.current_matches):
-                    if not m.winner:
-                        self.current_match_index = i
-                        self.load_match_for_editing(i)
-                        break
-                return
-            
-                # Случай 2: Не явка игрока 1
-            elif status1 != "Играет" and status2 == "Играет":
-                winner_name = match.player2
-                loser_name = match.player1
-                points_win = 2
-                points_loser = 0
-                score_in_game = "В : П"
-                score_win = "В : П"
-                score_loser = "П : В"
-                
-                # Обновляем запись в Result
-                match.winner = winner_name
-                match.points_win = points_win
-                match.score_in_game = score_in_game
-                match.score_win = score_win
-                match.loser = loser_name
-                match.points_loser = points_loser
-                match.score_loser = score_loser
-                match.save()
-                
-                QMessageBox.information(self, "Техническая победа", 
-                                    f"Игрок {loser_name} не явился.\n"
-                                    f"Победитель: {winner_name}\n"
-                                    f"Счет: {score_in_game}")
-                
-                # Обновляем таблицу
-                self.load_results_table_for_stage(match.system_stage)
-                self.clear_result_form_compact()
-                self.load_matches_for_stage(match.system_stage)
-                
-                # Переход к следующему матчу
-                for i, m in enumerate(self.current_matches):
-                    if not m.winner:
-                        self.current_match_index = i
-                        self.load_match_for_editing(i)
-                        break
-                return
-            
-                # Случай 3: Не явка игрока 2
-            elif status2 != "Играет" and status1 == "Играет":
-                winner_name = match.player1
-                loser_name = match.player2
-                points_win = 2
-                points_loser = 0
-                score_in_game = "В : П"
-                score_win = "В : П"
-                score_loser = "П : В"
-                
-                # Обновляем запись в Result
-                match.winner = winner_name
-                match.points_win = points_win
-                match.score_in_game = score_in_game
-                match.score_win = score_win
-                match.loser = loser_name
-                match.points_loser = points_loser
-                match.score_loser = score_loser
-                match.save()
-                
-                QMessageBox.information(self, "Техническая победа", 
-                                    f"Игрок {loser_name} не явился.\n"
-                                    f"Победитель: {winner_name}\n"
-                                    f"Счет: {score_in_game}")
-                
-                # # Обновляем таблицу
-                # self.load_results_table_for_stage(match.system_stage)
-                # self.clear_result_form_compact()
-                # self.load_matches_for_stage(match.system_stage)
-# ===========================================================  
-              
-            else:
-                # Собираем счета по партиям
-                for i in range(parties_count):
-                    score1 = self.score_edits_p1[i].text().strip()
-                    score2 = self.score_edits_p2[i].text().strip()
-                    if score1 and score2:
-                        # Проверяем корректность счета
-                        is_valid, error = self.validate_score(score1, score2)
-                        
-                        if is_valid:
-                            s1 = int(score1)
-                            s2 = int(score2)
-                            if s1 > s2:
-                                player1_wins += 1
-                                pl1_win.append(s2)
-                                pl2_win.append(s2 * (-1))
-                            else:
-                                player2_wins += 1
-                                pl1_win.append(s1 * (-1))
-                                pl2_win.append(s1)
-                                
-
-                            if player1_wins == math.ceil(parties_count / 2) or player2_wins == math.ceil(parties_count / 2):
-                                break
-                        else:
-                            has_error = True
-                            error_messages.append(f"Партия {i+1}: {error}")
-                            self.score_edits_p1[i].setStyleSheet("font-size: 12px; background-color: #FFB6C1;")
-                            self.score_edits_p2[i].setStyleSheet("font-size: 10px; background-color: #FFB6C1;")
-                    else:
-                        has_error = True
-                        error_messages.append(f"Партия {i+1}: не заполнена")
-                
-                if has_error:
-                    QMessageBox.warning(self, "Ошибка ввода", "\n".join(error_messages))
-                    return
-                # Обычная игра
-                if player1_wins > player2_wins:
-                    winner_name = match.player1
-                    loser_name = match.player2
-                    points_win = 2
-                    points_loser = 1
-                else:
-                    winner_name = match.player2
-                    loser_name = match.player1
-                    points_win = 2
-                    points_loser = 1
- 
-                # Объединяем в строки 
-                if player1_wins > player2_wins:
-                    pl1_win_str = [str(num) for num in pl1_win]
-                    score_win = ','.join(pl1_win_str)
-                else:
-                    pl2_win_str = [str(num) for num in pl2_win]
-                    score_win = ','.join(pl2_win_str)
-           
-            # Обновляем запись в Result
-            match.winner = winner_name
-            match.points_win = points_win
-            match.score_in_game = score_in_game
-            match.score_win = f"({score_win})"
-            match.loser = loser_name
-            match.points_loser = points_loser
-            match.score_loser = score_loser_game
-            match.save()
-            
-            # Показываем сообщение с результатом
-            QMessageBox.information(self, "Успех", 
-                                f"Результат сохранен!\n"
-                                f"Победитель: {winner_name}\n"
-                                f"Счет: {score_in_game}\n"
-                                f"score_win: ({score_win})\n"
-                                f"score_loser: ({score_loser_game})")
-            
-            # Обновляем таблицу
-            self.load_results_table_for_stage(match.system_stage)
-            self.clear_result_form_compact()
-            self.load_matches_for_stage(match.system_stage)
-            
-            # # Автоматически переходим к следующему несыгранному матчу
-            # for i, m in enumerate(self.current_matches):
-            #     if not m.winner:
-            #         self.current_match_index = i
-            #         self.load_match_for_editing(i)
-            #         break
-            
-        except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить результат: {str(e)}")
 # ======================= новый вариант с не явкой работает 2805======================
     def save_match_result_compact(self):
         """Сохранение результата матча с правильным форматом и обработкой неявок"""
@@ -3545,8 +2861,21 @@ class MainWindow(QMainWindow):
             # Обновляем таблицу
             self.clear_result_form_compact()
             self.load_results_table_for_stage(match.system_stage)
-            # self.clear_result_form_compact()
             self.load_matches_for_stage(match.system_stage)
+
+            # Если этап - Квалификация и все матчи сыграны, обновляем места в Choice
+            if self.current_stage == "Квалификация":
+                total = Result.select().where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.system_stage == self.current_stage)
+                ).count()
+                played = Result.select().where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.system_stage == self.current_stage) &
+                    (Result.winner.is_null(False))
+                ).count()
+                if total > 0 and played == total:
+                    self.update_qualification_places()
                     
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить результат: {str(e)}")
@@ -3598,45 +2927,6 @@ class MainWindow(QMainWindow):
                 self.score_edits_p1[i].setEnabled(False)
                 self.score_edits_p2[i].setEnabled(False)
 # =============================== рабочая 2805
-    def _load_results_table_for_stage(self, stage_name):
-        """Загрузка таблицы результатов для выбранного этапа"""
-        if not self.current_title_id:
-            return
-        
-        try:
-            # загружает согласно турам
-            results = Result.select().where(
-                (Result.title_id == self.current_title_id) &
-                (Result.system_stage == stage_name)
-            ).order_by(Result.number_group, Result.round)
-
-            data = []
-            for result in results:
-                winner_text = result.winner if result.winner else ""
-                score_text = result.score_in_game if result.score_in_game else ""
-                
-                data.append({
-                    'id': result.id,
-                    'stage': result.system_stage,
-                    'group':result.number_group,
-                    'tour': result.tours,
-                    'player1': result.player1,
-                    'player2': result.player2,
-                    'winner': winner_text,
-                    'score': score_text,
-                    'points': result.score_win
-                })
-            
-            self.results_table_model.setData(data)
-            
-            # Обновляем заголовок таблицы
-            total_matches = len(data)
-            played_matches = sum(1 for r in results if r.winner)
-            self.table_header.setText(f"📊 {stage_name} - Результаты матчей ({played_matches}/{total_matches})")
-            
-        except Exception as e:
-            print(f"Ошибка загрузки таблицы: {e}")
-
     def load_results_table_for_stage(self, stage_name):
         """Загрузка таблицы результатов для выбранного этапа с фильтрацией"""
         if not self.current_title_id:
@@ -3701,8 +2991,9 @@ class MainWindow(QMainWindow):
         
         if row < model.rowCount():
             # Получаем данные из модели
-            group = model.data(model.index(row, 2))
-            tour = model.data(model.index(row, 3))
+            # id_match = model.data(model.index(row, 0))
+            # group = model.data(model.index(row, 2))
+            # tour = model.data(model.index(row, 3))
             player1 = model.data(model.index(row, 4))
             player2 = model.data(model.index(row, 5))
             winner = model.data(model.index(row, 6))
@@ -3719,7 +3010,8 @@ class MainWindow(QMainWindow):
             # Если матч уже сыгран, загружаем счета
             if winner != "" and score != "":
                 self.parse_and_load_scores_compact(score)
-                
+                # self.load_match_for_editing(id_match)
+
                 # Устанавливаем победителя
                 if winner == player1:
                     self.player1_status.setCurrentText("Играет")
@@ -5331,22 +4623,6 @@ class MainWindow(QMainWindow):
                                 f"📅 Дата рейтинга: {rating_date_str}\n"
                                 f"🏆 Тип соревнования: {self.selected_tournament_type}\n\n"
                                 f"Теперь заполните информацию о соревновании.")
-# ========= просмотр соревнований ============
-    # def view_full_competition(self):
-    #     pass
-
-    # def view_player_listing(self):
-    #     """просмотр списка в PDF"""
-    #     from models import Player
-    #     # if view_sort == "По рейтингу":
-    #     player_list = Player.select().where(Player.title_id == self.current_title_id).order_by(Player.rank.desc())  # сортировка по рейтингу
-    #         # elif view_sort == "По алфавиту": 
-    #         #     player_list_x = Player.select().where(Player.title_id == self.title_current_id).order_by(Player.player) # сортировка по алфавиту
-    #         # elif view_sort == "По месту":
-    #         #     player_list_x = Player.select().where(Player.title_id == title_id()).order_by(Player.mesto)  # сортировка по месту
-    #         # player_list = player_list_x.select().where(Player.player != "x")
-    #     self.list_player_pdf(player_list)
-  
 # ==========================2905
     def create_menu_bar(self):
         """Создание меню"""
@@ -6193,68 +5469,6 @@ class MainWindow(QMainWindow):
                     font-size: 11px;
                     border-radius: 3px;
                 """)
-
-    def _filter_competitions(self):
-        """Фильтрация списка соревнований по критериям"""
-        if not hasattr(self, 'search_name_edit'):
-            return
-        
-        search_text = self.search_name_edit.text().strip().lower()
-        year_filter = self.year_combo.currentText()
-        month_filter = self.month_combo.currentText()
-        sredi_filter = self.sredi_combo.currentText()
-        
-        self.list_widget.clear()
-        
-        try:
-            titles = Title.select().order_by(Title.data_start.desc())
-            
-            filtered_titles = []
-            
-            for title in titles:
-                # Фильтр по названию
-                if search_text and search_text not in title.name.lower():
-                    continue
-                
-                # Фильтр по категории "Среди"
-                if sredi_filter != "Все категории" and title.sredi != sredi_filter:
-                    continue
-                
-                # Фильтр по году и месяцу
-                if title.data_start:
-                    if year_filter != "Все годы" and str(title.data_start.year) != year_filter:
-                        continue
-                    if month_filter != "Все месяцы":
-                        month_num = self.get_month_number(month_filter)
-                        if title.data_start.month != month_num:
-                            continue
-                else:
-                    if year_filter != "Все годы" or month_filter != "Все месяцы":
-                        continue
-                
-                filtered_titles.append(title)
-            
-            # Отображаем отфильтрованные соревнования
-            for title in filtered_titles:
-                start_date = title.data_start.strftime("%d.%m.%Y") if title.data_start else "---"
-                
-                item_text = f"""🏆 {title.name}
-    📅 {start_date} | {title.mesto}
-    👥 {title.sredi} | {title.vozrast}
-    🏷️ {title.vid_turnira}"""
-                
-                item = QListWidgetItem(item_text)
-                item.setData(Qt.UserRole, title.id)
-                item.setSizeHint(QSize(0, 65))
-                self.list_widget.addItem(item)
-            
-            # Показываем количество найденных
-            count = len(filtered_titles)
-            self.competitions_label.setText(f"🏆 Прошедшие соревнования ({count})")
-            
-        except Exception as e:
-            print(f"Ошибка фильтрации: {e}")
-            self.load_titles_list()
 
     def filter_competitions(self):
         """Фильтрация списка соревнований по критериям"""
@@ -11651,10 +10865,7 @@ class MainWindow(QMainWindow):
         if not system:
             QMessageBox.warning(self, "Ошибка", f"Этап '{stage}' не найден в системе")
             return
-        
-        # title = Title.get_by_id(self.current_title_id)
-        # sex = title.sredi if title.sredi else "Участники"
-        
+         
         # Определяем параметры таблиц
         if stage in stage_list_sf:  # если этап полуфинал
             kg = system.total_group  # кол-во групп
@@ -12112,6 +11323,8 @@ class MainWindow(QMainWindow):
                         for pos, info in calculated.items():
                             players_info[pos]['place'] = info['place']
                             players_info[pos]['ratio_points'] = info['ratio_points']
+                # ====== вставить функцию записи мест в Choice =====
+                self.update_choice_places(self, stage)
 # =========================                
                 # Создаем финальную таблицу
                 final_table = Table(data, colWidths=cW, rowHeights=[rH] * len(data))
@@ -14185,8 +13398,10 @@ class MainWindow(QMainWindow):
         
         # Обновляем список игроков для автодополнения
         self.load_players_for_filter()
+
+        self.view_results_dialog()
         
-        QMessageBox.information(self, "Загрузка", f"Загружены результаты для этапа '{stage_name}'")
+        # QMessageBox.information(self, "Загрузка", f"Загружены результаты для этапа '{stage_name}'")
 
     def view_results_dialog(self):
         """Просмотр результатов в PDF для текущего этапа"""
@@ -14597,9 +13812,6 @@ class MainWindow(QMainWindow):
                 else:
                     ratio_1 = 1
                     ratio_2 = 2
-
-                # ratio_1 = self.calculate_games_ratio(standings[group[0]['idx']])
-                # ratio_2 = self.calculate_games_ratio(standings[group[1]['idx']])
                 
                 players_info[group[0]['idx']]['ratio_points'] = ratio_1 if ratio_1 else ""
                 players_info[group[1]['idx']]['ratio_points'] = ratio_2 if ratio_2 else ""
@@ -14967,7 +14179,155 @@ class MainWindow(QMainWindow):
             elif sex == "мужчин и женщины":
                 title_sex = "Женщины"
         return title_sex
-    
+    # === запись в Choice места в квалификации
+    def update_choice_places(self, stage):
+        """Обновить места в квалификации в таблице Choice"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Нет выбранного соревнования")
+
+        system = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == stage)
+        )
+        if not system:
+            QMessageBox.warning(self, "Ошибка", "Этап 'Квалификация' не найден в системе")
+            return
+        
+        # # Проверяем, все ли матчи сыграны
+        # total_matches = Result.select().where(
+        #     (Result.title_id == self.current_title_id) &
+        #     (Result.system_stage == stage)
+        # ).count()
+        # played_matches = Result.select().where(
+        #     (Result.title_id == self.current_title_id) &
+        #     (Result.system_stage == stage) &
+        #     (Result.winner.is_null(False))
+        # ).count()
+        
+        # if total_matches == 0 or played_matches < total_matches:
+        #     QMessageBox.warning(self, "Ошибка", "Не все матчи квалификации сыграны. Места не могут быть определены.")
+        #     return
+        
+        # # Рассчитываем места
+        # places = self.calculate_qualification_places(system)
+        # if not places:
+        #     QMessageBox.warning(self, "Ошибка", "Не удалось рассчитать места")
+        #     return
+        
+        # Обновляем записи Choice
+        updated = 0
+        for group_num, players in places.items():
+            group_key = f"{group_num} группа"
+            for position, place in players.items():
+                # Находим игрока в Choice по группе и посеву
+                choice = Choice.get_or_none(
+                    (Choice.title_id == self.current_title_id) &
+                    (Choice.group == group_key) &
+                    (Choice.posev_group == position)
+                )
+                if choice:
+                    choice.mesto_group = place
+                    choice.save()
+                    updated += 1
+        
+        QMessageBox.information(self, "Успех", f"Обновлено мест для {updated} участников квалификации") 
+
+    def calculate_qualification_places(self, system):
+        """Рассчитать места в квалификации (возвращает словарь {номер_группы: {посев: место}})"""
+        from collections import defaultdict
+        
+        game_players = Game_list.select().where(
+            (Game_list.title_id == self.current_title_id) &
+            (Game_list.system_id == system.id)
+        ).order_by(Game_list.number_group, Game_list.rank_num_player)
+        
+        groups_players = defaultdict(list)
+        for gp in game_players:
+            groups_players[gp.number_group].append(gp)
+        
+        results = Result.select().where(
+            (Result.title_id == self.current_title_id) &
+            (Result.system_stage == system.stage)
+        )
+        
+        result_places = {}
+        
+        for group_num in range(1, system.total_group + 1):
+            group_key = f"{group_num} группа"
+            group_players = groups_players.get(group_key, [])
+            
+            players_info = {}
+            
+            for gp in group_players:
+                player = Player.get_or_none(Player.id == gp.player_group.id)
+                if player:
+                    pos = gp.rank_num_player
+                    players_info[pos] = {
+                        'total_points': 0,
+                        'wins': 0,
+                        'losses': 0,
+                        'idx': pos,
+                        'games_won': 0,
+                        'games_lost': 0,
+                        'points_scored': 0,
+                        'points_conceded': 0,
+                        'player_id': player.id
+                    }
+            
+            # Заполняем статистику
+            group_results = results.where(Result.number_group == group_key)
+            for result in group_results:
+                if not result.winner:
+                    continue
+                tour = result.tours
+                mark = tour.find("-")
+                if mark == -1:
+                    continue
+                idx1 = int(tour[:mark])
+                idx2 = int(tour[mark + 1:])
+                if idx1 not in players_info or idx2 not in players_info:
+                    continue
+                
+                point_win = result.points_win or 0
+                point_los = result.points_loser or 0
+                
+                if result.winner == result.player1:
+                    winner_idx, loser_idx = idx1, idx2
+                else:
+                    winner_idx, loser_idx = idx2, idx1
+                
+                players_info[winner_idx]['wins'] += 1
+                players_info[winner_idx]['total_points'] += point_win
+                players_info[loser_idx]['losses'] += 1
+                players_info[loser_idx]['total_points'] += point_los
+                
+                # Подсчет партий и мячей
+                self._add_game_and_point_stats(result, winner_idx, loser_idx, players_info)
+            
+            # Преобразуем в формат для calculate_round_robin_standings
+            standings_input = {}
+            for pos, data in players_info.items():
+                standings_input[pos] = {
+                    'total_points': data['total_points'],
+                    'wins': data['wins'],
+                    'losses': data['losses'],
+                    'idx': pos,
+                    'games_won': data.get('games_won', 0),
+                    'games_lost': data.get('games_lost', 0),
+                    'points_scored': data.get('points_scored', 0),
+                    'points_conceded': data.get('points_conceded', 0)
+                }
+            
+            if standings_input:
+                places_dict = self.calculate_round_robin_standings(standings_input, group_results)
+                group_places = {}
+                for idx, info in places_dict.items():
+                    group_places[idx] = info['place']
+                result_places[group_num] = group_places
+        
+        return result_places 
+
+  
 # =================================
 class RatingLoaderThread(QThread):
     progress = pyqtSignal(int)

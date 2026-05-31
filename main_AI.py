@@ -11642,13 +11642,18 @@ class MainWindow(QMainWindow):
             (System.title_id == self.current_title_id) &
             (System.stage == stage)
         )
-        
+        # определяем пол для титула на PDF
+        title = Title.get_by_id(self.current_title_id)
+        sex = title.sredi if title.sredi else "Участники"
+
+        title_sex = self.sex_for_title(stage)
+      
         if not system:
             QMessageBox.warning(self, "Ошибка", f"Этап '{stage}' не найден в системе")
             return
         
-        title = Title.get_by_id(self.current_title_id)
-        sex = title.sredi if title.sredi else "Участники"
+        # title = Title.get_by_id(self.current_title_id)
+        # sex = title.sredi if title.sredi else "Участники"
         
         # Определяем параметры таблиц
         if stage in stage_list_sf:  # если этап полуфинал
@@ -11817,14 +11822,14 @@ class MainWindow(QMainWindow):
         clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
         
         if stage == "Одна таблица":
-            title_text = f"Финальные соревнования. Одиночный разряд. {sex}."
+            title_text = f"Финальные соревнования. Одиночный разряд. {title_sex}."
             name_table = f"{clean_name}_one_table.pdf"
         elif stage == "Квалификация":
-            title_text = f"Квалификационные соревнования. среди {sex}."
+            title_text = f"Квалификационные соревнования. {title_sex}."
             name_table = f"{clean_name}_table_group.pdf"
         elif stage in ["1-й полуфинал", "2-й полуфинал"]:
             number_fin = stage[:stage.rfind("-")]
-            title_text = f"Квалификационные соревнования. {stage}. {sex}."
+            title_text = f"Квалификационные соревнования. {stage}. {title_sex}."
             name_table = f"{clean_name}_{number_fin}-semifinal.pdf"
         else:
             # Финал
@@ -11867,63 +11872,6 @@ class MainWindow(QMainWindow):
             if not system:
                 return dict_table
             
-            # # ===== ЭТАП 1: СОЗДАЕМ ПУСТЫЕ ТАБЛИЦЫ ИЗ GAME_LIST =====
-            # game_players = Game_list.select().where(
-            #     (Game_list.title_id == self.current_title_id) &
-            #     (Game_list.system_id == system.id)
-            # ).order_by(Game_list.number_group, Game_list.rank_num_player)
-            
-            # groups_players = defaultdict(list)
-            # for gp in game_players:
-            #     groups_players[gp.number_group].append(gp)
-
-            # groups_data = {}
-            
-            # for group_num in range(1, kg + 1):
-            #     group_key = f"{group_num} группа"
-            #     group_players = groups_players.get(group_key, [])
-                
-            #     players_info = {}
-            #     data = [list(zagolovok)]
-                
-            #     for idx, gp in enumerate(group_players, 1):
-            #         player = Player.get_or_none(Player.id == gp.player_group.id)
-            #         if player:
-            #             fio = player.fio if player.fio else ""
-            #             city = player.city if player.city else ""
-                        
-            #             players_info[idx] = {
-            #                 'fio': fio,
-            #                 'city': city,
-            #                 'wins': 0,
-            #                 'losses': 0,
-            #                 'total_points': 0,
-            #                 'scores': {},
-            #                 'matches': {},
-            #                 'place': 0,
-            #                 'ratio_points': 0
-            #             }
-                        
-            #             row_top = [str(idx), fio]
-            #             row_bottom = ["", city]
-                        
-            #             for i in range(max_pl):
-            #                 row_top.append("")
-            #                 row_bottom.append("")
-                        
-            #             row_top.extend(["", "", ""])
-            #             row_bottom.extend(["", "", ""])
-                        
-            #             data.append(row_top)
-            #             data.append(row_bottom)
-                
-            #     groups_data[group_num] = {
-            #         'data': data,
-            #         'players_info': players_info,
-            #         'players_count': len(group_players),
-            #         'total_matches_in_group': 0,  # будет заполнено позже
-            #         'played_matches_in_group': 0   # будет заполнено позже
-            #     }
 # ================= new ============
             # ===== ЭТАП 1: СОЗДАЕМ ПУСТЫЕ ТАБЛИЦЫ ИЗ GAME_LIST С ФИКСИРОВАННЫМ ЧИСЛОМ СТРОК =====
             game_players = Game_list.select().where(
@@ -12111,29 +12059,59 @@ class MainWindow(QMainWindow):
                 if all_matches_in_group_played:
                     players_info = self.calculate_round_robin_standings(players_info, results_group)
 # ==================================                
-                # Заполняем итоговые данные (очки, соотношение, место)
-                for idx, info in players_info.items():
-                    row_top_idx = 1 + (idx - 1) * 2
+                # # Заполняем итоговые данные (очки, соотношение, место)
+                # for idx, info in players_info.items():
+                #     row_top_idx = 1 + (idx - 1) * 2
                     
-                    # Очки
-                    data[row_top_idx][max_pl + 2] = str(info['total_points'])
+                #     # Очки
+                #     data[row_top_idx][max_pl + 2] = str(info['total_points'])
                     
-                    # Соотношение (только если все матчи сыграны)
-                    if all_matches_in_group_played and info.get('ratio_points', '') != '':
-                        # Проверяем тип и преобразуем в строку
-                        ratio_value = info['ratio_points']
-                        if ratio_value is not None and str(ratio_value).strip():
-                            data[row_top_idx][max_pl + 3] = str(ratio_value)
+                #     # Соотношение (только если все матчи сыграны)
+                #     if all_matches_in_group_played and info.get('ratio_points', '') != '':
+                #         # Проверяем тип и преобразуем в строку
+                #         ratio_value = info['ratio_points']
+                #         if ratio_value is not None and str(ratio_value).strip():
+                #             data[row_top_idx][max_pl + 3] = str(ratio_value)
+                #         else:
+                #             data[row_top_idx][max_pl + 3] = ""
+                #     else:
+                #         data[row_top_idx][max_pl + 3] = ""  # Пустое соотношение
+                    
+                #     # Место (только если все матчи сыграны)
+                #     if all_matches_in_group_played and info.get('place', 0) > 0:
+                #         data[row_top_idx][max_pl + 4] = str(info['place'])
+                #     else:
+                #         data[row_top_idx][max_pl + 4] = ""  # Место не определено
+#=========================== с пустысми строками от игроков
+                for position, info in players_info.items():
+                    row_top_idx = 1 + (position - 1) * 2
+                    if info['fio']:  # реальный участник
+                        # Очки
+                        data[row_top_idx][max_pl + 2] = str(info['total_points'])
+                        # Соотношение
+                        if all_matches_in_group_played and info.get('ratio_points', ''):
+                            data[row_top_idx][max_pl + 3] = str(info['ratio_points'])
                         else:
                             data[row_top_idx][max_pl + 3] = ""
+                        # Место
+                        if all_matches_in_group_played and info.get('place', 0) > 0:
+                            data[row_top_idx][max_pl + 4] = str(info['place'])
+                        else:
+                            data[row_top_idx][max_pl + 4] = ""
                     else:
-                        data[row_top_idx][max_pl + 3] = ""  # Пустое соотношение
-                    
-                    # Место (только если все матчи сыграны)
-                    if all_matches_in_group_played and info.get('place', 0) > 0:
-                        data[row_top_idx][max_pl + 4] = str(info['place'])
-                    else:
-                        data[row_top_idx][max_pl + 4] = ""  # Место не определено
+                        # Пустая строка — ничего не пишем (ячейки и так пустые, но для надёжности)
+                        data[row_top_idx][max_pl + 2] = ""
+                        data[row_top_idx][max_pl + 3] = ""
+                        data[row_top_idx][max_pl + 4] = ""
+
+                # Если все матчи сыграны, рассчитываем места только для реальных игроков
+                if all_matches_in_group_played:
+                    real_players = {k: v for k, v in players_info.items() if v['fio']}
+                    if real_players:
+                        calculated = self.calculate_round_robin_standings(real_players, results_group)
+                        for pos, info in calculated.items():
+                            players_info[pos]['place'] = info['place']
+                            players_info[pos]['ratio_points'] = info['ratio_points']
 # =========================                
                 # Создаем финальную таблицу
                 final_table = Table(data, colWidths=cW, rowHeights=[rH] * len(data))
@@ -14957,6 +14935,39 @@ class MainWindow(QMainWindow):
         if loser_idx in internal_stats:
             internal_stats[loser_idx]['points_scored'] += total_loser_scored
             internal_stats[loser_idx]['points_conceded'] += total_loser_conceded
+
+    def sex_for_title(self, stage):
+        """определяет пол для титула"""
+        # Получаем system_id для этапа
+        system = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == stage)
+        )
+        # определяем пол для титула на PDF
+        title = Title.get_by_id(self.current_title_id)
+        sex = title.sredi if title.sredi else "Участники"
+        pol = system.sex
+        title_sex = ""
+        if pol == "man":
+            if sex == 'мальчиков и девочек':
+                title_sex = "Мальчики"
+            elif sex == "юношей и девушек":
+                title_sex = "Юноши"
+            elif sex == "юниоров и юниорок":
+                title_sex = "Юниоры"
+            elif sex == "мужчин и женщины":
+                title_sex = "Мужчины"
+        else:
+            if sex == 'мальчиков и девочек':
+                title_sex = "Девочки"
+            elif sex == "юношей и девушек":
+                title_sex = "Девушки"
+            elif sex == "юниоров и юниорок":
+                title_sex = "Юниорки"
+            elif sex == "мужчин и женщины":
+                title_sex = "Женщины"
+        return title_sex
+    
 # =================================
 class RatingLoaderThread(QThread):
     progress = pyqtSignal(int)

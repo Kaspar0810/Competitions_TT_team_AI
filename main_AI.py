@@ -2874,8 +2874,8 @@ class MainWindow(QMainWindow):
                     (Result.system_stage == self.current_stage) &
                     (Result.winner.is_null(False))
                 ).count()
-                if total > 0 and played == total:
-                    self.update_qualification_places()
+                # if total > 0 and played == total:
+                #     self.update_qualification_places()
                     
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить результат: {str(e)}")
@@ -3009,6 +3009,8 @@ class MainWindow(QMainWindow):
                         
             # Если матч уже сыгран, загружаем счета
             if winner != "" and score != "":
+                if winner != player1:
+                    score = ' '.join(score.split()[::-1])
                 self.parse_and_load_scores_compact(score)
                 # self.load_match_for_editing(id_match)
 
@@ -11121,9 +11123,11 @@ class MainWindow(QMainWindow):
                     player_info = next((p for p in players_in_group if p[0] == position), None)
                     if player_info:
                         _, player = player_info
+                        id_pl = player.id if player.id else ""
                         fio = player.fio if player.fio else ""
                         city = player.city if player.city else ""
                         players_info[position] = {
+                            'pl_id': id_pl,
                             'fio': fio,
                             'city': city,
                             'wins': 0,
@@ -11198,7 +11202,7 @@ class MainWindow(QMainWindow):
                 
                 data = group_data['data']
                 players_info = group_data['players_info']
-                players_count = group_data['players_count']
+                # players_count = group_data['players_count']
                 total_matches = group_data['total_matches_in_group']
                 played_matches = group_data['played_matches_in_group']
                 
@@ -11269,6 +11273,7 @@ class MainWindow(QMainWindow):
                 # Определяем места ТОЛЬКО если все матчи в этой группе сыграны
                 if all_matches_in_group_played:
                     players_info = self.calculate_round_robin_standings(players_info, results_group)
+                    
 # ==================================                
                 # # Заполняем итоговые данные (очки, соотношение, место)
                 # for idx, info in players_info.items():
@@ -11316,6 +11321,7 @@ class MainWindow(QMainWindow):
                         data[row_top_idx][max_pl + 4] = ""
 
                 # Если все матчи сыграны, рассчитываем места только для реальных игроков
+                player_place = {}
                 if all_matches_in_group_played:
                     real_players = {k: v for k, v in players_info.items() if v['fio']}
                     if real_players:
@@ -11324,7 +11330,7 @@ class MainWindow(QMainWindow):
                             players_info[pos]['place'] = info['place']
                             players_info[pos]['ratio_points'] = info['ratio_points']
                 # ====== вставить функцию записи мест в Choice =====
-                self.update_choice_places(self, stage)
+                            self.update_choice_places(stage, info)
 # =========================                
                 # Создаем финальную таблицу
                 final_table = Table(data, colWidths=cW, rowHeights=[rH] * len(data))
@@ -14180,7 +14186,7 @@ class MainWindow(QMainWindow):
                 title_sex = "Женщины"
         return title_sex
     # === запись в Choice места в квалификации
-    def update_choice_places(self, stage):
+    def update_choice_places(self, stage, info):
         """Обновить места в квалификации в таблице Choice"""
         if not self.current_title_id:
             QMessageBox.warning(self, "Ошибка", "Нет выбранного соревнования")
@@ -14192,45 +14198,16 @@ class MainWindow(QMainWindow):
         if not system:
             QMessageBox.warning(self, "Ошибка", "Этап 'Квалификация' не найден в системе")
             return
-        
-        # # Проверяем, все ли матчи сыграны
-        # total_matches = Result.select().where(
-        #     (Result.title_id == self.current_title_id) &
-        #     (Result.system_stage == stage)
-        # ).count()
-        # played_matches = Result.select().where(
-        #     (Result.title_id == self.current_title_id) &
-        #     (Result.system_stage == stage) &
-        #     (Result.winner.is_null(False))
-        # ).count()
-        
-        # if total_matches == 0 or played_matches < total_matches:
-        #     QMessageBox.warning(self, "Ошибка", "Не все матчи квалификации сыграны. Места не могут быть определены.")
-        #     return
-        
-        # # Рассчитываем места
-        # places = self.calculate_qualification_places(system)
-        # if not places:
-        #     QMessageBox.warning(self, "Ошибка", "Не удалось рассчитать места")
-        #     return
-        
-        # Обновляем записи Choice
-        updated = 0
-        for group_num, players in places.items():
-            group_key = f"{group_num} группа"
-            for position, place in players.items():
-                # Находим игрока в Choice по группе и посеву
-                choice = Choice.get_or_none(
+        choice = Choice.get_or_none(
                     (Choice.title_id == self.current_title_id) &
-                    (Choice.group == group_key) &
-                    (Choice.posev_group == position)
+                    (Choice.player_choice_id == info['pl_id'])
                 )
-                if choice:
-                    choice.mesto_group = place
-                    choice.save()
-                    updated += 1
+        if choice:
+            choice.mesto_group = info['place']
+            choice.save()
+            # updated += 1
         
-        QMessageBox.information(self, "Успех", f"Обновлено мест для {updated} участников квалификации") 
+        # QMessageBox.information(self, "Успех", f"Обновлено мест для {updated} участников квалификации") 
 
     def calculate_qualification_places(self, system):
         """Рассчитать места в квалификации (возвращает словарь {номер_группы: {посев: место}})"""

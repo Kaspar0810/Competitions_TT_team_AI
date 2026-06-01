@@ -134,6 +134,8 @@ class MainWindow(QMainWindow):
         
         # Устанавливаем текущую вкладку - Титул
         self.tab_widget.setCurrentIndex(0)
+        # Скрываем секцию создания этапа
+        self.stage_section.setVisible(False)
         
         # Загружаем последнее соревнование (если есть)
         self.load_last_competition()
@@ -1254,7 +1256,7 @@ class MainWindow(QMainWindow):
             4: 350,  # Система
             5: 200,  # Результаты - маленькая верхняя часть для формы ввода
             6: 350,  # Рейтинг
-            7: 500   # Дополнительно
+            7: 250   # Дополнительно
         }
         
         # Устанавливаем начальную высоту
@@ -3145,11 +3147,11 @@ class MainWindow(QMainWindow):
         """)
         print_layout = QFormLayout(print_group)
         print_layout.setSpacing(10)
-        print_layout.setContentsMargins(15, 20, 15, 15)
+        print_layout.setContentsMargins(15, 15, 15, 15)
         
         # Тип бегунка (полный/урезанный)
         self.runner_type_combo = QComboBox()
-        self.runner_type_combo.addItems(["Полный", "Урезанный"])
+        self.runner_type_combo.addItems(["Урезанный","Полный"])
         self.runner_type_combo.setStyleSheet("padding: 5px; font-size: 11px;")
         print_layout.addRow("Тип бегунка:", self.runner_type_combo)
         
@@ -3435,16 +3437,25 @@ class MainWindow(QMainWindow):
                 # Обновляем кнопки категорий
                 self.create_category_buttons()
                 
+                # # Загружаем участников (если вкладка Участники активна)
+                # if self.tab_widget.isTabEnabled(1):
+                #     self.load_participants_for_title()
+             
+                # Переключаемся на вкладку Участники (индекс 1)
+                self.tab_widget.setCurrentIndex(1)
+            
                 # Загружаем участников (если вкладка Участники активна)
                 if self.tab_widget.isTabEnabled(1):
                     self.load_participants_for_title()
-             
+
                 # Если текущая вкладка - Система, обновляем информацию
                 if self.current_tab_index == 4:
                     self.update_stages_info()
                     # Обновляем кнопки на левой панели (чтобы убрать дублирование)
                     self.update_left_panel_for_tab(4)
-  
+                # elif self.current_tab_index == 7:
+                #     self.set_tab_height(7)    
+                 
                 # Обновляем заголовок списка
                 self.competitions_label.setText(f"🏆 Текущее: {title.name[:40]}...")
                 self.competitions_label.setStyleSheet("""
@@ -3476,6 +3487,8 @@ class MainWindow(QMainWindow):
                 
                 # Обновляем список этапов для бегунков
                 self.update_runner_stages()
+
+
 # ==================================================
     def update_finals_menu_after_selection(self):
         """Обновление меню финалов после выбора соревнования"""
@@ -3508,6 +3521,11 @@ class MainWindow(QMainWindow):
             
         # Переключаем таблицу в зависимости от вкладки
         if index == 1:  # Участники
+            # Скрываем секцию создания этапа
+            self.stage_section.setVisible(False)
+            # скрываем фильтр соревнований      
+            self.filters_widget.setVisible(False)
+            
             # Проверяем, есть ли table_view в стеке
             if self.table_container.indexOf(self.table_view) >= 0:
                 self.table_container.setCurrentWidget(self.table_view)
@@ -3635,6 +3653,9 @@ class MainWindow(QMainWindow):
             if index == 0:  # Титул
                 self.table_header.setText("📋 Информация о соревновании")
                 self.filters_widget.setVisible(True)
+                # Скрываем секцию создания этапа
+                self.stage_section.setVisible(False)
+                
             elif index == 4:  # Система
                 self.table_header.setText("⚙️ Система проведения")
                 self.filters_widget.setVisible(False)
@@ -6364,6 +6385,13 @@ class MainWindow(QMainWindow):
                 # Обновляем кнопки категорий
                 self.create_category_buttons()
                 
+                # Переключаемся на вкладку Участники (индекс 1)
+                self.tab_widget.setCurrentIndex(0)
+                
+                # Загружаем участников (если вкладка активна)
+                if self.tab_widget.isTabEnabled(1):
+                    self.load_participants_for_title()
+
                 # Загружаем участников (если вкладка активна)
                 if hasattr(self, 'tab_widget') and self.tab_widget.isTabEnabled(1):
                     self.load_participants_for_title()
@@ -15088,7 +15116,7 @@ class MainWindow(QMainWindow):
         else:
             QMessageBox.warning(self, "Ошибка", "Не удалось создать бегунки")
 
-    def create_runners_pdf(self, stage_name, subgroup, runner_type):
+    def _create_runners_pdf(self, stage_name, subgroup, runner_type):
         """Создание PDF файла с бегунками"""
         from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
         from reportlab.lib.pagesizes import A4, landscape
@@ -15190,7 +15218,7 @@ class MainWindow(QMainWindow):
             else:
                 os.system(f'open "{filepath}"')
 
-    def create_runner_card(self, player, runner_type, title, stage_name):
+    def _create_runner_card(self, player, runner_type, title, stage_name):
         """Создание карточки бегунка для одного игрока"""
         from reportlab.platypus import Table, Paragraph, Spacer
         from reportlab.lib.styles import ParagraphStyle as PS
@@ -15240,7 +15268,7 @@ class MainWindow(QMainWindow):
         
         return card
 
-    def get_players_for_runners(self, stage_name, subgroup):
+    def _get_players_for_runners(self, stage_name, subgroup):
         """Получение списка игроков для печати бегунков"""
         players = []
         
@@ -15326,118 +15354,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Ошибка загрузки заметок: {e}")
 
-    def begunki_made(self, stage, subgroup, runner_type):
-        """создание бегунков для выбранного этапа"""
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-        from reportlab.lib.pagesizes import A4, landscape
-        from reportlab.lib import colors
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle as PS
-        from reportlab.lib.units import cm
-        from sys import platform
-        import os
-        
-        if not self.current_title_id:
-            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
-            return None
-        
-        # Получаем систему для выбранного этапа
-        system = System.get_or_none(
-            (System.title_id == self.current_title_id) &
-            (System.stage == stage)
-        )
-        
-        if not system:
-            QMessageBox.warning(self, "Ошибка", f"Этап '{stage}' не найден в системе")
-            return None
-        
-        title = Title.get_by_id(self.current_title_id)
-        
-        # Определяем тип таблицы
-        type_table = system.type_table if hasattr(system, 'type_table') else "Круговая"
-        
-        # Получаем игроков для выбранного этапа и группы
-        if subgroup == "Все группы" or subgroup == "Все финалы":
-            players = self.get_players_for_stage(stage)
-        else:
-            players = self.get_players_for_group(stage, subgroup)
-        
-        if not players:
-            QMessageBox.warning(self, "Ошибка", "Нет данных для печати бегунков")
-            return None
-        
-        # Создаем папку table_pdf для бегунков
-        pdf_dir = "table_pdf"
-        if not os.path.exists(pdf_dir):
-            os.makedirs(pdf_dir)
-        
-        short_name = title.short_name_comp if title.short_name_comp else title.name
-        import re
-        clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
-        clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
-        
-        # Формируем имя файла
-        filename = f"{clean_name}_runners.pdf"
-        
-        # Создаем стили
-        styles = getSampleStyleSheet()
-        title_style = PS("TitleStyle", fontSize=14, fontName="DejaVuSerif-Bold",
-                        alignment=1, spaceAfter=20, textColor=colors.darkblue)
-        
-        # Создаем элементы
-        elements = []
-        
-        # Заголовок
-        elements.append(Paragraph(f"Бегунки для соревнований", title_style))
-        elements.append(Paragraph(f"{title.name}", title_style))
-        elements.append(Paragraph(f"Этап: {stage} | {subgroup} | Тип: {runner_type}", title_style))
-        elements.append(Spacer(1, 1*cm))
-        
-        # Создаем карточки бегунков
-        runner_cards = []
-        for player in players:
-            card = self.create_runner_card_table(player, runner_type, title, stage)
-            runner_cards.append(card)
-        
-        # Размещаем карточки по 3-4 в строку
-        cards_per_row = 3 if runner_type == "Полный" else 4
-        table_data = []
-        row = []
-        
-        for idx, card in enumerate(runner_cards):
-            row.append(card)
-            if len(row) == cards_per_row:
-                table_data.append(row)
-                row = []
-        
-        # Добавляем последний ряд
-        if row:
-            while len(row) < cards_per_row:
-                row.append(Paragraph("", styles['Normal']))
-            table_data.append(row)
-        
-        # Создаем таблицу
-        col_widths = [7*cm] * cards_per_row
-        main_table = Table(table_data, colWidths=col_widths)
-        main_table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 5),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
-            ('TOPPADDING', (0, 0), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ]))
-        
-        elements.append(main_table)
-        
-        # Строим документ
-        doc = SimpleDocTemplate(filename, pagesize=A4,
-                                topMargin=1.5*cm, bottomMargin=1.5*cm,
-                                leftMargin=1.5*cm, rightMargin=1.5*cm)
-        doc.build(elements, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
-        
-        return filename
-
-    def get_players_for_stage(self, stage):
+    def _get_players_for_stage(self, stage):
         """Получение всех игроков для этапа"""
         players = []
         
@@ -15476,7 +15393,7 @@ class MainWindow(QMainWindow):
         
         return players
 
-    def get_players_for_group(self, stage, group_name):
+    def _get_players_for_group(self, stage, group_name):
         """Получение игроков для конкретной группы"""
         players = []
         
@@ -15516,7 +15433,7 @@ class MainWindow(QMainWindow):
         
         return players
 
-    def create_runner_card_table(self, player, runner_type, title, stage):
+    def _create_runner_card_table(self, player, runner_type, title, stage):
         """Создание карточки бегунка в виде таблицы"""
         from reportlab.platypus import Table, TableStyle, Paragraph, Spacer
         from reportlab.lib import colors
@@ -15574,8 +15491,251 @@ class MainWindow(QMainWindow):
         card.setStyle(TableStyle(card_style))
         
         return card
+# ================= рабочий урезанный бегунок ======
+    def tbl_begunki(self, stage, subgroup, runner_type, tours="несыгранные", list_tours=None):
+        """
+        Создание данных для бегунков
+        stage - этап (Квалификация, 1-й полуфинал, 2-й полуфинал, Финал...)
+        subgroup - номер группы или финала (например "Группа 1", "1-й финал")
+        runner_type - "Полный" или "Урезанный" (пока не используется)
+        tours - "несыгранные", "все", "диапазон"
+        list_tours - список туров для диапазона
+        Возвращает список списков (данные для таблиц бегунков) или None
+        """
+        if not self.current_title_id:
+            return None
 
-# ======= полные соревноания
+        # Получаем систему для этапа
+        system = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == stage)
+        )
+        if not system:
+            return None
+
+        # Получаем результаты
+        results = Result.select().where(
+            (Result.title_id == self.current_title_id) &
+            (Result.system_stage == stage)
+        )
+
+        # Фильтруем по номеру группы/финала
+        if subgroup != "Все группы" and subgroup != "Все финалы":
+            results = results.where(Result.number_group == subgroup)
+
+        # Фильтруем по турам
+        if tours == "несыгранные":
+            results = results.where(Result.winner.is_null())
+        elif tours == "диапазон" and list_tours:
+            results = results.where(Result.tours.in_(list_tours))
+        # else "все" - без фильтра
+
+        results_list = list(results)
+        if not results_list:
+            QMessageBox.warning(self, "Уведомление",
+                                "Нет не сыгранных встреч,\nв печати бегунков нет необходимости.")
+            return None
+
+        # Данные о соревновании
+        title = Title.get_by_id(self.current_title_id)
+        gamer_txt = title.sredi if title.sredi else "Участники"
+        gm = gamer_txt[:1] if gamer_txt else "У"
+
+        # Сокращения этапов
+        if "Квалификация" in stage:
+            shot_stage = "ПР"
+        elif "1-й полуфинал" in stage:
+            shot_stage = "ПФ1"
+        elif "2-й полуфинал" in stage:
+            shot_stage = "ПФ2"
+        elif "Финал" in stage:
+            shot_stage = "Ф"
+        else:
+            shot_stage = stage[:2]
+
+        stiker_data = []
+        for res in results_list:
+            # Номер группы/финала для отображения
+            if "Финал" in stage:
+                import re
+                match = re.search(r'(\d+)', res.number_group)
+                n_gr = match.group(1) if match else gm
+                sys_stage = f"{n_gr}{shot_stage}"
+            else:
+                import re
+                match = re.search(r'(\d+)', res.number_group)
+                gr_num = match.group(1) if match else ""
+                n_gr = f"{gr_num}гр" if gr_num else ""
+                sys_stage = shot_stage
+
+            round_num = res.round if res.round else ""
+            tours_str = res.tours if res.tours else ""
+
+            # Разбор ФИО и города
+            player1_full = res.player1
+            player2_full = res.player2
+
+            s1 = player1_full.find("/")
+            s2 = player2_full.find("/")
+
+            if s1 != -1:
+                player1_fio = player1_full[:s1]
+                city1 = player1_full[s1+1:]
+            else:
+                player1_fio = player1_full
+                city1 = ""
+
+            if s2 != -1:
+                player2_fio = player2_full[:s2]
+                city2 = player2_full[s2+1:]
+            else:
+                player2_fio = player2_full
+                city2 = ""
+
+            # Укорачиваем длинные ФИО
+            if len(player1_fio) >= 16:
+                player1_fio = self.shorten_player_name(player1_fio)
+            if len(player2_fio) >= 16:
+                player2_fio = self.shorten_player_name(player2_fio)
+
+            pl1_text = f"{player1_fio}\n{city1}" if city1 else player1_fio
+            pl2_text = f"{player2_fio}\n{city2}" if city2 else player2_fio
+
+            # Шаблон бегунка (10 строк, 4 колонки)
+            d_tmp = [
+                [n_gr, 'тур', 'вст', 'стол'],
+                [sys_stage, round_num, tours_str, ''],
+                [pl1_text, '', pl2_text, ''],
+                ['', '', '', ''],
+                ['', '', '', ''],
+                ['', '', '', ''],
+                ['', '', '', ''],
+                ['', '', '', ''],
+                ['общ счет:', '', '', ''],
+                ['Победитель', '', '', '']
+            ]
+            stiker_data.append(d_tmp)
+
+        return stiker_data
+
+    def shorten_player_name(self, full_name):
+        """Укорачивает длинное ФИО для бегунков"""
+        parts = full_name.split()
+        if len(parts) >= 2:
+            return f"{parts[0]} {parts[1][0]}."
+        return full_name[:15]
+
+    def get_begunki_style(self):
+        """Создание стиля для таблицы бегунков"""
+        from reportlab.lib import colors
+        from reportlab.platypus import TableStyle
+
+        tblstyle = []
+        for p in range(0, 8):
+            tblstyle.append(('SPAN', (0, 2 + p), (1, 2 + p)))
+            tblstyle.append(('SPAN', (2, 2 + p), (3, 2 + p)))
+
+        ts = TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), "DejaVuSerif"),
+            ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('BOX', (0, 0), (-1, -1), 1, colors.black),
+            ('FONTSIZE', (0, 1), (0, 1), 20),
+            ('VALIGN', (0, 1), (0, 1), 'TOP'),
+            ('ALIGN', (0, 1), (0, 1), 'CENTER'),
+            ('FONTSIZE', (0, 2), (3, 2), 7),
+            ('VALIGN', (1, 0), (3, 0), 'MIDDLE'),
+            ('FONTSIZE', (1, 1), (3, 1), 12),
+            ('VALIGN', (1, 1), (3, 1), 'MIDDLE'),
+            ('ALIGN', (1, 1), (3, 1), 'CENTER'),
+            ('FONTSIZE', (0, 0), (0, 0), 12),
+            ('VALIGN', (0, 0), (0, 0), 'MIDDLE'),
+            ('ALIGN', (0, 0), (0, 0), 'CENTER')
+        ] + tblstyle)
+        return ts
+
+    def begunki_made(self, stage, subgroup, runner_type):
+        """создание бегунков для выбранного этапа"""
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib import colors
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle as PS
+        from reportlab.lib.units import cm
+        import os
+        import re
+
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return None
+
+        # Получаем данные для бегунков (только несыгранные матчи)
+        stiker_data = self.tbl_begunki(stage, subgroup, runner_type, tours="несыгранные")
+        if not stiker_data:
+            return None
+
+        title = Title.get_by_id(self.current_title_id)
+
+        # Папка для сохранения
+        pdf_dir = "table_pdf"
+        if not os.path.exists(pdf_dir):
+            os.makedirs(pdf_dir)
+
+        short_name = title.short_name_comp if title.short_name_comp else title.name
+        clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
+        clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
+
+        filename = f"{clean_name}_runners.pdf"
+
+        # Стили
+        styles = getSampleStyleSheet()
+        title_style = PS("TitleStyle", fontSize=14, fontName="DejaVuSerif-Bold",
+                        alignment=1, spaceAfter=20, textColor=colors.darkblue)
+
+        elements = []
+
+        # Создаём карточки бегунков
+        ts = self.get_begunki_style()
+        col_widths = [1.6*cm] * 4
+        row_heights = [0.6*cm, 0.9*cm, 1*cm, 0.6*cm, 0.6*cm, 0.6*cm, 0.6*cm, 0.6*cm, 0.5*cm, 0.5*cm]
+
+        runner_cards = []
+        for match_data in stiker_data:
+            table = Table(match_data, colWidths=col_widths, rowHeights=row_heights)
+            table.setStyle(ts)
+            runner_cards.append(table)
+
+        # Размещаем по 3 карточки в строку
+        cards_per_row = 3
+        table_data = []
+        row = []
+        for card in runner_cards:
+            row.append(card)
+            if len(row) == cards_per_row:
+                table_data.append(row)
+                row = []
+        if row:
+            while len(row) < cards_per_row:
+                row.append(Paragraph("", styles['Normal']))
+            table_data.append(row)
+
+        col_widths_main = [6.8*cm] * cards_per_row
+        main_table = Table(table_data, colWidths=col_widths_main)
+        main_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 5),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+        ]))
+
+        elements.append(main_table)
+
+        doc = SimpleDocTemplate(filename, pagesize=A4,
+                                topMargin=0.5*cm, bottomMargin=0.5*cm,
+                                leftMargin=0.5*cm, rightMargin=0.5*cm)
+        doc.build(elements)
+
+        return filename
+
+# ======= полные соревнования
     def export_competition_full_pdf(self):
         """Экспорт полного файла соревнования в PDF (сохраняется в competition_pdf)"""
         if not self.current_title_id:

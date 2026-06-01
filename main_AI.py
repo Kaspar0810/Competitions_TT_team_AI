@@ -2781,12 +2781,40 @@ class MainWindow(QMainWindow):
             # Случай 4: Обычная игра (оба играют)
 
             # Собираем счета по партиям
+            # ========== дополнение 0106
             for i in range(parties_count):
                 score1 = self.score_edits_p1[i].text().strip()
                 score2 = self.score_edits_p2[i].text().strip()
+                
+                # Проверка на пустые поля с учетом статусов
+                if status1 == "Играет" and status2 == "Играет":
+                    if not score1 or not score2:
+                        has_error = True
+                        error_messages.append(f"Партия {i+1}: не заполнена")
+                        continue
+                elif status1 == "Играет" and not score1:
+                    has_error = True
+                    error_messages.append(f"Партия {i+1}: не заполнен счет игрока 1")
+                    continue
+                elif status2 == "Играет" and not score2:
+                    has_error = True
+                    error_messages.append(f"Партия {i+1}: не заполнен счет игрока 2")
+                    continue
+                
+                # Если оба игрока не играют, то проверять счета не нужно
+                if status1 != "Играет" and status2 != "Играет":
+                    continue
+                
+                # Далее проверка validate_score
                 if score1 and score2:
-                    # Проверяем корректность счета
                     is_valid, error = self.validate_score(score1, score2)
+# ===========================
+            # for i in range(parties_count):
+                # score1 = self.score_edits_p1[i].text().strip()
+                # score2 = self.score_edits_p2[i].text().strip()
+                # if score1 and score2:
+                #     # Проверяем корректность счета
+                #     is_valid, error = self.validate_score(score1, score2)
                     
                     if is_valid:
                         s1 = int(score1)
@@ -12608,6 +12636,10 @@ class MainWindow(QMainWindow):
         all_score_1 = int(self.total_score1.text())
         all_score_2 = int(self.total_score2.text())
 
+        # проверка крректности ввода счета
+        score1 = self.score_edits_p1[current_col].text().strip()
+        score2 = self.score_edits_p2[current_col].text().strip()
+
         if current_row == 1:  # Игрок 1
             if current_col < parties:
                 # Переход к этой же партии игрока 2 (П1-1 → П1-2 → ...)
@@ -12619,9 +12651,12 @@ class MainWindow(QMainWindow):
                     self.save_btn.setFocus()
                     self.save_match_result_compact()
                 else:
-                    # self.validate_score(self, score1, score2)
+                    is_valid, error = self.validate_score(score1, score2)
                     # Переход к следующей партии игрока 1 (П2-1 → П2-2 → ...)
-                    self.score_edits_p1[current_col + 1].setFocus()
+                    if is_valid == True:
+                        self.score_edits_p1[current_col + 1].setFocus()
+                    else:
+                        QMessageBox.information(self, "Ошибка", f"{error}")
             else:
                 # После последней партии переходим на кнопку Сохранить
                 self.save_btn.setFocus()
@@ -12708,9 +12743,15 @@ class MainWindow(QMainWindow):
         Проверка корректности счета в партии
         Возвращает (is_valid, error_message)
         """
+        # Проверка на пустые поля
+        if not score1 or not score1.strip():
+            return False, "Поле счета игрока 1 пустое"
+        if not score2 or not score2.strip():
+            return False, "Поле счета игрока 2 пустое"
+        
         try:
             s1 = int(score1)
-            s2 = int(score2)
+            s2 = int(score2)            
         except ValueError:
             return False, "Счет должен быть целым числом"
         
@@ -12744,8 +12785,8 @@ class MainWindow(QMainWindow):
         
         # Если счет 10 и более, разница должна быть 2 очка
         if s1 >= 10 and s2 >= 10:
-            if abs(s1 - s2) == 2 or abs(s2 - s1) == 2:
-                    return True, ""
+            if abs(s1 - s2) == 2:
+                return True, ""
             else:
                 return False, f"При счете 10 и более разница должна быть 2 очка. Текущий счет: {s1}:{s2}"
         

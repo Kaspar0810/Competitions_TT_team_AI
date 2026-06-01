@@ -288,7 +288,6 @@ class DoublePlayersTableModel(QAbstractTableModel):
                 return self._headers[section]
         return None
 
-
 class TitlesTableModel(QAbstractTableModel):
     """Модель для отображения соревнований"""
     
@@ -364,7 +363,6 @@ class TitlesTableModel(QAbstractTableModel):
             if section < len(self._headers):
                 return self._headers[section]
         return None
-
 
 class CoachesTableModel(QAbstractTableModel):
     """Модель для отображения тренеров"""

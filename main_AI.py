@@ -2,6 +2,7 @@
 import sys
 import os
 
+from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QTabWidget, QTableView, QMenuBar, QAction, QLabel,
@@ -4682,13 +4683,13 @@ class MainWindow(QMainWindow):
         
         # Полуфиналы - подменю
         semifinals_menu = drawing_menu.addMenu("Полуфиналы")
-        
+
         semifinal_1_action = QAction("1-й полуфинал", self)
-        semifinal_1_action.triggered.connect(lambda: self.run_drawing_for_stage("1-й полуфинал"))
+        semifinal_1_action.triggered.connect(lambda: self.choice_semifinal_automat("Квалификация. 1-й полуфинал"))
         semifinals_menu.addAction(semifinal_1_action)
-        
+
         semifinal_2_action = QAction("2-й полуфинал", self)
-        semifinal_2_action.triggered.connect(lambda: self.run_drawing_for_stage("2-й полуфинал"))
+        semifinal_2_action.triggered.connect(lambda: self.choice_semifinal_automat("Квалификация. 2-й полуфинал"))
         semifinals_menu.addAction(semifinal_2_action)
         
         # Финалы - подменю
@@ -11068,9 +11069,9 @@ class MainWindow(QMainWindow):
         elif stage == "Квалификация":
             title_text = f"Квалификационные соревнования. {title_sex}."
             name_table = f"{clean_name}_table_group.pdf"
-        elif stage in ["1-й полуфинал", "2-й полуфинал"]:
+        elif stage in ["Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]:
             number_fin = stage[:stage.rfind("-")]
-            title_text = f"Квалификационные соревнования. {stage}. {title_sex}."
+            title_text = f"{stage}. {title_sex}."
             name_table = f"{clean_name}_{number_fin}-semifinal.pdf"
         else:
             # Финал
@@ -14344,8 +14345,549 @@ class MainWindow(QMainWindow):
                 result_places[group_num] = group_places
         
         return result_places 
+# ========== жеребьевка полуфиналов автомат ===========
+    def choice_semifinal_automat(self, stage):
+        """автоматическая жеребьевка полуфиналов"""
+        try:
+            # Проверяем результаты квалификации
+            self.check_qualification_results()
+            
+            # Получаем систему квалификации
+            qualification = System.get_or_none(
+                (System.title_id == self.current_title_id) &
+                (System.stage == "Квалификация")
+            )
+            if not qualification:
+                QMessageBox.warning(self, "Ошибка", "Этап 'Квалификация' не найден")
+                return
+            
+            total_group = qualification.total_group
+            mesta_exit = qualification.mesta_exit
+            
+            # Определяем места выхода в полуфинал
+            if stage == "Квалификация. 1-й полуфинал":
+                mesto_first = 1
+            else:
+                mesto_first = mesta_exit + 1
+            
+            # Создаем полуфинал
+            if stage == "Квалификация. 1-й полуфинал":
+                sf_groups = self.create_semi_final_1(mesto_first, total_group)
+                self.create_matches_for_semi_final(1, sf_groups, stage)
+            else:
+                sf_groups = self.create_semi_final_2(mesto_first, total_group)
+                self.create_matches_for_semi_final(2, sf_groups, stage)
+            
+            # Проверяем записанные данные
+            self.check_semifinal_data(stage)
+            
+            # Проверяем перенесенные матчи
+            self.check_transferred_matches(stage)
+            
+            QMessageBox.information(
+                self, "Успешно", 
+                f"Жеребьевка: {stage}\n\n"
+                f"✅ Созданы группы полуфинала\n"
+                f"✅ Записаны данные в Game_list и Choice\n"
+                f"✅ Перенесены результаты из квалификации\n"
+                f"✅ Готово к вводу результатов"
+            )
+            
+        except Exception as e:
+            print(f"Произошла ошибка: {e}")
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "Ошибка", f"Ошибка при жеребьевке: {str(e)}")
 
-  
+    def create_semi_final_1(self, mesto_first, total_group):
+        """жеребьевка 1-го полуфинала с разведением 1-х мест по регионам"""
+        from collections import defaultdict
+        
+        count_gr_sf = total_group // 2
+        
+        # Создаем группы для 1-го полуфинала
+        group_1_16 = []
+        for i in range(1, count_gr_sf + 1):
+            group_1_16.append({
+                'sf_group_num': i,
+                'players': [],
+                'from_groups': []
+            })
+        
+        # 1-й ЭТАП: Добавляем игроков с 1-2 мест из групп 1-16
+        for group_num in range(1, count_gr_sf + 1):
+            players = self.get_players_by_group_and_place(group_num, [mesto_first, mesto_first + 1])
+            if players:
+                for g in group_1_16:
+                    if g['sf_group_num'] == group_num:
+                        g['players'].extend(players)
+                        g['from_groups'].append(group_num)
+                        break
+        
+        # Собираем игроков с 1-2 мест из групп 17-32
+        group_17_32 = []
+        for group_num in range(count_gr_sf + 1, total_group + 1):
+            players = self.get_players_by_group_and_place(group_num, [mesto_first, mesto_first + 1])
+            if players:
+                group_17_32.append({
+                    'sf_group_num': group_num,
+                    'players': players
+                })
+        
+        # Создаем списки для распределения
+        group_num_list_1_16 = [p for p in range(1, count_gr_sf + 1)]
+        group_num_list_1_16.sort(reverse=True)
+        group_num_list_17_32 = [p for p in range(count_gr_sf + 1, total_group + 1)]
+        
+        pending_groups = group_17_32.copy()
+        k = 0
+        
+        while pending_groups:
+            source_group = pending_groups.pop(0)
+            source_group_num = source_group['sf_group_num']
+            target_group = None
+            
+            if k >= len(group_num_list_1_16):
+                k = 0
+                if not pending_groups:
+                    break
+            
+            gr_num = group_num_list_1_16[k]
+            ind = self.find_index_by_group(group_1_16, gr_num)
+            
+            if ind == -1:
+                k += 1
+                continue
+            
+            target_group = group_1_16[ind]
+            target_group_num = group_num_list_1_16[k]
+            
+            # Проверяем регионы
+            if target_group['players'] and source_group['players']:
+                gr_1_16_region = target_group['players'][0].region
+                gr_17_32_region = source_group['players'][0].region
+                
+                if gr_1_16_region != gr_17_32_region:
+                    target_group['players'].extend(source_group['players'])
+                    target_group['from_groups'].append(source_group_num)
+                    group_num_list_1_16.remove(target_group_num)
+                    k = 0
+                else:
+                    k += 1
+            else:
+                target_group['players'].extend(source_group['players'])
+                target_group['from_groups'].append(source_group_num)
+                group_num_list_1_16.remove(target_group_num)
+                k = 0
+        
+        # Получаем или создаем систему для 1-го полуфинала
+        system = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == "Квалификация. 1-й полуфинал")
+        )
+        if not system:
+            system = System.create(
+                title_id=self.current_title_id,
+                stage="Квалификация. 1-й полуфинал",
+                total_group=len(group_1_16),
+                max_player=4,
+                type_table="Круговая",
+                sex=self.current_sex if self.current_sex else "man",
+                score_flag=5
+            )
+        
+        # Очищаем старые записи в Game_list и Choice для этого этапа
+        Game_list.delete().where(
+            (Game_list.title_id == self.current_title_id) &
+            (Game_list.system_id == system.id)
+        ).execute()
+        
+        # Заполняем данные в таблицах Game_list и Choice
+        for sf_group in group_1_16:
+            sf_group_num = sf_group['sf_group_num']
+            players = sf_group['players']
+            
+            for idx, player in enumerate(players, 1):
+                # Обновляем Choice
+                player.semi_final = 1
+                player.posev_sf = idx
+                player.sf_group = f"{sf_group_num} группа"
+                player.save()
+                
+                # Создаем запись в Game_list
+                Game_list.create(
+                    number_group=f"{sf_group_num} группа",
+                    rank_num_player=idx,
+                    player_group=player.player_choice.id,
+                    system_id=system.id,
+                    title_id=self.current_title_id,
+                    sex=self.current_sex if self.current_sex else "man",
+                    player_double_id=None,
+                    team_id=None
+                )
+                print(f"  Группа {sf_group_num}: игрок {idx} - {player.family}")
+        
+        print(f"\nСоздано {len(group_1_16)} групп для 1-го полуфинала")
+        print(f"Записано игроков в Game_list: {Game_list.select().where(Game_list.system_id == system.id).count()}")
+        
+        return group_1_16
+
+    def create_semi_final_2(self, mesto_first, total_group):
+        """жеребьевка 2-го полуфинала"""
+        count_gr_sf = total_group // 2
+        
+        # Создаем группы для 2-го полуфинала
+        sf2_groups = []
+        for i in range(1, count_gr_sf + 1):
+            sf2_groups.append({
+                'sf_group_num': i,
+                'players': [],
+                'from_groups': []
+            })
+        
+        # Добавляем игроков с 3-4 мест из групп 1-16
+        for group_num in range(1, count_gr_sf + 1):
+            players = self.get_players_by_group_and_place(group_num, [mesto_first, mesto_first + 1])
+            if players:
+                for g in sf2_groups:
+                    if g['sf_group_num'] == group_num:
+                        g['players'].extend(players)
+                        g['from_groups'].append(group_num)
+                        break
+        
+        # Собираем игроков с 3-4 мест из групп 17-32
+        groups_17_32_players = []
+        for group_num in range(count_gr_sf + 1, total_group + 1):
+            players = self.get_players_by_group_and_place(group_num, [mesto_first, mesto_first + 1])
+            if players:
+                groups_17_32_players.append({
+                    'group_num': group_num,
+                    'players': players
+                })
+        
+        pending_groups = groups_17_32_players.copy()
+        group_num_list = [p for p in range(1, count_gr_sf + 1)]
+        group_num_list.sort(reverse=True)
+        
+        while pending_groups:
+            source_group = pending_groups.pop(0)
+            source_group_num = source_group['group_num']
+            
+            if not group_num_list:
+                break
+                
+            target_group_num = group_num_list[0]
+            target_group = None
+            
+            for g in sf2_groups:
+                if g['sf_group_num'] == target_group_num:
+                    target_group = g
+                    break
+            
+            if target_group:
+                target_group['players'].extend(source_group['players'])
+                target_group['from_groups'].append(source_group_num)
+                group_num_list.pop(0)
+        
+        # Получаем или создаем систему для 2-го полуфинала
+        system = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == "Квалификация. 2-й полуфинал")
+        )
+        if not system:
+            system = System.create(
+                title_id=self.current_title_id,
+                stage="Квалификация. 2-й полуфинал",
+                total_group=len(sf2_groups),
+                max_player=4,
+                type_table="Круговая",
+                sex=self.current_sex if self.current_sex else "man",
+                score_flag=5
+            )
+        
+        # Очищаем старые записи в Game_list и Choice для этого этапа
+        Game_list.delete().where(
+            (Game_list.title_id == self.current_title_id) &
+            (Game_list.system_id == system.id)
+        ).execute()
+        
+        # Заполняем данные в таблицах Game_list и Choice
+        for sf_group in sf2_groups:
+            sf_group_num = sf_group['sf_group_num']
+            players = sf_group['players']
+            
+            for idx, player in enumerate(players, 1):
+                # Обновляем Choice
+                player.semi_final = 2
+                player.posev_sf = idx
+                player.sf_group = f"{sf_group_num} группа"
+                player.save()
+                
+                # Создаем запись в Game_list
+                Game_list.create(
+                    number_group=f"{sf_group_num} группа",
+                    rank_num_player=idx,
+                    player_group=player.player_choice.id,
+                    system_id=system.id,
+                    title_id=self.current_title_id,
+                    sex=self.current_sex if self.current_sex else "man",
+                    player_double_id=None,
+                    team_id=None
+                )
+                print(f"  Группа {sf_group_num}: игрок {idx} - {player.family}")
+        
+        print(f"\nСоздано {len(sf2_groups)} групп для 2-го полуфинала")
+        print(f"Записано игроков в Game_list: {Game_list.select().where(Game_list.system_id == system.id).count()}")
+        
+        return sf2_groups
+
+    def create_matches_for_semi_final(self, semi_final_num, sf_groups, stage):
+        """
+        Создание встреч для групп полуфинала с ПЕРЕНОСОМ всех данных из квалификации
+        """
+        
+        # Получаем или создаем запись в System для полуфинала
+        system = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == stage)
+        )
+        if not system:
+            system = System.create(
+                title_id=self.current_title_id,
+                stage=stage,
+                total_group=len(sf_groups),
+                max_player=4,
+                type_table="Круговая",
+                sex=self.current_sex if self.current_sex else "man",
+                score_flag=5
+            )
+        
+        # Получаем ВСЕ результаты квалификации (включая пустые)
+        qualification_results = list(Result.select().where(
+            (Result.title_id == self.current_title_id) &
+            (Result.system_stage == "Квалификация")
+        ))
+        
+        # Создаем словарь для быстрого поиска результатов по парам игроков
+        matches_cache = {}
+        for res in qualification_results:
+            # Создаем ключ в обе стороны для поиска
+            key1 = f"{res.player1}|{res.player2}"
+            key2 = f"{res.player2}|{res.player1}"
+            matches_cache[key1] = res
+            matches_cache[key2] = res
+        
+        # Туры для 4-х спортсменов
+        tours_4 = ['1-2', '3-4', '1-4', '2-3', '1-3', '2-4']
+        tours_3 = ['1-2', '1-3', '2-3']
+        # === вставить раунд ====
+
+        created_matches = 0
+        transferred_matches = 0
+        
+        for sf_group in sf_groups:
+            group_name = f"{sf_group['sf_group_num']} группа"
+            players = sf_group['players']
+            num_players = len(players)
+            
+            # Получаем ФИО игроков с городом
+            player_names = []
+            for player in players:
+                fio_city = self.get_player_fio_city(player.player_choice.id)
+                player_names.append(fio_city)
+            
+            # Выбираем туры в зависимости от количества игроков
+            tours = tours_4 if num_players == 4 else tours_3
+            round = ""
+            for tour in tours:
+                # определяем раунд
+                if tour == '1-2' or tour == '3-4':
+                    round = 1
+                elif tour == '2-3' or tour == '1-4':
+                    round = 2
+                elif tour == '1-3' or tour == '2-4':
+                    round = 3
+
+                positions = tour.split('-')
+                pos1 = int(positions[0]) - 1  # переводим в индекс массива
+                pos2 = int(positions[1]) - 1
+                
+                if pos1 < num_players and pos2 < num_players:
+                    player1 = player_names[pos1]
+                    player2 = player_names[pos2]
+                    tours_str = f"{pos1 + 1}-{pos2 + 1}"
+                    
+                    # Проверяем, был ли уже сыгран этот матч в квалификации
+                    match_key = f"{player1}|{player2}"
+                    previous_match = matches_cache.get(match_key)
+                    
+                    # Удаляем старую запись, если она существует
+                    existing = Result.get_or_none(
+                        (Result.title_id == self.current_title_id) &
+                        (Result.system_stage == stage) &
+                        (Result.number_group == group_name) &
+                        (Result.tours == tours_str)
+                    )
+                    if existing:
+                        existing.delete_instance()
+                    
+                    if previous_match:
+                        # ПЕРЕНОСИМ ВСЕ ДАННЫЕ из квалификации
+                        result = Result.create(
+                            number_group=group_name,
+                            system_stage=stage,
+                            player1=player1,
+                            player2=player2,
+                            tours=tours_str,
+                            title_id=self.current_title_id,
+                            system_id=system.id,
+                            sex=self.current_sex if self.current_sex else "man",
+                            round=round,
+                            # Переносим все данные из квалификации
+                            winner=previous_match.winner,
+                            points_win=previous_match.points_win,
+                            score_in_game=previous_match.score_in_game,
+                            score_win=previous_match.score_win,
+                            loser=previous_match.loser,
+                            points_loser=previous_match.points_loser,
+                            score_loser=previous_match.score_loser,
+                            # round=previous_match.round,
+                            schedule_date=previous_match.schedule_date,
+                            schedule_time=previous_match.schedule_time,
+                            schedule_table=previous_match.schedule_table,
+                            stage_net=previous_match.stage_net
+                        )
+                        transferred_matches += 1
+                        print(f"  ✅ Перенесен результат: {player1} vs {player2}")
+                        if previous_match.winner:
+                            print(f"     Победитель: {previous_match.winner}")
+                            print(f"     Счет: {previous_match.score_in_game}")
+                    else:
+                        # Создаем пустой матч
+                        result = Result.create(
+                            number_group=group_name,
+                            system_stage=stage,
+                            player1=player1,
+                            player2=player2,
+                            tours=tours_str,
+                            title_id=self.current_title_id,
+                            system_id=system.id,
+                            sex=self.current_sex if self.current_sex else "man",
+                            round=round
+                        )
+                        created_matches += 1
+                        print(f"  ➕ Создан новый матч: {player1} vs {player2}")
+        
+        print(f"\n{'='*50}")
+        print(f"ИТОГО для {semi_final_num}-го полуфинала:")
+        print(f"  - Перенесено из квалификации: {transferred_matches}")
+        print(f"  - Создано новых матчей: {created_matches}")
+        print(f"  - Всего матчей: {transferred_matches + created_matches}")
+        print(f"{'='*50}")
+
+    def get_player_fio_city(self, player_id):
+        """Получение ФИО с городом игрока по ID"""
+        try:
+            player = Player.get_by_id(player_id)
+            fio = player.fio if player.fio else player.player
+            if player.city:
+                return f"{fio}/{player.city}"
+            return fio
+        except Exception as e:
+            print(f"Ошибка получения данных игрока {player_id}: {e}")
+            return ""
+
+    def find_index_by_group(self, data, gr_num):
+        """Поиск индекса группы в списке"""
+        for index, item in enumerate(data):
+            if item.get("sf_group_num") == gr_num:
+                return index
+        return -1
+
+    def get_players_by_group_and_place(self, group_num, places):
+        """Получение игроков из указанной группы по местам"""
+        group_name = f"{group_num} группа"
+        players = []
+        
+        for place in places:
+            choice = Choice.get_or_none(
+                (Choice.title_id == self.current_title_id) &
+                (Choice.group == group_name) &
+                (Choice.mesto_group == place)
+            )
+            if choice:
+                players.append(choice)
+        
+        return players
+
+    def check_qualification_results(self):
+        """Проверка результатов квалификации для отладки"""
+        results = Result.select().where(
+            (Result.title_id == self.current_title_id) &
+            (Result.system_stage == "Квалификация") &
+            (Result.winner.is_null(False))
+        )
+        
+        print(f"\n=== Сыгранные матчи квалификации ===")
+        for res in results:
+            print(f"{res.player1} vs {res.player2} -> Победитель: {res.winner}")
+            print(f"  Счет: {res.score_in_game}")
+        print(f"Всего сыгранных матчей: {results.count()}")
+
+    def check_transferred_matches(self, stage):
+        """Проверка перенесенных матчей в полуфинал"""
+        results = Result.select().where(
+            (Result.title_id == self.current_title_id) &
+            (Result.system_stage == stage) &
+            (Result.winner.is_null(False))
+        )
+        
+        print(f"\n=== Проверка перенесенных матчей в {stage} ===")
+        if results.count() == 0:
+            print("Нет перенесенных матчей с результатами")
+        else:
+            for res in results:
+                print(f"Матч: {res.player1} vs {res.player2}")
+                print(f"  Победитель: {res.winner}")
+                print(f"  Счет: {res.score_in_game}")
+                print(f"  Очки победителя: {res.points_win}")
+                print(f"  Очки проигравшего: {res.points_loser}")
+        print(f"Всего матчей с результатами: {results.count()}")
+
+    def check_semifinal_data(self, stage):
+        """Проверка данных полуфинала в таблицах Game_list и Choice"""
+        system = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == stage)
+        )
+        if not system:
+            print(f"Система для {stage} не найдена")
+            return
+        
+        print(f"\n=== Проверка данных для {stage} ===")
+        
+        # Проверяем Game_list
+        game_players = Game_list.select().where(
+            (Game_list.title_id == self.current_title_id) &
+            (Game_list.system_id == system.id)
+        ).order_by(Game_list.number_group, Game_list.rank_num_player)
+        
+        print(f"\nЗаписи в Game_list ({game_players.count()}):")
+        for gp in game_players:
+            player = Player.get_or_none(Player.id == gp.player_group.id)
+            player_name = player.fio if player else "Не найден"
+            print(f"  Группа: {gp.number_group}, Посев: {gp.rank_num_player}, Игрок: {player_name}")
+        
+        # Проверяем Choice
+        choices = Choice.select().where(
+            (Choice.title_id == self.current_title_id) &
+            (Choice.semi_final == (1 if "1-й" in stage else 2))
+        )
+        
+        print(f"\nЗаписи в Choice ({choices.count()}):")
+        for ch in choices:
+            print(f"  Группа: {ch.sf_group}, Посев: {ch.posev_sf}, Игрок: {ch.family}")
+
 # =================================
 class RatingLoaderThread(QThread):
     progress = pyqtSignal(int)

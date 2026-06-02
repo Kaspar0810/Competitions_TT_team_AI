@@ -4845,6 +4845,13 @@ class MainWindow(QMainWindow):
         edit_system_action = QAction("Редактировать", self)
         edit_system_action.triggered.connect(self.edit_system_settings)
         system_menu.addAction(edit_system_action)
+    
+        # Добавляем разделитель и пункт "Очистить"
+        system_menu.addSeparator()
+        
+        clear_system_action = QAction("🗑️ Очистить систему", self)
+        clear_system_action.triggered.connect(self.clear_system_data)
+        system_menu.addAction(clear_system_action)
         
         competitions_menu.addSeparator()
         
@@ -4953,6 +4960,77 @@ class MainWindow(QMainWindow):
         
         # Инициализируем обновление меню результатов
         self.update_results_menu()
+
+    def clear_system_data(self):
+        """Очистка всех данных системы проведения для текущего соревнования"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+        
+        # Подтверждение действия
+        reply = QMessageBox.question(
+            self,
+            "Подтверждение очистки",
+            "Вы действительно хотите очистить всю систему проведения?\n\n"
+            "Будут удалены:\n"
+            "• Все этапы (System)\n"
+            "• Все результаты (Result)\n"
+            "• Все игры (Game_list)\n"
+            "• Данные жеребьёвки (Choice)\n\n"
+            "Это действие необратимо!",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        
+        if reply != QMessageBox.Yes:
+            return
+        
+        try:
+            # Удаляем результаты
+            deleted_results = Result.delete().where(Result.title_id == self.current_title_id).execute()
+            print(f"Удалено результатов: {deleted_results}")
+            
+            # Удаляем игры
+            deleted_games = Game_list.delete().where(Game_list.title_id == self.current_title_id).execute()
+            print(f"Удалено записей Game_list: {deleted_games}")
+            
+            # Удаляем жеребьёвку
+            deleted_choices = Choice.delete().where(Choice.title_id == self.current_title_id).execute()
+            print(f"Удалено записей Choice: {deleted_choices}")
+            
+            # Удаляем этапы
+            deleted_systems = System.delete().where(System.title_id == self.current_title_id).execute()
+            print(f"Удалено этапов: {deleted_systems}")
+            
+            # Сбрасываем текущий этап
+            if hasattr(self, 'current_stage'):
+                self.current_stage = None
+            
+            # Обновляем интерфейс
+            self.update_stages_info()
+            
+            # Если открыта вкладка Система, обновляем её содержимое
+            if self.tab_widget.currentIndex() == 4:
+                self.stages_info.setText("Система очищена. Добавьте новые этапы.")
+            
+            QMessageBox.information(
+                self,
+                "Очистка выполнена",
+                f"Система проведения успешно очищена.\n\n"
+                f"Удалено:\n"
+                f"• Этапов: {deleted_systems}\n"
+                f"• Результатов: {deleted_results}\n"
+                f"• Игр: {deleted_games}\n"
+                f"• Записей жеребьёвки: {deleted_choices}"
+            )
+            
+            # Обновляем меню результатов (деактивируем пункты)
+            self.update_results_menu()
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось очистить систему: {str(e)}")
+            import traceback
+            traceback.print_exc()
 
     def toggle_fullscreen(self):
         """Полноэкранный режим"""
@@ -8343,7 +8421,8 @@ class MainWindow(QMainWindow):
             
             label_string = f"Одна таблица, {total_players} участников"
             choice_flag = 1
-            
+            source_stage = None
+
         # === КВАЛИФИКАЦИЯ ===
         elif "Квалификация" in stage_name and "полуфинал" not in stage_name:
             total_groups_text = self.total_groups.text().strip()
@@ -8775,7 +8854,6 @@ class MainWindow(QMainWindow):
             
             QMessageBox.information(self, "Успех", 
                                 f"✅ Этап '{stage_name}' добавлен\n"
-                                # f"📊 Игр в этапе: {total_games_in_stage}\n"
                                 f"🏆 Всего на соревновании: {total_all_games} игр.")
             
         except Exception as e:
@@ -10746,6 +10824,8 @@ class MainWindow(QMainWindow):
 
     def fill_choice_table_for_stage(self, stage):
         """Заполнение таблицы Choice для конкретного этапа"""
+        basic = ""
+        group_num_str = ""
         try:
             # Удаляем существующие записи Choice для этого соревнования (если нужно заново)
             Choice.delete().where(Choice.title_id == self.current_title_id).execute()
@@ -10779,6 +10859,13 @@ class MainWindow(QMainWindow):
                     coach = Coach.get_or_none(Coach.id == player.coach_id)
                     if coach:
                         coach_name = coach.coach
+
+                if stage == "Одна таблица":
+                    basic = stage
+                    group_num_str = ""
+                else:
+                    basic = ""
+                    group_num_str = f"Группа {group_num}"
                 
                 Choice.create(
                     player_choice=player.id,
@@ -10786,8 +10873,8 @@ class MainWindow(QMainWindow):
                     region=player.region or "",
                     coach=coach_name,
                     rank=player.rank or 0,
-                    basic="",
-                    group=f"Группа {group_num}",
+                    basic=basic,
+                    group=group_num_str,
                     posev_group=i + 1,
                     mesto_group=0,
                     title_id=self.current_title_id,
@@ -15838,10 +15925,11 @@ class MainWindow(QMainWindow):
             (Result.title_id == self.current_title_id) &
             (Result.system_stage == stage)
         )
-
-        # Фильтруем по номеру группы/финала
-        if subgroup != "Все группы" and subgroup != "Все финалы":
-            results = results.where(Result.number_group == subgroup)
+        # ====  Одна таблица ====
+        if stage != "Одна таблица":            
+            # Фильтруем по номеру группы/финала
+            if subgroup != "Все группы" and subgroup != "Все финалы":
+                results = results.where(Result.number_group == subgroup)
 
         # Фильтруем по турам
         if tours == "несыгранные":
@@ -16694,8 +16782,8 @@ class MainWindow(QMainWindow):
                     player2 = player_by_position[pos2]
                     
                     # Формируем ФИО с городом
-                    player1_fio_city = f"{player1.fio} ({player1.city})" if player1.city else player1.fio
-                    player2_fio_city = f"{player2.fio} ({player2.city})" if player2.city else player2.fio
+                    player1_fio_city = f"{player1.fio}/{player1.city}" if player1.city else player1.fio
+                    player2_fio_city = f"{player2.fio}/{player2.city}" if player2.city else player2.fio
                     
                     tours_str = f"{pos1}-{pos2}"
                     

@@ -4798,6 +4798,13 @@ class MainWindow(QMainWindow):
         
         # Жеребьевка - подменю
         drawing_menu = competitions_menu.addMenu("🎲 Жеребьевка")
+
+        # ="ОДНА ТАБЛИЦА" =====
+        one_table_action = QAction("📋 Одна таблица", self)
+        one_table_action.triggered.connect(self.create_one_table_drawing)
+        drawing_menu.addAction(one_table_action)
+        
+        drawing_menu.addSeparator()
         
         # Квалификация
         qualification_action = QAction("Квалификация", self)
@@ -4817,6 +4824,11 @@ class MainWindow(QMainWindow):
         
         # Финалы - подменю
         finals_menu = drawing_menu.addMenu("Финалы")
+
+        # Добавляем пункт для создания финала по кругу
+        create_circular_final_action = QAction("Создать круговой финал", self)
+        create_circular_final_action.triggered.connect(lambda: self.create_final_round_robin(1))
+        finals_menu.addAction(create_circular_final_action)
         
         # Динамически добавляем финалы
         self.update_finals_menu(finals_menu)
@@ -12452,6 +12464,309 @@ class MainWindow(QMainWindow):
         search_edit.returnPressed.connect(perform_search)
         
         dialog.exec_()
+
+# ================================
+    def _search_in_choice_table(self):
+        """Поиск информации в таблице Choice с выводом полной информации"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+        
+        # Проверяем существование таблицы Choice
+        try:
+            choices_count = Choice.select().where(Choice.title_id == self.current_title_id).count()
+            if choices_count == 0:
+                QMessageBox.information(self, "Информация", 
+                                    "Таблица Choice пуста.\n"
+                                    "Сначала проведите жеребьевку квалификации.")
+                return
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Ошибка доступа к таблице Choice: {str(e)}")
+            return
+        
+        # Создаем диалог поиска
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Поиск в таблице Choice")
+        dialog.setModal(True)
+        dialog.setMinimumWidth(800)
+        dialog.setMinimumHeight(600)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # Заголовок
+        title_label = QLabel("Поиск участников в жеребьевке (таблица Choice)")
+        title_label.setStyleSheet("font-weight: bold; font-size: 13px; margin-bottom: 10px;")
+        layout.addWidget(title_label)
+        
+        # Панель поиска
+        search_panel = QWidget()
+        search_layout = QHBoxLayout(search_panel)
+        search_layout.setContentsMargins(0, 0, 0, 0)
+        
+        search_layout.addWidget(QLabel("Поиск:"))
+        search_edit = QLineEdit()
+        search_edit.setPlaceholderText("Введите ФИО, регион, тренера, группу или рейтинг...")
+        search_edit.setMinimumWidth(400)
+        search_layout.addWidget(search_edit)
+        
+        search_type_combo = QComboBox()
+        search_type_combo.addItems(["Везде", "По ФИО", "По региону", "По тренеру", "По группе", "По рейтингу"])
+        search_layout.addWidget(search_type_combo)
+        
+        search_btn = QPushButton("🔍 Найти")
+        search_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 5px 15px;")
+        search_layout.addWidget(search_btn)
+        
+        clear_btn = QPushButton("🗑️ Очистить")
+        clear_btn.setStyleSheet("background-color: #FF9800; color: white; padding: 5px 15px;")
+        search_layout.addWidget(clear_btn)
+        
+        layout.addWidget(search_panel)
+        
+        # Результаты поиска
+        result_label = QLabel("Результаты поиска:")
+        result_label.setStyleSheet("font-weight: bold; margin-top: 10px;")
+        layout.addWidget(result_label)
+        
+        # Список результатов (краткий)
+        result_list = QListWidget()
+        result_list.setStyleSheet("""
+            QListWidget {
+                min-height: 200px;
+                max-height: 250px;
+                border: 1px solid #ccc;
+                border-radius: 3px;
+                font-size: 11px;
+            }
+            QListWidget::item {
+                padding: 8px;
+                border-bottom: 1px solid #eee;
+            }
+            QListWidget::item:selected {
+                background-color: #4CAF50;
+                color: white;
+            }
+        """)
+        layout.addWidget(result_list)
+        
+        # Панель детальной информации
+        detail_group = QGroupBox("📋 Полная информация об участнике")
+        detail_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                font-size: 12px;
+                border: 2px solid #2196F3;
+                border-radius: 5px;
+                margin-top: 10px;
+            }
+            QGroupBox::title {
+                color: #2196F3;
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+            }
+        """)
+        detail_layout = QVBoxLayout(detail_group)
+        
+        # Текстовое поле для детальной информации
+        detail_text = QTextEdit()
+        detail_text.setReadOnly(True)
+        detail_text.setStyleSheet("""
+            QTextEdit {
+                font-family: Consolas, monospace;
+                font-size: 11px;
+                background-color: #f9f9f9;
+                border: 1px solid #ddd;
+                border-radius: 3px;
+                padding: 10px;
+            }
+        """)
+        detail_layout.addWidget(detail_text)
+        
+        layout.addWidget(detail_group)
+        
+        # Кнопки действий
+        action_layout = QHBoxLayout()
+        close_btn = QPushButton("Закрыть")
+        close_btn.setStyleSheet("background-color: #f44336; color: white; padding: 5px 15px;")
+        close_btn.clicked.connect(dialog.reject)
+        action_layout.addStretch()
+        action_layout.addWidget(close_btn)
+        layout.addLayout(action_layout)
+        
+        def perform_search():
+            search_text = search_edit.text().strip().lower()
+            search_type = search_type_combo.currentText()
+            
+            if not search_text:
+                QMessageBox.warning(dialog, "Ошибка", "Введите текст для поиска")
+                return
+            
+            result_list.clear()
+            detail_text.clear()
+            
+            try:
+                # Получаем все записи Choice для текущего соревнования
+                choices = Choice.select().where(Choice.title_id == self.current_title_id)
+                
+                results = []
+                for choice in choices:
+                    # Получаем данные игрока
+                    player = Player.get_or_none(Player.id == choice.player_choice.id)
+                    if not player:
+                        continue
+                    
+                    match = False
+                    highlight_text = ""
+                    
+                    # Приводим все к нижнему регистру для сравнения
+                    family_lower = choice.family.lower() if choice.family else ""
+                    region_lower = choice.region.lower() if choice.region else ""
+                    coach_lower = choice.coach.lower() if choice.coach else ""
+                    group_lower = choice.group.lower() if choice.group else ""
+                    rank_str = str(choice.rank)
+                    
+                    if search_type == "Везде":
+                        if (search_text in family_lower or
+                            search_text in region_lower or
+                            search_text in coach_lower or
+                            search_text in group_lower or
+                            search_text == rank_str):
+                            match = True
+                            if search_text in family_lower:
+                                highlight_text = f"ФИО: {choice.family}"
+                            elif search_text in region_lower:
+                                highlight_text = f"Регион: {choice.region}"
+                            elif search_text in coach_lower:
+                                highlight_text = f"Тренер: {choice.coach}"
+                            elif search_text in group_lower:
+                                highlight_text = f"Группа: {choice.group}"
+                            elif search_text == rank_str:
+                                highlight_text = f"Рейтинг: {choice.rank}"
+                    
+                    elif search_type == "По ФИО":
+                        if search_text in family_lower:
+                            match = True
+                            highlight_text = f"ФИО: {choice.family}"
+                    
+                    elif search_type == "По региону":
+                        if search_text in region_lower:
+                            match = True
+                            highlight_text = f"Регион: {choice.region}"
+                    
+                    elif search_type == "По тренеру":
+                        if search_text in coach_lower:
+                            match = True
+                            highlight_text = f"Тренер: {choice.coach}"
+                    
+                    elif search_type == "По группе":
+                        if search_text in group_lower:
+                            match = True
+                            highlight_text = f"Группа: {choice.group}"
+                    
+                    elif search_type == "По рейтингу":
+                        if search_text == rank_str:
+                            match = True
+                            highlight_text = f"Рейтинг: {choice.rank}"
+                    
+                    if match:
+                        results.append({
+                            'id': choice.id,
+                            'family': choice.family,
+                            'region': choice.region,
+                            'coach': choice.coach,
+                            'rank': choice.rank,
+                            'group': choice.group,
+                            'posev_group': choice.posev_group,
+                            'mesto_group': choice.mesto_group,
+                            'basic': choice.basic,
+                            'sex': choice.sex,
+                            'player_id': player.id,
+                            'player_fio': player.fio,
+                            'player_city': player.city,
+                            'player_bday': player.bday,
+                            'player_razryad': player.razryad,
+                            'highlight': highlight_text
+                        })
+                
+                if results:
+                    for r in results:
+                        item_text = f"🏅 {r['family']} | {r['group']} | Рейтинг: {r['rank']}"
+                        item = QListWidgetItem(item_text)
+                        item.setData(Qt.UserRole, r)
+                        result_list.addItem(item)
+                    
+                    result_label.setText(f"Результаты поиска: найдено {len(results)} участников")
+                else:
+                    result_list.addItem("Ничего не найдено")
+                    result_label.setText("Результаты поиска: ничего не найдено")
+                    
+            except Exception as e:
+                QMessageBox.critical(dialog, "Ошибка", f"Ошибка поиска: {str(e)}")
+        
+        def show_details():
+            current_item = result_list.currentItem()
+            if not current_item:
+                return
+            
+            data = current_item.data(Qt.UserRole)
+            if not data:
+                return
+            
+            # Формируем детальную информацию
+            details = "=" * 60 + "\n"
+            details += "📋 ПОЛНАЯ ИНФОРМАЦИЯ ОБ УЧАСТНИКЕ\n"
+            details += "=" * 60 + "\n\n"
+            
+            details += "【 ИНФОРМАЦИЯ ИЗ ТАБЛИЦЫ CHOICE 】\n"
+            details += f"  🆔 ID записи: {data['id']}\n"
+            details += f"  👤 ФИО: {data['family']}\n"
+            details += f"  📍 Регион: {data['region'] or '—'}\n"
+            details += f"  👨‍🏫 Тренер: {data['coach'] or '—'}\n"
+            details += f"  📊 Рейтинг: {data['rank']}\n"
+            details += f"  🏆 Группа: {data['group'] or '—'}\n"
+            details += f"  🎯 Номер посева в группе: {data['posev_group'] or '—'}\n"
+            details += f"  🥇 Место в группе: {data['mesto_group'] or '—'}\n"
+            details += f"  🚻 Пол: {'Мужской' if data['sex'] == 'man' else 'Женский' if data['sex'] == 'woman' else '—'}\n"
+            details += f"  📝 Базовый: {data['basic'] or '—'}\n\n"
+            
+            details += "【 ИНФОРМАЦИЯ ИЗ ТАБЛИЦЫ PLAYER 】\n"
+            details += f"  🆔 ID игрока: {data['player_id']}\n"
+            details += f"  👤 ФИО: {data['player_fio'] or '—'}\n"
+            details += f"  🏙️ Город: {data['player_city'] or '—'}\n"
+            details += f"  🎂 Дата рождения: {data['player_bday'].strftime('%d.%m.%Y') if data['player_bday'] else '—'}\n"
+            details += f"  🎽 Разряд: {data['player_razryad'] or '—'}\n\n"
+            
+            # Поиск дополнительной информации о полуфиналах
+            if data['group']:
+                semifinal_info = Choice.select().where(
+                    (Choice.title_id == self.current_title_id) &
+                    (Choice.family == data['family'])
+                )
+                if semifinal_info.count() > 1:
+                    details += "【 УЧАСТИЕ В ПОЛУФИНАЛАХ 】\n"
+                    for sf in semifinal_info:
+                        if sf.semi_final:
+                            details += f"  🎯 {sf.stage}: Группа {sf.sf_group}, Посев {sf.posev_sf}\n"
+                    details += "\n"
+            
+            detail_text.setText(details)
+        
+        def clear_search():
+            search_edit.clear()
+            search_type_combo.setCurrentIndex(0)
+            result_list.clear()
+            detail_text.clear()
+            result_label.setText("Результаты поиска:")
+        
+        # Подключаем сигналы
+        search_btn.clicked.connect(perform_search)
+        clear_btn.clicked.connect(clear_search)
+        result_list.itemClicked.connect(show_details)
+        result_list.itemDoubleClicked.connect(show_details)
+        search_edit.returnPressed.connect(perform_search)
+        
+        dialog.exec_()
 # ================================
     def show_choice_statistics(self):
         """Показать статистику по таблице Choice"""
@@ -13607,10 +13922,15 @@ class MainWindow(QMainWindow):
             )
             if system and system.total_group > 2:
                 pv = "книжная"
-        
+        elif stage == "Одна таблица":
+            system = System.get_or_none(
+                (System.title_id == self.current_title_id) &
+                (System.stage == stage)
+            )            
+            pv = "альбомная"
+
         # Создаем PDF файл
         try:
-            # pdf_path = self.create_results_pdf(stage, pv)
             pdf_path = self.table_made(pv, stage)
             if pdf_path and os.path.exists(pdf_path):
                 # Открываем PDF файл
@@ -15759,6 +16079,639 @@ class MainWindow(QMainWindow):
         # ...
         
         QMessageBox.information(self, "Успех", f"Полный файл соревнования сохранен:\n{filename}")
+# ======== Финалы по кругу =========
+    def create_circular_final(self, stage_name, source_stage, exit_count=2):
+        """
+        Создание кругового финала с распределением игроков по турам
+        stage_name - название финала (например "1-й финал")
+        source_stage - этап откуда выходят игроки (квалификация или полуфинал)
+        exit_count - сколько игроков выходит из каждой группы (по умолчанию 2)
+        """
+        from collections import defaultdict
+        
+        # Получаем всех игроков, вышедших из source_stage
+        if "полуфинал" in source_stage.lower():
+            # Из полуфиналов
+            players = self.get_players_from_semifinal(source_stage, exit_count)
+        else:
+            # Из квалификации
+            players = self.get_players_from_qualification_for_final(exit_count)
+        
+        if not players:
+            QMessageBox.warning(self, "Ошибка", "Нет игроков для формирования финала")
+            return None
+        
+        # Сортируем игроков по рейтингу (по убыванию) внутри каждой группы
+        for group_key in players:
+            players[group_key].sort(key=lambda x: x.get('rank', 0), reverse=True)
+        
+        # Распределяем игроков согласно туру круговой таблицы
+        total_players = sum(len(p) for p in players.values())
+        positions = self.get_circular_tour_positions(total_players)
+        
+        # Создаем словарь для хранения позиций
+        assigned_players = [None] * total_players
+        
+        # Распределяем игроков по позициям
+        group_keys = sorted(players.keys())
+        position_idx = 0
+        
+        for group_key in group_keys:
+            group_players = players[group_key]
+            for i, player in enumerate(group_players):
+                if position_idx < len(positions):
+                    pos = positions[position_idx] - 1  # переводим в 0-индекс
+                    assigned_players[pos] = player
+                    position_idx += 1
+        
+        # Заполняем оставшиеся позиции (если есть)
+        for i, player in enumerate(assigned_players):
+            if player is None and position_idx < len(players):
+                # Ищем следующего игрока
+                for group_key in group_keys:
+                    if position_idx < len(players[group_key]):
+                        assigned_players[i] = players[group_key][position_idx]
+                        position_idx += 1
+                        break
+        
+        # Создаем группу финала
+        system = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == stage_name)
+        )
+        if not system:
+            system = System.create(
+                title_id=self.current_title_id,
+                stage=stage_name,
+                total_group=1,
+                max_player=total_players,
+                type_table="Круговая",
+                sex=self.current_sex if self.current_sex else "man",
+                score_flag=5
+            )
+        
+        # Очищаем старые записи
+        Game_list.delete().where(
+            (Game_list.title_id == self.current_title_id) &
+            (Game_list.system_id == system.id)
+        ).execute()
+        
+        Result.delete().where(
+            (Result.title_id == self.current_title_id) &
+            (Result.system_stage == stage_name)
+        ).execute()
+        
+        # Записываем игроков в Game_list и Choice
+        group_name = f"1 группа"
+        for idx, player in enumerate(assigned_players, 1):
+            if player:
+                Game_list.create(
+                    number_group=group_name,
+                    rank_num_player=idx,
+                    player_group=player['choice_id'],
+                    system_id=system.id,
+                    title_id=self.current_title_id,
+                    sex=self.current_sex if self.current_sex else "man"
+                )
+                
+                # Обновляем Choice
+                choice = Choice.get_by_id(player['choice_id'])
+                choice.posev_group = idx
+                choice.group = group_name
+                choice.save()
+        
+        # Создаем встречи для кругового финала
+        self.create_circular_matches(system, stage_name, assigned_players)
+        
+        return assigned_players
+
+    def get_players_from_qualification_for_final(self, exit_count=2):
+        """
+        Получение игроков из квалификации для финала
+        exit_count - сколько игроков выходит из каждой группы (1 или 2)
+        """
+        players = defaultdict(list)
+        
+        # Получаем квалификацию
+        qualification = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == "Квалификация")
+        )
+        if not qualification:
+            return players
+        
+        # Получаем результаты мест в группах
+        for group_num in range(1, qualification.total_group + 1):
+            group_name = f"{group_num} группа"
+            choices = Choice.select().where(
+                (Choice.title_id == self.current_title_id) &
+                (Choice.group == group_name) &
+                (Choice.mesto_group.is_null(False))
+            ).order_by(Choice.mesto_group)
+            
+            # Берем первых exit_count игроков
+            for i, choice in enumerate(choices):
+                if i >= exit_count:
+                    break
+                
+                player = Player.get_or_none(Player.id == choice.player_choice.id)
+                if player:
+                    players[f"Группа {group_num}"].append({
+                        'choice_id': choice.id,
+                        'player_id': player.id,
+                        'name': player.fio,
+                        'city': player.city,
+                        'region': player.region,
+                        'rank': player.rank or 0,
+                        'place': choice.mesto_group
+                    })
+        
+        return players
+
+    def get_players_from_semifinal(self, stage_name, exit_count=2):
+        """
+        Получение игроков из полуфинала для финала
+        """
+        players = defaultdict(list)
+        
+        # Получаем полуфинал
+        semifinal = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == stage_name)
+        )
+        if not semifinal:
+            return players
+        
+        # Получаем игроков из Game_list
+        game_players = Game_list.select().where(
+            (Game_list.title_id == self.current_title_id) &
+            (Game_list.system_id == semifinal.id)
+        ).order_by(Game_list.number_group, Game_list.rank_num_player)
+        
+        for gp in game_players:
+            choice = Choice.get_or_none(Choice.id == gp.player_group.id)
+            if choice:
+                player = Player.get_or_none(Player.id == choice.player_choice.id)
+                if player:
+                    players[gp.number_group].append({
+                        'choice_id': choice.id,
+                        'player_id': player.id,
+                        'name': player.fio,
+                        'city': player.city,
+                        'region': player.region,
+                        'rank': player.rank or 0,
+                        'place': choice.mesto_group if choice.mesto_group else 0
+                    })
+        
+        return players
+
+    def get_circular_tour_positions(self, total_players):
+        """
+        Возвращает порядок позиций игроков в круговой таблице
+        Для 8 игроков: [1, 7, 2, 6, 3, 5, 4, 8]
+        """
+        if total_players <= 1:
+            return [1]
+        
+        positions = []
+        left = 1
+        right = total_players
+        
+        # Чередуем первый и последний
+        for i in range(total_players):
+            if i % 2 == 0:
+                positions.append(left)
+                left += 1
+            else:
+                positions.append(right)
+                right -= 1
+        
+        return positions
+
+    def create_circular_matches(self, system, stage_name, players):
+        """
+        Создание встреч для кругового финала
+        """
+        from itertools import combinations
+        
+        if not players:
+            return
+        
+        # Создаем словарь для быстрого доступа к игрокам по их номерам
+        player_by_position = {}
+        for idx, player in enumerate(players, 1):
+            if player:
+                player_by_position[idx] = player
+        
+        # Получаем туры для круговой таблицы
+        total_players = len([p for p in players if p])
+        tours = self.get_round_robin_tours(total_players)
+        
+        group_name = "1 группа"
+        
+        for tour_idx, matches in enumerate(tours, 1):
+            for match in matches:
+                pos1, pos2 = match
+                if pos1 in player_by_position and pos2 in player_by_position:
+                    player1 = player_by_position[pos1]
+                    player2 = player_by_position[pos2]
+                    
+                    # Получаем ФИО с городом
+                    player1_fio = self.get_player_fio_city(player1['player_id'])
+                    player2_fio = self.get_player_fio_city(player2['player_id'])
+                    
+                    tours_str = f"{pos1}-{pos2}"
+                    
+                    Result.create(
+                        number_group=group_name,
+                        system_stage=stage_name,
+                        player1=player1_fio,
+                        player2=player2_fio,
+                        tours=tours_str,
+                        round=str(tour_idx),
+                        title_id=self.current_title_id,
+                        system_id=system.id,
+                        sex=self.current_sex if self.current_sex else "man"
+                    )
+        
+        print(f"Создано {len(tours) * (total_players // 2)} встреч для {stage_name}")
+
+    def get_round_robin_tours(self, n):
+        """
+        Генерация туров для круговой системы
+        Возвращает список туров, каждый тур - список пар [(1,2), (3,4), ...]
+        """
+        if n <= 1:
+            return []
+        
+        if n % 2 == 1:
+            # Нечетное количество участников - добавляем фиктивного
+            players = list(range(1, n + 1)) + [0]
+            n += 1
+        else:
+            players = list(range(1, n + 1))
+        
+        tours = []
+        for round_num in range(n - 1):
+            round_matches = []
+            for i in range(n // 2):
+                p1 = players[i]
+                p2 = players[n - 1 - i]
+                if p1 != 0 and p2 != 0:
+                    round_matches.append((p1, p2))
+            tours.append(round_matches)
+            
+            # Ротация (фиксированный элемент остается на месте)
+            players = [players[0]] + [players[-1]] + players[1:-1]
+        
+        return tours
+
+    def create_final_round_robin(self, final_number):
+        """
+        Создание финала по круговой системе
+        final_number - номер финала (1, 2, 3...)
+        """
+        stage_name = f"{final_number}-й финал"
+        
+        # Определяем источник игроков
+        if final_number == 1:
+            # Первый финал - из квалификации или 1-го полуфинала
+            source_stage = "Квалификация"
+            # Проверяем, есть ли 1-й полуфинал
+            semifinal = System.get_or_none(
+                (System.title_id == self.current_title_id) &
+                (System.stage == "Квалификация. 1-й полуфинал")
+            )
+            if semifinal:
+                source_stage = "Квалификация. 1-й полуфинал"
+        else:
+            # Второй и последующие финалы - из 2-го полуфинала или квалификации
+            source_stage = "Квалификация. 2-й полуфинал"
+            semifinal = System.get_or_none(
+                (System.title_id == self.current_title_id) &
+                (System.stage == "Квалификация. 2-й полуфинал")
+            )
+            if not semifinal:
+                source_stage = "Квалификация"
+        
+        # Определяем сколько игроков выходит из каждой группы
+        exit_count = 2
+        
+        # Создаем финал
+        players = self.create_circular_final(stage_name, source_stage, exit_count)
+        
+        if players:
+            QMessageBox.information(self, "Успех", 
+                                f"Создан {stage_name} по круговой системе\n"
+                                f"Участников: {len([p for p in players if p])}")
+        
+        return players
+
+    def transfer_results_to_final(self, final_stage, source_stage, players):
+        """Перенос результатов встреч между игроками, которые уже играли"""
+        # Получаем результаты из источника
+        source_results = Result.select().where(
+            (Result.title_id == self.current_title_id) &
+            (Result.system_stage == source_stage)
+        )
+        
+        # Создаем словарь игроков для быстрого поиска
+        player_map = {}
+        for pos, player in enumerate(players, 1):
+            if player:
+                player_map[player['choice_id']] = pos
+        
+        # Переносим результаты
+        for result in source_results:
+            # Находим позиции игроков в финале
+            pos1 = None
+            pos2 = None
+            
+            for choice_id, pos in player_map.items():
+                choice = Choice.get_by_id(choice_id)
+                if choice.family in result.player1:
+                    pos1 = pos
+                if choice.family in result.player2:
+                    pos2 = pos
+            
+            if pos1 and pos2:
+                # Обновляем результат в финале
+                final_result = Result.get_or_none(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.system_stage == final_stage) &
+                    (Result.tours == f"{pos1}-{pos2}")
+                )
+                if final_result:
+                    final_result.winner = result.winner
+                    final_result.points_win = result.points_win
+                    final_result.score_in_game = result.score_in_game
+                    final_result.score_win = result.score_win
+                    final_result.loser = result.loser
+                    final_result.points_loser = result.points_loser
+                    final_result.score_loser = result.score_loser
+                    final_result.save()
+
+    def create_one_table_drawing(self):
+        """Создание жеребьевки для одной таблицы (круговая система)"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+        
+        # Проверяем, есть ли система "Одна таблица"
+        system = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == "Одна таблица")
+        )
+        
+        if not system:
+            QMessageBox.warning(self, "Ошиб", "Этап 'Одна таблица' не найден в системе.\n"
+                            "Сначала добавьте этап на вкладке 'Система'")
+            return
+        
+        # Проверяем, есть ли участники
+        players_count = Player.select().where(Player.title_id == self.current_title_id).count()
+        if players_count == 0:
+            QMessageBox.warning(self, "Ошибка", "Нет участников для жеребьевки")
+            return
+        
+        # Проверяем, не проведена ли уже жеребьевка
+        if system.choice_flag == 1:
+            reply = QMessageBox.question(self, "Подтверждение", 
+                                        "Жеребьевка для этапа 'Одна таблица' уже проведена.\n"
+                                        "Провести заново?",
+                                        QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.No:
+                return
+        
+        # Выбор типа жеребьевки
+        drawing_type = self.get_drawing_type()
+        if drawing_type is None:
+            return
+        
+        if drawing_type == "auto":
+            self.auto_one_table_drawing(system)
+        else:
+            self.manual_one_table_drawing(system)
+
+    def auto_one_table_drawing(self, system):
+        """Автоматическая жеребьевка для одной таблицы"""
+        try:
+            # Получаем всех участников
+            players = Player.select().where(Player.title_id == self.current_title_id).order_by(Player.rank.desc())
+            
+            if players.count() == 0:
+                QMessageBox.warning(self, "Ошибка", "Нет участников для жеребьевки")
+                return
+            
+            # Очищаем таблицы Choice и Result для этого этапа
+            Choice.delete().where(Choice.title_id == self.current_title_id).execute()
+            Result.delete().where(
+                (Result.title_id == self.current_title_id) &
+                (Result.system_stage == "Одна таблица")
+            ).execute()
+            Game_list.delete().where(
+                (Game_list.title_id == self.current_title_id) &
+                (Game_list.system_id == system.id)
+            ).execute()
+            
+            # Заполняем Choice
+            group_name = "1 группа"
+            for idx, player in enumerate(players, 1):
+                # Получаем тренера
+                coach_name = ""
+                if player.coach_id:
+                    coach = Coach.get_or_none(Coach.id == player.coach_id)
+                    if coach:
+                        coach_name = coach.coach
+                
+                Choice.create(
+                    player_choice=player.id,
+                    family=player.fio or player.player,
+                    region=player.region or "",
+                    coach=coach_name,
+                    rank=player.rank or 0,
+                    basic="",
+                    group=group_name,
+                    posev_group=idx,
+                    mesto_group=0,
+                    title_id=self.current_title_id,
+                    sex=player.sex
+                )
+                
+                # Заполняем Game_list
+                Game_list.create(
+                    number_group=group_name,
+                    rank_num_player=idx,
+                    player_group=player.id,
+                    system_id=system.id,
+                    title_id=self.current_title_id,
+                    sex=player.sex
+                )
+            
+            # Создаем встречи для круговой таблицы
+            self.create_circular_matches_for_one_table(system, players)
+            
+            # Обновляем статус системы
+            system.choice_flag = 1
+            system.save()
+            
+            QMessageBox.information(self, "Успех", 
+                                f"✅ Жеребьевка для этапа 'Одна таблица' успешно проведена!\n\n"
+                                f"📊 Параметры:\n"
+                                f"   • Участников: {players.count()}\n"
+                                f"   • Тип таблицы: {system.type_table}\n\n"
+                                f"Таблицы Choice, Game_list и Result обновлены.")
+            
+            # Обновляем отображение
+            self.update_stages_info()
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Ошибка при жеребьевке: {str(e)}")
+
+    def manual_one_table_drawing(self, system):
+        """Ручная жеребьевка для одной таблицы"""
+        from models import Player, Coach
+        
+        # Получаем список игроков
+        players = Player.select().where(Player.title_id == self.current_title_id).order_by(Player.rank.desc())
+        players_list = list(players)
+        
+        athletes = []
+        for pl in players_list:
+            id = pl.id
+            player = pl.fio
+            rank = pl.rank
+            region = pl.region
+            coach_obj = Coach.get_or_none(Coach.id == pl.coach_id)
+            coach = coach_obj.coach if coach_obj else ""
+            gamer = [id, player, rank, region, coach]
+            athletes.append(gamer)
+        
+        num_groups = 1  # Одна группа
+        id_title = self.current_title_id
+        
+        # Используем существующий модуль manual_choice
+        num_id_player = manual_choice.choice_group_manual(self, athletes, num_groups, id_title, parent=None)
+        
+        self.save_manual_one_table_drawing(num_id_player, system)
+
+    def save_manual_one_table_drawing(self, num_id_player, system):
+        """Сохранение ручной жеребьевки для одной таблицы"""
+        try:
+            # Очищаем старые данные
+            Choice.delete().where(Choice.title_id == self.current_title_id).execute()
+            Result.delete().where(
+                (Result.title_id == self.current_title_id) &
+                (Result.system_stage == "Одна таблица")
+            ).execute()
+            Game_list.delete().where(
+                (Game_list.title_id == self.current_title_id) &
+                (Game_list.system_id == system.id)
+            ).execute()
+            
+            group_name = "1 группа"
+            
+            for pl in num_id_player:
+                id = pl['id_player']
+                group = f"{pl['group']} группа"
+                posev = pl['seed_num']
+                
+                # Получаем игрока
+                player = Player.get_by_id(id)
+                
+                # Получаем тренера
+                coach_name = ""
+                if player.coach_id:
+                    coach = Coach.get_or_none(Coach.id == player.coach_id)
+                    if coach:
+                        coach_name = coach.coach
+                
+                # Создаем запись в Choice
+                Choice.create(
+                    player_choice=player.id,
+                    family=player.fio or player.player,
+                    region=player.region or "",
+                    coach=coach_name,
+                    rank=player.rank or 0,
+                    basic="",
+                    group=group_name,
+                    posev_group=posev,
+                    mesto_group=0,
+                    title_id=self.current_title_id,
+                    sex=player.sex
+                )
+                
+                # Создаем запись в Game_list
+                Game_list.create(
+                    number_group=group_name,
+                    rank_num_player=posev,
+                    player_group=player.id,
+                    system_id=system.id,
+                    title_id=self.current_title_id,
+                    sex=player.sex
+                )
+            
+            # Создаем встречи для круговой таблицы
+            players = Player.select().where(Player.title_id == self.current_title_id).order_by(Player.rank.desc())
+            self.create_circular_matches_for_one_table(system, players)
+            
+            # Обновляем статус системы
+            system.choice_flag = 1
+            system.save()
+            
+            QMessageBox.information(self, "Успех", 
+                                f"Жеребьевка для этапа 'Одна таблица' сохранена!\n"
+                                f"Таблицы Choice, Game_list и Result обновлены.")
+            
+            self.update_stages_info()
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Ошибка при сохранении: {str(e)}")
+
+    def create_circular_matches_for_one_table(self, system, players):
+        """Создание встреч для круговой таблицы (одна таблица)"""
+        players_list = list(players)
+        total_players = len(players_list)
+        
+        if total_players < 2:
+            return
+        
+        # Получаем туры для круговой системы
+        tours = self.get_round_robin_tours(total_players)
+        
+        group_name = "1 группа"
+        
+        # Создаем словарь для быстрого доступа к игрокам по их номерам
+        player_by_position = {}
+        for idx, player in enumerate(players_list, 1):
+            player_by_position[idx] = player
+        
+        for tour_idx, matches in enumerate(tours, 1):
+            for match in matches:
+                pos1, pos2 = match
+                if pos1 in player_by_position and pos2 in player_by_position:
+                    player1 = player_by_position[pos1]
+                    player2 = player_by_position[pos2]
+                    
+                    # Формируем ФИО с городом
+                    player1_fio_city = f"{player1.fio} ({player1.city})" if player1.city else player1.fio
+                    player2_fio_city = f"{player2.fio} ({player2.city})" if player2.city else player2.fio
+                    
+                    tours_str = f"{pos1}-{pos2}"
+                    
+                    Result.create(
+                        number_group=group_name,
+                        system_stage="Одна таблица",
+                        player1=player1_fio_city,
+                        player2=player2_fio_city,
+                        tours=tours_str,
+                        round=str(tour_idx),
+                        title_id=self.current_title_id,
+                        system_id=system.id,
+                        sex=self.current_sex if self.current_sex else "man"
+                    )
+        
+        print(f"Создано {len(tours) * (total_players // 2)} встреч для этапа 'Одна таблица'")
 
 # =================================
 class RatingLoaderThread(QThread):

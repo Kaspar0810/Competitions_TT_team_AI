@@ -1323,10 +1323,15 @@ def choice_group_manual(self, athletes, num_groups, id_title, parent=None):
     Returns:
         list: список результатов или None если отмена
     """
+
     existing_data = None
-    if num_groups < 2 or num_groups > 32:
-        raise ValueError("Количество групп должно быть от 2 до 32")
-    system = System.select().where((System.title_id == id_title) and (System.stage == "Квалификация")).get()  # находит system id последнего
+    if num_groups == 1:
+        # одна таблица
+        system = System.select().where((System.title_id == id_title) and (System.stage == "Одна таблица")).get()  # находит system id последнего
+    elif num_groups > 1 or num_groups <= 48:
+    #     raise ValueError("Количество групп должно быть от 2 до 32")
+        system = System.select().where((System.title_id == id_title) and (System.stage == "Квалификация")).get()  # находит system id последнего
+    
     check_flag = system.choice_flag
     if check_flag is True:
         # Проверяем, есть ли уже жеребьевка в базе данных

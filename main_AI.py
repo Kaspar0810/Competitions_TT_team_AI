@@ -46,7 +46,7 @@ from datetime import datetime
 from PyPDF2 import PdfMerger 
 
 import manual_choice
-
+from db_setup import setup_database
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -17424,7 +17424,11 @@ class RatingFileDialog(QDialog):
 
 
 
-def main():
+def main():  
+    # Сначала проверяем БД
+    if not setup_database():
+        sys.exit(1)
+
     app = QApplication(sys.argv)
     window = MainWindow()
 

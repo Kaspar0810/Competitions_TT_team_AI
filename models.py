@@ -3,6 +3,12 @@ from peewee import *
 
 db = MySQLDatabase("mysql_db", user="root", password="db_pass", host="localhost", port=3306)
 
+def update_db_credentials(user, password, host='localhost', port=3306, database='mysql_db'):
+    """Обновляет параметры подключения к БД."""
+    from peewee import MySQLDatabase
+    global db
+    db = MySQLDatabase(database, user=user, password=password, host=host, port=port)
+
 class BaseModel(Model):
     id = PrimaryKeyField()
 

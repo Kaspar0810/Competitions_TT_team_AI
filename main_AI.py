@@ -2,7 +2,7 @@
 import sys
 import os
 
-from PyQt5 import QtWidgets
+# from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QTabWidget, QTableView, QMenuBar, QAction, QLabel,
@@ -47,6 +47,7 @@ from PyPDF2 import PdfMerger
 
 import manual_choice
 from db_setup import setup_database
+from import_initial_data import InitialDataImportDialog
 
 class MainWindow(QMainWindow):
     def __init__(self):

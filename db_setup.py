@@ -4,7 +4,8 @@ import os
 import subprocess
 from PyQt5.QtWidgets import QApplication, QDialog, QVBoxLayout, QLabel, QPushButton, QFileDialog, QMessageBox, QLineEdit, QFormLayout, QHBoxLayout
 from PyQt5.QtCore import Qt
-from models import db, Title  # импортируйте вашу БД и модели
+from models import db, Title, Region, Patronymic, Coach  # импортируйте вашу БД и модели
+from import_initial_data import InitialDataImportDialog
 
 def check_database_connection():
     """Проверяет подключение к БД и наличие таблиц."""
@@ -84,6 +85,11 @@ def get_mysql_credentials():
 def setup_database():
     """Основная функция настройки БД при запуске."""
     if check_database_connection():
+        # Проверяем, нужно ли импортировать начальные данные
+        if should_import_initial_data():
+            dialog = InitialDataImportDialog()
+            if dialog.exec_() == QDialog.Accepted:
+                print("Начальные данные импортированы")
         return True
     
     # Нет подключения
@@ -119,3 +125,17 @@ def setup_database():
         QMessageBox.critical(None, "Ошибка", "Приложение не может работать без MySQL.\n"
                              "Установите MySQL и настройте подключение, затем перезапустите программу.")
     return False
+
+def should_import_initial_data():
+        """Проверяет, есть ли данные в справочных таблицах"""
+        try:
+            # Проверяем, пусты ли основные справочники
+            regions_count = Region.select().count()
+            patronymics_count = Patronymic.select().count()
+            coaches_count = Coach.select().count()
+            
+            if regions_count == 0 or patronymics_count == 0 or coaches_count == 0:
+                return True
+            return False
+        except:
+            return True

@@ -15722,107 +15722,111 @@ class MainWindow(QMainWindow):
             (Result.title_id == self.current_title_id) &
             (Result.system_stage == stage)
         )
-        # ====  Одна таблица ====
-        if stage != "Одна таблица":            
-            # Фильтруем по номеру группы/финала
-            if subgroup != "Все группы" and subgroup != "Все финалы":
-                results = results.where(Result.number_group == subgroup)
+        if runner_type == "урезанный":
+            # ====  Одна таблица ====
+            if stage != "Одна таблица":            
+                # Фильтруем по номеру группы/финала
+                if subgroup != "Все группы" and subgroup != "Все финалы":
+                    results = results.where(Result.number_group == subgroup)
 
-        # Фильтруем по турам
-        if tours == "несыгранные":
-            results = results.where(Result.winner.is_null())
-        elif tours == "диапазон" and list_tours:
-            results = results.where(Result.tours.in_(list_tours))
-        # else "все" - без фильтра
+            # Фильтруем по турам
+            if tours == "несыгранные":
+                results = results.where(Result.winner.is_null())
+            elif tours == "диапазон" and list_tours:
+                results = results.where(Result.tours.in_(list_tours))
+            # else "все" - без фильтра
 
-        results_list = list(results)
-        if not results_list:
-            QMessageBox.warning(self, "Уведомление",
-                                "Нет не сыгранных встреч,\nв печати бегунков нет необходимости.")
-            return None
+            results_list = list(results)
+            if not results_list:
+                QMessageBox.warning(self, "Уведомление",
+                                    "Нет не сыгранных встреч,\nв печати бегунков нет необходимости.")
+                return None
 
-        # Данные о соревновании
-        title = Title.get_by_id(self.current_title_id)
-        gamer_txt = title.sredi if title.sredi else "Участники"
-        gm = gamer_txt[:1] if gamer_txt else "У"
+            # Данные о соревновании
+            title = Title.get_by_id(self.current_title_id)
+            gamer_txt = title.sredi if title.sredi else "Участники"
+            gm = gamer_txt[:1] if gamer_txt else "У"
 
-        # Сокращения этапов
-        if stage == "Квалификация":
-            shot_stage = "ПР"
-        elif stage == "Квалификация. 1-й полуфинал":
-            shot_stage = "ПФ1"
-        elif stage == "Квалификация. 2-й полуфинал":
-            shot_stage = "ПФ2"
-        elif stage == "Одна таблица":
-           shot_stage = stage[:2]
+            # Сокращения этапов
+            if stage == "Квалификация":
+                shot_stage = "ПР"
+            elif stage == "Квалификация. 1-й полуфинал":
+                shot_stage = "ПФ1"
+            elif stage == "Квалификация. 2-й полуфинал":
+                shot_stage = "ПФ2"
+            elif stage == "Одна таблица":
+                shot_stage = stage[:2]
+            else:
+                shot_stage = "Ф"
+                
+
+            stiker_data = []
+            for res in results_list:
+                # Номер группы/финала для отображения
+                if "Финал" in stage:
+                    import re
+                    match = re.search(r'(\d+)', res.number_group)
+                    n_gr = match.group(1) if match else gm
+                    sys_stage = f"{n_gr}{shot_stage}"
+                else:
+                    import re
+                    match = re.search(r'(\d+)', res.number_group)
+                    gr_num = match.group(1) if match else ""
+                    n_gr = f"{gr_num}гр" if gr_num else ""
+                    sys_stage = shot_stage
+
+                round_num = res.round if res.round else ""
+                tours_str = res.tours if res.tours else ""
+
+                # Разбор ФИО и города
+                player1_full = res.player1
+                player2_full = res.player2
+
+                s1 = player1_full.find("/")
+                s2 = player2_full.find("/")
+
+                if s1 != -1:
+                    player1_fio = player1_full[:s1]
+                    city1 = player1_full[s1+1:]
+                else:
+                    player1_fio = player1_full
+                    city1 = ""
+
+                if s2 != -1:
+                    player2_fio = player2_full[:s2]
+                    city2 = player2_full[s2+1:]
+                else:
+                    player2_fio = player2_full
+                    city2 = ""
+
+                # Укорачиваем длинные ФИО
+                if len(player1_fio) >= 16:
+                    player1_fio = self.shorten_player_name(player1_fio)
+                if len(player2_fio) >= 16:
+                    player2_fio = self.shorten_player_name(player2_fio)
+
+                pl1_text = f"{player1_fio}\n{city1}" if city1 else player1_fio
+                pl2_text = f"{player2_fio}\n{city2}" if city2 else player2_fio
+
+                # Шаблон бегунка (10 строк, 4 колонки)
+                d_tmp = [
+                    [n_gr, 'тур', 'вст', 'стол'],
+                    [sys_stage, round_num, tours_str, ''],
+                    [pl1_text, '', pl2_text, ''],
+                    ['', '', '', ''],
+                    ['', '', '', ''],
+                    ['', '', '', ''],
+                    ['', '', '', ''],
+                    ['', '', '', ''],
+                    ['общ счет:', '', '', ''],
+                    ['Победитель', '', '', '']
+                ]
+                stiker_data.append(d_tmp)
+            return stiker_data
         else:
-            shot_stage = "Ф"
-            
+           self.create_full_runners_pdf(stage, subgroup, date=None, time=None) 
 
-        stiker_data = []
-        for res in results_list:
-            # Номер группы/финала для отображения
-            if "Финал" in stage:
-                import re
-                match = re.search(r'(\d+)', res.number_group)
-                n_gr = match.group(1) if match else gm
-                sys_stage = f"{n_gr}{shot_stage}"
-            else:
-                import re
-                match = re.search(r'(\d+)', res.number_group)
-                gr_num = match.group(1) if match else ""
-                n_gr = f"{gr_num}гр" if gr_num else ""
-                sys_stage = shot_stage
-
-            round_num = res.round if res.round else ""
-            tours_str = res.tours if res.tours else ""
-
-            # Разбор ФИО и города
-            player1_full = res.player1
-            player2_full = res.player2
-
-            s1 = player1_full.find("/")
-            s2 = player2_full.find("/")
-
-            if s1 != -1:
-                player1_fio = player1_full[:s1]
-                city1 = player1_full[s1+1:]
-            else:
-                player1_fio = player1_full
-                city1 = ""
-
-            if s2 != -1:
-                player2_fio = player2_full[:s2]
-                city2 = player2_full[s2+1:]
-            else:
-                player2_fio = player2_full
-                city2 = ""
-
-            # Укорачиваем длинные ФИО
-            if len(player1_fio) >= 16:
-                player1_fio = self.shorten_player_name(player1_fio)
-            if len(player2_fio) >= 16:
-                player2_fio = self.shorten_player_name(player2_fio)
-
-            pl1_text = f"{player1_fio}\n{city1}" if city1 else player1_fio
-            pl2_text = f"{player2_fio}\n{city2}" if city2 else player2_fio
-
-            # Шаблон бегунка (10 строк, 4 колонки)
-            d_tmp = [
-                [n_gr, 'тур', 'вст', 'стол'],
-                [sys_stage, round_num, tours_str, ''],
-                [pl1_text, '', pl2_text, ''],
-                ['', '', '', ''],
-                ['', '', '', ''],
-                ['', '', '', ''],
-                ['', '', '', ''],
-                ['', '', '', ''],
-                ['общ счет:', '', '', ''],
-                ['Победитель', '', '', '']
-            ]
-            stiker_data.append(d_tmp)
-
-        return stiker_data
+        
 
     def shorten_player_name(self, full_name):
         """Укорачивает длинное ФИО для бегунков"""
@@ -15941,7 +15945,7 @@ class MainWindow(QMainWindow):
 
         return filename
 # ================== полный бегунок ====
-    def full_runners_data(self, stage=None, subgroup=None, date=None, time=None):
+    def full_runners_data(self, stage, subgroup, date=None, time=None):
         """
         Получение данных для полного бегунка
         stage - этап (Квалификация, 1-й полуфинал, 2-й полуфинал, Финал...)
@@ -15963,7 +15967,10 @@ class MainWindow(QMainWindow):
         
         # Фильтр по группе/финалу
         if subgroup and subgroup not in ["Все группы", "Все финалы", ""]:
-            results = results.where(Result.number_group == subgroup)
+            if stage == "Одна таблица":
+                results = results.where(Result.number_group == "1 группа")
+            else:
+                results = results.where(Result.number_group == subgroup)
         
         # Фильтр по дате
         if date and date != "все даты":
@@ -16012,7 +16019,7 @@ class MainWindow(QMainWindow):
             if type_table == "сетка":
                 stage_text = res.stage_net if res.stage_net else ""
             else:
-                stage_text = res.tours if res.tours else ""
+                stage_text = res.round if res.round else ""
             
             # Игрок 1
             player1_full = res.player1
@@ -16064,9 +16071,10 @@ class MainWindow(QMainWindow):
         if len(fio_parts) >= 2:
             # Фамилия и инициалы
             surname = fio_parts[0]
-            name_initial = fio_parts[1][0] if fio_parts[1] else ""
-            patronymic_initial = fio_parts[2][0] if len(fio_parts) > 2 else ""
-            formatted_name = f"{surname}\n{name_initial}.{patronymic_initial}." if patronymic_initial else f"{surname}\n{name_initial}."
+            # name_initial = fio_parts[1][0] if fio_parts[1] else ""
+            # patronymic_initial = fio_parts[2][0] if len(fio_parts) > 2 else ""
+            # formatted_name = f"{surname}\n{name_initial}.{patronymic_initial}." if patronymic_initial else f"{surname}\n{name_initial}."
+            formatted_name = f"{surname}\n{fio_parts[1]} {fio_parts[2]}" if fio_parts[2] else f"{surname}\n{fio_parts[1]}"
         else:
             formatted_name = fio_part
         
@@ -16086,7 +16094,7 @@ class MainWindow(QMainWindow):
         
         return result
 
-    def create_full_runners_pdf(self, stage=None, subgroup=None, date=None, time=None):
+    def create_full_runners_pdf(self, stage, subgroup, date=None, time=None):
         """
         Создание PDF с полными бегунками
         """
@@ -16114,9 +16122,7 @@ class MainWindow(QMainWindow):
         clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
         
         # Формируем имя файла
-        from datetime import datetime
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{pdf_dir}/{clean_name}_full_runners_{timestamp}.pdf"
+        filename = f"{clean_name}_full_runners.pdf"
         
         # Создаем PDF
         pdf = BegunokPDF(filename)

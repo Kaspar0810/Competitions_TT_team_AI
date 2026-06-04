@@ -15527,7 +15527,6 @@ class MainWindow(QMainWindow):
         else:
             QMessageBox.warning(self, "Ошибка", "Не удалось создать бегунки")
 
-
     def save_notes(self):
         """Сохранение заметок"""
         if not self.current_title_id:
@@ -15722,7 +15721,7 @@ class MainWindow(QMainWindow):
             (Result.title_id == self.current_title_id) &
             (Result.system_stage == stage)
         )
-        if runner_type == "урезанный":
+        if runner_type == "Урезанный":
             # ====  Одна таблица ====
             if stage != "Одна таблица":            
                 # Фильтруем по номеру группы/финала
@@ -15823,11 +15822,10 @@ class MainWindow(QMainWindow):
                 ]
                 stiker_data.append(d_tmp)
             return stiker_data
-        else:
-           self.create_full_runners_pdf(stage, subgroup, date=None, time=None) 
-
+        # else:
+        #     self.create_full_runners_pdf(stage, subgroup, date=None, time=None) 
+        #     return
         
-
     def shorten_player_name(self, full_name):
         """Укорачивает длинное ФИО для бегунков"""
         parts = full_name.split()
@@ -15877,73 +15875,98 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
             return None
 
-        # Получаем данные для бегунков (только несыгранные матчи)
-        stiker_data = self.tbl_begunki(stage, subgroup, runner_type, tours="несыгранные")
-        if not stiker_data:
-            return None
-
-        title = Title.get_by_id(self.current_title_id)
-
         # Папка для сохранения
-        pdf_dir = "table_pdf"
+        pdf_dir = "runners"
         if not os.path.exists(pdf_dir):
             os.makedirs(pdf_dir)
+
+        title = Title.get_by_id(self.current_title_id)
 
         short_name = title.short_name_comp if title.short_name_comp else title.name
         clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
         clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
 
-        filename = f"{clean_name}_runners.pdf"
+        if runner_type == "Урезанный":
 
-        # Стили
-        styles = getSampleStyleSheet()
-        title_style = PS("TitleStyle", fontSize=14, fontName="DejaVuSerif-Bold",
-                        alignment=1, spaceAfter=20, textColor=colors.darkblue)
+            # title = Title.get_by_id(self.current_title_id)
+            # Получаем данные для бегунков (только несыгранные матчи)
+            stiker_data = self.tbl_begunki(stage, subgroup, runner_type, tours="несыгранные")
 
-        elements = []
+            # short_name = title.short_name_comp if title.short_name_comp else title.name
+            # clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
+            # clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
 
-        # Создаём карточки бегунков
-        ts = self.get_begunki_style()
-        col_widths = [1.6*cm] * 4
-        row_heights = [0.6*cm, 0.9*cm, 1*cm, 0.6*cm, 0.6*cm, 0.6*cm, 0.6*cm, 0.6*cm, 0.5*cm, 0.5*cm]
+            filename = f"{clean_name}_runners.pdf"
 
-        runner_cards = []
-        for match_data in stiker_data:
-            table = Table(match_data, colWidths=col_widths, rowHeights=row_heights)
-            table.setStyle(ts)
-            runner_cards.append(table)
+            if not stiker_data:
+                return None
 
-        # Размещаем по 3 карточки в строку
-        cards_per_row = 3
-        table_data = []
-        row = []
-        for card in runner_cards:
-            row.append(card)
-            if len(row) == cards_per_row:
+            # title = Title.get_by_id(self.current_title_id)
+
+            # Папка для сохранения
+            # pdf_dir = "table_pdf"
+            # pdf_dir = "runners"
+            # if not os.path.exists(pdf_dir):
+            #     os.makedirs(pdf_dir)
+
+            # short_name = title.short_name_comp if title.short_name_comp else title.name
+            # clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
+            # clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
+
+            # filename = f"{clean_name}_runners.pdf"
+
+            # Стили
+            styles = getSampleStyleSheet()
+            title_style = PS("TitleStyle", fontSize=14, fontName="DejaVuSerif-Bold",
+                            alignment=1, spaceAfter=20, textColor=colors.darkblue)
+
+            elements = []
+
+            # Создаём карточки бегунков
+            ts = self.get_begunki_style()
+            col_widths = [1.6*cm] * 4
+            row_heights = [0.6*cm, 0.9*cm, 1*cm, 0.6*cm, 0.6*cm, 0.6*cm, 0.6*cm, 0.6*cm, 0.5*cm, 0.5*cm]
+
+            runner_cards = []
+            for match_data in stiker_data:
+                table = Table(match_data, colWidths=col_widths, rowHeights=row_heights)
+                table.setStyle(ts)
+                runner_cards.append(table)
+
+            # Размещаем по 3 карточки в строку
+            cards_per_row = 3
+            table_data = []
+            row = []
+            for card in runner_cards:
+                row.append(card)
+                if len(row) == cards_per_row:
+                    table_data.append(row)
+                    row = []
+            if row:
+                while len(row) < cards_per_row:
+                    row.append(Paragraph("", styles['Normal']))
                 table_data.append(row)
-                row = []
-        if row:
-            while len(row) < cards_per_row:
-                row.append(Paragraph("", styles['Normal']))
-            table_data.append(row)
 
-        col_widths_main = [6.8*cm] * cards_per_row
-        main_table = Table(table_data, colWidths=col_widths_main)
-        main_table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 5),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
-        ]))
+            col_widths_main = [6.8*cm] * cards_per_row
+            main_table = Table(table_data, colWidths=col_widths_main)
+            main_table.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 5),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+            ]))
 
-        elements.append(main_table)
+            elements.append(main_table)
 
-        doc = SimpleDocTemplate(filename, pagesize=A4,
-                                topMargin=0.5*cm, bottomMargin=0.5*cm,
-                                leftMargin=0.5*cm, rightMargin=0.5*cm)
-        doc.build(elements)
+            doc = SimpleDocTemplate(filename, pagesize=A4,
+                                    topMargin=0.5*cm, bottomMargin=0.5*cm,
+                                    leftMargin=0.5*cm, rightMargin=0.5*cm)
+            doc.build(elements)
 
-        return filename
+            # return filename
+        else:
+            filename = self.create_full_runners_pdf(stage, subgroup, date=None, time=None)
+            return filename
 # ================== полный бегунок ====
     def full_runners_data(self, stage, subgroup, date=None, time=None):
         """
@@ -16102,7 +16125,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
             return None
         
-        # Получаем данные для бегунков
+        # Получаем данные для бегунков, список словарей
         begunki_data = self.full_runners_data(stage, subgroup, date, time)
         
         if not begunki_data:
@@ -16131,7 +16154,7 @@ class MainWindow(QMainWindow):
         
         return filename
 
-    def print_full_runners_dialog(self):
+    def _print_full_runners_dialog(self):
         """Диалог для печати полных бегунков с фильтрами"""
         if not self.current_title_id:
             QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
@@ -16237,8 +16260,8 @@ class MainWindow(QMainWindow):
         
         dialog.exec_()
 
-    def _print_full_runners(self, dialog, stage_combo, group_combo, date_combo, time_combo):
-        """Внутренний метод печати бегунков"""
+    def _print_full_runners(self, stage_combo, group_combo, date_combo, time_combo):
+        """Внутренний метод печати бегунков при выборе из расписания на сетке"""
         stage = stage_combo.currentText()
         if stage == "Все этапы":
             stage = None
@@ -16259,7 +16282,7 @@ class MainWindow(QMainWindow):
         filename = self.create_full_runners_pdf(stage, subgroup, date, time)
         
         if filename:
-            dialog.accept()
+            # dialog.accept()
             QMessageBox.information(self, "Успех", f"Бегунки сохранены в файл:\n{filename}")
             
             # Предлагаем открыть файл

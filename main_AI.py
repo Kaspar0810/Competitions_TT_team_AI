@@ -2813,14 +2813,7 @@ class MainWindow(QMainWindow):
                 # Далее проверка validate_score
                 if score1 and score2:
                     is_valid, error = self.validate_score(score1, score2)
-# ===========================
-            # for i in range(parties_count):
-                # score1 = self.score_edits_p1[i].text().strip()
-                # score2 = self.score_edits_p2[i].text().strip()
-                # if score1 and score2:
-                #     # Проверяем корректность счета
-                #     is_valid, error = self.validate_score(score1, score2)
-                    
+# ===========================                   
                     if is_valid:
                         s1 = int(score1)
                         s2 = int(score2)
@@ -2896,19 +2889,31 @@ class MainWindow(QMainWindow):
             self.load_results_table_for_stage(match.system_stage)
             self.load_matches_for_stage(match.system_stage)
 
-            # Если этап - Квалификация и все матчи сыграны, обновляем места в Choice
-            if self.current_stage == "Квалификация":
-                total = Result.select().where(
+            # # Если этап - Квалификация и все матчи сыграны, обновляем места в Choice
+            # if self.current_stage == "Квалификация":
+            #     total = Result.select().where(
+            #         (Result.title_id == self.current_title_id) &
+            #         (Result.system_stage == self.current_stage)
+            #     ).count()
+            #     played = Result.select().where(
+            #         (Result.title_id == self.current_title_id) &
+            #         (Result.system_stage == self.current_stage) &
+            #         (Result.winner.is_null(False))
+            #                 ).count()
+                
+            # Если текущий этап - полуфинал и все матчи сыграны, обновляем места
+            if self.current_stage in ["Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]:
+                total_matches = Result.select().where(
                     (Result.title_id == self.current_title_id) &
                     (Result.system_stage == self.current_stage)
                 ).count()
-                played = Result.select().where(
+                played_matches = Result.select().where(
                     (Result.title_id == self.current_title_id) &
                     (Result.system_stage == self.current_stage) &
                     (Result.winner.is_null(False))
                 ).count()
-                # if total > 0 and played == total:
-                #     self.update_qualification_places()
+                if total_matches > 0 and played_matches == total_matches:
+                    self.update_semifinal_places(self.current_stage)
                     
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить результат: {str(e)}")
@@ -17195,6 +17200,84 @@ class MainWindow(QMainWindow):
                             "Заметки можно редактировать на вкладке 'Дополнительно'.\n"
                             "Не забудьте сохранить изменения.")
 
+    def update_semifinal_places(self, stage):
+        """Обновить места игроков в полуфинале в таблице Choice"""
+        from collections import defaultdict
+        
+        system = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == stage)
+        )
+        if not system:
+            return
+        
+        # Получаем всех игроков в группах полуфинала
+        game_players = Game_list.select().where(
+            (Game_list.title_id == self.current_title_id) &
+            (Game_list.system_id == system.id)
+        ).order_by(Game_list.number_group, Game_list.rank_num_player)
+        
+        groups = defaultdict(list)
+        for gp in game_players:
+            groups[gp.number_group].append(gp)
+        
+        # Получаем все результаты этого этапа
+        results = Result.select().where(
+            (Result.title_id == self.current_title_id) &
+            (Result.system_stage == stage)
+        )
+        
+        for group_name, players_in_group in groups.items():
+            players_info = {}
+            for gp in players_in_group:
+                players_info[gp.rank_num_player] = {
+                    'total_points': 0,
+                    'wins': 0,
+                    'losses': 0,
+                    'idx': gp.rank_num_player,
+                    'games_won': 0,
+                    'games_lost': 0,
+                    'points_scored': 0,
+                    'points_conceded': 0,
+                }
+            
+            group_results = [r for r in results if r.number_group == group_name]
+            for res in group_results:
+                if not res.winner:
+                    continue
+                if '-' not in res.tours:
+                    continue
+                pos1, pos2 = map(int, res.tours.split('-'))
+                if pos1 not in players_info or pos2 not in players_info:
+                    continue
+                
+                if res.winner == res.player1:
+                    winner_idx, loser_idx = pos1, pos2
+                else:
+                    winner_idx, loser_idx = pos2, pos1
+                
+                point_win = res.points_win or 0
+                point_los = res.points_loser or 0
+                players_info[winner_idx]['total_points'] += point_win
+                players_info[winner_idx]['wins'] += 1
+                players_info[loser_idx]['total_points'] += point_los
+                players_info[loser_idx]['losses'] += 1
+                
+                self._add_game_and_point_stats_for_players(res, winner_idx, loser_idx, players_info)
+            
+            if players_info:
+                # Используем существующую логику расчёта мест
+                updated_info = self.calculate_round_robin_standings(players_info, group_results)
+                for pos, info in updated_info.items():
+                    # Находим запись Choice по группе полуфинала и номеру посева
+                    choice = Choice.get_or_none(
+                        (Choice.title_id == self.current_title_id) &
+                        (Choice.sf_group == group_name) &
+                        (Choice.posev_sf == pos)
+                    )
+                    if choice:
+                        choice.mesto_semi_final = info['place']
+                        choice.save()
 # =================================
 class RatingLoaderThread(QThread):
     progress = pyqtSignal(int)

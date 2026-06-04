@@ -108,7 +108,7 @@ class MainWindow(QMainWindow):
             6: {"title": "Рейтинг", "description": "Рейтинг участников",
                 "buttons": ["🔄 Обновить", "🏆 Топ-10", "📊 Расчёт"]},
             7: {"title": "Дополнительно", "description": "Дополнительные настройки",
-                "buttons": ["📝 Заметки", "❓ Справка", "ℹ️ О программе"]},
+                "buttons": ["📝 Заметки", "📝 Просмотреть заметки", "❓ Справка", "ℹ️ О программе"]},
         }
         
         self.current_competition_buttons = []
@@ -3386,7 +3386,7 @@ class MainWindow(QMainWindow):
         self.referee_category_combo.setCurrentIndex(0)
         self.secretary_category_combo.setCurrentIndex(0)
 
-    def on_title_selected(self, item):
+    def _on_title_selected(self, item):
         """Выбор соревнования из списка"""
         title_id = item.data(Qt.UserRole)
         if title_id:
@@ -3490,7 +3490,84 @@ class MainWindow(QMainWindow):
                 # Обновляем список этапов для бегунков
                 self.update_runner_stages()
 
-
+    def on_title_selected(self, item):
+        """Выбор соревнования из списка"""
+        title_id = item.data(Qt.UserRole)
+        if title_id:
+            self.current_title_id = title_id
+            title = Title.get_or_none(Title.id == title_id)
+            if title:
+                # Обновляем информацию на вкладке Титул
+                self.comp_name_label.setText(title.name or "-")
+                self.comp_short_name_label.setText(title.short_name_comp or "-")
+                self.comp_full_name_label.setText(title.full_name_comp or "-")
+                self.comp_sredi_label.setText(title.sredi or "-")
+                self.comp_vozrast_label.setText(title.vozrast or "-")
+                self.comp_type_info_label.setText(title.vid_turnira or "-")
+                
+                start = title.data_start.strftime("%d.%m.%Y") if title.data_start else "---"
+                end = title.data_end.strftime("%d.%m.%Y") if title.data_end else "---"
+                self.comp_dates_label.setText(f"{start} - {end}")
+                self.comp_mesto_label.setText(title.mesto or "-")
+                self.comp_referee_label.setText(title.referee or "-")
+                self.comp_referee_category_label.setText(title.kat_ref or "-")
+                self.comp_secretary_label.setText(title.secretary or "-")
+                self.comp_secretary_category_label.setText(title.kat_sec or "-")
+                
+                # ===== ЗАГРУЗКА ЗАМЕТОК =====
+                self.load_notes()
+                
+                # Если есть заметки, показываем уведомление
+                if hasattr(title, 'notes') and title.notes and title.notes.strip():
+                    # Показываем всплывающее уведомление
+                    self.show_notes_notification(title.notes)
+                
+                # Определяем пол по умолчанию
+                if "девушки" in title.name.lower() or "дев" in title.name.lower():
+                    self.current_sex = "woman"
+                else:
+                    self.current_sex = "man"
+                
+                # Обновляем меню финалов
+                self.update_finals_menu_after_selection()
+                
+                # ОБНОВЛЯЕМ АКТИВНОСТЬ ВКЛАДОК
+                self.update_tabs_enabled()
+                
+                # Обновляем кнопки категорий
+                self.create_category_buttons()
+                
+                # Загружаем участников
+                self.load_participants_for_title()
+                
+                # Переключаемся на вкладку Участники
+                self.tab_widget.setCurrentIndex(1)
+                
+                # Обновляем заголовок списка
+                self.competitions_label.setText(f"🏆 Текущее: {title.name[:40]}...")
+                self.competitions_label.setStyleSheet("""
+                    background-color: #2196F3;
+                    color: white;
+                    padding: 8px;
+                    font-weight: bold;
+                    font-size: 12px;
+                    border-radius: 3px;
+                """)
+                
+                # Сбрасываем цвет заголовка через 2 секунды
+                from PyQt5.QtCore import QTimer
+                def reset_label():
+                    count = self.list_widget.count()
+                    self.competitions_label.setText(f"🏆 Прошедшие соревнования ({count})")
+                    self.competitions_label.setStyleSheet("""
+                        background-color: #4CAF50;
+                        color: white;
+                        padding: 8px;
+                        font-weight: bold;
+                        font-size: 12px;
+                        border-radius: 3px;
+                    """)
+                QTimer.singleShot(2000, reset_label)
 # ==================================================
     def update_finals_menu_after_selection(self):
         """Обновление меню финалов после выбора соревнования"""
@@ -4017,36 +4094,86 @@ class MainWindow(QMainWindow):
 #=============================
     def update_left_panel_for_tab(self, tab_index):
         """Обновление левой панели в зависимости от вкладки (полная очистка)"""
-        # ПОЛНОСТЬЮ ОЧИЩАЕМ ЛЕВУЮ ПАНЕЛЬ
-        for i in reversed(range(self.dynamic_filters_layout.count())):
-            item = self.dynamic_filters_layout.itemAt(i)
-            if item.widget():
-                item.widget().deleteLater()
-            elif item.layout():
-                while item.layout().count():
-                    child = item.layout().takeAt(0)
-                    if child.widget():
-                        child.widget().deleteLater()
+        # Защита от повторного входа
+        if hasattr(self, '_updating_left_panel') and self._updating_left_panel:
+            return
+        self._updating_left_panel = True
         
-        context = self.tab_context.get(tab_index, self.tab_context[0])
+        try:
+            # ПОЛНАЯ ОЧИСТКА ЛЕВОЙ ПАНЕЛИ
+            while self.dynamic_filters_layout.count():
+                item = self.dynamic_filters_layout.takeAt(0)
+                if item.widget():
+                    item.widget().deleteLater()
+                elif item.layout():
+                    self.clear_layout(item.layout())
         
-        # Обновляем заголовок и описание
-        self.action_title.setText(f"🔧 {context['title']}")
-        self.action_description.setText(context['description'])
+            context = self.tab_context.get(tab_index, self.tab_context[0])     
+            # Обновляем заголовок и описание
+            self.action_title.setText(f"🔧 {context['title']}")
+            self.action_description.setText(context['description'])
+            
+            buttons = context["buttons"]
         
-        buttons = context["buttons"]
-        
-        # Проверяем, является ли список кнопок двумерным (для рядов)
-        if buttons and isinstance(buttons[0], list):
-            # Создаем ряды кнопок (как для Участников)
-            for row_buttons in buttons:
-                row_layout = QHBoxLayout()
-                row_layout.setSpacing(10)
-                
-                for btn_text in row_buttons:
+            # Проверяем, является ли список кнопок двумерным (для рядов)
+            if buttons and isinstance(buttons[0], list):
+                # Создаем ряды кнопок (как для Участников)
+                for row_buttons in buttons:
+                    row_layout = QHBoxLayout()
+                    row_layout.setSpacing(10)
+                    
+                    for btn_text in row_buttons:
+                        btn = QPushButton(btn_text)
+                        btn.setMinimumHeight(35)
+                        btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+                        btn.setStyleSheet("""
+                            QPushButton {
+                                background-color: #4CAF50;
+                                color: white;
+                                border: none;
+                                border-radius: 4px;
+                                padding: 8px;
+                                font-size: 11px;
+                                font-weight: bold;
+                            }
+                            QPushButton:hover { background-color: #45a049; }
+                        """)
+                        
+                        # Привязываем функции
+                        if tab_index == 1:  # Участники
+                            if btn_text == "➕ Добавить":
+                                btn.clicked.connect(self.add_player_from_form)
+                            elif btn_text == "✏️ Редактировать":
+                                btn.clicked.connect(self.edit_player)
+                            elif btn_text == "🗑️ Удалить":
+                                btn.clicked.connect(self.delete_player_from_table)
+                            elif btn_text == "🔍 Поиск":
+                                btn.clicked.connect(self.search_players)
+                            elif btn_text == "📤 Экспорт":
+                                btn.clicked.connect(self.export_players)
+                            elif btn_text == "🗑️ Очистить":
+                                btn.clicked.connect(self.clear_player_form)
+                        elif tab_index == 4:  # Система
+                            if btn_text == "🔍 Поиск в Choice":
+                                btn.clicked.connect(self.search_in_choice_table)
+                            elif btn_text == "📊 Статистика":
+                                btn.clicked.connect(self.show_choice_statistics)
+                            elif btn_text == "🗑️ Очистить":
+                                btn.clicked.connect(self.clear_choice_table)
+                            elif btn_text == "📋 Отчет":
+                                btn.clicked.connect(self.export_choice_report)
+                        elif tab_index == 0:  # Титул
+                            if btn_text == "📋 Создать новое":
+                                btn.clicked.connect(self.new_competition)
+                        
+                        row_layout.addWidget(btn)
+                    
+                    self.dynamic_filters_layout.addLayout(row_layout)
+            else:
+                # Обычное отображение (для других вкладок, включая Результаты)
+                for btn_text in buttons:
                     btn = QPushButton(btn_text)
-                    btn.setMinimumHeight(35)
-                    btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+                    btn.setMinimumHeight(32)
                     btn.setStyleSheet("""
                         QPushButton {
                             background-color: #4CAF50;
@@ -4056,110 +4183,81 @@ class MainWindow(QMainWindow):
                             padding: 8px;
                             font-size: 11px;
                             font-weight: bold;
+                            text-align: left;
+                            padding-left: 12px;
                         }
                         QPushButton:hover { background-color: #45a049; }
                     """)
                     
-                    # Привязываем функции
-                    if tab_index == 1:  # Участники
-                        if btn_text == "➕ Добавить":
-                            btn.clicked.connect(self.add_player_from_form)
-                        elif btn_text == "✏️ Редактировать":
-                            btn.clicked.connect(self.edit_player)
-                        elif btn_text == "🗑️ Удалить":
-                            btn.clicked.connect(self.delete_player_from_table)
-                        elif btn_text == "🔍 Поиск":
-                            btn.clicked.connect(self.search_players)
-                        elif btn_text == "📤 Экспорт":
-                            btn.clicked.connect(self.export_players)
-                        elif btn_text == "🗑️ Очистить":
-                            btn.clicked.connect(self.clear_player_form)
-                    elif tab_index == 4:  # Система
-                        if btn_text == "🔍 Поиск в Choice":
-                            btn.clicked.connect(self.search_in_choice_table)
-                        elif btn_text == "📊 Статистика":
-                            btn.clicked.connect(self.show_choice_statistics)
-                        elif btn_text == "🗑️ Очистить":
-                            btn.clicked.connect(self.clear_choice_table)
-                        elif btn_text == "📋 Отчет":
-                            btn.clicked.connect(self.export_choice_report)
-                    elif tab_index == 0:  # Титул
+                    if tab_index == 0:  # Титул
                         if btn_text == "📋 Создать новое":
                             btn.clicked.connect(self.new_competition)
-                    
-                    row_layout.addWidget(btn)
-                
-                self.dynamic_filters_layout.addLayout(row_layout)
-        else:
-            # Обычное отображение (для других вкладок, включая Результаты)
-            for btn_text in buttons:
-                btn = QPushButton(btn_text)
-                btn.setMinimumHeight(32)
-                btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: #4CAF50;
-                        color: white;
-                        border: none;
-                        border-radius: 4px;
-                        padding: 8px;
-                        font-size: 11px;
-                        font-weight: bold;
-                        text-align: left;
-                        padding-left: 12px;
-                    }
-                    QPushButton:hover { background-color: #45a049; }
-                """)
-                
-                if tab_index == 0:  # Титул
-                    if btn_text == "📋 Создать новое":
-                        btn.clicked.connect(self.new_competition)
-                elif tab_index == 2:  # Команды
-                    if btn_text == "➕ Добавить":
-                        btn.clicked.connect(self.add_team)
-                    elif btn_text == "✏️ Редактировать":
-                        btn.clicked.connect(self.edit_team)
-                    elif btn_text == "🗑️ Удалить":
-                        btn.clicked.connect(self.delete_team)
-                    elif btn_text == "⭐ Рейтинг":
-                        btn.clicked.connect(self.show_team_rating)
-                elif tab_index == 3:  # Пары
-                    if btn_text == "🎲 Сформировать":
-                        btn.clicked.connect(self.generate_pairs)
-                    elif btn_text == "🔄 Разбить":
-                        btn.clicked.connect(self.break_pairs)
-                    elif btn_text == "📊 Посев":
-                        btn.clicked.connect(self.seeding_pairs)
-                elif tab_index == 5:  # Результаты
-                    if btn_text == "🎯 Выбрать этап":
-                        btn.clicked.connect(self.select_stage_for_results)
-                    elif btn_text == "🔄 Обновить":
-                        btn.clicked.connect(self.refresh_results_data)
-                    elif btn_text == "📊 Фильтры":
-                        btn.clicked.connect(self.show_results_filters)
-                    elif btn_text == "📤 Экспорт":
-                        btn.clicked.connect(self.export_results_to_pdf)
-                elif tab_index == 6:  # Рейтинг
-                    if btn_text == "🔄 Обновить":
-                        btn.clicked.connect(self.update_rating)
-                    elif btn_text == "🏆 Топ-10":
-                        btn.clicked.connect(self.show_top10)
-                    elif btn_text == "📊 Расчёт":
-                        btn.clicked.connect(self.calculate_rating)
-                elif tab_index == 7:  # Дополнительно
-                    if btn_text == "📝 Заметки":
-                        btn.clicked.connect(self.show_notes)
-                    elif btn_text == "❓ Справка":
-                        btn.clicked.connect(self.show_help)
-                    elif btn_text == "ℹ️ О программе":
-                        btn.clicked.connect(self.about_dialog)
-                
-                self.dynamic_filters_layout.addWidget(btn)
+                    elif tab_index == 2:  # Команды
+                        if btn_text == "➕ Добавить":
+                            btn.clicked.connect(self.add_team)
+                        elif btn_text == "✏️ Редактировать":
+                            btn.clicked.connect(self.edit_team)
+                        elif btn_text == "🗑️ Удалить":
+                            btn.clicked.connect(self.delete_team)
+                        elif btn_text == "⭐ Рейтинг":
+                            btn.clicked.connect(self.show_team_rating)
+                    elif tab_index == 3:  # Пары
+                        if btn_text == "🎲 Сформировать":
+                            btn.clicked.connect(self.generate_pairs)
+                        elif btn_text == "🔄 Разбить":
+                            btn.clicked.connect(self.break_pairs)
+                        elif btn_text == "📊 Посев":
+                            btn.clicked.connect(self.seeding_pairs)
+                    elif tab_index == 5:  # Результаты
+                        if btn_text == "🎯 Выбрать этап":
+                            btn.clicked.connect(self.select_stage_for_results)
+                        elif btn_text == "🔄 Обновить":
+                            btn.clicked.connect(self.refresh_results_data)
+                        elif btn_text == "📊 Фильтры":
+                            btn.clicked.connect(self.show_results_filters)
+                        elif btn_text == "📤 Экспорт":
+                            btn.clicked.connect(self.export_results_to_pdf)
+                    elif tab_index == 6:  # Рейтинг
+                        if btn_text == "🔄 Обновить":
+                            btn.clicked.connect(self.update_rating)
+                        elif btn_text == "🏆 Топ-10":
+                            btn.clicked.connect(self.show_top10)
+                        elif btn_text == "📊 Расчёт":
+                            btn.clicked.connect(self.calculate_rating)
+                    elif tab_index == 7:  # Дополнительно
+                        if btn_text == "📝 Заметки":
+                            btn.clicked.connect(self.show_notes)
+                        elif btn_text == "❓ Справка":
+                            btn.clicked.connect(self.show_help)
+                        elif btn_text == "ℹ️ О программе":
+                            btn.clicked.connect(self.about_dialog)
+                        elif btn_text == "📝 Просмотреть заметки":
+                            btn.clicked.connect(self.show_notes_dialog)   
+                        # Кнопка просмотра заметок
+                        # view_notes_btn = QPushButton("📝 Просмотреть заметки")
+                        # view_notes_btn.setMinimumHeight(35)
+                        # view_notes_btn.setStyleSheet(self.get_button_style())
+                        # view_notes_btn.clicked.connect(self.show_notes_dialog)
+                        # self.dynamic_filters_layout.addWidget(view_notes_btn)
+                                    
+                    self.dynamic_filters_layout.addWidget(btn)
         
-        # Добавляем фильтры ТОЛЬКО для вкладки Участники
-        if tab_index == 1:
-            self.add_participant_filters()
-        
-        self.dynamic_filters_layout.addStretch()
+            # Добавляем фильтры ТОЛЬКО для вкладки Участники
+            if tab_index == 1:
+                self.add_participant_filters()
+            
+            self.dynamic_filters_layout.addStretch()
+        finally:
+            self._updating_left_panel = False
+
+    def clear_layout(self, layout):
+        """Рекурсивная очистка layout"""
+        while layout.count():
+            item = layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+            elif item.layout():
+                self.clear_layout(item.layout())
 # =======================================
     def add_player_from_form(self):
         """Добавление участника из формы на вкладке Участники"""
@@ -15528,9 +15626,12 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Не удалось создать бегунки")
 
     def save_notes(self):
-        """Сохранение заметок"""
+        """Сохранение заметок в базу данных"""
         if not self.current_title_id:
             QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+        
+        if not hasattr(self, 'notes_text'):
             return
         
         notes = self.notes_text.toPlainText()
@@ -15544,18 +15645,24 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить заметки: {str(e)}")
 
     def load_notes(self):
-        """Загрузка заметок"""
+        """Загрузка заметок из базы данных"""
         if not self.current_title_id:
+            if hasattr(self, 'notes_text'):
+                self.notes_text.clear()
             return
         
         try:
             title = Title.get_by_id(self.current_title_id)
             if hasattr(title, 'notes') and title.notes:
-                self.notes_text.setText(title.notes)
+                if hasattr(self, 'notes_text'):
+                    self.notes_text.setText(title.notes)
             else:
-                self.notes_text.clear()
+                if hasattr(self, 'notes_text'):
+                    self.notes_text.clear()
         except Exception as e:
             print(f"Ошибка загрузки заметок: {e}")
+            if hasattr(self, 'notes_text'):
+                self.notes_text.clear()
 
     def _get_players_for_stage(self, stage):
         """Получение всех игроков для этапа"""
@@ -16952,6 +17059,141 @@ class MainWindow(QMainWindow):
                     )
         
         print(f"Создано {len(tours) * (total_players // 2)} встреч для этапа 'Одна таблица'")
+
+    def show_notes_notification(self, notes_text):
+        """Показать уведомление о наличии заметок"""
+        # Создаем уведомление в правом нижнем углу
+        notification = QFrame(self)
+        notification.setStyleSheet("""
+            QFrame {
+                background-color: #FF9800;
+                border-radius: 5px;
+                padding: 10px;
+                margin: 5px;
+            }
+            QLabel {
+                color: white;
+                font-size: 11px;
+            }
+        """)
+        notification.setFixedSize(300, 80)
+        
+        layout = QVBoxLayout(notification)
+        layout.setContentsMargins(10, 5, 10, 5)
+        
+        title_label = QLabel("📝 Заметки к соревнованию")
+        title_label.setStyleSheet("font-weight: bold; font-size: 12px;")
+        layout.addWidget(title_label)
+        
+        # Показываем превью заметок (первые 100 символов)
+        preview = notes_text[:100] + "..." if len(notes_text) > 100 else notes_text
+        preview_label = QLabel(preview)
+        preview_label.setWordWrap(True)
+        layout.addWidget(preview_label)
+        
+        # Кнопка "Показать все"
+        show_btn = QPushButton("Показать все")
+        show_btn.setStyleSheet("""
+            QPushButton {
+                background-color: white;
+                color: #FF9800;
+                border: none;
+                padding: 3px;
+                font-size: 10px;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background-color: #f0f0f0;
+            }
+        """)
+        show_btn.clicked.connect(self.show_notes_dialog)
+        layout.addWidget(show_btn)
+        
+        # Позиционируем в правом нижнем углу
+        notification.move(self.width() - notification.width() - 10, 
+                        self.height() - notification.height() - 50)
+        notification.show()
+        
+        # Автоматически скрываем через 5 секунд
+        QTimer.singleShot(5000, notification.deleteLater)
+        
+        # Сохраняем ссылку для возможного закрытия
+        self.notification = notification
+
+    def show_notes_dialog(self):
+        """Показать диалог с полным текстом заметок"""
+        if not self.current_title_id:
+            return
+        
+        title = Title.get_by_id(self.current_title_id)
+        notes = title.notes if title.notes else ""
+        
+        if not notes:
+            QMessageBox.information(self, "Заметки", "Нет сохраненных заметок")
+            return
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Заметки к соревнованию")
+        dialog.setModal(True)
+        dialog.setMinimumWidth(500)
+        dialog.setMinimumHeight(400)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # Заголовок
+        title_label = QLabel(f"Заметки: {title.name}")
+        title_label.setStyleSheet("font-weight: bold; font-size: 13px; margin-bottom: 10px;")
+        layout.addWidget(title_label)
+        
+        # Текст заметок
+        notes_text = QTextEdit()
+        notes_text.setPlainText(notes)
+        notes_text.setReadOnly(True)
+        notes_text.setStyleSheet("""
+            QTextEdit {
+                font-family: Consolas, monospace;
+                font-size: 11px;
+                background-color: #f9f9f9;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                padding: 10px;
+            }
+        """)
+        layout.addWidget(notes_text)
+        
+        # Кнопка редактирования
+        btn_layout = QHBoxLayout()
+        edit_btn = QPushButton("✏️ Редактировать")
+        edit_btn.setStyleSheet("background-color: #2196F3; color: white; padding: 5px;")
+        edit_btn.clicked.connect(lambda: self.edit_notes_from_dialog(dialog, notes_text))
+        
+        close_btn = QPushButton("Закрыть")
+        close_btn.setStyleSheet("background-color: #f44336; color: white; padding: 5px;")
+        close_btn.clicked.connect(dialog.accept)
+        
+        btn_layout.addWidget(edit_btn)
+        btn_layout.addStretch()
+        btn_layout.addWidget(close_btn)
+        layout.addLayout(btn_layout)
+        
+        dialog.exec_()
+
+    def edit_notes_from_dialog(self, dialog, notes_text):
+        """Редактирование заметок из диалога"""
+        # Закрываем диалог просмотра
+        dialog.accept()
+        
+        # Переключаемся на вкладку Дополнительно
+        self.tab_widget.setCurrentIndex(7)
+        
+        # Устанавливаем фокус на поле заметок
+        if hasattr(self, 'notes_text'):
+            self.notes_text.setPlainText(notes_text.toPlainText())
+            self.notes_text.setFocus()
+        
+        QMessageBox.information(self, "Редактирование", 
+                            "Заметки можно редактировать на вкладке 'Дополнительно'.\n"
+                            "Не забудьте сохранить изменения.")
 
 # =================================
 class RatingLoaderThread(QThread):

@@ -107,6 +107,7 @@ class Title(BaseModel):
     otchestvo = IntegerField()
     r_date = CharField()
     vid_turnira = CharField(15)
+    notes = TextField(null=True, default='')  # Заметки о соревновании
 
     class Meta:
         db_table = "titles"

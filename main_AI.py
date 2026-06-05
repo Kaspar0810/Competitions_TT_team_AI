@@ -3690,9 +3690,9 @@ class MainWindow(QMainWindow):
                 # Если есть выбранный этап, загружаем его
                 if hasattr(self, 'current_stage') and self.current_stage:
                     self.load_results_table_for_stage(self.current_stage)
-                else:
-                    # Показываем диалог выбора этапа
-                    QTimer.singleShot(100, self.select_stage_for_results)
+                # else:
+                #     # Показываем диалог выбора этапа
+                #     QTimer.singleShot(100, self.select_stage_for_results)
             
             # Скрываем секцию создания этапа
             self.stage_section.setVisible(False)
@@ -13247,7 +13247,7 @@ class MainWindow(QMainWindow):
         btn_layout.addWidget(ok_btn)
         btn_layout.addWidget(cancel_btn)
         layout.addLayout(btn_layout)
-        
+        # диалог выбора этапа
         if dialog.exec_() == QDialog.Accepted:
             selected = list_widget.currentItem()
             if selected:
@@ -13256,6 +13256,8 @@ class MainWindow(QMainWindow):
                 self.load_matches_for_stage(stage_name)
                 # Обновляем таблицу результатов
                 self.load_results_table_for_stage(stage_name)
+                self.tab_widget.setCurrentIndex(5)
+                
 # ============================= 2805
     def refresh_results_data(self):
         """Обновление данных результатов"""

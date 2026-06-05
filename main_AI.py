@@ -12672,222 +12672,11 @@ class MainWindow(QMainWindow):
             raise e
 # ===============================        
     def search_in_choice_table(self):
-        """Поиск информации в таблице Choice"""
-        if not self.current_title_id:
-            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
-            return
-        
-        # Проверяем существование таблицы Choice
-        try:
-            # Проверяем, есть ли записи в Choice для текущего соревнования
-            choices_count = Choice.select().where(Choice.title_id == self.current_title_id).count()
-            
-            if choices_count == 0:
-                QMessageBox.information(self, "Информация", 
-                                    "Таблица Choice пуста.\n"
-                                    "Сначала проведите жеребьевку квалификации.")
-                return
-        except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Ошибка доступа к таблице Choice: {str(e)}")
-            return
-        
-        # Создаем диалог поиска
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Поиск в таблице Choice")
-        dialog.setModal(True)
-        dialog.setMinimumWidth(650)
-        dialog.setMinimumHeight(550)
-        
-        layout = QVBoxLayout(dialog)
-        
-        # Заголовок
-        title_label = QLabel("Поиск участников в жеребьевке (таблица Choice)")
-        title_label.setStyleSheet("font-weight: bold; font-size: 13px; margin-bottom: 10px;")
-        layout.addWidget(title_label)
-        
-        # Поле для ввода поискового запроса
-        search_layout = QHBoxLayout()
-        search_layout.addWidget(QLabel("Поиск:"))
-        search_edit = QLineEdit()
-        search_edit.setPlaceholderText("Введите ФИО, регион, тренера или группу...")
-        search_edit.setMinimumWidth(300)
-        search_layout.addWidget(search_edit)
-        layout.addLayout(search_layout)
-        
-        # Выбор типа поиска
-        type_layout = QHBoxLayout()
-        type_layout.addWidget(QLabel("Тип поиска:"))
-        search_type_combo = QComboBox()
-        search_type_combo.addItems(["Везде", "По ФИО", "По региону", "По тренеру", "По группе", "По рейтингу"])
-        type_layout.addWidget(search_type_combo)
-        type_layout.addStretch()
-        layout.addLayout(type_layout)
-        
-        # Кнопки
-        buttons_layout = QHBoxLayout()
-        search_btn = QPushButton("🔍 Найти")
-        search_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 5px;")
-        clear_btn = QPushButton("🗑️ Очистить")
-        clear_btn.setStyleSheet("background-color: #FF9800; color: white; padding: 5px;")
-        close_btn = QPushButton("Закрыть")
-        close_btn.setStyleSheet("background-color: #f44336; color: white; padding: 5px;")
-        buttons_layout.addWidget(search_btn)
-        buttons_layout.addWidget(clear_btn)
-        buttons_layout.addWidget(close_btn)
-        layout.addLayout(buttons_layout)
-        
-        # Результаты поиска
-        result_label = QLabel("Результаты поиска:")
-        result_label.setStyleSheet("font-weight: bold; margin-top: 10px;")
-        layout.addWidget(result_label)
-        
-        result_list = QListWidget()
-        result_list.setStyleSheet("""
-            QListWidget {
-                min-height: 350px;
-                border: 1px solid #ccc;
-                border-radius: 3px;
-                font-size: 11px;
-            }
-            QListWidget::item {
-                padding: 8px;
-                border-bottom: 1px solid #eee;
-            }
-            QListWidget::item:selected {
-                background-color: #4CAF50;
-                color: white;
-            }
-        """)
-        layout.addWidget(result_list)
-        
-        def perform_search():
-            search_text = search_edit.text().strip().lower()
-            search_type = search_type_combo.currentText()
-            
-            if not search_text:
-                QMessageBox.warning(dialog, "Ошибка", "Введите текст для поиска")
-                return
-            
-            result_list.clear()
-            
-            try:
-                # Получаем все записи Choice для текущего соревнования
-                choices = Choice.select().where(Choice.title_id == self.current_title_id)
-                
-                results = []
-                for choice in choices:
-                    # Получаем данные игрока
-                    player = Player.get_or_none(Player.id == choice.player_choice.id)
-                    if not player:
-                        continue
-                    
-                    match = False
-                    highlight_text = ""
-                    
-                    # Приводим все к нижнему регистру для сравнения
-                    family_lower = choice.family.lower() if choice.family else ""
-                    region_lower = choice.region.lower() if choice.region else ""
-                    coach_lower = choice.coach.lower() if choice.coach else ""
-                    group_lower = choice.group.lower() if choice.group else ""
-                    rank_str = str(choice.rank)
-                    
-                    if search_type == "Везде":
-                        if (search_text in family_lower or
-                            search_text in region_lower or
-                            search_text in coach_lower or
-                            search_text in group_lower or
-                            search_text == rank_str):
-                            match = True
-                            if search_text in family_lower:
-                                highlight_text = f"ФИО: {choice.family}"
-                            elif search_text in region_lower:
-                                highlight_text = f"Регион: {choice.region}"
-                            elif search_text in coach_lower:
-                                highlight_text = f"Тренер: {choice.coach}"
-                            elif search_text in group_lower:
-                                highlight_text = f"Группа: {choice.group}"
-                            elif search_text == rank_str:
-                                highlight_text = f"Рейтинг: {choice.rank}"
-                    
-                    elif search_type == "По ФИО":
-                        if search_text in family_lower:
-                            match = True
-                            highlight_text = f"ФИО: {choice.family}"
-                    
-                    elif search_type == "По региону":
-                        if search_text in region_lower:
-                            match = True
-                            highlight_text = f"Регион: {choice.region}"
-                    
-                    elif search_type == "По тренеру":
-                        if search_text in coach_lower:
-                            match = True
-                            highlight_text = f"Тренер: {choice.coach}"
-                    
-                    elif search_type == "По группе":
-                        if search_text in group_lower:
-                            match = True
-                            highlight_text = f"Группа: {choice.group}"
-                    
-                    elif search_type == "По рейтингу":
-                        if search_text == rank_str:
-                            match = True
-                            highlight_text = f"Рейтинг: {choice.rank}"
-                    
-                    if match:
-                        results.append({
-                            'id': choice.id,
-                            'family': choice.family,
-                            'region': choice.region,
-                            'coach': choice.coach,
-                            'rank': choice.rank,
-                            'group': choice.group,
-                            'posev_group': choice.posev_group,
-                            'mesto_group': choice.mesto_group,
-                            'highlight': highlight_text
-                        })
-                
-                if results:
-                    for r in results:
-                        item_text = f"""🏅 {r['family']}
-    📍 Регион: {r['region']}
-    👨‍🏫 Тренер: {r['coach']}
-    📊 Рейтинг: {r['rank']}
-    🏆 Группа: {r['group']} (посев: {r['posev_group']}, место: {r['mesto_group'] or 'не определено'})
-    🔍 Найдено по: {r['highlight']}"""
-                        item = QListWidgetItem(item_text)
-                        item.setData(Qt.UserRole, r['id'])
-                        result_list.addItem(item)
-                    
-                    result_label.setText(f"Результаты поиска: найдено {len(results)} участников")
-                else:
-                    result_list.addItem("Ничего не найдено")
-                    result_label.setText("Результаты поиска: ничего не найдено")
-                    
-            except Exception as e:
-                QMessageBox.critical(dialog, "Ошибка", f"Ошибка поиска: {str(e)}")
-        
-        def clear_search():
-            search_edit.clear()
-            search_type_combo.setCurrentIndex(0)
-            result_list.clear()
-            result_label.setText("Результаты поиска:")
-        
-        search_btn.clicked.connect(perform_search)
-        clear_btn.clicked.connect(clear_search)
-        close_btn.clicked.connect(dialog.reject)
-        search_edit.returnPressed.connect(perform_search)
-        
-        dialog.exec_()
-
-# ================================
-    def _search_in_choice_table(self):
         """Поиск информации в таблице Choice с выводом полной информации"""
         if not self.current_title_id:
             QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
             return
         
-        # Проверяем существование таблицы Choice
         try:
             choices_count = Choice.select().where(Choice.title_id == self.current_title_id).count()
             if choices_count == 0:
@@ -12899,11 +12688,11 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Ошибка", f"Ошибка доступа к таблице Choice: {str(e)}")
             return
         
-        # Создаем диалог поиска
+        # Диалог поиска
         dialog = QDialog(self)
         dialog.setWindowTitle("Поиск в таблице Choice")
         dialog.setModal(True)
-        dialog.setMinimumWidth(800)
+        dialog.setMinimumWidth(400)
         dialog.setMinimumHeight(600)
         
         layout = QVBoxLayout(dialog)
@@ -12938,20 +12727,19 @@ class MainWindow(QMainWindow):
         
         layout.addWidget(search_panel)
         
-        # Результаты поиска
+        # Результаты поиска (краткий список)
         result_label = QLabel("Результаты поиска:")
         result_label.setStyleSheet("font-weight: bold; margin-top: 10px;")
         layout.addWidget(result_label)
         
-        # Список результатов (краткий)
         result_list = QListWidget()
         result_list.setStyleSheet("""
             QListWidget {
-                min-height: 200px;
-                max-height: 250px;
+                min-height:50px;
+                max-height: 100px;
                 border: 1px solid #ccc;
                 border-radius: 3px;
-                font-size: 11px;
+                font-size: 14px;
             }
             QListWidget::item {
                 padding: 8px;
@@ -12969,7 +12757,7 @@ class MainWindow(QMainWindow):
         detail_group.setStyleSheet("""
             QGroupBox {
                 font-weight: bold;
-                font-size: 12px;
+                font-size: 14px;
                 border: 2px solid #2196F3;
                 border-radius: 5px;
                 margin-top: 10px;
@@ -12983,13 +12771,12 @@ class MainWindow(QMainWindow):
         """)
         detail_layout = QVBoxLayout(detail_group)
         
-        # Текстовое поле для детальной информации
         detail_text = QTextEdit()
         detail_text.setReadOnly(True)
         detail_text.setStyleSheet("""
             QTextEdit {
                 font-family: Consolas, monospace;
-                font-size: 11px;
+                font-size: 12px;
                 background-color: #f9f9f9;
                 border: 1px solid #ddd;
                 border-radius: 3px;
@@ -13000,7 +12787,7 @@ class MainWindow(QMainWindow):
         
         layout.addWidget(detail_group)
         
-        # Кнопки действий
+        # Кнопки
         action_layout = QHBoxLayout()
         close_btn = QPushButton("Закрыть")
         close_btn.setStyleSheet("background-color: #f44336; color: white; padding: 5px 15px;")
@@ -13009,6 +12796,7 @@ class MainWindow(QMainWindow):
         action_layout.addWidget(close_btn)
         layout.addLayout(action_layout)
         
+        # ---- Функции поиска и отображения ----
         def perform_search():
             search_text = search_edit.text().strip().lower()
             search_type = search_type_combo.currentText()
@@ -13021,20 +12809,15 @@ class MainWindow(QMainWindow):
             detail_text.clear()
             
             try:
-                # Получаем все записи Choice для текущего соревнования
-                choices = Choice.select().where(Choice.title_id == self.current_title_id)
-                
+                all_choices = Choice.select().where(Choice.title_id == self.current_title_id)
                 results = []
-                for choice in choices:
-                    # Получаем данные игрока
+                for choice in all_choices:
                     player = Player.get_or_none(Player.id == choice.player_choice.id)
                     if not player:
                         continue
                     
                     match = False
-                    highlight_text = ""
-                    
-                    # Приводим все к нижнему регистру для сравнения
+                    highlight = ""
                     family_lower = choice.family.lower() if choice.family else ""
                     region_lower = choice.region.lower() if choice.region else ""
                     coach_lower = choice.coach.lower() if choice.coach else ""
@@ -13049,73 +12832,54 @@ class MainWindow(QMainWindow):
                             search_text == rank_str):
                             match = True
                             if search_text in family_lower:
-                                highlight_text = f"ФИО: {choice.family}"
+                                highlight = f"ФИО: {choice.family}"
                             elif search_text in region_lower:
-                                highlight_text = f"Регион: {choice.region}"
+                                highlight = f"Регион: {choice.region}"
                             elif search_text in coach_lower:
-                                highlight_text = f"Тренер: {choice.coach}"
+                                highlight = f"Тренер: {choice.coach}"
                             elif search_text in group_lower:
-                                highlight_text = f"Группа: {choice.group}"
+                                highlight = f"Группа: {choice.group}"
                             elif search_text == rank_str:
-                                highlight_text = f"Рейтинг: {choice.rank}"
-                    
+                                highlight = f"Рейтинг: {choice.rank}"
                     elif search_type == "По ФИО":
                         if search_text in family_lower:
                             match = True
-                            highlight_text = f"ФИО: {choice.family}"
-                    
+                            highlight = f"ФИО: {choice.family}"
                     elif search_type == "По региону":
                         if search_text in region_lower:
                             match = True
-                            highlight_text = f"Регион: {choice.region}"
-                    
+                            highlight = f"Регион: {choice.region}"
                     elif search_type == "По тренеру":
                         if search_text in coach_lower:
                             match = True
-                            highlight_text = f"Тренер: {choice.coach}"
-                    
+                            highlight = f"Тренер: {choice.coach}"
                     elif search_type == "По группе":
                         if search_text in group_lower:
                             match = True
-                            highlight_text = f"Группа: {choice.group}"
-                    
+                            highlight = f"Группа: {choice.group}"
                     elif search_type == "По рейтингу":
                         if search_text == rank_str:
                             match = True
-                            highlight_text = f"Рейтинг: {choice.rank}"
+                            highlight = f"Рейтинг: {choice.rank}"
                     
                     if match:
                         results.append({
-                            'id': choice.id,
-                            'family': choice.family,
-                            'region': choice.region,
-                            'coach': choice.coach,
-                            'rank': choice.rank,
-                            'group': choice.group,
-                            'posev_group': choice.posev_group,
-                            'mesto_group': choice.mesto_group,
-                            'basic': choice.basic,
-                            'sex': choice.sex,
-                            'player_id': player.id,
-                            'player_fio': player.fio,
-                            'player_city': player.city,
-                            'player_bday': player.bday,
-                            'player_razryad': player.razryad,
-                            'highlight': highlight_text
+                            'choice': choice,
+                            'player': player,
+                            'highlight': highlight
                         })
                 
                 if results:
-                    for r in results:
-                        item_text = f"🏅 {r['family']} | {r['group']} | Рейтинг: {r['rank']}"
+                    for res in results:
+                        choice = res['choice']
+                        item_text = f"🏅 {choice.family} | {choice.region} | {choice.coach} | Рейтинг: {choice.rank}"
                         item = QListWidgetItem(item_text)
-                        item.setData(Qt.UserRole, r)
+                        item.setData(Qt.UserRole, res)
                         result_list.addItem(item)
-                    
                     result_label.setText(f"Результаты поиска: найдено {len(results)} участников")
                 else:
                     result_list.addItem("Ничего не найдено")
                     result_label.setText("Результаты поиска: ничего не найдено")
-                    
             except Exception as e:
                 QMessageBox.critical(dialog, "Ошибка", f"Ошибка поиска: {str(e)}")
         
@@ -13123,47 +12887,69 @@ class MainWindow(QMainWindow):
             current_item = result_list.currentItem()
             if not current_item:
                 return
-            
             data = current_item.data(Qt.UserRole)
             if not data:
                 return
+            choice = data['choice']
+            player = data['player']
             
-            # Формируем детальную информацию
+            # Получаем все записи Choice для этого игрока (по player_choice)
+            player_choices = Choice.select().where(
+                (Choice.title_id == self.current_title_id) &
+                (Choice.player_choice_id == player.id)
+            ).order_by(Choice.id)
+            
             details = "=" * 60 + "\n"
             details += "📋 ПОЛНАЯ ИНФОРМАЦИЯ ОБ УЧАСТНИКЕ\n"
             details += "=" * 60 + "\n\n"
             
-            details += "【 ИНФОРМАЦИЯ ИЗ ТАБЛИЦЫ CHOICE 】\n"
-            details += f"  🆔 ID записи: {data['id']}\n"
-            details += f"  👤 ФИО: {data['family']}\n"
-            details += f"  📍 Регион: {data['region'] or '—'}\n"
-            details += f"  👨‍🏫 Тренер: {data['coach'] or '—'}\n"
-            details += f"  📊 Рейтинг: {data['rank']}\n"
-            details += f"  🏆 Группа: {data['group'] or '—'}\n"
-            details += f"  🎯 Номер посева в группе: {data['posev_group'] or '—'}\n"
-            details += f"  🥇 Место в группе: {data['mesto_group'] or '—'}\n"
-            details += f"  🚻 Пол: {'Мужской' if data['sex'] == 'man' else 'Женский' if data['sex'] == 'woman' else '—'}\n"
-            details += f"  📝 Базовый: {data['basic'] or '—'}\n\n"
+            # Общая информация
+            details += "【 ОБЩАЯ ИНФОРМАЦИЯ 】\n"
+            details += f"  👤 ФИО: {choice.family}\n"
+            details += f"  🏙️ Город: {player.city or '—'}\n"
+            details += f"  📍 Регион: {choice.region or '—'}\n"
+            details += f"  👨‍🏫 Тренер: {choice.coach or '—'}\n"
+            details += f"  📊 Рейтинг: {choice.rank}\n\n"
+
+            # --- Квалификация ---
+            qual_choices = [c for c in player_choices if c.group in c.group]
+            if qual_choices:
+                details += "【 КВАЛИФИКАЦИЯ 】\n"
+                for qc in qual_choices:
+                    details += f"  🏆 Группа: {qc.group}\n"
+                    details += f"  🎯 Посев в группе: {qc.posev_group}\n"
+                    details += f"  🥇 Место в группе: {qc.mesto_group if qc.mesto_group else '—'}\n"
+                details += "\n"
             
-            details += "【 ИНФОРМАЦИЯ ИЗ ТАБЛИЦЫ PLAYER 】\n"
-            details += f"  🆔 ID игрока: {data['player_id']}\n"
-            details += f"  👤 ФИО: {data['player_fio'] or '—'}\n"
-            details += f"  🏙️ Город: {data['player_city'] or '—'}\n"
-            details += f"  🎂 Дата рождения: {data['player_bday'].strftime('%d.%m.%Y') if data['player_bday'] else '—'}\n"
-            details += f"  🎽 Разряд: {data['player_razryad'] or '—'}\n\n"
+            # --- Полуфиналы ---
+            sf_choices = [c for c in player_choices if c.semi_final in (1, 2)]
+            if sf_choices:
+                details += "【 ПОЛУФИНАЛЫ 】\n"
+                for sc in sf_choices:
+                    sf_num = "1-й полуфинал" if sc.semi_final == 1 else "2-й полуфинал"
+                    details += f"  🎯 {sf_num}\n"
+                    details += f"     Группа: {sc.sf_group}\n"
+                    details += f"     Посев: {sc.posev_sf}\n"
+                    details += f"     Место: {sc.mesto_semi_final if sc.mesto_semi_final else '—'}\n"
+                details += "\n"
             
-            # Поиск дополнительной информации о полуфиналах
-            if data['group']:
-                semifinal_info = Choice.select().where(
-                    (Choice.title_id == self.current_title_id) &
-                    (Choice.family == data['family'])
-                )
-                if semifinal_info.count() > 1:
-                    details += "【 УЧАСТИЕ В ПОЛУФИНАЛАХ 】\n"
-                    for sf in semifinal_info:
-                        if sf.semi_final:
-                            details += f"  🎯 {sf.stage}: Группа {sf.sf_group}, Посев {sf.posev_sf}\n"
-                    details += "\n"
+            # --- Финалы ---
+            final_choices = [c for c in player_choices if c.group and ("финал" in c.group.lower() or "Финал" in c.group)]
+            if final_choices:
+                details += "【 ФИНАЛЫ 】\n"
+                for fc in final_choices:
+                    details += f"  🏆 {fc.group}\n"
+                    details += f"     Посев: {fc.posev_group}\n"
+                    details += f"     Место: {fc.mesto_group if fc.mesto_group else '—'}\n"
+                details += "\n"
+            
+            # Дополнительно: если есть ещё какие-то записи
+            other_choices = [c for c in player_choices if c not in qual_choices and c not in sf_choices and c not in final_choices]
+            if other_choices:
+                details += "【 ПРОЧИЕ ЭТАПЫ 】\n"
+                for oc in other_choices:
+                    details += f"  📌 {oc.stage if oc.stage else oc.group}: Посев {oc.posev_group}, Место {oc.mesto_group}\n"
+                details += "\n"
             
             detail_text.setText(details)
         
@@ -13174,7 +12960,6 @@ class MainWindow(QMainWindow):
             detail_text.clear()
             result_label.setText("Результаты поиска:")
         
-        # Подключаем сигналы
         search_btn.clicked.connect(perform_search)
         clear_btn.clicked.connect(clear_search)
         result_list.itemClicked.connect(show_details)
@@ -13182,7 +12967,7 @@ class MainWindow(QMainWindow):
         search_edit.returnPressed.connect(perform_search)
         
         dialog.exec_()
-# ================================
+
     def show_choice_statistics(self):
         """Показать статистику по таблице Choice"""
         if not self.current_title_id:
@@ -17486,7 +17271,7 @@ class MainWindow(QMainWindow):
                 players_info[loser_idx]['total_points'] += point_los
                 players_info[loser_idx]['losses'] += 1
                 
-                self._add_game_and_point_stats_for_players(res, winner_idx, loser_idx, players_info)
+                # self._add_game_and_point_stats_for_players(res, winner_idx, loser_idx, players_info)
             
             if players_info:
                 # Используем существующую логику расчёта мест
@@ -17501,6 +17286,7 @@ class MainWindow(QMainWindow):
                     if choice:
                         choice.mesto_semi_final = info['place']
                         choice.save()
+
 # =================================
 class RatingLoaderThread(QThread):
     progress = pyqtSignal(int)

@@ -3573,6 +3573,9 @@ class MainWindow(QMainWindow):
                         border-radius: 3px;
                     """)
                 QTimer.singleShot(2000, reset_label)
+                
+                # Обновляем список этапов для бегунков
+                self.update_runner_stages()
 # ==================================================
     def update_finals_menu_after_selection(self):
         """Обновление меню финалов после выбора соревнования"""

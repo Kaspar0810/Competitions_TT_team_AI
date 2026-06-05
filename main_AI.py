@@ -3573,7 +3573,7 @@ class MainWindow(QMainWindow):
                         border-radius: 3px;
                     """)
                 QTimer.singleShot(2000, reset_label)
-                
+
                 # Обновляем список этапов для бегунков
                 self.update_runner_stages()
 # ==================================================
@@ -8969,7 +8969,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось добавить этап: {str(e)}")    
 # ==================================
-    def update_stages_info(self):
+    def _update_stages_info(self):
         """Обновление информационного окна со списком этапов (формат 2 строки с выравниванием)"""
         try:
             from models import System, Player, Title
@@ -9192,6 +9192,224 @@ class MainWindow(QMainWindow):
             
             # Подсчет общего времени
 
+            total_hours = total_time_minutes // 60
+            total_minutes = total_time_minutes % 60
+            if total_hours > 0:
+                total_time_str = f"{total_hours} ч {total_minutes} мин"
+            else:
+                total_time_str = f"{total_minutes} мин"
+            
+            # Подчеркивание и сумма игр всех этапов
+            info_text += "─" * 70 + "\n"
+            info_text += f"🏆 ВСЕГО НА СОРЕВНОВАНИИ: {total_all_games} ИГР | ⏱️ ОБЩЕЕ ВРЕМЯ: {total_time_str}\n"
+            
+            self.stages_info.setText(info_text)
+            
+        except Exception as e:
+            print(f"Ошибка обновления информации об этапах: {e}")
+            import traceback
+            traceback.print_exc()
+            self.stages_info.setText(f"Ошибка: {str(e)}")
+
+# =========== update 0506
+    def update_stages_info(self):
+        """Обновление информационного окна со списком этапов (формат 2 строки с выравниванием)"""
+        try:
+            from models import System, Player, Title
+            import math
+            
+            if not self.current_title_id:
+                self.stages_info.setText("Нет выбранного соревнования")
+                return
+            
+            title = Title.get_or_none(Title.id == self.current_title_id)
+            title_name = title.name if title else "Неизвестное соревнование"
+            
+            systems = System.select().where(System.title_id == self.current_title_id).order_by(System.id)
+            
+            self.stages_info.clear()
+            
+            if systems.count() == 0:
+                self.stages_info.setText(f"🏆 СОРЕВНОВАНИЕ: {title_name}\n\n{'=' * 60}\n\n❌ Нет добавленных этапов")
+                return
+            
+            # Получаем параметры системы
+            tables = getattr(self, 'system_tables', 4)
+            match_time = getattr(self, 'match_time', 15)
+            
+            info_text = f"🏆 СОРЕВНОВАНИЕ: {title_name.upper()}. СИСТЕМА ПРОВЕДЕНИЯ. | 🏓 Столов: {tables} | ⏱️ Время на матч: {match_time} мин.\n"
+            info_text += "=" * 110 + "\n\n"
+            
+            previous_stage = None
+            current_place = 1
+            total_all_games = 0
+            total_time_minutes = 0  # <--- Инициализируем общее время
+            
+            # Определяем максимальную ширину для выравнивания
+            max_games_width = 0
+            
+            # Первый проход: определяем максимальную ширину
+            temp_games_list = []
+            for system in systems:
+                total_players = Player.select().where(Player.title_id == self.current_title_id).count()
+                if total_players == 0:
+                    temp_games_list.append(0)
+                else:
+                    groups_count = system.total_group if system.total_group else 1
+                    if "полуфинал" in system.stage.lower() and previous_stage and "Квалификация" in previous_stage.stage:
+                        players_in_semifinal = previous_stage.total_group * previous_stage.mesta_exit
+                        players_per_group = previous_stage.mesta_exit * 2
+                        games = self.calculate_semifinal_games_count(groups_count, players_per_group, previous_stage)
+                    elif self.is_final_stage(system.stage):
+                        if system.kol_game_string:
+                            import re
+                            games_match = re.search(r'(\d+)', system.kol_game_string)
+                            games = int(games_match.group(1)) if games_match else 0
+                        else:
+                            if "Круговая" in system.type_table:
+                                games = (system.max_player * (system.max_player - 1)) // 2
+                            else:
+                                games = self.calculate_olympic_games(system.max_player)
+                    else:
+                        group_sizes = self.calculate_group_sizes(total_players, groups_count)
+                        games = self.calculate_total_games(
+                            system.type_table, total_players, groups_count, group_sizes,
+                            system.stage, previous_stage
+                        )
+                    temp_games_list.append(games)
+                previous_stage = system
+            
+            # Определяем максимальную ширину для выравнивания
+            max_games_width = max([len(str(g)) for g in temp_games_list]) if temp_games_list else 0
+            max_games_width = max(max_games_width, 30)
+            
+            # Второй проход: выводим с выравниванием и считаем общее время
+            previous_stage = None
+            for idx, system in enumerate(systems, 1):
+                total_players = Player.select().where(Player.title_id == self.current_title_id).count()
+                
+                if total_players == 0:
+                    distribution_text = "нет участников"
+                    total_games = 0
+                    stage_display = system.stage
+                    places_display = ""
+                    stage_time = "0 мин"
+                else:
+                    groups_count = system.total_group if system.total_group else 1
+                    
+                    # Для полуфинала
+                    if "полуфинал" in system.stage.lower() and previous_stage and "Квалификация" in previous_stage.stage:
+                        players_in_semifinal = previous_stage.total_group * previous_stage.mesta_exit
+                        players_per_group = previous_stage.mesta_exit * 2
+                        group_sizes = [players_per_group] * groups_count
+                        distribution_text = self.calculate_group_distribution(players_in_semifinal, groups_count)
+                        total_games = self.calculate_semifinal_games_count(groups_count, players_per_group, previous_stage)
+                        stage_display = system.stage
+                        places_display = ""
+                        
+                        # Расчет времени для полуфинала
+                        max_tours = self.calculate_max_tours_in_stage(group_sizes)
+                        tables_per_tour = self.calculate_tables_per_tour(group_sizes)
+                        
+                        if max_tours > 0 and tables > 0:
+                            if tables_per_tour > tables:
+                                actual_tours = max_tours * math.ceil(tables_per_tour / tables)
+                            else:
+                                actual_tours = max_tours
+                            stage_minutes = actual_tours * match_time
+                        else:
+                            stage_minutes = 0
+                        
+                    # Для финала
+                    elif self.is_final_stage(system.stage):
+                        players_in_final = system.max_player
+                        start_place = current_place
+                        end_place = current_place + players_in_final - 1
+                        
+                        distribution_text = f"{players_in_final} чел."
+                        
+                        if system.kol_game_string:
+                            import re
+                            games_match = re.search(r'(\d+)', system.kol_game_string)
+                            total_games = int(games_match.group(1)) if games_match else 0
+                        else:
+                            if "Круговая" in system.type_table:
+                                total_games = (players_in_final * (players_in_final - 1)) // 2
+                            else:
+                                total_games = self.calculate_olympic_games(players_in_final)
+                        
+                        stage_display = system.stage
+                        places_display = f" | места {start_place}-{end_place}"
+                        current_place += players_in_final
+                        
+                        # Расчет времени для финала
+                        if "Круговая" in system.type_table:
+                            max_tours = self.calculate_tours_in_group(players_in_final)
+                            tables_per_tour = players_in_final // 2
+                            if max_tours > 0 and tables > 0:
+                                if tables_per_tour > tables:
+                                    actual_tours = max_tours * math.ceil(tables_per_tour / tables)
+                                else:
+                                    actual_tours = max_tours
+                                stage_minutes = actual_tours * match_time
+                            else:
+                                stage_minutes = 0
+                        else:
+                            if tables > 0:
+                                stage_minutes = math.ceil(total_games / tables) * match_time
+                            else:
+                                stage_minutes = 0
+                        
+                    else:
+                        # Для квалификации
+                        group_sizes = self.calculate_group_sizes(total_players, groups_count)
+                        distribution_text = self.calculate_group_distribution(total_players, groups_count)
+                        total_games = self.calculate_total_games(
+                            system.type_table, total_players, groups_count, group_sizes,
+                            system.stage, previous_stage
+                        )
+                        stage_display = system.stage
+                        places_display = ""
+                        
+                        # Расчет времени для квалификации
+                        max_tours = self.calculate_max_tours_in_stage(group_sizes)
+                        tables_per_tour = self.calculate_tables_per_tour(group_sizes)
+                        
+                        if max_tours > 0 and tables > 0:
+                            if tables_per_tour > tables:
+                                actual_tours = max_tours * math.ceil(tables_per_tour / tables)
+                            else:
+                                actual_tours = max_tours
+                            stage_minutes = actual_tours * match_time
+                        else:
+                            stage_minutes = 0
+                    
+                    # Форматируем время этапа
+                    hours = stage_minutes // 60
+                    minutes = stage_minutes % 60
+                    if hours > 0:
+                        stage_time = f"{hours} ч {minutes} мин"
+                    else:
+                        stage_time = f"{minutes} мин"
+                    
+                    # Добавляем ко общему времени
+                    total_time_minutes += stage_minutes  # <--- Суммируем
+                
+                # Подсчитываем общее количество игр
+                total_all_games += total_games
+
+                # Выравниваем количество игр по правому краю
+                games_str = str(total_games)
+                games_padded = games_str.rjust(max_games_width)
+                
+                # 1-я строка: номер этапа, название, места
+                info_text += f"┌─ 📌 ЭТАП {idx}: {stage_display}{places_display}\n"
+                # 2-я строка: тип таблицы, распределение, количество игр, время
+                info_text += f"└─ 📊 {system.type_table} | {distribution_text} | {games_padded} игр | ⏱️ {stage_time}\n"
+                
+                previous_stage = system
+            
+            # Подсчет общего времени
             total_hours = total_time_minutes // 60
             total_minutes = total_time_minutes % 60
             if total_hours > 0:

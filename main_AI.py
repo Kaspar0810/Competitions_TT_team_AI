@@ -15618,12 +15618,23 @@ class MainWindow(QMainWindow):
                     assigned_players[idx] = player
                     idx += 1
         else:  # exit_count = 2 и более
-            # Просто по порядку групп
+            # Сначала по месту затем по группе
+            all_athletes = []
+            for group_id, athletes in players_by_group.items():
+                for athlete in athletes:
+                    # Добавляем информацию о группе (опционально)
+                    athlete_with_group = athlete.copy()
+                    athlete_with_group["group"] = group_id
+                    all_athletes.append(athlete_with_group)
+
+            # Сортируем: сначала по месту, затем (опционально) по имени
+            sorted_athletes = sorted(all_athletes, key=lambda x: (x["place"]))
+
             idx = 0
-            for group in sorted_groups:
-                for player in players_by_group[group]:
-                    assigned_players[idx] = player
-                    idx += 1
+            # for group in sorted_groups:
+            for player in sorted_athletes:
+                assigned_players[idx] = player
+                idx += 1
             
             k = 0
 
@@ -15744,7 +15755,10 @@ class MainWindow(QMainWindow):
 
     def transfer_results_to_final(self, final_stage, source_stage, assigned_players):
         """Переносит результаты сыгранных матчей из source_stage в final_stage."""
+        # определяем system_id
+        system = System.get_or_none((System.title_id == self.current_title_id) & (System.stage == final_stage))
         # Создаём карту игроков: player_id -> позиция в финале
+        matches_cache = {}
         player_to_pos = {}
         for idx, p in enumerate(assigned_players, 1):
             if p:
@@ -15755,9 +15769,12 @@ class MainWindow(QMainWindow):
             (Result.system_stage == source_stage)
         )
         for res in source_results:
-            # Извлекаем player_id из player1/player2 строк (сложно, лучше через Choice)
-            # Более надёжно: найти Choice по FIO, получить player_choice_id.
-            # Здесь упрощённо: ищем по имени.
+            # Создаем ключ в обе стороны для поиска
+            key1 = f"{res.player1}|{res.player2}"
+            key2 = f"{res.player2}|{res.player1}"
+            matches_cache[key1] = res
+            matches_cache[key2] = res
+
             player1_id = None
             player2_id = None
             for pid, pos in player_to_pos.items():
@@ -15766,24 +15783,75 @@ class MainWindow(QMainWindow):
                     player1_id = pid
                 if player and player.fio_city in res.player2:
                     player2_id = pid
+
             if player1_id and player2_id:
                 pos1 = player_to_pos[player1_id]
                 pos2 = player_to_pos[player2_id]
-                # Ищем матч в финале по tours = f"{pos1}-{pos2}"
-                final_match = Result.get_or_none(
+                tours_str = f"{pos1}-{pos2}"
+                player1 = res.player1
+                player2 = res.player2
+                
+                # Проверяем, был ли уже сыгран этот матч в квалификации
+                match_key = f"{player1}|{player2}"
+                previous_match = matches_cache.get(match_key)
+
+                # Удаляем старую запись, если она существует
+                existing = Result.get_or_none(
                     (Result.title_id == self.current_title_id) &
-                    (Result.system_stage == final_stage) &
-                    (Result.tours == f"{pos1}-{pos2}")
+                    (Result.system_stage == 'Финальный') &
+                    (Result.number_group == final_stage) &
+                    (Result.tours == tours_str)
                 )
-                if final_match:
-                    final_match.winner = res.winner
-                    final_match.points_win = res.points_win
-                    final_match.score_in_game = res.score_in_game
-                    final_match.score_win = res.score_win
-                    final_match.loser = res.loser
-                    final_match.points_loser = res.points_loser
-                    final_match.score_loser = res.score_loser
-                    final_match.save()
+                if existing:
+                    existing.delete_instance()
+                
+                if previous_match:
+                    # ПЕРЕНОСИМ ВСЕ ДАННЫЕ из квалификации
+                    result = Result.create(
+                        number_group=final_stage,
+                        system_stage='Финальный',
+                        player1=player1,
+                        player2=player2,
+                        tours=tours_str,
+                        title_id=self.current_title_id,
+                        system_id=system.id,
+                        sex=self.current_sex if self.current_sex else "man",
+                        # round=round,
+                        # Переносим все данные из квалификации
+                        winner=previous_match.winner,
+                        points_win=previous_match.points_win,
+                        score_in_game=previous_match.score_in_game,
+                        score_win=previous_match.score_win,
+                        loser=previous_match.loser,
+                        points_loser=previous_match.points_loser,
+                        score_loser=previous_match.score_loser,
+                        # round=previous_match.round,
+                        schedule_date=previous_match.schedule_date,
+                        schedule_time=previous_match.schedule_time,
+                        schedule_table=previous_match.schedule_table,
+                        stage_net=previous_match.stage_net
+                    )
+                    # transferred_matches += 1
+                    # print(f"  ✅ Перенесен результат: {player1} vs {player2}")
+                    # if previous_match.winner:
+                    #     print(f"     Победитель: {previous_match.winner}")
+                    #     print(f"     Счет: {previous_match.score_in_game}")
+                else:
+                    # Создаем пустой матч
+                    result = Result.create(
+                        number_group=final_stage,
+                        system_stage='Финальный',
+                        player1=player1,
+                        player2=player2,
+                        tours=tours_str,
+                        title_id=self.current_title_id,
+                        system_id=system.id,
+                        sex=self.current_sex if self.current_sex else "man",
+                        round=round
+                    )
+                    created_matches += 1
+                    # print(f"  ➕ Создан новый матч: {player1} vs {player2}")
+           
 # ================================
     def create_circular_final(self, stage_name, source_stage, exit_count):
         """

@@ -13870,14 +13870,13 @@ class MainWindow(QMainWindow):
                     if len(set(points_ratios)) == len(sorted_by_points):
                         for place, player in enumerate(sorted_by_points, 1):
                             player['place_in_group'] = current_place + place - 1
-                            # Сохраняем соотношение мячей в ratio_points
-                            ratio_value = internal_stats[player['idx']]['ratio_points_val']
-                            if ratio_value == 0:
-                                player['ratio_points'] = "0"
-                            elif ratio_value.is_integer():
-                                player['ratio_points'] = str(int(ratio_value))
-                            else:
-                                player['ratio_points'] = f"{ratio_value:.2f}"
+
+                        # После вычисления internal_stats, соберем значения ratio_games для всех игроков группы
+                        ratios = [internal_stats[p['idx']]['ratio_points_val'] for p in players]
+                        formatted_ratios = self.format_ratio_with_precision(ratios)
+
+                        for player, fmt_ratio in zip(players, formatted_ratios):
+                            player['ratio_points'] = fmt_ratio  
                             
                             result.append(player)
                         current_place += len(group)
@@ -13937,7 +13936,7 @@ class MainWindow(QMainWindow):
             standings[loser_idx]['points_scored'] += total_loser_scored
             standings[loser_idx]['points_conceded'] += total_loser_conceded
 
-    def format_ratio(self, value):
+    def _format_ratio(self, value):
         """Возвращает строку с десятичной дробью без лишних нулей, до 2 знаков, но если третий знак не ноль, то показывает больше."""
         if value == 0:
             return "0"
@@ -16730,6 +16729,81 @@ class MainWindow(QMainWindow):
                 (System.id == system.id))
      
         count = query.execute()
+
+    def format_ratio(self, value):
+        """
+        Форматирует соотношение с нужной точностью:
+        - Если число целое, возвращает без дробной части.
+        - Если число имеет ограниченное количество знаков, выводит минимально необходимое,
+        чтобы отличить от других, но не более 5 знаков.
+        """
+        if value is None:
+            return ""
+        if value == 0:
+            return "0"
+        if value.is_integer():
+            return str(int(value))
+        
+        # Проверяем количество знаков, чтобы разница стала заметна
+        for digits in range(2, 6):
+            rounded = round(value, digits)
+ 
+            if abs(rounded - value) < 1e-8:
+                s = f"{value:.{digits}f}".rstrip('0').rstrip('.')
+                return s
+        
+        # Если за 5 знаков не уложились – показываем 5 знаков (обрезаем лишние нули)
+        s = f"{value:.5f}".rstrip('0').rstrip('.')
+        return s
+
+    def format_ratio_with_precision(self, values):
+        """
+        Форматирует список соотношений с единой для всех точностью,
+        достаточной, чтобы видеть различие между числами (максимум 6 знаков).
+        Возвращает список строк.
+        """
+        if not values:
+            return []
+        
+        # Приводим к float
+        nums = [float(v) if not isinstance(v, str) else 0.0 for v in values]
+
+        # Ищем минимальный знак, где значения различаются
+        precision = 2
+        max_precision = 6
+        for p in range(2, max_precision + 1):
+            # Округляем все до p знаков
+            rounded_list = []
+            for num in nums:
+                number = self.truncate_floor(num, p)
+                rounded_list.append(number)
+            result = self.find_first_duplicate(rounded_list)
+            if result is None:
+                precision = p
+                break
+ 
+        # Форматируем каждое число с найденной точностью
+        formatted = []
+        for x in rounded_list:
+            s = f"{x:.{precision}f}".rstrip('0').rstrip('.')
+            # Если строка пустая или содержит только минус (маловероятно)
+            if not s or s == '-':
+                s = "0"
+            formatted.append(s)
+        return formatted
+    
+    def find_first_duplicate(self, lst):
+        """находит одинаковые соотношения для определения знаков после запятой"""
+        seen = set()
+        for num in lst:
+            if num in seen:
+                return num
+            seen.add(num)
+        return None
+
+    def truncate_floor(self, number, decimals):
+        factor = 10 ** decimals
+        return math.floor(number * factor) / factor
 # =================================
 class RatingLoaderThread(QThread):
     progress = pyqtSignal(int)

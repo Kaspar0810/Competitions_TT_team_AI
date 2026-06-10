@@ -12,6 +12,7 @@ class ChoiceActionDialog(QDialog):
         self.setWindowTitle("Жеребьевка спортсменов")
         self.setModal(True)
         self.setFixedSize(450, 220)
+
         
         layout = QVBoxLayout(self)
         
@@ -184,9 +185,9 @@ class ChoiceGroupManual(QDialog):
         direction = "→" if self.current_round % 2 == 1 else "←"
         self.round_label.setText(f"Круг: {self.current_round}\nНаправление: {direction}")
         
-    def initUI(self):
+    def _initUI(self):
         self.setWindowTitle('Ручная жеребьевка спортсменов')
-        self.setGeometry(100, 100, 1600, 720)
+        self.setGeometry(10, 10, 1300, 700)
         
         main_layout = QVBoxLayout(self)
         
@@ -200,7 +201,7 @@ class ChoiceGroupManual(QDialog):
         # ========== ЛЕВАЯ ПАНЕЛЬ ==========
         left_panel = QFrame()
         left_panel.setFrameStyle(QFrame.StyledPanel)
-        left_panel.setMaximumWidth(400)
+        left_panel.setMaximumWidth(330)
         left_layout = QVBoxLayout(left_panel)
         
         # Горизонтальный layout для информации
@@ -372,7 +373,216 @@ class ChoiceGroupManual(QDialog):
         content_layout.addWidget(center_panel, stretch=1)
         
         main_layout.addLayout(content_layout)
+
+# ========================================
+    def initUI(self):
+        self.setWindowTitle('Ручная жеребьевка спортсменов')
+        # Уменьшаем размер окна под 1366x768
+        self.setGeometry(50, 50, 1200, 650)  # Изменено с 1300x700
+        self.setMaximumSize(1300, 700)
         
+        main_layout = QVBoxLayout(self)
+        main_layout.setSpacing(5)  # Уменьшаем отступы
+        main_layout.setContentsMargins(5, 5, 5, 5)  # Уменьшаем отступы
+        
+        title_label = QLabel("Ручная жеребьевка спортсменов")
+        title_label.setStyleSheet("font-size: 14px; font-weight: bold; margin: 5px;")  # Уменьшен margin
+        title_label.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(title_label)
+        
+        content_layout = QHBoxLayout()
+        content_layout.setSpacing(5)  # Уменьшаем отступ между панелями
+        
+        # ========== ЛЕВАЯ ПАНЕЛЬ ==========
+        left_panel = QFrame()
+        left_panel.setFrameStyle(QFrame.StyledPanel)
+        left_panel.setMaximumWidth(300)  # Уменьшено с 330
+        left_panel.setMinimumWidth(280)
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setSpacing(3)  # Уменьшаем отступы
+        left_layout.setContentsMargins(3, 3, 3, 3)
+        
+        # Горизонтальный layout для информации
+        info_layout = QHBoxLayout()
+        info_layout.setSpacing(3)
+        
+        # Информация о текущем спортсмене
+        current_athlete_group = QGroupBox("Текущий спортсмен")
+        current_athlete_group.setStyleSheet("QGroupBox { font-weight: bold; font-size: 11px; }")
+        current_athlete_layout = QVBoxLayout(current_athlete_group)
+        current_athlete_layout.setSpacing(2)
+        
+        self.current_athlete_label = QLabel("Спортсмен: -\nРейтинг: -\nРегион: -\nТренер: -")
+        self.current_athlete_label.setStyleSheet("background-color: #ffe0b3; padding: 5px; font-size: 10px;")
+        self.current_athlete_label.setWordWrap(True)
+        current_athlete_layout.addWidget(self.current_athlete_label)
+        
+        left_layout.addWidget(current_athlete_group)
+        
+        # Информация о текущей группе
+        current_group_group = QGroupBox("Текущая группа")
+        current_group_group.setStyleSheet("QGroupBox { font-weight: bold; font-size: 11px; }")
+        current_group_layout = QVBoxLayout(current_group_group)
+        current_group_layout.setSpacing(2)
+        
+        self.current_group_label = QLabel("Группа: -\nИгроков: -")
+        self.current_group_label.setStyleSheet("background-color: #b3d9ff; padding: 5px; font-size: 10px;")
+        current_group_layout.addWidget(self.current_group_label)
+        
+        info_layout.addWidget(current_group_group)
+        
+        # Информация о текущем круге
+        round_group = QGroupBox("Текущий круг")
+        round_group.setStyleSheet("QGroupBox { font-weight: bold; font-size: 11px; }")
+        round_layout = QVBoxLayout(round_group)
+        round_layout.setSpacing(2)
+        
+        self.round_label = QLabel("Круг: 1\nНаправление: →")
+        self.round_label.setStyleSheet("background-color: #d4e6f1; padding: 5px; font-size: 10px;")
+        round_layout.addWidget(self.round_label)
+        
+        info_layout.addWidget(round_group)
+        
+        left_layout.addLayout(info_layout)
+        
+        # Список участников
+        athletes_group = QGroupBox("Список участников")
+        athletes_group.setStyleSheet("QGroupBox { font-weight: bold; font-size: 11px; }")
+        athletes_layout = QVBoxLayout(athletes_group)
+        athletes_layout.setSpacing(2)
+        
+        self.athletes_table = QTableWidget()
+        self.athletes_table.setColumnCount(4)
+        self.athletes_table.setHorizontalHeaderLabels(["ID", "ФИО", "Рейтинг", "Регион"])
+        self.athletes_table.horizontalHeader().setStretchLastSection(True)
+        self.athletes_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.athletes_table.setAlternatingRowColors(True)
+        self.athletes_table.verticalHeader().setDefaultSectionSize(20)  # Уменьшаем высоту строк
+        athletes_layout.addWidget(self.athletes_table)
+        
+        left_layout.addWidget(athletes_group)
+        
+        # Статистика и управление
+        control_group = QGroupBox("Управление")
+        control_group.setStyleSheet("QGroupBox { font-weight: bold; font-size: 11px; }")
+        control_layout = QVBoxLayout(control_group)
+        control_layout.setSpacing(3)
+        
+        # Статистика
+        stats_layout = QGridLayout()
+        stats_layout.addWidget(QLabel("Всего спортсменов:"), 0, 0)
+        self.total_label = QLabel("0")
+        stats_layout.addWidget(self.total_label, 0, 1)
+        stats_layout.addWidget(QLabel("Размещено:"), 1, 0)
+        self.placed_label = QLabel("0")
+        stats_layout.addWidget(self.placed_label, 1, 1)
+        stats_layout.addWidget(QLabel("Осталось:"), 2, 0)
+        self.remaining_label = QLabel("0")
+        stats_layout.addWidget(self.remaining_label, 2, 1)
+        stats_layout.addWidget(QLabel("Макс. в группе:"), 3, 0)
+        self.max_rows_label = QLabel("0")
+        stats_layout.addWidget(self.max_rows_label, 3, 1)
+        stats_layout.addWidget(QLabel("Текущий круг:"), 4, 0)
+        self.round_number_label = QLabel("1")
+        stats_layout.addWidget(self.round_number_label, 4, 1)
+        control_layout.addLayout(stats_layout)
+        
+        # Кнопки управления
+        btn_layout = QGridLayout()
+        btn_layout.setSpacing(2)
+
+        self.btn_reset = QPushButton("Сбросить")
+        self.btn_reset.setFixedHeight(25)  # Фиксированная высота
+        self.btn_reset.clicked.connect(self.reset_draw)
+        btn_layout.addWidget(self.btn_reset, 0, 0, 1, 1)
+        
+        self.btn_auto = QPushButton("Авто (1 номера)")
+        self.btn_auto.setFixedHeight(25)
+        self.btn_auto.clicked.connect(self.auto_fill_first)
+        btn_layout.addWidget(self.btn_auto, 1, 0, 1, 1)
+        
+        self.btn_clear = QPushButton("Очистить")
+        self.btn_clear.setFixedHeight(25)
+        self.btn_clear.clicked.connect(self.clear_all_groups)
+        btn_layout.addWidget(self.btn_clear, 0, 1, 1, 1)
+
+        self.btn_edit = QPushButton("Редактор")
+        self.btn_edit.setFixedHeight(25)
+        self.btn_edit.clicked.connect(self.open_editor)
+        self.btn_edit.setStyleSheet("background-color: #FF9800; color: white; font-weight: bold;")
+        btn_layout.addWidget(self.btn_edit, 1, 1, 1, 1)
+
+        control_layout.addLayout(btn_layout)
+        
+        # Кнопки OK и Cancel
+        dialog_buttons = QHBoxLayout()
+        dialog_buttons.setSpacing(5)
+        
+        self.btn_result = QPushButton("Результат")
+        self.btn_result.setFixedHeight(28)
+        self.btn_result.clicked.connect(self.show_results)
+        self.btn_result.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold;")
+        dialog_buttons.addWidget(self.btn_result)
+        
+        self.btn_ok = QPushButton("Записать")
+        self.btn_ok.setFixedHeight(28)
+        self.btn_ok.clicked.connect(self.accept)
+        self.btn_ok.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold;")
+        dialog_buttons.addWidget(self.btn_ok)
+        
+        self.btn_cancel = QPushButton("Отмена")
+        self.btn_cancel.setFixedHeight(28)
+        self.btn_cancel.clicked.connect(self.reject)
+        dialog_buttons.addWidget(self.btn_cancel)
+        
+        control_layout.addLayout(dialog_buttons)
+        
+        # Инструкция - делаем более компактной
+        info_text = QTextEdit()
+        info_text.setMaximumHeight(120)  # Уменьшено с 150
+        info_text.setReadOnly(True)
+        info_text.setStyleSheet("font-size: 9px;")
+        info_text.setPlainText("Правила:\n"
+                            "• 1 номера групп - автоматически\n"
+                            "• Желтая подсветка - текущая группа\n"
+                            "• Клик по зеленой/желтой ячейке\n"
+                            "• Зеленые - можно сеять\n"
+                            "• Желтые - конфликт региона\n"
+                            "• Красные - конфликт региона+тренера\n"
+                            "• Двойной клик - редактирование")
+        control_layout.addWidget(info_text)
+        
+        left_layout.addWidget(control_group)
+        
+        # ========== ЦЕНТРАЛЬНАЯ ПАНЕЛЬ ==========
+        center_panel = QFrame()
+        center_panel.setFrameStyle(QFrame.StyledPanel)
+        center_layout = QVBoxLayout(center_panel)
+        center_layout.setSpacing(3)
+        
+        lbl_groups = QLabel(f"Жеребьевка групп (групп: {self.num_groups}, макс: {self.max_rows_per_group})")
+        lbl_groups.setStyleSheet("font-weight: bold; font-size: 12px;")
+        center_layout.addWidget(lbl_groups)
+        
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        
+        self.groups_widget = QWidget()
+        self.groups_layout = QGridLayout(self.groups_widget)
+        self.groups_layout.setAlignment(Qt.AlignTop)
+        self.groups_layout.setVerticalSpacing(8)  # Уменьшено с 15
+        self.groups_layout.setHorizontalSpacing(8)  # Уменьшено с 10
+        self.groups_layout.setContentsMargins(5, 5, 5, 5)
+        scroll_area.setWidget(self.groups_widget)
+        center_layout.addWidget(scroll_area)
+        
+        content_layout.addWidget(left_panel)
+        content_layout.addWidget(center_panel, stretch=1)
+        
+        main_layout.addLayout(content_layout)
+ # ======================================================       
     def get_group_players_count(self, group_idx):
         """Получить количество игроков в группе"""
         if group_idx < len(self.groups):
@@ -453,24 +663,41 @@ class ChoiceGroupManual(QDialog):
         self.group_headers.clear()
         
         cols = min(4, self.num_groups)
-        
+# =====================================        
+        # for g in range(self.num_groups):
+        #     group_frame = QFrame()
+        #     group_frame.setFrameStyle(QFrame.Box)
+        #     group_frame.setMinimumWidth(300)
+        #     group_frame.setMaximumWidth(400)
+        #     group_layout = QVBoxLayout(group_frame)
+        #     group_layout.setSpacing(5)
+            
+        #     header = QLabel(f"Группа {g+1}")
+        #     header.setStyleSheet("font-weight: bold; background-color: #4CAF50; color: white; padding: 5px;")
+        #     header.setAlignment(Qt.AlignCenter)
+        #     group_layout.addWidget(header)
+            
+        #     table = QTableWidget()
+        #     table.setColumnCount(2)
+        #     table.setHorizontalHeaderLabels(["№", "Участник (регион) рейтинг"])
+
         for g in range(self.num_groups):
             group_frame = QFrame()
             group_frame.setFrameStyle(QFrame.Box)
-            group_frame.setMinimumWidth(300)
-            group_frame.setMaximumWidth(400)
+            group_frame.setMinimumWidth(260)  # Уменьшено с 300
+            group_frame.setMaximumWidth(320)  # Уменьшено с 400
             group_layout = QVBoxLayout(group_frame)
-            group_layout.setSpacing(5)
+            group_layout.setSpacing(3)
             
             header = QLabel(f"Группа {g+1}")
-            header.setStyleSheet("font-weight: bold; background-color: #4CAF50; color: white; padding: 5px;")
+            header.setStyleSheet("font-weight: bold; background-color: #4CAF50; color: white; padding: 3px; font-size: 11px;")
             header.setAlignment(Qt.AlignCenter)
             group_layout.addWidget(header)
             
             table = QTableWidget()
             table.setColumnCount(2)
-            table.setHorizontalHeaderLabels(["№", "Участник (регион) рейтинг"])
-            
+            table.setHorizontalHeaderLabels(["№", "Участник"])
+# =======================================================            
             table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
             table.setColumnWidth(0, 40)
             table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
@@ -495,12 +722,12 @@ class ChoiceGroupManual(QDialog):
                 num_item.setTextAlignment(Qt.AlignCenter)
                 num_item.setFlags(num_item.flags() & ~Qt.ItemIsEditable)
                 table.setItem(row, 0, num_item)
-                table.setRowHeight(row, 25)
+                table.setRowHeight(row, 22)
             
             group_layout.addWidget(table)
             
             table_height = table.horizontalHeader().height() + 2
-            table_height += self.max_rows_per_group * 25
+            table_height += self.max_rows_per_group * 22
             table.setFixedHeight(table_height + 5)
             
             row = g // cols

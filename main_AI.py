@@ -353,7 +353,7 @@ class MainWindow(QMainWindow):
         
         # Заголовок категорий участников
         category_label = QLabel("👥 Категория участников:")
-        category_label.setStyleSheet("font-weight: bold; font-size: 13px; color: #333; margin-top: 5px;")
+        category_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #333; margin-top: 5px;")
         left_layout.addWidget(category_label)
         
         # Горизонтальный контейнер для кнопок Мальчики/Девочки
@@ -691,7 +691,7 @@ class MainWindow(QMainWindow):
             QTabBar::tab { 
                 padding: 4px 10px; 
                 margin-right: 2px; 
-                font-size: 11px;
+                font-size: 14px;
                 min-width: 70px;
             }
             QTabBar::tab:selected {
@@ -838,7 +838,7 @@ class MainWindow(QMainWindow):
         self.table_view.setShowGrid(True)
         self.table_view.setStyleSheet("""
             QTableView {
-                font-size: 10px;
+                font-size: 14px;
                 gridline-color: #ddd;
                 selection-background-color: #a0c4ff;
             }
@@ -875,7 +875,7 @@ class MainWindow(QMainWindow):
         self.results_table_view.setShowGrid(True)
         self.results_table_view.setStyleSheet("""
             QTableView {
-                font-size: 10px;
+                font-size: 14px;
                 gridline-color: #ddd;
                 selection-background-color: #a0c4ff;
             }
@@ -906,7 +906,7 @@ class MainWindow(QMainWindow):
         self.teams_table_view.setShowGrid(True)
         self.teams_table_view.setStyleSheet("""
             QTableView {
-                font-size: 10px;
+                font-size: 14px;
                 gridline-color: #ddd;
                 selection-background-color: #a0c4ff;
             }
@@ -929,7 +929,7 @@ class MainWindow(QMainWindow):
         self.doubles_table_view.setShowGrid(True)
         self.doubles_table_view.setStyleSheet("""
             QTableView {
-                font-size: 10px;
+                font-size: 14px;
                 gridline-color: #ddd;
                 selection-background-color: #a0c4ff;
             }
@@ -3225,7 +3225,7 @@ class MainWindow(QMainWindow):
                 color: white;
                 padding: 6px;
                 font-weight: bold;
-                font-size: 11px;
+                font-size: 13px;
                 border-radius: 3px;
             """)
             
@@ -13850,90 +13850,90 @@ class MainWindow(QMainWindow):
                                 
         return sorted(result, key=lambda x: x['place_in_group'])
 # =====================================================        
-        # Собираем результаты матчей ТОЛЬКО между этими игроками
-            for result in results_group:
-                tour = result.tours
-                mark = tour.find("-")
-                if mark == -1:
-                    continue
+        # # Собираем результаты матчей ТОЛЬКО между этими игроками
+        #     for result in results_group:
+        #         tour = result.tours
+        #         mark = tour.find("-")
+        #         if mark == -1:
+        #             continue
                 
-                idx1 = int(tour[:mark])
-                idx2 = int(tour[mark + 1:])
+        #         idx1 = int(tour[:mark])
+        #         idx2 = int(tour[mark + 1:])
                 
-                # Проверяем, оба ли игрока в нашей группе
-                if idx1 in player_indices and idx2 in player_indices:
-                    # Парсим счет матча
-                    if result.score_in_game:
-                        score_parts = result.score_in_game.replace(" ", "").split(":")
-                        if len(score_parts) == 2:
-                            try:
-                                games_winner = int(score_parts[0])
-                                games_loser = int(score_parts[1])
-                                # Очки
-                                points_winner = result.points_win
-                                points_loser = result.points_loser
-                                # Определяем победителя
-                                if result.winner == result.player1:
-                                    winner_idx = idx1
-                                    loser_idx = idx2
-                                else:
-                                    winner_idx = idx2
-                                    loser_idx = idx1
-                                # Считаем очки между ними
-                                internal_stats[winner_idx]['won'] += points_winner
-                                internal_stats[winner_idx]['lost'] += points_loser
-                                internal_stats[loser_idx]['won'] += points_loser
-                                internal_stats[loser_idx]['lost'] += points_winner
+        #         # Проверяем, оба ли игрока в нашей группе
+        #         if idx1 in player_indices and idx2 in player_indices:
+        #             # Парсим счет матча
+        #             if result.score_in_game:
+        #                 score_parts = result.score_in_game.replace(" ", "").split(":")
+        #                 if len(score_parts) == 2:
+        #                     try:
+        #                         games_winner = int(score_parts[0])
+        #                         games_loser = int(score_parts[1])
+        #                         # Очки
+        #                         points_winner = result.points_win
+        #                         points_loser = result.points_loser
+        #                         # Определяем победителя
+        #                         if result.winner == result.player1:
+        #                             winner_idx = idx1
+        #                             loser_idx = idx2
+        #                         else:
+        #                             winner_idx = idx2
+        #                             loser_idx = idx1
+        #                         # Считаем очки между ними
+        #                         internal_stats[winner_idx]['won'] += points_winner
+        #                         internal_stats[winner_idx]['lost'] += points_loser
+        #                         internal_stats[loser_idx]['won'] += points_loser
+        #                         internal_stats[loser_idx]['lost'] += points_winner
                                 
-                                # Добавляем партии
-                                internal_stats[winner_idx]['won'] += games_winner
-                                internal_stats[winner_idx]['lost'] += games_loser
-                                internal_stats[loser_idx]['won'] += games_loser
-                                internal_stats[loser_idx]['lost'] += games_winner
+        #                         # Добавляем партии
+        #                         internal_stats[winner_idx]['won'] += games_winner
+        #                         internal_stats[winner_idx]['lost'] += games_loser
+        #                         internal_stats[loser_idx]['won'] += games_loser
+        #                         internal_stats[loser_idx]['lost'] += games_winner
                                 
-                                # Подсчет забитых и пропущенных мячей
-                                self.calculate_internal_points_scored_conceded(
-                                    result, winner_idx, loser_idx, internal_stats
-                                )
+        #                         # Подсчет забитых и пропущенных мячей
+        #                         self.calculate_internal_points_scored_conceded(
+        #                             result, winner_idx, loser_idx, internal_stats
+        #                         )
                                 
-                            except ValueError:
-                                pass
-            # internal_stats[idx]['ratio_points_val'] = points_scored / points_conceded               
+        #                     except ValueError:
+        #                         pass
+        #     # internal_stats[idx]['ratio_points_val'] = points_scored / points_conceded               
             
-            # Рассчитываем соотношение партий для каждого игрока
-            for idx in internal_stats:
-                won = internal_stats[idx]['won']
-                lost = internal_stats[idx]['lost']
-                if lost == 0:
-                    internal_stats[idx]['ratio_games'] = float(won) if won > 0 else 0.0
-                else:
-                    internal_stats[idx]['ratio_games'] = won / lost
+        #     # Рассчитываем соотношение партий для каждого игрока
+        #     for idx in internal_stats:
+        #         won = internal_stats[idx]['won']
+        #         lost = internal_stats[idx]['lost']
+        #         if lost == 0:
+        #             internal_stats[idx]['ratio_games'] = float(won) if won > 0 else 0.0
+        #         else:
+        #             internal_stats[idx]['ratio_games'] = won / lost
             
-            # Сортируем игроков по соотношению партий
-            sorted_players = sorted(players, 
-                                key=lambda x: internal_stats[x['idx']]['ratio_games'], 
-                                reverse=True)
+        #     # Сортируем игроков по соотношению партий
+        #     sorted_players = sorted(players, 
+        #                         key=lambda x: internal_stats[x['idx']]['ratio_games'], 
+        #                         reverse=True)
             
-            # Проверяем, есть ли одинаковые соотношения партий
-            games_ratios = [internal_stats[p['idx']]['ratio_games'] for p in sorted_players]
+        #     # Проверяем, есть ли одинаковые соотношения партий
+        #     games_ratios = [internal_stats[p['idx']]['ratio_games'] for p in sorted_players]
             
-            if len(set(games_ratios)) == len(sorted_players):
-                # Все соотношения партий разные - присваиваем места
-                result = []
-                for place, player in enumerate(sorted_players, 1):
-                    player_copy = player.copy()
-                    player_copy['place_in_group'] = place
-                    # Форматируем соотношение для отображения
-                    ratio_value = internal_stats[player['idx']]['ratio_games']
-                    if ratio_value == 0:
-                        player_copy['ratio_points'] = "0"
-                    elif ratio_value.is_integer():
-                        player_copy['ratio_points'] = str(int(ratio_value))
-                    else:
-                        player_copy['ratio_points'] = f"{ratio_value:.2f}"
-                    result.append(player_copy)
-                return result
-        return sorted(result, key=lambda x: x['place_in_group'])
+        #     if len(set(games_ratios)) == len(sorted_players):
+        #         # Все соотношения партий разные - присваиваем места
+        #         result = []
+        #         for place, player in enumerate(sorted_players, 1):
+        #             player_copy = player.copy()
+        #             player_copy['place_in_group'] = place
+        #             # Форматируем соотношение для отображения
+        #             ratio_value = internal_stats[player['idx']]['ratio_games']
+        #             if ratio_value == 0:
+        #                 player_copy['ratio_points'] = "0"
+        #             elif ratio_value.is_integer():
+        #                 player_copy['ratio_points'] = str(int(ratio_value))
+        #             else:
+        #                 player_copy['ratio_points'] = f"{ratio_value:.2f}"
+        #             result.append(player_copy)
+        #         return result
+        # return sorted(result, key=lambda x: x['place_in_group'])
             # else:
             #     # Есть одинаковые соотношения партий - считаем соотношение мячей
             #     # Группируем по соотношению партий
@@ -13996,7 +13996,7 @@ class MainWindow(QMainWindow):
             #                     result.append(sub_player)
             #                 current_place += len(group)
         
-        return sorted(result, key=lambda x: x['place_in_group'])
+        # return sorted(result, key=lambda x: x['place_in_group'])
 # ==== 3105===============
     def _calculate_points_scored_conceded(self, result, winner_idx, loser_idx, standings):
         score_win = result.score_win if result.score_win else ""

@@ -187,7 +187,7 @@ class ChoiceGroupManual(QDialog):
         
     def _initUI(self):
         self.setWindowTitle('Ручная жеребьевка спортсменов')
-        self.setGeometry(10, 10, 1300, 700)
+        self.setGeometry(10, 10, 1700, 800)
         
         main_layout = QVBoxLayout(self)
         
@@ -378,8 +378,8 @@ class ChoiceGroupManual(QDialog):
     def initUI(self):
         self.setWindowTitle('Ручная жеребьевка спортсменов')
         # Уменьшаем размер окна под 1366x768
-        self.setGeometry(50, 50, 1200, 650)  # Изменено с 1300x700
-        self.setMaximumSize(1300, 700)
+        self.setGeometry(50, 50, 1600, 850)  # Изменено с 1300x700
+        self.setMaximumSize(1600, 850)
         
         main_layout = QVBoxLayout(self)
         main_layout.setSpacing(5)  # Уменьшаем отступы

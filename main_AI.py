@@ -11153,7 +11153,10 @@ class MainWindow(QMainWindow):
                 # Флаг: все ли матчи в этой группе сыграны
                 all_matches_in_group_played = (played_matches == total_matches and total_matches > 0)
                 
-                results_group = results.where(Result.number_group == f"{group_num} группа")
+                if stage in group_list:
+                    results_group = results.where(Result.number_group == f"{group_num} группа")
+                else:
+                    results_group = results.where(Result.number_group == stage)
                 
                 # Сбрасываем статистику
                 for idx in players_info:

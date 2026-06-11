@@ -11112,14 +11112,23 @@ class MainWindow(QMainWindow):
                 }
 # ===============================            
             # ===== ЭТАП 2: ЗАПОЛНЯЕМ РЕЗУЛЬТАТАМИ ИЗ RESULT =====
-            results = Result.select().where(
-                (Result.title_id == self.current_title_id) &
-                (Result.system_stage == stage)
-            )
+            if stage in group_list:
+                results = Result.select().where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.system_stage == stage)
+                )
+            else:
+                results = Result.select().where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.number_group == stage)
+                )
             
             # Сначала подсчитываем количество матчей в каждой группе
             for group_num in range(1, kg + 1):
-                group_key = f"{group_num} группа"
+                if stage in group_list:
+                    group_key = f"{group_num} группа"
+                else:
+                    group_key = stage
                 results_group = results.where(Result.number_group == group_key)
                 
                 # Общее количество матчей в группе

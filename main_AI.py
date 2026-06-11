@@ -2443,15 +2443,25 @@ class MainWindow(QMainWindow):
 # ======================
     def load_matches_for_stage(self, stage_name):
         """Загрузка матчей для выбранного этапа"""
+        group_list = ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]
+
+        
         if not self.current_title_id:
             return
         
         try:
-            # Получаем все матчи для выбранного этапа
-            self.current_matches = list(Result.select().where(
-                (Result.title_id == self.current_title_id) &
-                (Result.system_stage == stage_name)
-            ).order_by(Result.number_group, Result.round))
+            if stage_name in group_list:
+                # Получаем все матчи для выбранного этапа
+                self.current_matches = list(Result.select().where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.system_stage == stage_name)
+                ).order_by(Result.number_group, Result.round))
+            else:
+                # Получаем все матчи для выбранного этапа
+                self.current_matches = list(Result.select().where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.number_group == stage_name)
+                ).order_by(Result.number_group, Result.round))
             
             self.current_match_index = 0
             self.current_stage_label.setText(f"Этап: {stage_name}")
@@ -2847,15 +2857,25 @@ class MainWindow(QMainWindow):
 # =============================== рабочая 2805
     def load_results_table_for_stage(self, stage_name):
         """Загрузка таблицы результатов для выбранного этапа с фильтрацией"""
+
+        group_list = ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]
+
         if not self.current_title_id:
             return
         
         try:
             # Базовый запрос
-            query = Result.select().where(
-                (Result.title_id == self.current_title_id) &
-                (Result.system_stage == stage_name)
-            )
+            if stage_name in group_list:
+                query = Result.select().where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.system_stage == stage_name)
+                )
+            else:
+               # Базовый запрос
+                query = Result.select().where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.number_group == stage_name)
+                ) 
             
             # Применяем фильтр по группе
             if self.current_group_filter:
@@ -10790,7 +10810,8 @@ class MainWindow(QMainWindow):
         else:  # игры в финале по кругу или одна круговая таблица
             kg = 1
             max_pl = system.max_player
-        
+            pv = "альбомная"
+
         # Определяем ориентацию страницы
         if pv == "альбомная":
             page_size = landscape(A4)
@@ -10984,7 +11005,7 @@ class MainWindow(QMainWindow):
         """
         from reportlab.platypus import Table
         from collections import defaultdict
-        
+        group_list = [ "Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]
         dict_table = {}
         
         try:
@@ -11012,7 +11033,10 @@ class MainWindow(QMainWindow):
             max_players_in_stage = max_pl  # из параметра функции
 
             for group_num in range(1, kg + 1):
-                group_key = f"{group_num} группа"
+                if stage not in group_list:
+                    group_key = stage
+                else:
+                    group_key = f"{group_num} группа"   
                 group_players = groups_players.get(group_key, [])
 
                 # Собираем реальных игроков группы с их посевом

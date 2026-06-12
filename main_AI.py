@@ -16524,11 +16524,27 @@ class MainWindow(QMainWindow):
                 mesto_end = mesto_first + p.mesta_exit
                 for m in range(mesto_first, mesto_end):
                     place.append(m)
+
                 stage_place[p.stage_exit] = place.copy()
-                result = [item for item in place_stage if item not in place]
                 place_players[stage] = stage_place
-                player_max_stage[p.stage_exit] = result
-                # place.clear()
+                result = [item for item in place_stage if item not in place]
+                # place_players[stage] = stage_place
+                # player_max_stage[p.stage_exit] = result
+                player_max_stage = defaultdict(list)
+                systems = System.get_or_none(System.id == p.id)
+                if systems:
+                    player_max_stage[stage].append({
+                        'stage_exit': systems.stage_exit,
+                        'count_exit': systems.mesta_exit,
+                        'place_stage': place.copy()
+                    })
+                
+                # stage_place[p.stage_exit] = place.copy()
+                # place_players[stage] = stage_place
+                # result = [item for item in place_stage if item not in place]
+                # # place_players[stage] = stage_place
+                # player_max_stage[p.stage_exit] = result
+                place.clear()
 
        
 

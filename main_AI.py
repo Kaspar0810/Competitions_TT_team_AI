@@ -11152,7 +11152,8 @@ class MainWindow(QMainWindow):
                 
                 # Флаг: все ли матчи в этой группе сыграны
                 all_matches_in_group_played = (played_matches == total_matches and total_matches > 0)
-                
+                #
+                # если групповой этап
                 if stage in group_list:
                     results_group = results.where(Result.number_group == f"{group_num} группа")
                 else:
@@ -15738,8 +15739,8 @@ class MainWindow(QMainWindow):
         
         # 2. Получаем игроков из источника
         if "полуфинал" in source_stage.lower():
-            players_by_group, actual_exit_count = self.get_players_for_final(source_stage, exit_count)
-            # players_by_group = self.get_players_for_final(source_stage, exit_count=None)
+            # players_by_group, actual_exit_count = self.get_players_for_final(source_stage, exit_count)
+            players_by_group = self.get_players_for_final(stage_name, exit_count=None)
         else:
             players_by_group = self.get_players_from_qualification_for_final(exit_count)
         
@@ -16183,8 +16184,357 @@ class MainWindow(QMainWindow):
                     })
         
         return players
+# ============== мой вариант жеребьевки
+    def get_players_for_final(self, stage_name, exit_count=None):
+            """
+            Получает игроков из указанного этапа (квалификация или полуфинал) для выхода в финал.
+            source_stage: название этапа (например, "Квалификация", "Квалификация. 1-й полуфинал")
+            exit_count: если не указан, берется из System.stage_exit
+            Возвращает: (players_by_group, actual_exit_count)
+                players_by_group: {номер_группы: [список_игроков_в_порядке_мест]}
+                actual_exit_count: количество выходящих (из System)
+            """
+            from collections import defaultdict
+                    
+            system = System.get_or_none(
+                (System.title_id == self.current_title_id) &
+                (System.stage == stage_name)
+            )
+                
+            exit_count = system.mesta_exit
 
-    def get_players_for_final(self, source_stage, exit_count=None):
+            if not system:
+                return {}, 0
+            
+            if exit_count is None:
+                exit_count = system.stage_exit or 1
+            actual_exit_count = exit_count
+            
+            players_by_group = defaultdict(list)
+            
+            stage_exit = system.stage_exit
+            # Определяем поля в зависимости от этапа
+            if "полуфинал" in stage_exit.lower():
+                if "1-й" in stage_exit:
+                    semi_num = 1
+                else:
+                    semi_num = 2
+                query = Choice.select().where(
+                    (Choice.title_id == self.current_title_id) &
+                    (Choice.semi_final == semi_num)
+                )
+                group_field = 'sf_group'
+                place_field = 'mesto_semi_final'
+            else:
+                query = Choice.select().where(Choice.title_id == self.current_title_id)
+                group_field = 'group'
+                place_field = 'mesto_group'
+            
+            # Группируем по группам
+            for choice in query:
+                group_name = getattr(choice, group_field)
+                if not group_name:
+                    continue
+                place = getattr(choice, place_field) or 999
+                players_by_group[group_name].append((place, choice))
+            # ====вставить вариант определения мест игроков
+            # self.real_place_for_final()
+            self.real_place_for_final(stage_name=None)
+            # ============================================
+            # Для каждой группы сортируем по месту и берём первых exit_count
+            result = {}
+            for group_name, items in players_by_group.items():
+                items.sort(key=lambda x: x[0])
+                group_players = []
+                for _, choice in items[:exit_count]:
+                    player = Player.get_or_none(Player.id == choice.player_choice.id)
+                    if player:
+                        group_players.append({
+                            'choice_id': choice.id,
+                            'player_id': player.id,
+                            'name': player.fio or player.player,
+                            'city': player.city or "",
+                            'region': choice.region or "",
+                            'rank': player.rank or 0,
+                            'place': getattr(choice, place_field) or 0,
+                            'group': group_name
+                        })
+                if group_players:
+                    result[group_name] = group_players
+            
+            return result, actual_exit_count
+#========================================= AI 
+    def __real_place_for_final(self, stage_name=None):
+        """
+        Определение мест игроков, выходящих в финал для жеребьевки.
+        
+        Логика распределения:
+        - Из каждой группы квалификации выходят 2 игрока (1 и 2 место)
+        - В 1-й полуфинал выходят игроки с 1 и 2 местом из групп 1-16
+        - В 2-й полуфинал выходят игроки с 1 и 2 местом из групп 17-32
+        - В 1-й финал выходят игроки с 1 и 2 местом из 1-го полуфинала
+        - Во 2-й финал выходят игроки с 3 и 4 местом из 1-го полуфинала
+        - В 3-й финал выходят игроки с 3 и 4 местом из квалификации (не вышедшие в полуфиналы)
+        """
+        from collections import defaultdict
+        
+        result = {}
+        
+        # Получаем все системы для текущего соревнования
+        systems = System.select().where(System.title_id == self.current_title_id).order_by(System.id)
+        
+        # Определяем этапы
+        qualification = None
+        semifinal_1 = None
+        semifinal_2 = None
+        finals = []
+        
+        for system in systems:
+            if system.stage == "Квалификация":
+                qualification = system
+            elif system.stage == "Квалификация. 1-й полуфинал":
+                semifinal_1 = system
+            elif system.stage == "Квалификация. 2-й полуфинал":
+                semifinal_2 = system
+            elif "финал" in system.stage.lower() and "полуфинал" not in system.stage.lower():
+                finals.append(system.stage)
+        
+        # Сортируем финалы по номеру
+        finals.sort(key=lambda x: int(x.split('-')[0]) if '-' in x else 0)
+        
+        # Словарь для хранения мест выхода из каждого этапа
+        exit_places = {}
+        
+        # 1. Определяем выход из квалификации в полуфиналы
+        if qualification:
+            groups_count = qualification.total_group
+            half_groups = groups_count // 2
+            
+            # В 1-й полуфинал выходят 1 и 2 места из групп 1 - half_groups
+            exit_places["Квалификация. 1-й полуфинал"] = {
+                "exit_stage": "Квалификация",
+                "places": [1, 2],
+                "groups": list(range(1, half_groups + 1)),
+                "description": "1 и 2 места из групп 1-{0}".format(half_groups)
+            }
+            
+            # Во 2-й полуфинал выходят 1 и 2 места из групп half_groups+1 - groups_count
+            exit_places["Квалификация. 2-й полуфинал"] = {
+                "exit_stage": "Квалификация",
+                "places": [1, 2],
+                "groups": list(range(half_groups + 1, groups_count + 1)),
+                "description": "1 и 2 места из групп {0}-{1}".format(half_groups + 1, groups_count)
+            }
+        
+        # 2. Определяем выход из полуфиналов в финалы
+        if semifinal_1:
+            # В 1-й финал выходят 1 и 2 места из 1-го полуфинала
+            exit_places["1-й финал"] = {
+                "exit_stage": "Квалификация. 1-й полуфинал",
+                "places": [1, 2],
+                "groups": None,
+                "description": "1 и 2 места из 1-го полуфинала"
+            }
+            
+            # Во 2-й финал выходят 3 и 4 места из 1-го полуфинала
+            exit_places["2-й финал"] = {
+                "exit_stage": "Квалификация. 1-й полуфинал",
+                "places": [3, 4],
+                "groups": None,
+                "description": "3 и 4 места из 1-го полуфинала"
+            }
+        
+        if semifinal_2:
+            # Из 2-го полуфинала в финалы
+            next_final_num = 3 if "2-й финал" in exit_places else 2
+            exit_places[f"{next_final_num}-й финал"] = {
+                "exit_stage": "Квалификация. 2-й полуфинал",
+                "places": [1, 2],
+                "groups": None,
+                "description": "1 и 2 места из 2-го полуфинала"
+            }
+            
+            exit_places[f"{next_final_num + 1}-й финал"] = {
+                "exit_stage": "Квалификация. 2-й полуфинал",
+                "places": [3, 4],
+                "groups": None,
+                "description": "3 и 4 места из 2-го полуфинала"
+            }
+        
+        # 3. Определяем выход из квалификации напрямую в финалы (оставшиеся места)
+        if qualification and finals:
+            # Находим, сколько финалов уже определено
+            defined_finals = len([f for f in exit_places.keys() if "-й финал" in f])
+            
+            # Оставшиеся места в квалификации (3 и 4)
+            remaining_places = [3, 4]
+            
+            for i, final in enumerate(finals[defined_finals:], defined_finals + 1):
+                exit_places[f"{final}"] = {
+                    "exit_stage": "Квалификация",
+                    "places": remaining_places.copy(),
+                    "groups": None,
+                    "description": "{0} и {1} места из квалификации (не вышедшие в полуфиналы)".format(remaining_places[0], remaining_places[1])
+                }
+        
+        # 4. Формируем результат для указанного этапа или для всех
+        current_place = 1
+        stage_places = {}
+        
+        for final_name in finals:
+            if final_name in exit_places:
+                exit_info = exit_places[final_name]
+                exit_count = len(exit_info["places"])
+                
+                stage_places[final_name] = {
+                    "stage": final_name,
+                    "exit_stage": exit_info["exit_stage"],
+                    "places": list(range(current_place, current_place + exit_count)),
+                    "exit_count": exit_count,
+                    "start_place": current_place,
+                    "end_place": current_place + exit_count - 1,
+                    "source_places": exit_info["places"],
+                    "description": exit_info["description"]
+                }
+                current_place += exit_count
+            else:
+                # Если нет информации о выходе, используем stage_exit из системы
+                system = System.get_or_none(
+                    (System.title_id == self.current_title_id) &
+                    (System.stage == final_name)
+                )
+                if system and system.stage_exit:
+                    exit_count = system.mesta_exit or 1
+                    stage_places[final_name] = {
+                        "stage": final_name,
+                        "exit_stage": system.stage_exit or "Квалификация",
+                        "places": list(range(current_place, current_place + exit_count)),
+                        "exit_count": exit_count,
+                        "start_place": current_place,
+                        "end_place": current_place + exit_count - 1,
+                        "source_places": list(range(1, exit_count + 1)),
+                        "description": f"{', '.join(map(str, range(1, exit_count + 1)))} места из {system.stage_exit}"
+                    }
+                    current_place += exit_count
+        
+        # Если указан конкретный этап, возвращаем только его
+        if stage_name and stage_name in stage_places:
+            return {stage_name: stage_places[stage_name]}
+        
+        return stage_places
+
+
+    def get_players_for_final_by_places(self, stage_name):
+        """
+        Получение игроков для финала на основе мест выхода.
+        
+        Параметры:
+            stage_name: название финала (например, "1-й финал")
+        
+        Возвращает:
+            словарь {номер_группы: [список_игроков]}
+        """
+        from collections import defaultdict
+        
+        # Получаем информацию о финале
+        final_info = self.real_place_for_final(stage_name)
+        if stage_name not in final_info:
+            return {}
+        
+        info = final_info[stage_name]
+        exit_stage = info["exit_stage"]
+        places = info["places"]
+        
+        # Определяем тип этапа для правильного получения данных
+        if "полуфинал" in exit_stage.lower():
+            # Для полуфиналов используем sf_place
+            if "1-й" in exit_stage:
+                semi_num = 1
+            else:
+                semi_num = 2
+            
+            choices = Choice.select().where(
+                (Choice.title_id == self.current_title_id) &
+                (Choice.semi_final == semi_num) &
+                (Choice.sf_place.is_null(False))
+            )
+            group_field = 'sf_group'
+            place_field = 'sf_place'
+        else:
+            # Для квалификации
+            choices = Choice.select().where(
+                (Choice.title_id == self.current_title_id) &
+                (Choice.mesto_group.is_null(False))
+            )
+            group_field = 'group'
+            place_field = 'mesto_group'
+        
+        # Группируем игроков по местам
+        players_by_place = defaultdict(list)
+        
+        for choice in choices:
+            place = getattr(choice, place_field) or 0
+            if place in places:
+                player = Player.get_or_none(Player.id == choice.player_choice.id)
+                if player:
+                    players_by_place[place].append({
+                        'choice_id': choice.id,
+                        'player_id': player.id,
+                        'name': player.fio or player.player,
+                        'city': player.city or "",
+                        'region': choice.region or "",
+                        'rank': player.rank or 0,
+                        'place': place,
+                        'group': getattr(choice, group_field)
+                    })
+        
+        # Сортируем игроков по группам внутри каждого места
+        result = defaultdict(list)
+        for place, players in players_by_place.items():
+            # Сортируем игроков с одинаковым местом по номеру группы
+            players.sort(key=lambda x: self._extract_number_from_group(x['group']))
+            for player in players:
+                result[player['group']].append(player)
+        
+        return result
+# =========== моя функция для определения мест =======
+    def real_place_for_final(self, stage_name):
+        """определения мест игроков, выходящих в финал для жеребьевки"""
+        group_list = ["Квалификация", "Квалификация. 1-й полуфинал","Квалификация. 2-й полуфинал"]
+        stage_place = {}
+        place_players = {}
+        place = []
+        player_max_stage = {}
+        mesto_first = 1
+        system = System.select().where(System.title_id == self.current_title_id)
+
+        for h in system:
+            stage = h.stage
+            if stage in group_list:
+                # pm = h.max_player
+                place_stage = [k for k in range(1, h.max_player + 1)]
+                player_max_stage[stage] = place_stage
+        for p in system:
+            stage = p.stage
+            if stage not in group_list:
+                if stage == "1-й финал":
+                    mesto_first = 1
+                else:
+                    mesto_first = result[0]
+                mesto_end = mesto_first + p.mesta_exit
+                for m in range(mesto_first, mesto_end):
+                    place.append(m)
+                stage_place[p.stage_exit] = place.copy()
+                result = [item for item in place_stage if item not in place]
+                place_players[stage] = stage_place
+                player_max_stage[p.stage_exit] = result
+                # place.clear()
+
+       
+
+
+# ================================================
+    def _get_players_for_final(self, source_stage, exit_count=None):
         """
         Получает игроков из указанного этапа (квалификация или полуфинал) для выхода в финал.
         source_stage: название этапа (например, "Квалификация", "Квалификация. 1-й полуфинал")
@@ -16199,7 +16549,7 @@ class MainWindow(QMainWindow):
             (System.title_id == self.current_title_id) &
             (System.stage == source_stage)
         )
-        
+             
         exit_count = system.mesta_exit
 
         if not system:

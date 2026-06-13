@@ -14219,6 +14219,34 @@ class MainWindow(QMainWindow):
         
         # QMessageBox.information(self, "Успех", f"Обновлено мест для {updated} участников квалификации") 
 
+#============== функция очистки таблиц DB перед повторной жеребьевкой =====
+    def clear_table_DB_after_choice(self, stage):
+        """очищает таблицы Choice, Result< Game_list перед повторной жеребьевкой"""
+
+        group_list = ["Квалификация", "Квалификация. 1-й полуфинал","Квалификация. 2-й полуфинал"]
+     
+        system = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == stage)
+        )
+
+        gamelist = Game_list.delete().where(
+            (Game_list.title_id == self.current.title_id) &
+            (Game_list.system_id == system.id))
+        
+        if stage in group_list:
+            results = Result.delete().where(
+                (Result.title_id == self.current_title_id) &
+                (Result.system_stage == stage)
+            )
+        else:
+            results = Result.delete().where(
+                (Result.title_id == self.current_title_id) &
+                (Result.number_group == stage)
+            )
+
+    
+
     def calculate_qualification_places(self, system):
         """Рассчитать места в квалификации (возвращает словарь {номер_группы: {посев: место}})"""
         from collections import defaultdict
@@ -17035,14 +17063,14 @@ class MainWindow(QMainWindow):
             
             # Очищаем таблицы Choice и Result для этого этапа
             # Choice.delete().where(Choice.title_id == self.current_title_id).execute()
-            # Result.delete().where(
-            #     (Result.title_id == self.current_title_id) &
-            #     (Result.system_stage == "Одна таблица")
-            # ).execute()
-            # Game_list.delete().where(
-            #     (Game_list.title_id == self.current_title_id) &
-            #     (Game_list.system_id == system.id)
-            # ).execute()
+            Result.delete().where(
+                (Result.title_id == self.current_title_id) &
+                (Result.system_stage == "Одна таблица")
+            ).execute()
+            Game_list.delete().where(
+                (Game_list.title_id == self.current_title_id) &
+                (Game_list.system_id == system.id)
+            ).execute()
             
             # Заполняем Choice
             group_name = "1 группа"

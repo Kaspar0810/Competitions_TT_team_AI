@@ -2033,18 +2033,18 @@ class MainWindow(QMainWindow):
         info_layout.setContentsMargins(2, 2, 2, 2)
         
         self.current_stage_label = QLabel("Этап: Не выбран")
-        self.current_stage_label.setStyleSheet("font-weight: bold; font-size: 11px;")
+        self.current_stage_label.setStyleSheet("font-weight: bold; font-size: 14px;")
         info_layout.addWidget(self.current_stage_label)
         
         self.current_match_label = QLabel("Матч: ")
-        self.current_match_label.setStyleSheet("color: gray; font-size: 11px;")
+        self.current_match_label.setStyleSheet("color: gray; font-size: 14px;")
         info_layout.addWidget(self.current_match_label)
         info_layout.addStretch()
         
         main_layout.addWidget(info_frame)
 
         self.filter_info_label = QLabel("")
-        self.filter_info_label.setStyleSheet("color: #666; font-size: 11px;")
+        self.filter_info_label.setStyleSheet("color: #666; font-size: 14px;")
         info_layout.addWidget(self.filter_info_label)
         
         # ===== КНОПКА ПРОСМОТР ПРИЖАТА К ПРАВОЙ СТОРОНЕ =====
@@ -10386,8 +10386,9 @@ class MainWindow(QMainWindow):
                                         QMessageBox.Yes | QMessageBox.No)
             if reply == QMessageBox.No:
                 return
-        # очищает старую жеребьевку
-        self.clear_table_DB_after_choice(stage)
+            else:
+                # очищает старую жеребьевку
+                self.clear_table_DB_after_choice(stage)
 
         # Запускаем жеребьевку
         self.drawing_for_stage(stage)
@@ -10406,7 +10407,10 @@ class MainWindow(QMainWindow):
                                         QMessageBox.Yes | QMessageBox.No)
             if reply == QMessageBox.No:
                 return
-        
+            else:
+                # очищает таблицы перед повторной жербеьвкой
+                stage = final.stage
+                self.clear_table_DB_after_choice(stage)
         # Запускаем жеребьевку для финала
         self.drawing_for_stage(final)
 
@@ -10436,19 +10440,19 @@ class MainWindow(QMainWindow):
             stage.choice_flag = 1
             stage.save()
             # вставить автоматическую жеребьевку финала по кругу
-
-            # Заполняем таблицу Result после жеребьевки
-            self.fill_results_after_drawing()
+            if stage == "Квалификация":
+                # Заполняем таблицу Result после жеребьевки
+                self.fill_results_after_drawing()
             
-            QMessageBox.information(self, "Автоматическая жеребьевка", 
-                                f"✅ Жеребьевка для этапа '{stage.stage}' успешно проведена!\n\n"
-                                f"📊 Параметры жеребьевки:\n"
-                                f"   • Количество групп: {stage.total_group}\n"
-                                f"   • Участников в группе: {stage.max_player}\n\n"
-                                f"Таблицы Choice и Result обновлены.")
-            
-            # Обновляем отображение информации
-            self.update_stages_info()
+                QMessageBox.information(self, "Автоматическая жеребьевка", 
+                                    f"✅ Жеребьевка для этапа '{stage.stage}' успешно проведена!\n\n"
+                                    f"📊 Параметры жеребьевки:\n"
+                                    f"   • Количество групп: {stage.total_group}\n"
+                                    f"   • Участников в группе: {stage.max_player}\n\n"
+                                    f"Таблицы Choice и Result обновлены.")
+                
+                # Обновляем отображение информации
+                self.update_stages_info()
             
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка при автоматической жеребьевке: {str(e)}")
@@ -11757,11 +11761,11 @@ class MainWindow(QMainWindow):
             system = System.get_or_none(System.title_id == self.current_title_id)
             system_stage = system.stage if system else "Квалификация"
             
-            # Очищаем существующие результаты для этого этапа
-            Result.delete().where(
-                (Result.title_id == self.current_title_id) &
-                (Result.system_stage == system_stage)
-            ).execute()
+            # # Очищаем существующие результаты для этого этапа
+            # Result.delete().where(
+            #     (Result.title_id == self.current_title_id) &
+            #     (Result.system_stage == system_stage)
+            # ).execute()
             # Очищаем существующие результаты для этого этапа
             Game_list.delete().where(
                 (Game_list.title_id == self.current_title_id) &
@@ -14142,7 +14146,7 @@ class MainWindow(QMainWindow):
         )
 
         gamelist = Game_list.delete().where(
-            (Game_list.title_id == self.current.title_id) &
+            (Game_list.title_id == self.current_title_id) &
             (Game_list.system_id == system.id))
         
         if stage in group_list:
@@ -16171,10 +16175,10 @@ class MainWindow(QMainWindow):
             (Game_list.system_id == system.id)
         ).execute()
         
-        Result.delete().where(
-            (Result.title_id == self.current_title_id) &
-            (Result.system_stage == stage_name)
-        ).execute()
+        # Result.delete().where(
+        #     (Result.title_id == self.current_title_id) &
+        #     (Result.system_stage == stage_name)
+        # ).execute()
         
         # Записываем игроков в Game_list и Choice
         group_name = f"1 группа"

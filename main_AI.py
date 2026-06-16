@@ -2778,18 +2778,6 @@ class MainWindow(QMainWindow):
             self.clear_result_form_compact()
             self.load_results_table_for_stage(match.system_stage)
             self.load_matches_for_stage(match.system_stage)
-
-            # # Если этап - Квалификация и все матчи сыграны, обновляем места в Choice
-            # if self.current_stage == "Квалификация":
-            #     total = Result.select().where(
-            #         (Result.title_id == self.current_title_id) &
-            #         (Result.system_stage == self.current_stage)
-            #     ).count()
-            #     played = Result.select().where(
-            #         (Result.title_id == self.current_title_id) &
-            #         (Result.system_stage == self.current_stage) &
-            #         (Result.winner.is_null(False))
-            #                 ).count()
                 
             # Если текущий этап - полуфинал и все матчи сыграны, обновляем места
             if self.current_stage in ["Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]:
@@ -10989,7 +10977,7 @@ class MainWindow(QMainWindow):
             # Получаем начальное место для финала
             first_mesto = self.get_final_start_place(stage)
             last_mesto = first_mesto + max_pl - 1 if max_pl > 0 else first_mesto
-            title_text = f'Финальные соревнования.({first_mesto}-{last_mesto} место). Одиночный разряд. {sex}.'
+            title_text = f'Финальные соревнования.({first_mesto}-{last_mesto} место). Одиночный разряд. {title_sex}.'
             name_table = f"{clean_name}_{number_fin}-final.pdf"
         
         # Создаем PDF
@@ -14147,21 +14135,18 @@ class MainWindow(QMainWindow):
 
         gamelist = Game_list.delete().where(
             (Game_list.title_id == self.current_title_id) &
-            (Game_list.system_id == system.id))
+            (Game_list.system_id == system.id)).execute()
         
         if stage in group_list:
             results = Result.delete().where(
                 (Result.title_id == self.current_title_id) &
-                (Result.system_stage == stage)
-            )
+                (Result.system_stage == stage)).execute()
+           
         else:
             results = Result.delete().where(
                 (Result.title_id == self.current_title_id) &
-                (Result.number_group == stage)
-            )
-
-    
-
+                (Result.number_group == stage)).execute()
+           
     def calculate_qualification_places(self, system):
         """Рассчитать места в квалификации (возвращает словарь {номер_группы: {посев: место}})"""
         from collections import defaultdict
@@ -14262,7 +14247,24 @@ class MainWindow(QMainWindow):
         try:
             # Проверяем результаты квалификации
             self.check_qualification_results()
-            
+# ======= мой вариант повторной жеребьевки ================
+            # Находим этап в системе
+            stage_id = System.get_or_none(
+                (System.title_id == self.current_title_id) &
+                (System.stage == stage)
+            )
+            # Проверяем, есть ли уже жеребьевка для этого этапа
+            if stage_id.choice_flag == 1:
+                reply = QMessageBox.question(self, "Подтверждение", 
+                                            f"Для этапа '{stage}' уже проведена жеребьевка.\n"
+                                            f"Провести заново?",
+                                            QMessageBox.Yes | QMessageBox.No)
+                if reply == QMessageBox.No:
+                    return
+                else:
+                    # очищает старую жеребьевку
+                    self.clear_table_DB_after_choice(stage)
+# ==================================
             # Получаем систему квалификации
             qualification = System.get_or_none(
                 (System.title_id == self.current_title_id) &
@@ -14295,6 +14297,9 @@ class MainWindow(QMainWindow):
             # Проверяем перенесенные матчи
             self.check_transferred_matches(stage)
             
+            # записываем flag жеребьевки = 1
+            systems = System.update(choice_flag = 1).where(System.stage == stage).execute()
+
             QMessageBox.information(
                 self, "Успешно", 
                 f"Жеребьевка: {stage}\n\n"

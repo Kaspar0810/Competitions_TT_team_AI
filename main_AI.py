@@ -13120,17 +13120,36 @@ class MainWindow(QMainWindow):
             # Показываем все имена при пустом поле
             model = QStringListModel(self.player_filter_list[:50])
             self.player_filter_completer.setModel(model)
-
-    def apply_player_filter(self):
+# ========== было ==========
+    def _apply_player_filter(self):
         """Применение фильтра по игроку"""
         self.player_filter_text = self.player_filter_edit.text().strip()
-        
+        stage_name = self.stage_name
         if self.player_filter_text:
             # Обновляем информационную строку
             self.filter_info_label.setText(f"🔍 Фильтр по игроку: {self.player_filter_text}")
             
             # Применяем фильтр ко всем этапам
-            self.load_filtered_results_all_stages()
+            self.load_filtered_results_all_stages(stage_name=None)
+        else:
+            # Сбрасываем фильтр
+            self.reset_player_filter()
+# ====== новый вариант ========
+    def apply_player_filter(self):
+        """Применение фильтра по игроку с учётом текущего этапа"""
+        if hasattr(self, 'player_filter_edit'):
+            self.player_filter_text = self.player_filter_edit.text().strip()
+        else:
+            return
+        
+        if self.player_filter_text:
+            # Обновляем информационную строку
+            if hasattr(self, 'filter_info_label'):
+                self.filter_info_label.setText(f"🔍 Фильтр по игроку: {self.player_filter_text}")
+            
+            # Применяем фильтр ко всем этапам или только к текущему
+            current_stage = getattr(self, 'current_stage', None)
+            self.load_filtered_results_all_stages(current_stage)
         else:
             # Сбрасываем фильтр
             self.reset_player_filter()
@@ -13177,7 +13196,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Ошибка загрузки списка игроков: {e}")
 
-    def load_filtered_results_all_stages(self):
+    def _load_filtered_results_all_stages(self):
         """Загрузка результатов, отфильтрованных по игроку, по всем этапам"""
         if not self.current_title_id or not self.player_filter_text:
             return
@@ -13223,6 +13242,65 @@ class MainWindow(QMainWindow):
             # percent = (played_matches / total_matches * 100) if total_matches > 0 else 0
             
             # self.current_stage_label.setText(f"🔍 Поиск по игроку: {self.player_filter_text}")
+            # self.progress_label.setText(f"📊 Найдено матчей: {total_matches} | Сыграно: {played_matches} ({percent:.1f}%)")
+            
+        except Exception as e:
+            print(f"Ошибка фильтрации по игроку: {e}")
+
+
+    def load_filtered_results_all_stages(self, stage_name=None):
+        """
+        Загрузка результатов, отфильтрованных по игроку.
+        Если stage_name указан – фильтруем только этот этап.
+        """
+        if not self.current_title_id or not self.player_filter_text:
+            return
+        
+        try:
+            search_text = self.player_filter_text.lower()
+            # Базовый запрос
+            query = Result.select().where(Result.title_id == self.current_title_id)
+            
+            # Фильтр по этапу (если указан)
+            if stage_name:
+                query = query.where(Result.system_stage == stage_name)
+            
+            # Фильтруем по игроку (поиск в player1 или player2)
+            filtered_results = []
+            for result in query:
+                player1_clean = result.player1.split(' (')[0] if ' (' in result.player1 else result.player1
+                player2_clean = result.player2.split(' (')[0] if ' (' in result.player2 else result.player2
+                
+                if search_text in player1_clean.lower() or search_text in player2_clean.lower():
+                    filtered_results.append(result)
+            
+            # Формируем данные для таблицы
+            data = []
+            for result in filtered_results:
+                winner_text = result.winner if result.winner else "—"
+                score_text = result.score_in_game if result.score_in_game else "—"
+                
+                data.append({
+                    'id': result.id,
+                    'stage': result.system_stage,
+                    'group': f"Гр.{result.number_group}",
+                    'tour': f"Тур {result.tours}",
+                    'player1': result.player1,
+                    'player2': result.player2,
+                    'winner': winner_text,
+                    'score': score_text,
+                    'points': f"{result.points_win}:{result.points_loser}" if result.points_win else "—"
+                })
+            
+            self.results_table_model.setData(data)
+            
+            # Обновляем информацию
+            total_matches = len(filtered_results)
+            played_matches = sum(1 for r in filtered_results if r.winner)
+            percent = (played_matches / total_matches * 100) if total_matches > 0 else 0
+            
+            stage_display = f" (этап: {stage_name})" if stage_name else " (все этапы)"
+            self.current_stage_label.setText(f"🔍 Поиск по игроку: {self.player_filter_text}{stage_display}")
             # self.progress_label.setText(f"📊 Найдено матчей: {total_matches} | Сыграно: {played_matches} ({percent:.1f}%)")
             
         except Exception as e:

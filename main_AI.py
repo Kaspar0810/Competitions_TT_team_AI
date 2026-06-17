@@ -2804,7 +2804,7 @@ class MainWindow(QMainWindow):
                     (Result.winner.is_null(False))
                 ).count() 
                 if total_matches > 0 and played_matches == total_matches:
-                    players_info = self.calculate_and_save_round_robin_final_places(self.current_stage)
+                    self.calculate_and_save_round_robin_final_places(self.current_stage)
 
 
         except Exception as e:
@@ -10820,10 +10820,14 @@ class MainWindow(QMainWindow):
             max_pl = system.max_player
             pv = "альбомная"
 
+        family_col = 0
         # Определяем ориентацию страницы
         if pv == "альбомная":
             page_size = landscape(A4)
-            family_col = 4.6
+            if max_pl <= 8:
+                family_col = 5.0
+            else:
+                family_col = 4.6
             center_stage = 210
             wcells = 20.0 / max_pl if max_pl > 0 else 1
         else:
@@ -11281,18 +11285,22 @@ class MainWindow(QMainWindow):
 
     def get_final_start_place(self, stage):
         """Получение начального места для финала"""
+
+        group_list = ["Квалификация", "Квалификация. 1-й полуфинал","Квалификация. 2-й полуфинал"]
+
         try:
             # Получаем все финалы до текущего
-            finals = System.select().where(
-                (System.title_id == self.current_title_id) &
-                (System.stage.contains("финал")) &
-                (~System.stage.contains("полуфинал")) &
-                (System.id < System.get(System.stage == stage).id)
-            ).order_by(System.id)
+ 
+            # отбор записей, которых нет в списке
+            finals = System.select().where((System.title_id == self.current_title_id) & (System.stage.not_in(group_list)))
             
             start_place = 1
-            for final in finals:
-                start_place += final.max_player
+            for fin in finals:
+                final = fin.stage
+                if final != stage:
+                    start_place += fin.max_player
+                else:
+                    break
             
             return start_place
         except:
@@ -13746,7 +13754,7 @@ class MainWindow(QMainWindow):
                 current_place += len(group)
         
         return players_info
-# ========новый вариант с записью мест в choice player ========= 
+# ========новый вариант с записью мест в choice player работает 1706 ========= 
     def calculate_round_robin_standings(self, players_info, results_group, final_stage=None):
         """
         Расчет мест в круговой таблице (только для групп с полными данными)
@@ -13876,8 +13884,7 @@ class MainWindow(QMainWindow):
             self._save_places_to_db(players_info, final_stage)
         
         return players_info
-
-
+# эта функция для записи в DB
     def _save_places_to_db(self, players_info, final_stage):
         """
         Сохраняет места игроков в таблицы Choice (mesto_final) и Player (mesto)
@@ -13930,7 +13937,7 @@ class MainWindow(QMainWindow):
                     choice.mesto_final = info['place']
                     choice.save()
                     updated_choice += 1
-                    print(f"Choice: игрок {choice.family} -> место {info['place']}")
+                    # print(f"Choice: игрок {choice.family} -> место {info['place']}")
                 
                 # 2. Обновляем Player - поле mesto
                 player = Player.get_or_none(Player.id == player_id)
@@ -13938,7 +13945,7 @@ class MainWindow(QMainWindow):
                     player.mesto = info['place']
                     player.save()
                     updated_player += 1
-                    print(f"Player: игрок {player.fio} -> место {info['place']}")
+                    # print(f"Player: игрок {player.fio} -> место {info['place']}")
             
             print(f"Сохранены места для {updated_choice} записей Choice и {updated_player} записей Player")
             
@@ -13946,7 +13953,6 @@ class MainWindow(QMainWindow):
             print(f"Ошибка сохранения мест: {e}")
             import traceback
             traceback.print_exc()
-
 
     def calculate_and_save_round_robin_final_places(self, final_stage):
         """
@@ -14018,7 +14024,7 @@ class MainWindow(QMainWindow):
             # Вызываем функцию расчета мест с сохранением в БД
             players_info = self.calculate_round_robin_standings(players_info, results_group, final_stage)
             
-            print(f"Места для {final_stage} рассчитаны и сохранены")
+            # print(f"Места для {final_stage} рассчитаны и сохранены")
             
             return players_info
             

@@ -2792,7 +2792,21 @@ class MainWindow(QMainWindow):
                 ).count()
                 if total_matches > 0 and played_matches == total_matches:
                     self.update_semifinal_places(self.current_stage)
-                    
+            # ======= мой вариант ================
+            else:
+                total_matches = Result.select().where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.number_group == self.current_stage)
+                ).count()
+                played_matches = Result.select().where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.number_group == self.current_stage) &
+                    (Result.winner.is_null(False))
+                ).count() 
+                if total_matches > 0 and played_matches == total_matches:
+                    players_info = self.calculate_and_save_round_robin_final_places(self.current_stage)
+
+
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить результат: {str(e)}")
  
@@ -13610,8 +13624,8 @@ class MainWindow(QMainWindow):
             player['ratio_points'] = ""
         
         return players
- 
-    def calculate_round_robin_standings(self, players_info, results_group):
+# =========== рабочий вариант 1706 ======= 
+    def __calculate_round_robin_standings(self, players_info, results_group):
         """
         Расчет мест в круговой таблице (только для групп с полными данными)
         """
@@ -13732,7 +13746,288 @@ class MainWindow(QMainWindow):
                 current_place += len(group)
         
         return players_info
+# ========новый вариант с записью мест в choice player ========= 
+    def calculate_round_robin_standings(self, players_info, results_group, final_stage=None):
+        """
+        Расчет мест в круговой таблице (только для групп с полными данными)
+        и запись в таблицы Choice (mesto_final) и Player (mesto)
+        
+        Параметры:
+            players_info: dict {индекс игрока: {'total_points': int, 'wins': int, 'losses': int, ...}}
+            results_group: список результатов матчей в группе
+            final_stage: название финала (если None - не записываем в БД)
+        """
+        from collections import defaultdict
+        import re
+        
+        if not players_info:
+            return players_info
+        
+        # Копируем данные для работы
+        standings = {}
+        for idx, info in players_info.items():
+            standings[idx] = {
+                'total_points': info['total_points'],
+                'wins': info['wins'],
+                'losses': info['losses'],
+                'idx': idx,
+                'games_won': 0,      # выигранные партии
+                'games_lost': 0,     # проигранные партии
+                'points_scored': 0,  # забитые мячи
+                'points_conceded': 0 # пропущенные мячи
+            }
+        
+        # Подсчитываем выигранные/проигранные партии и забитые/пропущенные мячи
+        for result in results_group:
+            if result.winner:
+                tour = result.tours
+                mark = tour.find("-")
+                if mark == -1:
+                    continue
+                
+                idx1 = int(tour[:mark])
+                idx2 = int(tour[mark + 1:])
+                
+                # Парсим счет матча для подсчета партий и мячей
+                if result.score_in_game:
+                    # Формат счета: "3:1" или "3 : 1"
+                    score_parts = result.score_in_game.replace(" ", "").split(":")
+                    if len(score_parts) == 2:
+                        try:
+                            games_winner = int(score_parts[0])
+                            games_loser = int(score_parts[1])
+                            
+                            # Определяем победителя
+                            if result.winner == result.player1:
+                                winner_idx = idx1
+                                loser_idx = idx2
+                            else:
+                                winner_idx = idx2
+                                loser_idx = idx1
+                            
+                            # Добавляем выигранные/проигранные партии
+                            if winner_idx in standings:
+                                standings[winner_idx]['games_won'] += games_winner
+                                standings[winner_idx]['games_lost'] += games_loser
+                            if loser_idx in standings:
+                                standings[loser_idx]['games_won'] += games_loser
+                                standings[loser_idx]['games_lost'] += games_winner
+                            
+                        except ValueError:
+                            pass
+        
+        # Сортируем игроков по очкам
+        sorted_players = sorted(standings.values(), 
+                            key=lambda x: x['total_points'], 
+                            reverse=True)
+        
+        # Группируем по очкам
+        points_groups = defaultdict(list)
+        for player in sorted_players:
+            points_groups[player['total_points']].append(player)
+        
+        # Если все очки разные
+        if len(points_groups) == len(standings):
+            for place, player in enumerate(sorted_players, 1):
+                players_info[player['idx']]['place'] = place
+                players_info[player['idx']]['ratio_points'] = ""  # Пустая строка
+            # Записываем места в БД
+            if final_stage:
+                self._save_places_to_db(players_info, final_stage)
+            return players_info
+        
+        # Обрабатываем группы с одинаковыми очками
+        current_place = 1
+        for points, group in sorted(points_groups.items(), key=lambda x: x[0], reverse=True):
+            if len(group) == 1:
+                players_info[group[0]['idx']]['place'] = current_place
+                players_info[group[0]['idx']]['ratio_points'] = ""
+                current_place += 1
+            elif len(group) == 2:
+                # Два игрока - личная встреча
+                place_1, place_2 = self.resolve_two_players_tie(group, results_group, points, standings)
+                players_info[group[0]['idx']]['place'] = current_place + place_1 - 1
+                players_info[group[1]['idx']]['place'] = current_place + place_2 - 1
+                
+                # Соотношение партий
+                if place_1 < place_2:
+                    ratio_1 = 2
+                    ratio_2 = 1
+                else:
+                    ratio_1 = 1
+                    ratio_2 = 2
+                
+                players_info[group[0]['idx']]['ratio_points'] = ratio_1 if ratio_1 else ""
+                players_info[group[1]['idx']]['ratio_points'] = ratio_2 if ratio_2 else ""
+                
+                current_place += 2
+            else:
+                # Три и более игроков - считаем соотношение партий и мячей
+                resolved = self.resolve_multiple_players_tie(group, results_group, points, standings)
+                
+                for player_data in resolved:
+                    players_info[player_data['idx']]['place'] = current_place + player_data['place_in_group'] - 1
+                    players_info[player_data['idx']]['ratio_points'] = player_data.get('ratio_points', '')
+                
+                current_place += len(group)
+        
+        # Записываем места в БД
+        if final_stage:
+            self._save_places_to_db(players_info, final_stage)
+        
+        return players_info
 
+
+    def _save_places_to_db(self, players_info, final_stage):
+        """
+        Сохраняет места игроков в таблицы Choice (mesto_final) и Player (mesto)
+        
+        Параметры:
+            players_info: dict {индекс игрока: {'player_id': int, 'place': int, ...}}
+            final_stage: название финала
+        """
+        from models import Choice, Player
+        
+        if not players_info:
+            return
+        
+        try:
+            # Получаем систему для финала
+            system = System.get_or_none(
+                (System.title_id == self.current_title_id) &
+                (System.stage == final_stage)
+            )
+            if not system:
+                print(f"Система {final_stage} не найдена")
+                return
+            
+            updated_choice = 0
+            updated_player = 0
+            
+            for idx, info in players_info.items():
+                if 'place' not in info or info['place'] == 0:
+                    continue
+                
+                # Получаем ID игрока из Game_list
+                game_player = Game_list.get_or_none(
+                    (Game_list.title_id == self.current_title_id) &
+                    (Game_list.system_id == system.id) &
+                    (Game_list.rank_num_player == idx)
+                )
+                
+                if not game_player:
+                    continue
+                
+                player_id = game_player.player_group.id
+                
+                # 1. Обновляем Choice - поле mesto_final
+                choice = Choice.get_or_none(
+                    (Choice.title_id == self.current_title_id) &
+                    (Choice.player_choice == player_id)
+                )
+                if choice:
+                    # Обновляем поле mesto_final
+                    choice.mesto_final = info['place']
+                    choice.save()
+                    updated_choice += 1
+                    print(f"Choice: игрок {choice.family} -> место {info['place']}")
+                
+                # 2. Обновляем Player - поле mesto
+                player = Player.get_or_none(Player.id == player_id)
+                if player:
+                    player.mesto = info['place']
+                    player.save()
+                    updated_player += 1
+                    print(f"Player: игрок {player.fio} -> место {info['place']}")
+            
+            print(f"Сохранены места для {updated_choice} записей Choice и {updated_player} записей Player")
+            
+        except Exception as e:
+            print(f"Ошибка сохранения мест: {e}")
+            import traceback
+            traceback.print_exc()
+
+
+    def calculate_and_save_round_robin_final_places(self, final_stage):
+        """
+        Рассчитывает места в круговом финале и сохраняет их в базу данных.
+        """
+        if not self.current_title_id:
+            return
+        
+        try:
+            # Получаем систему для финала
+            system = System.get_or_none(
+                (System.title_id == self.current_title_id) &
+                (System.stage == final_stage)
+            )
+            if not system:
+                print(f"Система {final_stage} не найдена")
+                return
+            
+            # Получаем всех игроков в финале из Game_list
+            game_players = Game_list.select().where(
+                (Game_list.title_id == self.current_title_id) &
+                (Game_list.system_id == system.id)
+            ).order_by(Game_list.rank_num_player)
+            
+            if game_players.count() == 0:
+                print(f"Нет игроков в {final_stage}")
+                return
+            
+            # Собираем информацию об игроках
+            players_info = {}
+            for gp in game_players:
+                player = Player.get_or_none(Player.id == gp.player_group.id)
+                if player:
+                    players_info[gp.rank_num_player] = {
+                        'player_id': player.id,
+                        'total_points': 0,
+                        'wins': 0,
+                        'losses': 0,
+                        'place': 0
+                    }
+            
+            # Получаем результаты
+            results = Result.select().where(
+                (Result.title_id == self.current_title_id) &
+                (Result.number_group == final_stage)
+            )
+            
+            # Подсчитываем очки
+            for result in results:
+                if result.winner:
+                    tour = result.tours
+                    if '-' in tour:
+                        pos1, pos2 = map(int, tour.split('-'))
+                        if result.winner == result.player1:
+                            winner_pos, loser_pos = pos1, pos2
+                        else:
+                            winner_pos, loser_pos = pos2, pos1
+                        
+                        if winner_pos in players_info:
+                            players_info[winner_pos]['wins'] += 1
+                            players_info[winner_pos]['total_points'] += 2  # 2 очка за победу
+                        if loser_pos in players_info:
+                            players_info[loser_pos]['losses'] += 1
+                            players_info[loser_pos]['total_points'] += 1  # 1 очко за поражение
+            
+            # Получаем результаты для расчета мест
+            results_group = list(results)
+            
+            # Вызываем функцию расчета мест с сохранением в БД
+            players_info = self.calculate_round_robin_standings(players_info, results_group, final_stage)
+            
+            print(f"Места для {final_stage} рассчитаны и сохранены")
+            
+            return players_info
+            
+        except Exception as e:
+            print(f"Ошибка расчета мест в финале: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+# ==============================
     def calculate_games_ratio(self, player_stats):
         """Расчет соотношения выигранных/проигранных партий - возвращает строку"""
         games_won = player_stats['games_won']

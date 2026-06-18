@@ -13046,6 +13046,8 @@ class MainWindow(QMainWindow):
 
     def update_filter_combos(self, stage_name):
         """Обновление списков групп и туров в фильтрах"""
+        group_list = ["Квалификация", "Квалификация. 1-й полуфинал","Квалификация. 2-й полуфинал"]
+
         try:
             # Блокируем сигналы для предотвращения рекурсии
             self.group_filter_combo.blockSignals(True)
@@ -13076,10 +13078,16 @@ class MainWindow(QMainWindow):
                     self.group_filter_combo.setCurrentIndex(0)
             
             # Получаем уникальные туры
-            rounds = Result.select(Result.round).where(
-                (Result.title_id == self.current_title_id) &
-                (Result.system_stage == stage_name)
-            ).distinct().order_by(Result.round)
+            if stage_name in group_list:
+                rounds = Result.select(Result.round).where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.system_stage == stage_name)
+                ).distinct().order_by(Result.round)
+            else:# финалы
+                rounds = Result.select(Result.round).where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.number_group == stage_name)
+                ).distinct().order_by(Result.round)
             
             # Сохраняем текущее значение
             current_tour = self.tour_filter_combo.currentText()
@@ -13252,7 +13260,10 @@ class MainWindow(QMainWindow):
         """
         Загрузка результатов, отфильтрованных по игроку.
         Если stage_name указан – фильтруем только этот этап.
+        
         """
+        group_list = ["Квалификация", "Квалификация. 1-й полуфинал","Квалификация. 2-й полуфинал"]
+
         if not self.current_title_id or not self.player_filter_text:
             return
         
@@ -13263,7 +13274,10 @@ class MainWindow(QMainWindow):
             
             # Фильтр по этапу (если указан)
             if stage_name:
-                query = query.where(Result.system_stage == stage_name)
+                if stage_name in group_list:
+                    query = query.where(Result.system_stage == stage_name)
+                else:
+                    query = query.where(Result.number_group == stage_name)
             
             # Фильтруем по игроку (поиск в player1 или player2)
             filtered_results = []
@@ -13283,13 +13297,13 @@ class MainWindow(QMainWindow):
                 data.append({
                     'id': result.id,
                     'stage': result.system_stage,
-                    'group': f"Гр.{result.number_group}",
-                    'tour': f"Тур {result.tours}",
+                    'group': result.number_group,
+                    'tour': result.tours,
                     'player1': result.player1,
                     'player2': result.player2,
                     'winner': winner_text,
-                    'score': score_text,
-                    'points': f"{result.points_win}:{result.points_loser}" if result.points_win else "—"
+                    'score': result.score_in_game,
+                    'points': result.score_win
                 })
             
             self.results_table_model.setData(data)
@@ -16387,6 +16401,8 @@ class MainWindow(QMainWindow):
         """Переносит результаты сыгранных матчей из source_stage в final_stage."""
         # определяем system_id
         system = System.get_or_none((System.title_id == self.current_title_id) & (System.stage == final_stage))
+        # количество попадающих в финал для нумерации райнод
+        players_count = system.max_player
         # Создаём карту игроков: player_id -> позиция в финале
         matches_cache = {}
         player_to_pos = {}
@@ -16434,7 +16450,10 @@ class MainWindow(QMainWindow):
                 )
                 if existing:
                     existing.delete_instance()
-                
+
+
+                round = self.get_round_number(players_count, tours_str)
+
                 if previous_match:
                     # ПЕРЕНОСИМ ВСЕ ДАННЫЕ из квалификации
                     result = Result.create(
@@ -16446,7 +16465,7 @@ class MainWindow(QMainWindow):
                         title_id=self.current_title_id,
                         system_id=system.id,
                         sex=self.current_sex if self.current_sex else "man",
-                        # round=round,
+                        round=round,
                         # Переносим все данные из квалификации
                         winner=previous_match.winner,
                         points_win=previous_match.points_win,
@@ -16461,11 +16480,6 @@ class MainWindow(QMainWindow):
                         schedule_table=previous_match.schedule_table,
                         stage_net=previous_match.stage_net
                     )
-                    # transferred_matches += 1
-                    # print(f"  ✅ Перенесен результат: {player1} vs {player2}")
-                    # if previous_match.winner:
-                    #     print(f"     Победитель: {previous_match.winner}")
-                    #     print(f"     Счет: {previous_match.score_in_game}")
                 else:
                     # Создаем пустой матч
                     result = Result.create(
@@ -16477,10 +16491,9 @@ class MainWindow(QMainWindow):
                         title_id=self.current_title_id,
                         system_id=system.id,
                         sex=self.current_sex if self.current_sex else "man",
-                        round=round
+                        # round=round
                     )
-                    created_matches += 1
-                    # print(f"  ➕ Создан новый матч: {player1} vs {player2}")       
+                    created_matches += 1      
 # ================================
     def create_circular_final(self, stage_name, source_stage, exit_count):
         """
@@ -17783,6 +17796,79 @@ class MainWindow(QMainWindow):
                     if choice:
                         choice.mesto_semi_final = info['place']
                         choice.save()
+
+    def get_round_number(self, players_count, match_pair):
+        """
+        Определяет номер раунда (тура) по количеству игроков и паре встречи.
+        
+        Параметры:
+            players_count: количество игроков в группе (например, 4, 6, 8, ...)
+            match_pair: строка вида "1-3" (номера игроков через дефис)
+        
+        Возвращает:
+            номер раунда (1, 2, 3, ...) или None, если пара не найдена
+        """
+        # Получаем список туров для данного количества игроков
+        tours = self.tours_list(players_count)
+        if not tours:
+            return None
+        
+        # Поиск пары в турах
+        for round_idx, round_matches in enumerate(tours, 1):
+            # round_matches - список пар в этом туре (например, ['1-3', '2-4'])
+            for match in round_matches:
+                if match == match_pair:
+                    return round_idx
+        
+        # Если пара не найдена, пробуем обратный порядок (например, "3-1" как "1-3")
+        reversed_pair = '-'.join(reversed(match_pair.split('-')))
+        for round_idx, round_matches in enumerate(tours, 1):
+            for match in round_matches:
+                if match == reversed_pair:
+                    return round_idx
+        
+        return None  # Пара не найдена ни в одном туре
+
+
+    # def get_round_for_match(self, players_count, player1_num, player2_num):
+    #     """
+    #     Определяет номер раунда по номерам двух игроков.
+        
+    #     Параметры:
+    #         players_count: количество игроков в группе
+    #         player1_num: номер первого игрока (int)
+    #         player2_num: номер второго игрока (int)
+        
+    #     Возвращает:
+    #         номер раунда (int) или None
+    #     """
+    #     match_pair = f"{player1_num}-{player2_num}"
+    #     return self.get_round_number(players_count, match_pair)
+
+
+    # def get_all_rounds_info(self, players_count):
+    #     """
+    #     Возвращает информацию о всех турах для данного количества игроков.
+        
+    #     Параметры:
+    #         players_count: количество игроков в группе
+        
+    #     Возвращает:
+    #         список словарей с информацией о турах:
+    #         [{'round': 1, 'matches': ['1-3', '2-4']}, ...]
+    #     """
+    #     tours = self.tours_list(players_count)
+    #     if not tours:
+    #         return []
+        
+    #     result = []
+    #     for round_idx, matches in enumerate(tours, 1):
+    #         result.append({
+    #             'round': round_idx,
+    #             'matches': matches
+    #         })
+        
+    #     return result
 # == устанавливает флаг жеребьевки в Choice =====
     def set_choice_flag_for_stage(self, stage, flag=1):
         """

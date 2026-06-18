@@ -2562,6 +2562,7 @@ class MainWindow(QMainWindow):
 # ============= Сохранение результата матча с правильным форматом и обработкой неявок ======================
     def save_match_result_compact(self):
         """Сохранение результата матча с правильным форматом и обработкой неявок"""
+        group_list = ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]
 
         if not self.current_matches:
             QMessageBox.warning(self, "Ошибка", "Нет выбранного матча")
@@ -2640,7 +2641,6 @@ class MainWindow(QMainWindow):
                 # Обновляем таблицу
                 self.clear_result_form_compact()
                 self.load_results_table_for_stage(match.system_stage)
-                # self.clear_result_form_compact()
                 self.load_matches_for_stage(match.system_stage)
                 
             # Случай 3: Не явка игрока 2
@@ -2859,8 +2859,9 @@ class MainWindow(QMainWindow):
 # =============================== рабочая 2805
     def load_results_table_for_stage(self, stage_name):
         """Загрузка таблицы результатов для выбранного этапа с фильтрацией"""
-
         group_list = ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]
+
+        stage_name = self.current_stage
 
         if not self.current_title_id:
             return
@@ -2896,9 +2897,9 @@ class MainWindow(QMainWindow):
             elif self.current_status_filter == "unplayed":
                 query = query.where(Result.winner.is_null(True))
             
-            # Сортировка
+            # # Сортировка
             query = query.order_by(Result.number_group, Result.round)
-            
+
             data = []
             for result in query:
                 winner_text = result.winner if result.winner else ""

@@ -16273,8 +16273,9 @@ class MainWindow(QMainWindow):
                     all_athletes.append(athlete_with_group)
 
             # Сортируем: сначала по месту, затем (опционально) по имени
-            sorted_athletes = sorted(all_athletes, key=lambda x: (x["place"]))
-
+            # sorted_athletes = sorted(all_athletes, key=lambda x: (x["place"]))
+            sorted_athletes = sorted(all_athletes, 
+                                            key=lambda x: (x.get('group'), x.get('place')))
             idx = 0
             # for group in sorted_groups:
             for player in sorted_athletes:

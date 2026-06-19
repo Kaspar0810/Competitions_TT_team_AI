@@ -16433,9 +16433,14 @@ class MainWindow(QMainWindow):
             if player1_id and player2_id:
                 pos1 = player_to_pos[player1_id]
                 pos2 = player_to_pos[player2_id]
-                tours_str = f"{pos1}-{pos2}"
-                player1 = res.player1
-                player2 = res.player2
+                if pos2 > pos1:
+                    tours_str = f"{pos1}-{pos2}"
+                    player1 = res.player1
+                    player2 = res.player2
+                else:
+                    tours_str = f"{pos2}-{pos1}"
+                    player1 = res.player2
+                    player2 = res.player1
                 
                 # Проверяем, был ли уже сыгран этот матч в квалификации
                 match_key = f"{player1}|{player2}"

@@ -41,6 +41,7 @@ from datetime import *
 import pandas as pd
 import math
 import re
+import random
 
 from collections import defaultdict
 from datetime import datetime
@@ -10432,8 +10433,9 @@ class MainWindow(QMainWindow):
                                         QMessageBox.Yes | QMessageBox.No)
             if reply == QMessageBox.No:
                 return
-        # очищаем предыдущую жеребьевку
-        self.clear_table_DB_after_choice(final.stage)
+            elif reply == QMessageBox.Yes:
+                # очищаем предыдущую жеребьевку
+                self.clear_table_DB_after_choice(final.stage)
         # Определяем тип таблицы
         table_type = final.type_table if hasattr(final, 'type_table') else "Круговая"
         # self.drawing_for_stage(final.stage)
@@ -17059,6 +17061,8 @@ class MainWindow(QMainWindow):
         # 3. Сортируем группы по номеру
         sorted_groups = sorted(players_by_group.keys(), key=self._extract_number_from_group) 
 
+        # 4. Жеребьевка сетки автоматом
+        self.choice_net_automat(stage, players_by_group)
 # ====================================================
     def get_circular_tour_positions(self, total_players):
         """Возвращает список позиций в круговой таблице для total_players."""
@@ -17323,16 +17327,18 @@ class MainWindow(QMainWindow):
             return players
         
         result = self.real_place_for_final(stage_name=stage)
-
+        # Получаем результаты мест в группах согласно выходу из групп
+        place = result['place_stage']
+                       
         # Получаем результаты мест в группах
         for group_num in range(1, qualification.total_group + 1):
             group_name = f"{group_num} группа"
             choices = Choice.select().where(
                 (Choice.title_id == self.current_title_id) &
                 (Choice.group == group_name) &
-                (Choice.mesto_group.is_null(False))
-            ).order_by(Choice.mesto_group)
-            
+                (Choice.mesto_group.in_(place))
+            ).order_by(Choice.mesto_group) 
+
             # Берем первых exit_count игроков
             for i, choice in enumerate(choices):
                 if i >= exit_count:
@@ -18855,9 +18861,206 @@ class MainWindow(QMainWindow):
         return math.floor(number * factor) / factor
 
 # ======== жеребьвка сетки ==========
-    def choice_net_automat(self, sorted_sportsmen, count_exit, free_num, posevs_num, nums):
+
+    def free_place_in_setka(self, max_player, real_all_player_in_final, count_exit):
+        """вычеркиваем свободные номера в сетке"""
+        free_num = []
+        free_number_8 = [2, 7, 6, 3]
+        free_number_16 = [2, 15, 7, 10, 6, 11, 3, 14]
+        free_number_24 = [5, 20, 8, 17, 11, 14, 2, 23]
+        free_number_32 = [2, 31, 15, 18, 10, 23, 7, 26, 6, 27, 11, 22, 14, 19, 3, 30]
+        count = max_player - real_all_player_in_final # кол-во свободных мест
+
+
+        if max_player == 8:
+            free_number = free_number_8
+        if max_player == 16:
+            free_number = free_number_16
+        elif max_player == 24:
+            free_number = free_number_24
+        elif max_player == 32:
+            free_number = free_number_32
+        # если нет одного игрока, но выходят два из группы, то есть выбор из двух вариантов     
+        if count_exit == 1:
+            free_num = free_number[:count]
+        elif count_exit == 2:
+            fn = count if count % 2 == 0 else count + 1
+            free_num = free_number[:fn]       
+        return free_num
+
+    def setka_choice_number(self, fin, count_exit):
+        """номера сетки при посеве"""
+
+        # type_setka_8_list = ["Сетка (с розыгрышем всех мест)", "Сетка (-2)", "Сетка (1-3 место)", "Сетка (1-3 место) на 8 пар(ы)"]
+        # type_setka_16_list = ["Сетка (с розыгрышем всех мест)", "Сетка (-2) на 16 участников", "Сетка (1-3 место) на 16 участников", "Сетка (1-3 место) на 16 пар(ы)"]
+        # type_setka_32_list = ["Сетка (с розыгрышем всех мест)", "Сетка (-2) на 32 участников", "Сетка (1-3 место) на 32 участников", "Сетка (1-3 место) на 32 пар(ы)"]
+        posevs = []
+        posev_1 = []
+        posev_2 = []
+        posev_3 = []
+        posev_4 = []
+
+        system = System.select().where((System.title_id == self.current_title_id) & (System.stage == fin)).get()
+        max_player = system.max_player
+        # type_setka = system.type_table
+        if fin == "Суперфинал":
+            count_exit = 1
+            posev_1 = [[1, 8], [4, 5], [2, 3, 6, 7]]
+            player_net = 8
+        else:
+            if count_exit <= 1:
+                if max_player == 8:
+                    posev_1 = [[1, 8], [4, 5], [2, 3, 6, 7]]
+                    # player_net = 8
+                elif max_player == 16:
+                    posev_1 = [[1, 16], [8, 9], [4, 5, 12, 13], [2, 3, 6, 7, 10, 11, 14, 15]]
+                    # player_net = 16
+                elif max_player == 32:
+                    posev_1 = [[1, 32], [16, 17], [8, 9, 24, 25], [4, 5, 12, 13, 20, 21, 28, 29], [2, 3, 6, 7, 10, 11, 14, 15, 18, 19, 22, 23, 26, 27, 30, 31]]
+                player_net = max_player 
+            elif  count_exit == 2:  
+                if max_player == 8:
+                    posev_1 = [[1, 8], [4, 5]]
+                    posev_2 = [[2, 3, 6, 7]]
+                elif max_player == 16:
+                    posev_1 = [[1, 16], [8, 9], [4, 5, 12, 13]]
+                    posev_2 = [[2, 3, 6, 7, 10, 11, 14, 15]]
+                elif max_player == 32:
+                    posev_1 = [[1, 32], [16, 17], [8, 9, 24, 25], [4, 5, 12, 13, 20, 21, 28, 29]]
+                    posev_2 = [[2, 3, 6, 7, 10, 11, 14, 15, 18, 19, 22, 23, 26, 27, 30, 31]]
+                player_net = max_player
+            # добавить при большем выходе из групп
+            # elif count_exit == 3:
+            # if count_exit <= 1 or fin == "Парный разряд" :
+                 
+            #     if type_setka in type_setka_8_list:
+            #         posev_1 = [[1, 8], [4, 5], [2, 3, 6, 7]]
+            #         player_net = 8
+            #     elif type_setka in type_setka_16_list:
+            #         posev_1 = [[1, 16], [8, 9], [4, 5, 12, 13], [2, 3, 6, 7, 10, 11, 14, 15]]
+            #         player_net = 16
+            #     elif type_setka in type_setka_32_list:
+            #         posev_1 = [[1, 32], [16, 17], [8, 9, 24, 25], [4, 5, 12, 13, 20, 21, 28, 29], [2, 3, 6, 7, 10, 11, 14, 15, 18, 19, 22, 23, 26, 27, 30, 31]]
+            #         player_net = 32
+            # elif count_exit == 1 or fin == "Одна таблица":
+            #     if type_setka in type_setka_8_list:
+            #         posev_1 = [[1, 8], [4, 5], [2, 3, 6, 7]]
+            #         player_net = 8
+            #     elif type_setka in type_setka_16_list:
+            #         posev_1 = [[1, 16], [8, 9], [4, 5, 12, 13], [2, 3, 6, 7, 10, 11, 14, 15]]
+            #         player_net = 16
+            #     elif type_setka in type_setka_32_list:
+            #         posev_1 = [[1, 32], [16, 17], [8, 9, 24, 25], [4, 5, 12, 13, 20, 21, 28, 29], [2, 3, 6, 7, 10, 11, 14, 15, 18, 19, 22, 23, 26, 27, 30, 31]]
+            #         player_net = 32
+            # elif count_exit == 2:
+            #     if type_setka in type_setka_8_list:
+            #         posev_1 = [[1, 8], [4, 5]]
+            #         posev_2 = [[2, 3, 6, 7]]
+            #         player_net = 8
+            #     elif type_setka in type_setka_16_list:
+            #         posev_1 = [[1, 16], [8, 9], [4, 5, 12, 13]]
+            #         posev_2 = [[2, 3, 6, 7, 10, 11, 14, 15]]
+            #         player_net = 16
+            #     elif type_setka in type_setka_32_list:
+            #         posev_1 = [[1, 32], [16, 17], [8, 9, 24, 25], [4, 5, 12, 13, 20, 21, 28, 29]]
+            #         posev_2 = [[2, 3, 6, 7, 10, 11, 14, 15, 18, 19, 22, 23, 26, 27, 30, 31]]
+            #         player_net = 32
+            # elif count_exit == 3:
+            #     if type_setka in type_setka_8_list:
+            #         posev_1 = [[1, 8]]
+            #         posev_2 = [[4, 5]]
+            #         posev_3 = [[3, 6]]
+            #         # posev_4 = [[2, 7]]
+            #         player_net = 8
+            #     elif type_setka in type_setka_16_list:
+            #         posev_1 = [[1, 16], [8, 9]]
+            #         posev_2 = [[4, 5, 12, 13]]
+            #         posev_3 = [[3, 6, 11, 14]]
+            #         # posev_4 = [[2, 7, 10, 15]]
+            #         player_net = 16
+            #     elif type_setka in type_setka_32_list:
+            #         posev_1 = [[1, 32], [16, 17], [8, 9, 24, 25]]
+            #         posev_2 = [[4, 5, 12, 13, 20, 21, 28, 29]]
+            #         posev_3 = [[3, 6, 11, 14, 19, 22, 27, 30]]
+            #         # posev_4 = [[2, 7, 10, 15, 18, 23, 26, 31]] 
+            #         player_net = 32
+            # elif count_exit == 4:
+            #     if type_setka in type_setka_8_list:
+            #         posev_1 = [[1, 8]]
+            #         posev_2 = [[4, 5]]
+            #         posev_3 = [[3, 6]]
+            #         posev_4 = [[2, 7]]
+            #         player_net = 8
+            #     elif type_setka in type_setka_16_list:
+            #         posev_1 = [[1, 16], [8, 9]]
+            #         posev_2 = [[4, 5, 12, 13]]
+            #         posev_3 = [[3, 6, 11, 14]]
+            #         posev_4 = [[2, 7, 10, 15]]
+            #         player_net = 16
+            #     elif type_setka in type_setka_32_list:
+            #         posev_1 = [[1, 32], [16, 17], [8, 9, 24, 25]]
+            #         posev_2 = [[4, 5, 12, 13, 20, 21, 28, 29]]
+            #         posev_3 = [[3, 6, 11, 14, 19, 22, 27, 30]]
+            #         posev_4 = [[2, 7, 10, 15, 18, 23, 26, 31]]
+            #         player_net = 32
+        posevs.append(player_net)
+        if len(posev_1) != 0:
+            posevs.append(posev_1)
+            if len(posev_2) != 0:
+                posevs.append(posev_2)
+                if len(posev_3) != 0:
+                    posevs.append(posev_3)
+                    if len(posev_4) != 0:
+                        posevs.append(posev_4)
+        return posevs
+
+    def choice_net_automat(self, stage, player_by_group):
         """"Жеребьевка сетки автомат новый вариант"""
         import collections
+        # ====== мой вариант =====
+        psv = []
+        systems = System.select().where((System.title_id == self.current_title_id) & (System.stage == stage)).get()
+        choice = Choice.select().where(Choice.title_id == self.current_title_id)
+        stage_exit = systems.stage_exit
+        count_exit = systems.mesta_exit
+        max_player = systems.max_player
+        vid_turnira = Title.select().where(Title.id == self.current_title_id).get()
+        # номер для посева
+        posevs_num = self.setka_choice_number(stage, count_exit)
+        # Получаем результаты мест в группах согласно выходу из групп
+        result = self.real_place_for_final(stage_name=stage)       
+        nums = result['place_stage']
+
+        # реальное число игроков в финале
+        if stage_exit == "Квалификация":
+            real_all_player_in_final = len(choice.select().where(Choice.mesto_group.in_(nums))) # реальное число игроков в сетке
+            # choice_posev = choice.select().where(Choice.mesto_group.in_(nums))
+        else:
+            real_all_player_in_final = len(choice.select().where(Choice.mesto_semi_final.in_(nums))) # реальное число игроков в сетке
+        # свободные номера в сетке
+        free_num = self.free_place_in_setka(max_player, real_all_player_in_final, count_exit)
+        #  спортсмены для посева ===
+        # из базы данных согласно местам в группе для жеребьевки сетки
+        full_posev = []
+        for posevs in player_by_group:
+            players_list = player_by_group[posevs]
+            for player in players_list:
+                pl_id = player['player_id']
+                family = player['name']
+                region = player['region']
+                city = player['city']
+                rank = player['rank']
+                mesto_group = player['place']
+                group = posevs
+
+                # if vid_turnira == "личные":
+                    # psv = [pl_id, family, region, group_number, group, city, rank, mesto_group]
+                psv = [pl_id, family, region, group, city, rank, mesto_group]
+        # else:
+        #     psv = [team_id, family, region, group_number, group, rank, mesto_group]
+
+                full_posev.append(psv)
+        # =======================
         # === колво посевов ====
         sportsmen_data = sorted_sportsmen
         # =======================
@@ -18978,6 +19181,7 @@ class MainWindow(QMainWindow):
 
         def draw_out_groups_one_person(sportsmen_data: List[List], free_num, max_attempts: int = 1000) -> Optional[Dict[int, int]]:
             """Жеребьевка для выхода из групп одного человека с улучшенным алгоритмом"""
+            import random
             # Сортируем по рейтингу (по убыванию)
             sorted_sportsmen = sorted(enumerate(sportsmen_data), key=lambda x: x[1][6], reverse=True)
             sorted_indices = [idx for idx, _ in sorted_sportsmen]

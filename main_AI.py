@@ -10432,21 +10432,23 @@ class MainWindow(QMainWindow):
                                         QMessageBox.Yes | QMessageBox.No)
             if reply == QMessageBox.No:
                 return
-
+        # очищаем предыдущую жеребьевку
+        self.clear_table_DB_after_choice(final.stage)
         # Определяем тип таблицы
         table_type = final.type_table if hasattr(final, 'type_table') else "Круговая"
-
+        # self.drawing_for_stage(final.stage)
         if "Круговая" in table_type or "круг" in table_type.lower():
             # Жеребьевка по круговой системе
-            import re
-            match = re.search(r'(\d+)', final.stage)
-            final_number = int(match.group(1)) if match else 1
+            # import re
+            # match = re.search(r'(\d+)', final.stage)
+            # final_number = int(match.group(1)) if match else 1
+            self.drawing_for_stage(final.stage)
 
-            # Определяем источник выхода и количество игроков (если заданы)
-            source_stage = final.stage_exit if final.stage_exit else None
-            exit_count = final.mesta_exit if final.mesta_exit else None
+            # # Определяем источник выхода и количество игроков (если заданы)
+            # source_stage = final.stage_exit if final.stage_exit else None
+            # exit_count = final.mesta_exit if final.mesta_exit else None
 
-            self.create_round_robin_final_automatically(final_number, source_stage, exit_count)
+            # self.create_round_robin_final_automatically(final_number, source_stage, exit_count)
         else:
             # Олимпийская система – зарезервировано
             finals = System.select().where((System.title_id == self.current_title_id) & (System.stage == final.stage)).get()
@@ -10483,9 +10485,9 @@ class MainWindow(QMainWindow):
                 self.determine_net_type(stage)
                 self.create_olimpic_final_automatically(stage, source_stage, exit_count)
 
-            # Обновляем статус системы
-            stage.choice_flag = 1
-            stage.save()
+            # # Обновляем статус системы
+            # stage.choice_flag = 1
+            # stage.save()
             # вставить автоматическую жеребьевку финала по кругу
             if stage == "Квалификация":
                 # Заполняем таблицу Result после жеребьевки
@@ -16864,7 +16866,7 @@ class MainWindow(QMainWindow):
         source_stage: откуда брать игроков (если None – определяется автоматически)
         exit_count: сколько игроков выходит из каждой группы (1 или 2)
         """
-        stage_name = stage.stage
+        stage_name = stage
         system = System.get_or_none((System.title_id == self.current_title_id) & (System.stage == stage_name))
 
         # 1. Определяем источник игроков
@@ -17403,11 +17405,11 @@ class MainWindow(QMainWindow):
                 (System.stage == stage_name)
             )
                 
-            exit_count = system.mesta_exit
-
             if not system:
                 return {}, 0
             
+            exit_count = system.mesta_exit
+
             if exit_count is None:
                 exit_count = system.stage_exit or 1
             actual_exit_count = exit_count
@@ -17435,7 +17437,8 @@ class MainWindow(QMainWindow):
              # =========== мой вариант =====
             # агружает игроков только с местами для финала
             result = self.real_place_for_final(stage_name)
-            place_for_final = result[0]['place_stage']
+            # place_for_final = result[0]['place_stage']
+            place_for_final = result['place_stage']
             # ==========
             
             # Группируем по группам
@@ -17443,19 +17446,9 @@ class MainWindow(QMainWindow):
                 group_name = getattr(choice, group_field)
                 if not group_name:
                     continue
-                # # =========== мой вариант =====
-                # # агружает игроков только с местами для финала
-                # result = self.real_place_for_final(stage_name)
-                # place_for_final = result[0]['place_stage']
-                # # ==========
                 place = getattr(choice, place_field) or 999
                 if place in place_for_final:
                     players_by_group[group_name].append((place, choice))
-            # ====вставить вариант определения мест игроков
-            # self.real_place_for_final()
-            # result = self.real_place_for_final(stage_name)
-
-            # actual_exit_count = result[0]['count_exit']
             # ============================================
             # Для каждой группы сортируем по месту и берём первых exit_count
             result = {}
@@ -17480,26 +17473,31 @@ class MainWindow(QMainWindow):
             
             return result, actual_exit_count
 #========================================= AI 
-    def __real_place_for_final(self, stage_name=None):
+    def _real_place_for_final(self, stage_name=None):
         """
-        Определение мест игроков, выходящих в финал для жеребьевки.
+        Определяет, из каких этапов и с какими местами игроки попадают в каждый финал.
         
-        Логика распределения:
-        - Из каждой группы квалификации выходят 2 игрока (1 и 2 место)
-        - В 1-й полуфинал выходят игроки с 1 и 2 местом из групп 1-16
-        - В 2-й полуфинал выходят игроки с 1 и 2 местом из групп 17-32
-        - В 1-й финал выходят игроки с 1 и 2 местом из 1-го полуфинала
-        - Во 2-й финал выходят игроки с 3 и 4 местом из 1-го полуфинала
-        - В 3-й финал выходят игроки с 3 и 4 местом из квалификации (не вышедшие в полуфиналы)
+        Логика:
+        - Если есть полуфиналы, то 1-й полуфинал получает из квалификации места 1..mesta_exit (обычно 1-2),
+        2-й полуфинал получает места mesta_exit+1 .. 2*mesta_exit (обычно 3-4).
+        - Если только один полуфинал, он получает все места из квалификации.
+        - Из полуфиналов в финалы места распределяются согласно mesta_exit каждого полуфинала.
+        - Если полуфиналов нет, то финалы получают места напрямую из квалификации.
+        
+        Возвращает словарь:
+        {
+            "1-й финал": {
+                "Квалификация. 1-й полуфинал": [1, 2],
+                ...
+            },
+            ...
+        }
         """
         from collections import defaultdict
+        import re
         
-        result = {}
-        
-        # Получаем все системы для текущего соревнования
         systems = System.select().where(System.title_id == self.current_title_id).order_by(System.id)
         
-        # Определяем этапы
         qualification = None
         semifinal_1 = None
         semifinal_2 = None
@@ -17513,131 +17511,138 @@ class MainWindow(QMainWindow):
             elif system.stage == "Квалификация. 2-й полуфинал":
                 semifinal_2 = system
             elif "финал" in system.stage.lower() and "полуфинал" not in system.stage.lower():
-                finals.append(system.stage)
+                finals.append(system)
         
         # Сортируем финалы по номеру
-        finals.sort(key=lambda x: int(x.split('-')[0]) if '-' in x else 0)
+        def extract_number(stage):
+            match = re.search(r'(\d+)', stage)
+            return int(match.group(1)) if match else 999
+        finals.sort(key=lambda s: extract_number(s.stage))
         
-        # Словарь для хранения мест выхода из каждого этапа
-        exit_places = {}
+        result = {}
+        if not finals:
+            return result
         
-        # 1. Определяем выход из квалификации в полуфиналы
-        if qualification:
-            groups_count = qualification.total_group
-            half_groups = groups_count // 2
-            
-            # В 1-й полуфинал выходят 1 и 2 места из групп 1 - half_groups
-            exit_places["Квалификация. 1-й полуфинал"] = {
-                "exit_stage": "Квалификация",
-                "places": [1, 2],
-                "groups": list(range(1, half_groups + 1)),
-                "description": "1 и 2 места из групп 1-{0}".format(half_groups)
-            }
-            
-            # Во 2-й полуфинал выходят 1 и 2 места из групп half_groups+1 - groups_count
-            exit_places["Квалификация. 2-й полуфинал"] = {
-                "exit_stage": "Квалификация",
-                "places": [1, 2],
-                "groups": list(range(half_groups + 1, groups_count + 1)),
-                "description": "1 и 2 места из групп {0}-{1}".format(half_groups + 1, groups_count)
-            }
+        # ---- Формирование источников мест для финалов ----
+        # Источники: список словарей {'stage': имя_этапа, 'places': список_мест}
+        sources = []
         
-        # 2. Определяем выход из полуфиналов в финалы
-        if semifinal_1:
-            # В 1-й финал выходят 1 и 2 места из 1-го полуфинала
-            exit_places["1-й финал"] = {
-                "exit_stage": "Квалификация. 1-й полуфинал",
-                "places": [1, 2],
-                "groups": None,
-                "description": "1 и 2 места из 1-го полуфинала"
-            }
-            
-            # Во 2-й финал выходят 3 и 4 места из 1-го полуфинала
-            exit_places["2-й финал"] = {
-                "exit_stage": "Квалификация. 1-й полуфинал",
-                "places": [3, 4],
-                "groups": None,
-                "description": "3 и 4 места из 1-го полуфинала"
-            }
-        
-        if semifinal_2:
-            # Из 2-го полуфинала в финалы
-            next_final_num = 3 if "2-й финал" in exit_places else 2
-            exit_places[f"{next_final_num}-й финал"] = {
-                "exit_stage": "Квалификация. 2-й полуфинал",
-                "places": [1, 2],
-                "groups": None,
-                "description": "1 и 2 места из 2-го полуфинала"
-            }
-            
-            exit_places[f"{next_final_num + 1}-й финал"] = {
-                "exit_stage": "Квалификация. 2-й полуфинал",
-                "places": [3, 4],
-                "groups": None,
-                "description": "3 и 4 места из 2-го полуфинала"
-            }
-        
-        # 3. Определяем выход из квалификации напрямую в финалы (оставшиеся места)
-        if qualification and finals:
-            # Находим, сколько финалов уже определено
-            defined_finals = len([f for f in exit_places.keys() if "-й финал" in f])
-            
-            # Оставшиеся места в квалификации (3 и 4)
-            remaining_places = [3, 4]
-            
-            for i, final in enumerate(finals[defined_finals:], defined_finals + 1):
-                exit_places[f"{final}"] = {
-                    "exit_stage": "Квалификация",
-                    "places": remaining_places.copy(),
-                    "groups": None,
-                    "description": "{0} и {1} места из квалификации (не вышедшие в полуфиналы)".format(remaining_places[0], remaining_places[1])
-                }
-        
-        # 4. Формируем результат для указанного этапа или для всех
-        current_place = 1
-        stage_places = {}
-        
-        for final_name in finals:
-            if final_name in exit_places:
-                exit_info = exit_places[final_name]
-                exit_count = len(exit_info["places"])
-                
-                stage_places[final_name] = {
-                    "stage": final_name,
-                    "exit_stage": exit_info["exit_stage"],
-                    "places": list(range(current_place, current_place + exit_count)),
-                    "exit_count": exit_count,
-                    "start_place": current_place,
-                    "end_place": current_place + exit_count - 1,
-                    "source_places": exit_info["places"],
-                    "description": exit_info["description"]
-                }
-                current_place += exit_count
+        # Если есть полуфиналы, формируем источники из них
+        if semifinal_1 or semifinal_2:
+            # Определяем, сколько мест выходит из каждой группы квалификации в полуфиналы
+            exit_per_group = qualification.mesta_exit if qualification and qualification.mesta_exit else 2
+            # Всего мест в квалификации (в каждой группе) — это обычно 4, но может быть и больше.
+            # Мы будем считать, что из группы выходят exit_per_group * количество_полуфиналов мест.
+            # Если два полуфинала, то всего мест = exit_per_group * 2.
+            # Если один полуфинал, то все места (обычно 4) идут в него.
+            total_places_per_group = 0
+            if qualification:
+                # Количество игроков в группе можно получить из max_player квалификации
+                total_places_per_group = qualification.max_player or 4
             else:
-                # Если нет информации о выходе, используем stage_exit из системы
-                system = System.get_or_none(
-                    (System.title_id == self.current_title_id) &
-                    (System.stage == final_name)
-                )
-                if system and system.stage_exit:
-                    exit_count = system.mesta_exit or 1
-                    stage_places[final_name] = {
-                        "stage": final_name,
-                        "exit_stage": system.stage_exit or "Квалификация",
-                        "places": list(range(current_place, current_place + exit_count)),
-                        "exit_count": exit_count,
-                        "start_place": current_place,
-                        "end_place": current_place + exit_count - 1,
-                        "source_places": list(range(1, exit_count + 1)),
-                        "description": f"{', '.join(map(str, range(1, exit_count + 1)))} места из {system.stage_exit}"
-                    }
-                    current_place += exit_count
+                total_places_per_group = 4  # по умолчанию
+            
+            # Места для 1-го полуфинала (если есть)
+            if semifinal_1:
+                # Берём первые exit_per_group мест (1..exit_per_group)
+                places_1 = list(range(1, exit_per_group + 1))
+                sources.append({
+                    'stage': semifinal_1.stage,
+                    'places': places_1,
+                    'from_stage': qualification.stage if qualification else None
+                })
+            # Места для 2-го полуфинала (если есть)
+            if semifinal_2:
+                # Берём следующие exit_per_group мест (exit_per_group+1 .. 2*exit_per_group)
+                start = exit_per_group + 1
+                end = 2 * exit_per_group
+                # Проверяем, чтобы не выходить за пределы total_places_per_group
+                if end > total_places_per_group:
+                    end = total_places_per_group
+                places_2 = list(range(start, end + 1))
+                if places_2:
+                    sources.append({
+                        'stage': semifinal_2.stage,
+                        'places': places_2,
+                        'from_stage': qualification.stage if qualification else None
+                    })
+            # Если есть только один полуфинал, он получает все места из квалификации
+            if semifinal_1 and not semifinal_2:
+                # Все места от 1 до total_places_per_group
+                all_places = list(range(1, total_places_per_group + 1))
+                # Обновляем источник для semifinal_1
+                sources = [{
+                    'stage': semifinal_1.stage,
+                    'places': all_places,
+                    'from_stage': qualification.stage if qualification else None
+                }]
+        else:
+            # Полуфиналов нет, источник — квалификация (все места)
+            if qualification:
+                # Количество игроков в квалификации (общее)
+                # Лучше взять из Choice или из Game_list, но для простоты используем max_player * total_group
+                total_players = 0
+                if qualification.max_player and qualification.total_group:
+                    total_players = qualification.max_player * qualification.total_group
+                else:
+                    # Альтернативно, можно посчитать количество записей в Choice для квалификации
+                    choices = Choice.select().where(
+                        (Choice.title_id == self.current_title_id) &
+                        (Choice.group.contains("группа"))
+                    )
+                    total_players = choices.count()
+                if total_players > 0:
+                    all_places = list(range(1, total_players + 1))
+                    sources.append({
+                        'stage': qualification.stage,
+                        'places': all_places,
+                        'from_stage': None
+                    })
         
-        # Если указан конкретный этап, возвращаем только его
-        if stage_name and stage_name in stage_places:
-            return {stage_name: stage_places[stage_name]}
+        # ---- Теперь распределяем места из источников по финалам ----
+        # Для каждого финала определяем, сколько мест ему нужно (max_player или mesta_exit)
+        for final in finals:
+            places_needed = final.max_player if final.max_player else (final.mesta_exit or 1)
+            final.places_needed = places_needed
         
-        return stage_places
+        # Проходим по финалам и выделяем им блоки мест из источников
+        source_index = 0
+        place_index = 0  # индекс в текущем источнике
+        for final in finals:
+            if source_index >= len(sources):
+                break
+            source = sources[source_index]
+            places = source['places']
+            # Если текущий источник исчерпан, переходим к следующему
+            if place_index >= len(places):
+                source_index += 1
+                place_index = 0
+                continue
+            # Берём блок
+            block = places[place_index : place_index + final.places_needed]
+            if not block:
+                continue
+            # Записываем в результат
+            if final.stage not in result:
+                result[final.stage] = {}
+            # Ключ — этап-источник (если есть from_stage, используем его, иначе source['stage'])
+            key = source.get('from_stage', source['stage'])
+            result[final.stage][key] = block
+            place_index += len(block)
+        
+        # Если финалов больше, чем источников, и остались нераспределённые, 
+        # то можно добавить оставшиеся места из квалификации напрямую в финалы (если ещё есть)
+        if qualification and not sources:
+            # В этом случае все финалы получают места из квалификации
+            # (Это уже обработано в ветке else выше, но для полноты)
+            pass
+        
+        # Если указан конкретный финал, возвращаем только его
+        if stage_name:
+            return {stage_name: result.get(stage_name, {})}
+        
+        return result
+
 
     def get_players_for_final_by_places(self, stage_name):
         """
@@ -17712,13 +17717,211 @@ class MainWindow(QMainWindow):
                 result[player['group']].append(player)
         
         return result
-# =========== моя функция для определения мест =======
+# =========== функция для определения мест =======
+    def __real_place_for_final(self, stage_name=None):
+        """
+        Определяет, из каких этапов и с какими местами игроки попадают в каждый финал.
+        
+        Параметры:
+            stage_name (str, optional): если указан, возвращает данные только для этого финала.
+        
+        Возвращает:
+            dict: 
+            {
+                "1-й финал": {
+                    "Квалификация. 1-й полуфинал": [1, 2],
+                    ...
+                },
+                ...
+            }
+            Ключ — название финала. Значение — словарь, где ключ — этап-источник, 
+            значение — список мест (номера мест) из этого этапа, которые попадают в финал.
+        """
+        # Получаем все системы для текущего соревнования
+        systems = System.select().where(System.title_id == self.current_title_id).order_by(System.id)
+        
+        # Разделяем этапы
+        qualification = None
+        semifinal_1 = None
+        semifinal_2 = None
+        finals = []  # список объектов System для финалов (не полуфиналов)
+        
+        for system in systems:
+            if system.stage == "Квалификация":
+                qualification = system
+            elif system.stage == "Квалификация. 1-й полуфинал":
+                semifinal_1 = system
+            elif system.stage == "Квалификация. 2-й полуфинал":
+                semifinal_2 = system
+            elif "финал" in system.stage.lower() and "полуфинал" not in system.stage.lower():
+                finals.append(system)
+        
+        # Сортируем финалы по номеру (извлекаем число из названия)
+        def extract_final_number(stage):
+            import re
+            match = re.search(r'(\d+)', stage)
+            return int(match.group(1)) if match else 999
+        finals.sort(key=lambda s: extract_final_number(s.stage))
+        
+        # Результат
+        result = {}
+        
+        # Если нет финалов, возвращаем пустой словарь
+        if not finals:
+            return result
+        
+        # ---- 1. Обработка полуфиналов ----
+        # Список источников (этапов) и их доступных мест для распределения по финалам
+        sources = []  # каждый элемент: {'stage': имя_этапа, 'places': список_мест}
+        
+        if semifinal_1:
+            # Из 1-го полуфинала выходят места 1..mesta_exit (обычно 4)
+            exit_count = semifinal_1.mesta_exit or 4
+            places = list(range(1, exit_count + 1))
+            sources.append({
+                'stage': semifinal_1.stage,
+                'places': places
+            })
+        
+        if semifinal_2:
+            exit_count = semifinal_2.mesta_exit or 4
+            places = list(range(1, exit_count + 1))
+            sources.append({
+                'stage': semifinal_2.stage,
+                'places': places
+            })
+        
+        # Если полуфиналов нет, используем квалификацию как источник
+        if not sources and qualification:
+            # Из квалификации выходят все места, которые распределяются по финалам
+            # Количество мест зависит от того, сколько игроков в финалах
+            # Но мы не знаем, сколько финалов будет, поэтому отдаём все места из квалификации
+            # (предполагаем, что все игроки квалификации распределяются по финалам)
+            # Для этого нужно знать общее количество игроков, вышедших из квалификации.
+            # Это можно вычислить: total_groups * mesta_exit (если mesta_exit > 0)
+            total_qual_players = 0
+            if qualification.total_group and qualification.mesta_exit:
+                total_qual_players = qualification.total_group * qualification.mesta_exit
+            else:
+                # Если не указано, считаем, что выходят все (но это редко)
+                total_qual_players = 0  # лучше оставить 0
+            # Лучше взять из Game_list или Choice, но для простоты используем логику:
+            # Если нет полуфиналов, то все игроки квалификации идут в финалы.
+            # Но мы не знаем, сколько мест в финалах, поэтому просто создаём источник с местами
+            # 1,2,3,... до общего числа игроков в квалификации (можно взять из Player).
+            # Однако правильнее будет взять из системы: количество групп * количество выходящих.
+            # Предположим, что в финалы выходят все игроки из квалификации (если нет полуфиналов).
+            # Тогда места будут 1,2,3,... до общего числа.
+            # Получим общее число игроков в квалификации из Choice или из Game_list.
+            # Используем Choice для этой квалификации.
+            choices = Choice.select().where(
+                (Choice.title_id == self.current_title_id) &
+                (Choice.group.contains("группа"))
+            )
+            total_qual_players = choices.count()
+            if total_qual_players > 0:
+                places = list(range(1, total_qual_players + 1))
+                sources.append({
+                    'stage': qualification.stage,
+                    'places': places
+                })
+        
+        # ---- 2. Распределение мест по финалам ----
+        # Проходим по финалам и отдаём им места из источников последовательно
+        # Для каждого источника отдаём блоки мест по количеству mesta_exit финала
+        # или по количеству мест, которые нужны финалу (mesta_exit из системы финала).
+        
+        # Сначала определим, сколько мест нужно каждому финалу
+        for final in finals:
+            # Количество мест, которые занимает этот финал (обычно mesta_exit или max_player)
+            # В круговом финале количество мест = max_player (все участники финала)
+            # В олимпийском — тоже max_player.
+            # Лучше взять max_player, так как это общее число участников в финале.
+            places_needed = final.max_player or 0
+            if places_needed == 0:
+                # Если не задано, используем mesta_exit (количество выходящих из предыдущего этапа)
+                places_needed = final.mesta_exit or 1
+            # Запоминаем потребность
+            final.places_needed = places_needed
+        
+        # Теперь распределяем места из источников по финалам
+        # Сначала заполняем финалы из полуфиналов (если есть)
+        source_index = 0
+        source_place_index = 0  # текущий индекс в списке мест источника
+        
+        for final in finals:
+            # Если закончились источники, выходим
+            if source_index >= len(sources):
+                break
+            
+            source = sources[source_index]
+            places_available = source['places']
+            
+            # Если в источнике остались места
+            if source_place_index < len(places_available):
+                # Берём блок мест для этого финала
+                block = places_available[source_place_index : source_place_index + final.places_needed]
+                # Если блок не пустой
+                if block:
+                    # Записываем в результат
+                    if final.stage not in result:
+                        result[final.stage] = {}
+                    result[final.stage][source['stage']] = block
+                    # Сдвигаем индекс
+                    source_place_index += len(block)
+                else:
+                    # Если мест не хватает, переходим к следующему источнику
+                    source_index += 1
+                    source_place_index = 0
+                    # Пробуем снова для этого же финала
+                    # (рекурсивно или через цикл, но проще продолжить)
+                    continue
+            else:
+                # Места в источнике закончились, переходим к следующему
+                source_index += 1
+                source_place_index = 0
+                # Повторяем для текущего финала
+                continue
+        
+        # Если остались финалы, а источники закончились, то берём из квалификации (если она есть)
+        if qualification and not sources:
+            # Если полуфиналов нет, то все финалы берут из квалификации
+            # Нужно распределить все места квалификации по финалам
+            # Получаем все места квалификации (1..общее_число)
+            choices = Choice.select().where(
+                (Choice.title_id == self.current_title_id) &
+                (Choice.group.contains("группа"))
+            )
+            total_qual_players = choices.count()
+            if total_qual_players > 0:
+                qual_places = list(range(1, total_qual_players + 1))
+                place_idx = 0
+                for final in finals:
+                    if final.stage not in result:
+                        result[final.stage] = {}
+                    # Если финал уже имеет источник (например, из полуфинала), пропускаем
+                    if result[final.stage]:
+                        continue
+                    needed = final.places_needed
+                    block = qual_places[place_idx : place_idx + needed]
+                    if block:
+                        result[final.stage][qualification.stage] = block
+                        place_idx += len(block)
+                    else:
+                        break
+        
+        # Если указан конкретный финал, возвращаем только его
+        if stage_name:
+            return {stage_name: result.get(stage_name, {})}
+        
+        return result
+# ==========================================
     def real_place_for_final(self, stage_name):
         """определения мест игроков, выходящих в финал для жеребьевки"""
         
         group_list = ["Квалификация", "Квалификация. 1-й полуфинал","Квалификация. 2-й полуфинал"]
         stage_place = {}
-        place_players = {}
+        place_players = []
         place = []
         player_max_stage = {}
         mesto_first = 1
@@ -17727,39 +17930,60 @@ class MainWindow(QMainWindow):
         for h in system:
             stage = h.stage
             if stage in group_list:
-                # pm = h.max_player
                 place_stage = [k for k in range(1, h.max_player + 1)]
                 player_max_stage[stage] = place_stage
+        mesta_stage = []
         for p in system:
             stage = p.stage
-            if stage not in group_list:
-                if stage == "1-й финал":
-                    mesto_first = 1
-                else:
-                    mesto_first = result[0]
-                mesto_end = mesto_first + p.mesta_exit
-                for m in range(mesto_first, mesto_end):
-                    place.append(m)
+            stage_out = p.stage_exit
+            if stage_out != "":
+                mesta_list = player_max_stage[stage_out]               
+                exit_out = p.mesta_exit
+                mesta_stage = mesta_list[:exit_out]
+                if stage not in group_list:
+                    systems = System.get_or_none(System.id == p.id)
+                    if systems:
+                        place_players.append({
+                            'stage': stage,
+                            'stage_exit': systems.stage_exit,
+                            'place_stage': mesta_stage.copy()
+                        }) 
+                result = [item for item in mesta_list if item not in mesta_stage]
+                player_max_stage[stage_out] = result
+            mesta_stage.clear()
 
-                stage_place[p.stage_exit] = place.copy()
-                place_players[stage] = stage_place
-                result = [item for item in place_stage if item not in place]
-                # place_players[stage] = stage_place
-                # player_max_stage[p.stage_exit] = result
-                player_max_stage = defaultdict(list)
-                systems = System.get_or_none(System.id == p.id)
-                if systems:
-                    player_max_stage[stage].append({
-                        'stage_exit': systems.stage_exit,
-                        'count_exit': systems.mesta_exit,
-                        'place_stage': place.copy()
-                    })
+            for res_place in place_players:
+                if res_place['stage'] == stage_name:
+                    return res_place
 
-                place.clear()
+        # if stage not in group_list:
+        #     if stage == "1-й финал":
+        #         mesto_first = 1
+        #     else:
+        #         mesto_first = result[0]
+        #     mesto_end = mesto_first + p.mesta_exit
+        #     for m in range(mesto_first, mesto_end):
+        #         place.append(m)
 
-                if stage_name == stage:
+        #     stage_place[p.stage_exit] = place.copy()
+        #     place_players[stage] = stage_place
+        #     result = [item for item in place_stage if item not in place]
+        #     # place_players[stage] = stage_place
+        #     # player_max_stage[p.stage_exit] = result
+        #     player_max_stage = defaultdict(list)
+        #     systems = System.get_or_none(System.id == p.id)
+        #     if systems:
+        #         player_max_stage[stage].append({
+        #             'stage_exit': systems.stage_exit,
+        #             'count_exit': systems.mesta_exit,
+        #             'place_stage': place.copy()
+        #         })
 
-                    return player_max_stage[stage]
+        #     place.clear()
+
+        #     if stage_name == stage:
+
+        #         return player_max_stage[stage]
        
 
 

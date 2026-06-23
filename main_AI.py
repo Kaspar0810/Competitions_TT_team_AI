@@ -16083,6 +16083,8 @@ class MainWindow(QMainWindow):
         list_tours - список туров для диапазона
         Возвращает список списков (данные для таблиц бегунков) или None
         """
+        group_list = ["Квалификация", "Квалификация. 1-й полуфинал","Квалификация. 2-й полуфинал"]
+
         if not self.current_title_id:
             return None
 
@@ -16095,10 +16097,17 @@ class MainWindow(QMainWindow):
             return None
 
         # Получаем результаты
-        results = Result.select().where(
-            (Result.title_id == self.current_title_id) &
-            (Result.system_stage == stage)
-        )
+        if stage in group_list:
+            results = Result.select().where(
+                (Result.title_id == self.current_title_id) &
+                (Result.system_stage == stage)
+            )
+        else:
+            results = Result.select().where(
+                (Result.title_id == self.current_title_id) &
+                (Result.number_group == stage)
+            )
+
         if runner_type == "Урезанный":
             # ====  Одна таблица ====
             if stage != "Одна таблица":            

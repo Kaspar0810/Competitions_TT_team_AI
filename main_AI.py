@@ -8489,6 +8489,10 @@ class MainWindow(QMainWindow):
             all_posev_player = total_in_this_final + remaining_players
             if total_players <= all_posev_player:
                 self.fill_choice_table()
+
+            # ======================
+                self.get_or_create_x_player()
+            # =================
             # if total_players - already_in_finals - players_not_out  <= 1:
             # if total_players - remaining_players <= 1:
                 reply = QMessageBox.question(self, "Завершение посева", 
@@ -17036,6 +17040,7 @@ class MainWindow(QMainWindow):
 
         # stage_name = stage.stage
         system = System.get_or_none((System.title_id == self.current_title_id) & (System.stage == stage))
+        choice = Choice.select().where(Choice.title_id == self.current_title_id)
 
         # 1. Определяем источник игроков
         if source_stage is None:
@@ -17073,7 +17078,112 @@ class MainWindow(QMainWindow):
         sorted_groups = sorted(players_by_group.keys(), key=self._extract_number_from_group) 
 
         # 4. Жеребьевка сетки автоматом
-        self.choice_net_automat(stage, players_by_group)
+        num_id_player = self.choice_net_automat(stage, players_by_group)
+
+        posev_data = {} # окончательные посев номер в сетке - игрок/ город
+
+        for i in num_id_player.keys():
+            tmp_list = list(num_id_player[i])
+            # if vid_turnira == "личные":
+            if tmp_list[1] == "X":
+                posev_data[i] = "X"
+            else:
+                id = tmp_list[0]
+                pl_id = Player.get(Player.id == id)
+                family_city = pl_id.fio_city
+                posev_data[i] = family_city
+                with db:
+                    choice_final = choice.select().where(Choice.player_choice_id == pl_id).get()
+                    if stage == "Суперфинал":
+                        choice_final.super_final = i
+                    else:
+                        choice_final.final = stage
+                        choice_final.posev_final = i
+                    choice_final.save()
+            # else: # команды
+            #     if tmp_list[1] == "X":
+            #         posev_data[i] = "X"
+            #     else:
+            #         id = tmp_list[0]
+            #         team_id = Team.get(Team.id == id)
+            #         team_name = team_id.team_name
+            #         team_full = team_id.team_full
+            #         posev_data[i] = team_full
+
+            #         with db:
+            #             choice_final = choice_posev.select().where(Choice_Team.team_choice_id == team_id).get()
+            #             if fin == "Суперфинал":
+            #                 choice_final.super_final = i
+            #             else:
+            #                 choice_final.final = fin
+            #                 choice_final.posev_final = i
+            #             choice_final.save()
+        # n += 1 # добавил в связи со сменой цикла
+        return posev_data
+# =============================
+    def get_or_create_x_player(self):
+        """Создает или возвращает игрока X для свободных мест в сетке"""
+        try:
+            # Проверяем, существует ли уже игрок X
+            x_player = Player.get_or_none(
+                (Player.player == "X") &
+                (Player.fio == "X") &
+                (Player.fio_city == "X") &
+                (Player.title_id == self.current_title_id)
+            )
+            
+            if not x_player:
+                # Создаем игрока X
+                x_player = Player.create(
+                    player="X",
+                    fio="X",
+                    fio_city="X",
+                    bday="0000-00-00",  # Невалидная дата, но допустимая для БД
+                    rank=0,
+                    city="",
+                    region="",
+                    razryad="",
+                    title_id=self.current_title_id,
+                    sex="man",
+                    total_game_player=0,
+                    total_win_game=0,
+                    coefficient_victories=0.0,
+                    application="",
+                    comment="",
+                    pay_rejting="",
+                    patronymic_id=159,  # Ссылка на несуществующее отчество (или создаем)
+                    coach_id=1,
+                    mesto=0
+                )
+                print("Создан игрок X для свободных мест в сетке")
+            else:
+                print("Игрок X уже существует")
+            
+            return x_player
+            
+        except Exception as e:
+            print(f"Ошибка создания игрока X: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    def get_x_player_id(self):
+        """Возвращает ID игрока X"""
+        try:
+            x_player = Player.get_or_none(
+                (Player.player == "X") &
+                (Player.fio == "X") &
+                (Player.fio_city == "X")
+            )
+            if x_player:
+                return x_player.id
+            else:
+                # Создаем, если не существует
+                x_player = self.get_or_create_x_player()
+                return x_player.id if x_player else None
+        except:
+            return None
+
 # ====================================================
     def get_circular_tour_positions(self, total_players):
         """Возвращает список позиций в круговой таблице для total_players."""
@@ -19331,6 +19441,9 @@ class MainWindow(QMainWindow):
         """"Жеребьевка сетки автомат новый вариант"""
         import collections
         # ====== мой вариант =====
+        # Получаем ID игрока X
+        x_player_id = self.get_x_player_id()
+
         psv = []
         systems = System.select().where((System.title_id == self.current_title_id) & (System.stage == stage)).get()
         choice = Choice.select().where(Choice.title_id == self.current_title_id)
@@ -19353,6 +19466,27 @@ class MainWindow(QMainWindow):
         # свободные номера в сетке
         free_num = self.free_place_in_setka(max_player, real_all_player_in_final, count_exit)
         #  спортсмены для посева ===
+# ========================= новое =============
+        # Создаем данные для игрока X
+        x_player_data = [
+            x_player_id,  # id
+            "X",          # name
+            "",           # region
+            0,            # group_number
+            "",           # group
+            "",           # city
+            0,            # rank
+            0             # place
+        ]
+
+        # Заполняем свободные места данными игрока X
+        free_positions_with_x = []
+        for pos in free_num:
+            free_positions_with_x.append((pos, x_player_data))
+
+        # Объединяем реальных игроков и X для заполнения сетки
+        all_players_for_grid = sportsmen_data + [x_player_data] * len(free_num)
+# =============================================================
         # из базы данных согласно местам в группе для жеребьевки сетки
         full_posev = []
         for posevs in player_by_group:
@@ -19741,10 +19875,13 @@ class MainWindow(QMainWindow):
         if count_exit == 1:    
             placement = draw_out_groups_one_person(sportsmen_data, free_num)
         elif count_exit == 2:
-            # placement = draw_out_groups_two_person(sorted_sportsmen, free_num)
             placement = draw_out_groups_two_person(full_posev, free_num)
+                
+        # Размещаем X на свободные позиции
+        for pos in free_num:
+            placement[pos] = x_player_data
+            player_list = list(placement.values())
 
-        player_list = list(placement.values())
         k = 1
         for player_id in player_list:
             if player_id == "X" or player_id is None:

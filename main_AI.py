@@ -49,6 +49,8 @@ from collections import defaultdict
 from datetime import datetime
 from PyPDF2 import PdfMerger 
 
+# В основной программе
+from manual_choice import choice_group_auto
 import manual_choice
 from db_setup import setup_database
 from import_initial_data import InitialDataImportDialog

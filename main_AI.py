@@ -50,7 +50,7 @@ from datetime import datetime
 from PyPDF2 import PdfMerger 
 
 # В основной программе
-from manual_choice import choice_group_auto
+import auto_choice_group
 import manual_choice
 from db_setup import setup_database
 from import_initial_data import InitialDataImportDialog
@@ -10484,27 +10484,24 @@ class MainWindow(QMainWindow):
     def auto_drawing_for_stage(self, stage):
         """Автоматическая жеребьевка для указанного этапа"""
         try:
-            systems = System.select().where((System.title_id == self.current_title_id) & (System.stage == stage)).get()
+            systems = System.select().where((System.title_id == self.current_title_id) & (System.stage == stage.stage)).get()
             exit_count = systems.mesta_exit
             source_stage = systems.stage_exit
             type_table = systems.type_table
+            num_groups = systems.total_group
+            athletes = systems.total_athletes
+            stage = stage.stage
 
-            if type_table == "Круговая":
-                self.create_round_robin_final_automatically(stage, source_stage, exit_count)
-            else:
-                self.determine_net_type(stage)
-                self.create_olimpic_final_automatically(stage, source_stage, exit_count)
-
-            # # Обновляем статус системы
-            # stage.choice_flag = 1
-            # stage.save()
-            # вставить автоматическую жеребьевку финала по кругу
             if stage == "Квалификация":
+                #авто жеребьвка групп
+                auto_choice_group.choice_group_auto(self, athletes, num_groups, stage, parent=self)
+
+                # self.save_manual_drawing_for_stage(num_id_player, stage)
                 # Заполняем таблицу Result после жеребьевки
                 self.fill_results_after_drawing()
             
                 QMessageBox.information(self, "Автоматическая жеребьевка", 
-                                    f"✅ Жеребьевка для этапа '{stage.stage}' успешно проведена!\n\n"
+                                    f"✅ Жеребьевка для этапа '{stage}' успешно проведена!\n\n"
                                     f"📊 Параметры жеребьевки:\n"
                                     f"   • Количество групп: {stage.total_group}\n"
                                     f"   • Участников в группе: {stage.max_player}\n\n"
@@ -10512,6 +10509,31 @@ class MainWindow(QMainWindow):
                 
                 # Обновляем отображение информации
                 self.update_stages_info()
+            else:
+                if type_table == "Круговая":
+                    self.create_round_robin_final_automatically(stage, source_stage, exit_count)
+                else:
+                    self.determine_net_type(stage)
+                    self.create_olimpic_final_automatically(stage, source_stage, exit_count)
+
+            # # Обновляем статус системы
+            # stage.choice_flag = 1
+            # stage.save()
+            # вставить автоматическую жеребьевку финала по кругу
+            # if stage == "Квалификация":
+                
+            #     # Заполняем таблицу Result после жеребьевки
+            #     self.fill_results_after_drawing()
+            
+            #     QMessageBox.information(self, "Автоматическая жеребьевка", 
+            #                         f"✅ Жеребьевка для этапа '{stage.stage}' успешно проведена!\n\n"
+            #                         f"📊 Параметры жеребьевки:\n"
+            #                         f"   • Количество групп: {stage.total_group}\n"
+            #                         f"   • Участников в группе: {stage.max_player}\n\n"
+            #                         f"Таблицы Choice и Result обновлены.")
+                
+            #     # Обновляем отображение информации
+            #     self.update_stages_info()
             
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка при автоматической жеребьевке: {str(e)}")

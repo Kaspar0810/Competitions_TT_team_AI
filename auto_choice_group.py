@@ -267,7 +267,7 @@ def save_choice_results(results, title_id):
         return False
 
 
-def choice_group_auto(athletes, num_groups, id_title, parent=None):
+def choice_group_auto(self, athletes, num_groups, stage, parent=None):
     """
     Функция для автоматической жеребьевки
     
@@ -286,9 +286,9 @@ def choice_group_auto(athletes, num_groups, id_title, parent=None):
     try:
         # Проверяем наличие системы
         if num_groups == 1:
-            system = System.select().where((System.title_id == id_title) & (System.stage == "Одна таблица")).get()
+            system = System.select().where((System.title_id == self.current_title_id) & (System.stage == "Одна таблица")).get()
         else:
-            system = System.select().where((System.title_id == id_title) & (System.stage == "Квалификация")).get()
+            system = System.select().where((System.title_id == self.current_title_id) & (System.stage == "Квалификация")).get()
         
         check_flag = system.choice_flag
         
@@ -303,15 +303,15 @@ def choice_group_auto(athletes, num_groups, id_title, parent=None):
                 return None
             
             # Очищаем старые данные
-            clear_db_before_choice(id_title)
+            clear_db_before_choice(self.current_title_id)
         
         # Запускаем автоматическую жеребьевку
-        auto_draw = ChoiceGroupAuto(athletes, num_groups, id_title, parent)
+        auto_draw = ChoiceGroupAuto(athletes, num_groups, self.current_title_id, parent)
         results = auto_draw.run()
         
         if results:
             # Сохраняем результаты
-            if save_choice_results(results, id_title):
+            if save_choice_results(results, self.current_title_id):
                 QMessageBox.information(parent, "Успех", 
                     f"Автоматическая жеребьевка завершена!\n"
                     f"Распределено {len(results)} спортсменов по {num_groups} группам.")

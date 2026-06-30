@@ -352,13 +352,13 @@ def choice_group_manual(self, athletes, num_groups, id_title, parent=None):
         
         check_flag = system.choice_flag
         if check_flag:
-            existing_data = load_existing_draw_from_db(id_title)
+            existing_data = self.load_existing_draw_from_db(self.current_title_id)
     except Exception as e:
         print(f"Ошибка при проверке системы: {e}")
         existing_data = None
     
     if existing_data:
-        action_dialog = ChoiceActionDialog(parent)
+        action_dialog = self.ChoiceActionDialog(parent)
         result = action_dialog.exec_()
         
         if result == 1:  # Сбросить
@@ -375,7 +375,7 @@ def choice_group_manual(self, athletes, num_groups, id_title, parent=None):
         else:  # Отмена
             return None
     
-    dialog = ChoiceGroupManual(athletes, num_groups, id_title, parent, existing_data)
+    dialog = self.ChoiceGroupManual(athletes, num_groups, id_title, parent, existing_data)
     result_code = dialog.exec_()
     
     if result_code == QDialog.Accepted:

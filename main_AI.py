@@ -10489,22 +10489,34 @@ class MainWindow(QMainWindow):
             source_stage = systems.stage_exit
             type_table = systems.type_table
             num_groups = systems.total_group
-            athletes = systems.total_athletes
             stage = stage.stage
+
+            # Получаем список игроков
+            athletes = []
+            players = self.get_real_players_for_stage(exclude_x=True)
+            players_list = list(players)
+            for pl in players_list:
+                id = pl.id
+                player = pl.fio
+                rank = pl.rank
+                region = pl.region
+                coaches = Coach.get(Coach.id == pl.coach_id)
+                coach = coaches.coach
+                gamer = [id, player, rank, region, coach]
+                athletes.append(gamer)
 
             if stage == "Квалификация":
                 #авто жеребьвка групп
                 auto_choice_group.choice_group_auto(self, athletes, num_groups, stage, parent=self)
 
-                # self.save_manual_drawing_for_stage(num_id_player, stage)
                 # Заполняем таблицу Result после жеребьевки
                 self.fill_results_after_drawing()
             
                 QMessageBox.information(self, "Автоматическая жеребьевка", 
                                     f"✅ Жеребьевка для этапа '{stage}' успешно проведена!\n\n"
                                     f"📊 Параметры жеребьевки:\n"
-                                    f"   • Количество групп: {stage.total_group}\n"
-                                    f"   • Участников в группе: {stage.max_player}\n\n"
+                                    f"   • Количество групп: {num_groups}\n"
+                                    f"   • Участников в группе: {systems.max_player}\n\n"
                                     f"Таблицы Choice и Result обновлены.")
                 
                 # Обновляем отображение информации
@@ -10515,25 +10527,6 @@ class MainWindow(QMainWindow):
                 else:
                     self.determine_net_type(stage)
                     self.create_olimpic_final_automatically(stage, source_stage, exit_count)
-
-            # # Обновляем статус системы
-            # stage.choice_flag = 1
-            # stage.save()
-            # вставить автоматическую жеребьевку финала по кругу
-            # if stage == "Квалификация":
-                
-            #     # Заполняем таблицу Result после жеребьевки
-            #     self.fill_results_after_drawing()
-            
-            #     QMessageBox.information(self, "Автоматическая жеребьевка", 
-            #                         f"✅ Жеребьевка для этапа '{stage.stage}' успешно проведена!\n\n"
-            #                         f"📊 Параметры жеребьевки:\n"
-            #                         f"   • Количество групп: {stage.total_group}\n"
-            #                         f"   • Участников в группе: {stage.max_player}\n\n"
-            #                         f"Таблицы Choice и Result обновлены.")
-                
-            #     # Обновляем отображение информации
-            #     self.update_stages_info()
             
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка при автоматической жеребьевке: {str(e)}")
@@ -15211,22 +15204,22 @@ class MainWindow(QMainWindow):
      
         system = System.get_or_none(
             (System.title_id == self.current_title_id) &
-            (System.stage == stage)
+            (System.stage == stage.stage)
         )
 
         gamelist = Game_list.delete().where(
             (Game_list.title_id == self.current_title_id) &
             (Game_list.system_id == system.id)).execute()
         
-        if stage in group_list:
+        if stage.stage in group_list:
             results = Result.delete().where(
                 (Result.title_id == self.current_title_id) &
-                (Result.system_stage == stage)).execute()
+                (Result.system_stage == stage.stage)).execute()
            
         else:
             results = Result.delete().where(
                 (Result.title_id == self.current_title_id) &
-                (Result.number_group == stage)).execute()
+                (Result.number_group == stage.stage)).execute()
            
     def calculate_qualification_places(self, system):
         """Рассчитать места в квалификации (возвращает словарь {номер_группы: {посев: место}})"""
@@ -17208,6 +17201,45 @@ class MainWindow(QMainWindow):
         except:
             return None
 
+    def get_real_players_for_stage(self, exclude_x=True):
+        """
+        Получает реальных игроков для этапа, исключая X.
+        """
+        query = Player.select().where(Player.title_id == self.current_title_id)
+        if exclude_x:
+            query = query.where((Player.player != "X") & (Player.fio != "X") & (Player.fio_city != "X"))
+        
+        # Дополнительные фильтры по этапу
+        # ...
+        return query
+
+    def count_real_players_in_final(self, final_stage):
+        """
+        Подсчет реальных игроков в финале (без X).
+        """
+        system = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == final_stage)
+        )
+        if not system:
+            return 0
+        
+        game_players = Game_list.select().where(
+            (Game_list.title_id == self.current_title_id) &
+            (Game_list.system_id == system.id)
+        )
+        
+        # Фильтруем X
+        x_player = Player.get_or_none(
+            (Player.player == "X") &
+            (Player.fio == "X") &
+            (Player.fio_city == "X")
+        )
+        
+        if x_player:
+            game_players = game_players.where(Game_list.player_group != x_player.id)
+        
+        return game_players.count()
 # ====================================================
     def get_circular_tour_positions(self, total_players):
         """Возвращает список позиций в круговой таблице для total_players."""

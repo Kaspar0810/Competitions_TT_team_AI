@@ -12443,11 +12443,6 @@ class MainWindow(QMainWindow):
             system = System.get_or_none(System.title_id == self.current_title_id)
             system_stage = system.stage if system else "Квалификация"
             
-            # # Очищаем существующие результаты для этого этапа
-            # Result.delete().where(
-            #     (Result.title_id == self.current_title_id) &
-            #     (Result.system_stage == system_stage)
-            # ).execute()
             # Очищаем существующие результаты для этого этапа
             Game_list.delete().where(
                 (Game_list.title_id == self.current_title_id) &
@@ -17205,9 +17200,9 @@ class MainWindow(QMainWindow):
         """
         Получает реальных игроков для этапа, исключая X.
         """
-        query = Player.select().where(Player.title_id == self.current_title_id)
+        query = Player.select().where(Player.title_id == self.current_title_id).order_by(Player.rank.desc())
         if exclude_x:
-            query = query.where((Player.player != "X") & (Player.fio != "X") & (Player.fio_city != "X"))
+            query = query.where((Player.player != "X") & (Player.fio != "X") & (Player.fio_city != "X")).order_by(Player.rank.desc())
         
         # Дополнительные фильтры по этапу
         # ...

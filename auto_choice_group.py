@@ -300,14 +300,12 @@ def save_choice_results(self, results):
         for result in results:
             Choice.update(
                 title_id=self.current_title_id,
-                system_id=id_system,
-                player_choice_id=result['id_player'],
                 group=f"{result['group']} группа",
                 posev_group=result['seed_num']
-            ).execute()
+            ).where(Choice.player_choice_id == result['id_player']).execute()
         
         # Обновляем флаг выбора в System
-        System.update(choice_flag=True).where(System.id == self.current_title_id).execute()
+        System.update(choice_flag=True).where(System.id == id_system).execute()
         
         return True
     except Exception as e:

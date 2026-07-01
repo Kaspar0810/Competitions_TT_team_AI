@@ -10278,7 +10278,6 @@ class MainWindow(QMainWindow):
             return 7
         else:
             # Для большего количества игроков: количество туров = players_count - 1 (для нечетного)
-            # или players_count - 1 (для четного)
             return players_count - 1 if players_count % 2 == 0 else players_count
 
     def get_drawing_type(self):
@@ -10448,19 +10447,9 @@ class MainWindow(QMainWindow):
                 self.clear_table_DB_after_choice(final.stage)
         # Определяем тип таблицы
         table_type = final.type_table if hasattr(final, 'type_table') else "Круговая"
-        # self.drawing_for_stage(final.stage)
         if "Круговая" in table_type or "круг" in table_type.lower():
             # Жеребьевка по круговой системе
-            # import re
-            # match = re.search(r'(\d+)', final.stage)
-            # final_number = int(match.group(1)) if match else 1
             self.drawing_for_stage(final.stage)
-
-            # # Определяем источник выхода и количество игроков (если заданы)
-            # source_stage = final.stage_exit if final.stage_exit else None
-            # exit_count = final.mesta_exit if final.mesta_exit else None
-
-            # self.create_round_robin_final_automatically(final_number, source_stage, exit_count)
         else:
             # Олимпийская система – зарезервировано
             finals = System.select().where((System.title_id == self.current_title_id) & (System.stage == final.stage)).get()

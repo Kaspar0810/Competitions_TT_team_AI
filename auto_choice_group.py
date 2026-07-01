@@ -286,28 +286,28 @@ def clear_db_before_choice(title_id):
         print(f"Ошибка при очистке БД: {e}")
 
 
-def save_choice_results(results, title_id):
+def save_choice_results(self, results):
     """Сохранение результатов жеребьевки в базу данных"""
     try:
         # Получаем систему
-        system = System.select().where((System.stage == "Квалификация") & (System.title_id == title_id)).get()
+        system = System.select().where((System.stage == "Квалификация") & (System.title_id == self.current_title_id)).get()
         id_system = system.id
         
-        # Очищаем старые данные Choice
-        Choice.delete().where(Choice.title_id == title_id).execute()
+        # # Очищаем старые данные Choice
+        # Choice.delete().where(Choice.title_id == self.current_title_id).execute()
         
         # Сохраняем новые результаты
         for result in results:
-            Choice.create(
-                title_id=title_id,
+            Choice.update(
+                title_id=self.current_title_id,
                 system_id=id_system,
                 player_choice_id=result['id_player'],
                 group=f"{result['group']} группа",
                 posev_group=result['seed_num']
-            )
+            ).execute()
         
         # Обновляем флаг выбора в System
-        System.update(choice_flag=True).where(System.id == id_system).execute()
+        System.update(choice_flag=True).where(System.id == self.current_title_id).execute()
         
         return True
     except Exception as e:
@@ -359,7 +359,7 @@ def choice_group_auto(self, athletes, num_groups, stage, parent=None):
         
         if results:
             # Сохраняем результаты
-            if save_choice_results(results, self.current_title_id):
+            if save_choice_results(self, results):
                 # Выводим информацию о распределении
                 groups_info = {}
                 for r in results:

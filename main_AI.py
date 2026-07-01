@@ -6074,12 +6074,6 @@ class MainWindow(QMainWindow):
         # Сбрасываем заголовок поиска
         self.reset_search_label()
         
-        # # Показываем сообщение о смене рейтинга
-        # if sex == "woman":
-        #     QMessageBox.information(self, "Поиск", "Теперь поиск будет выполняться в женских рейтинг-листах")
-        # else:
-        #     QMessageBox.information(self, "Поиск", "Теперь поиск будет выполняться в мужских рейтинг-листах")
-
     def load_participants_for_title(self):
         """Загрузка участников для выбранного соревнования"""
         if not self.current_title_id:
@@ -6088,9 +6082,19 @@ class MainWindow(QMainWindow):
             return
         
         try:
-            # Базовый запрос
-            query = Player.select().where(Player.title_id == self.current_title_id)
-            
+            # Фильтруем X
+            x_player = Player.get_or_none(
+                (Player.player == "X") &
+                (Player.fio == "X") &
+                (Player.fio_city == "X") &
+                (Player.title_id == self.current_title_id)
+            )
+    
+            if x_player:
+                query = Player.select().where((Player.title_id == self.current_title_id) & (Player.player != "X"))
+            else:
+                query = Player.select().where(Player.title_id == self.current_title_id)
+
             # Применяем фильтр по полу
             if self.current_sex == "woman":
                 query = query.where(Player.sex == "woman")
@@ -8339,20 +8343,6 @@ class MainWindow(QMainWindow):
             remaining_label.setStyleSheet("color: brown; font-weight: bold;")
             layout.addWidget(remaining_label)
             
-            # # Показываем сколько игроков уже в финалах из этого этапа
-            # already_in_finals_from_source = already_in_finals
-            # if source_stage == "Квалификация. 1-й полуфинал":
-            #     already_in_finals_from_source = already_in_finals
-            # elif source_stage == "Квалификация. 2-й полуфинал":
-            #     already_in_finals_from_source = already_in_finals - distribution['semifinal_1']['exited_total'] if distribution['semifinal_1']['exited_total'] > 0 else already_in_finals
-            # elif source_stage == "Квалификация":
-            #     already_in_finals_from_source = already_in_finals - distribution['semifinal_1']['exited_total'] - distribution['semifinal_2']['exited_total'] if distribution['semifinal_2']['exited_total'] > 0 else already_in_finals
-            
-            # already_label = QLabel(f"Уже распределено в финалы из {source_stage}: {already_in_finals_from_source}")
-            # already_label.setStyleSheet("color: blue;")
-            # layout.addWidget(already_label)
-            
-            # layout.addSpacing(5)
 # ===========================================            
             # Количество выходящих из каждой группы
             exit_layout = QHBoxLayout()
@@ -8495,8 +8485,7 @@ class MainWindow(QMainWindow):
             # ======================
                 self.get_or_create_x_player()
             # =================
-            # if total_players - already_in_finals - players_not_out  <= 1:
-            # if total_players - remaining_players <= 1:
+
                 reply = QMessageBox.question(self, "Завершение посева", 
                                             f"✅ Все {total_players} игроков распределены по финалам!\n\n"
                                             f"Провести жеребьевку квалификации сейчас?",
@@ -9263,16 +9252,18 @@ class MainWindow(QMainWindow):
             return
 
         # Выбор типа жеребьевки
-        drawing_type = self.get_drawing_type()
-        if drawing_type is None:
-            return  # Пользователь отменил
+        self.drawing_for_stage(stage)
+
+        # drawing_type = self.get_drawing_type()
+        # if drawing_type is None:
+        #     return  # Пользователь отменил
         
-        if drawing_type == "auto":
-            self.auto_drawing(qualification)
-        else:
-            self.hide()
-            self.manual_drawing_for_stage(stage)
-            self.show()
+        # if drawing_type == "auto":
+        #     self.drawing_for_stage(stage)
+        # else:
+        #     self.hide()
+        #     self.manual_drawing_for_stage(stage)
+        #     self.show()
 
     def calculate_semifinal_games(self, groups_count, players_per_group, exit_count):
         """
@@ -9574,6 +9565,17 @@ class MainWindow(QMainWindow):
         if not self.current_title_id:
             return False
         
+        # Удаляем существующие записи игрока X
+        # Проверяем, существует ли уже игрок X
+        x_player = Player.get_or_none(
+            (Player.player == "X") &
+            (Player.fio == "X") &
+            (Player.fio_city == "X") &
+            (Player.title_id == self.current_title_id)
+        )
+        if x_player:          
+            Player.delete().where((Player.title_id == self.current_title_id) & (Player.id == x_player.id)).execute()
+
         # Получаем всех игроков с неосновным статусом
         pending_players = Player.select().where(
             (Player.title_id == self.current_title_id) &
@@ -10401,7 +10403,7 @@ class MainWindow(QMainWindow):
                 return
             else:
                 # очищает старую жеребьевку
-                self.clear_table_DB_after_choice(stage)
+                self.clear_table_DB_after_choice(stage_name)
 
         # Запускаем жеребьевку
         self.drawing_for_stage(stage)
@@ -15199,22 +15201,22 @@ class MainWindow(QMainWindow):
      
         system = System.get_or_none(
             (System.title_id == self.current_title_id) &
-            (System.stage == stage.stage)
+            (System.stage == stage)
         )
 
         gamelist = Game_list.delete().where(
             (Game_list.title_id == self.current_title_id) &
             (Game_list.system_id == system.id)).execute()
         
-        if stage.stage in group_list:
+        if stage in group_list:
             results = Result.delete().where(
                 (Result.title_id == self.current_title_id) &
-                (Result.system_stage == stage.stage)).execute()
+                (Result.system_stage == stage)).execute()
            
         else:
             results = Result.delete().where(
                 (Result.title_id == self.current_title_id) &
-                (Result.number_group == stage.stage)).execute()
+                (Result.number_group == stage)).execute()
            
     def calculate_qualification_places(self, system):
         """Рассчитать места в квалификации (возвращает словарь {номер_группы: {посев: место}})"""

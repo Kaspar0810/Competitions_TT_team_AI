@@ -44,6 +44,7 @@ import pandas as pd
 import math
 import re
 import random
+import backup_dump_db
 
 import pymysql
 import subprocess
@@ -4647,8 +4648,7 @@ class MainWindow(QMainWindow):
         db_menu.addAction(import_action)
         
         export_action = QAction("📤 Экспортировать", self)
-        # export_action.triggered.connect(self.export_database)
-        export_action.triggered.connect(self.backup)
+        export_action.triggered.connect(backup_dump_db.run_backup_db)
         db_menu.addAction(export_action)
         
         db_menu.addSeparator()
@@ -12882,7 +12882,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Ошибка сохранения соревнования: {e}")
 
-    def export_database_internal(self, file_path, progress=None):
+    def _export_database_internal(self, file_path, progress=None):
         """Встроенный экспорт базы данных (без mysqldump)"""
         try:
             from models import (

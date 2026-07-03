@@ -12537,6 +12537,10 @@ class MainWindow(QMainWindow):
 
     def save_current_competition(self):
         """Сохранение текущего соревнования"""
+
+        # Player.update(patronymic_id=112).where(Player.patronymic_id.is_null()).execute()
+        # Game_list.update(player_double_id=16, team_id=1).where(Game_list.team_id.is_null()).execute()
+
         if not self.current_title_id:
             return
         
@@ -12571,8 +12575,9 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Ошибка сохранения соревнования: {e}")
 
-    def _export_database_internal(self, file_path, progress=None):
+    def export_database_internal(self, file_path, progress=None):
         """Встроенный экспорт базы данных (без mysqldump)"""
+        
         try:
             from models import (
                 Title, Coach, Region, City, Patronymic, Player, Players_full,

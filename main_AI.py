@@ -50,7 +50,7 @@ import pandas as pd
 import math
 import re
 import random
-# import backup_dump_db
+import BackupManagementDialog
 
 import pymysql
 import subprocess
@@ -69,6 +69,10 @@ from begunok_full import BegunokPDF
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+
+        # Проверка старых бэкапов при запуске (через 2 секунды после загрузки)
+        QTimer.singleShot(2000, self.check_old_backups_on_startup)
+
         self.setWindowTitle("Панель управления соревнованиями")
         self.setGeometry(100, 100, 1500, 780)
         self.setMinimumSize(1200, 600)
@@ -161,7 +165,41 @@ class MainWindow(QMainWindow):
         # Для фильтра по игроку
         self.player_filter_text = ""
         self.player_filter_list = []  # Список всех игроков для автодополнения
-
+# =========================
+    def check_old_backups_on_startup(self):
+        """Проверка старых бэкапов при запуске"""
+        backup_dir = "backup_db"
+        if not os.path.exists(backup_dir):
+            return
+        
+        days = 3
+        now = datetime.datetime.now()
+        old_files = []
+        for filename in os.listdir(backup_dir):
+            filepath = os.path.join(backup_dir, filename)
+            if os.path.isfile(filepath) and filename.endswith(('.sql', '.zip')):
+                mtime = datetime.datetime.fromtimestamp(os.path.getmtime(filepath))
+                if (now - mtime).days >= days:
+                    old_files.append(filepath)
+        
+        if old_files:
+            reply = QMessageBox.question(
+                self,
+                "Обнаружены старые бэкапы",
+                f"В папке {backup_dir} найдено {len(old_files)} бэкапов старше {days} дней.\n\n"
+                f"Удалить их?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if reply == QMessageBox.Yes:
+                deleted = 0
+                for filepath in old_files:
+                    try:
+                        os.remove(filepath)
+                        deleted += 1
+                    except:
+                        pass
+                QMessageBox.information(self, "Готово", f"Удалено {deleted} файлов")
+# =========================
     def showEvent(self, event):
         """Событие при первом отображении окна"""
         super().showEvent(event)
@@ -725,7 +763,7 @@ class MainWindow(QMainWindow):
         results_tab = self.create_results_tab()
         rating_tab = self.create_rating_tab()
         extra_tab = self.create_extra_tab()
-        
+           
         # Добавляем вкладки
         self.tab_widget.addTab(title_tab, "📋 Титул")
         self.tab_widget.addTab(participants_tab, "👥 Участники")
@@ -4658,11 +4696,18 @@ class MainWindow(QMainWindow):
         db_menu.addAction(export_action)
         
         db_menu.addSeparator()
-        
+
         # Сохранить текущее соревнование
         save_competition_action = QAction("💾 Сохранить текущее соревнование", self)
         save_competition_action.triggered.connect(self.save_current_competition)
         db_menu.addAction(save_competition_action)
+
+        db_menu.addSeparator()
+
+        # Подпункт "Управление бэкапами"
+        backup_action = db_menu.addAction("⚙️ Управление бэкапами")
+        backup_action.triggered.connect(self.open_backup_management)
+
         
         # Помощь
         help_menu = menubar.addMenu("Помощь")
@@ -4672,7 +4717,54 @@ class MainWindow(QMainWindow):
         
         # Инициализируем обновление меню результатов
         self.update_results_menu()
+# ================================ 0307
+    def open_backup_management(self):
+        """Открыть диалог управления бэкапами"""
+        dialog = BackupManagementDialog.BackupManagementDialog(self, backup_dir="backup_db")
+        dialog.exec_()  # модальный диалог
 
+    def create_backup_from_menu(self):
+        """Создать бэкап (переключаем на вкладку 'Создание бэкапа')"""
+        # Если у вас есть вкладки, можно переключиться на нужную
+        if hasattr(self, 'tabs'):
+            self.tabs.setCurrentIndex(0)  # индекс вкладки "Создание бэкапа"
+        else:
+            # Или сразу вызвать функцию создания с диалогом выбора параметров
+            pass
+
+    def import_backup_from_menu(self):
+        """Импортировать бэкап (переключаем на вкладку импорта)"""
+        if hasattr(self, 'tabs'):
+            self.tabs.setCurrentIndex(1)  # индекс вкладки "Импорт"
+
+    def check_old_backups_on_startup(self):
+        """Проверка старых бэкапов при запуске"""
+        backup_dir = "backup_db"
+        if not os.path.exists(backup_dir):
+            return
+        
+        days = 3
+        # now = datetime.datetime.now()
+        now = datetime.now()
+        old_files = []
+        for filename in os.listdir(backup_dir):
+            filepath = os.path.join(backup_dir, filename)
+            if os.path.isfile(filepath) and filename.lower().endswith(('.sql', '.zip')):
+                mtime = datetime.fromtimestamp(os.path.getmtime(filepath))
+                if (now - mtime).days >= days:
+                    old_files.append(filepath)
+        
+        if old_files:
+            reply = QMessageBox.question(
+                self,
+                "Обнаружены старые бэкапы",
+                f"В папке {backup_dir} найдено {len(old_files)} бэкапов старше {days} дней.\n\n"
+                f"Открыть управление бэкапами?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if reply == QMessageBox.Yes:
+                self.open_backup_management()
+# ================================
     def clear_system_data(self):
         """Очистка всех данных системы проведения для текущего соревнования"""
         if not self.current_title_id:

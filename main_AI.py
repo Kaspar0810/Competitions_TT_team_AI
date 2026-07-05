@@ -11460,6 +11460,30 @@ class MainWindow(QMainWindow):
             return 1
 
 # ===== сетки PDF =============================
+    def player_choice_in_setka(self, stage):
+        """распределяет спортсменов в сетке согласно жеребьевке"""
+        systems = System.select().where((System.title_id == self.current_title_id) & (System.stage == stage)).get()
+        player = Player.select().where(Player.title_id == self.current_title_id)
+        gamelist = Game_list.select().where((Game_list.title_id == self.current_title_id) & (Game_list.number_group == stage))
+        # choice = Choice.select().where(Choice.title_id == self.current_title_id)
+        posev = {}
+        posev_data = {}
+        
+        for k in gamelist:
+            sev = k.rank_num_player
+            name_id = k.player_group_id
+            players = player.select().where(Player.id == name_id).get()
+            name_city = players.fio_city
+            name = players.fio
+            posev_data[sev] = {
+                'player_id': name_id,
+                'name_city':name_city,
+                'name':name
+            }
+        posev_data = {k: posev_data[k] for k in sorted(posev_data)}
+
+        return posev_data
+
     def setka_8_full_made(self, fin, posev_data):
         """сетка на 8 в pdf"""
         from reportlab.platypus import Table
@@ -12384,8 +12408,6 @@ class MainWindow(QMainWindow):
 
     def setka_data(self, fin, posev_data):
         """данные сетки"""
-        # id_full_name = {}
-        # id_name = {}
         tds = []
         fam_name_city = []
         fam_name = []
@@ -12406,10 +12428,13 @@ class MainWindow(QMainWindow):
             family_city = player_data['name_city']
             family_shot = player_data['name']
             # на верху фамилия, внизу город
-            znak = family_city.find("/")
-            f = family_city[:znak]
-            c = family_city[znak + 1:]
-            family = f"{f}\n{c}" # фио и на другой строке город
+            if family_city != 'X':
+                znak = family_city.find("/")
+                f = family_city[:znak]
+                c = family_city[znak + 1:]
+                family = f"{f}\n{c}" # фио и на другой строке город
+            else:
+                family = 'X' 
             tds.append(family)
             fam_name_city.append(family_city)
             fam_name.append(family_shot)
@@ -12575,8 +12600,8 @@ class MainWindow(QMainWindow):
             (System.stage == fin)
         )
 
-        # results = Result.select().where((Result.title_id == self.current_title_id) & (Result.system_id == system.id))
-        results = Result.get_or_none((Result.title_id == self.current_title_id) & (Result.system_id == system.id))
+        results = Result.select().where((Result.title_id == self.current_title_id) & (Result.system_id == system.id))
+        # results = Result.get_or_none((Result.title_id == self.current_title_id) & (Result.system_id == system.id))
         if results:
             for res_num in results:
                 num = res_num.tours
@@ -14740,31 +14765,34 @@ class MainWindow(QMainWindow):
         if not hasattr(self, 'current_stage') or not self.current_stage:
             QMessageBox.warning(self, "Ошибка", "Сначала выберите этап для просмотра")
             return
-        
+                
         # Определяем тип этапа и ориентацию страницы
         stage = self.current_stage
 
-        pv = "книжная"  # по умолчанию книжная
-        
-        # Для квалификации с большим количеством групп используем альбомную ориентацию
-        if stage == "Квалификация":
-            system = System.get_or_none(
+        system = System.get_or_none(
                 (System.title_id == self.current_title_id) &
                 (System.stage == stage)
             )
-            if system and system.total_group > 2:
-                pv = "книжная"
-        elif stage == "Одна таблица":
-            system = System.get_or_none(
-                (System.title_id == self.current_title_id) &
-                (System.stage == stage)
-            )            
-            pv = "альбомная"
+        type_table = system.type_table
+
+        pv = "книжная"  # по умолчанию книжная
+        
+        if type_table == "Круговая":
+            # Для квалификации с большим количеством групп используем альбомную ориентацию
+            if stage == "Квалификация":               
+                if system and system.total_group > 2:
+                    pv = "книжная"
+            elif stage == "Одна таблица":                           
+                pv = "альбомная"
+            pdf_path = self.table_made(pv, stage)
+        else:# олимпийская
+            posev_data = self.player_choice_in_setka(stage)
+            type = self.determine_net_type(stage, posev_data)
+
+            pdf_path = self.table_made(pv, stage)
 
         # Создаем PDF файл
         try:
-
-            pdf_path = self.table_made(pv, stage)
             if pdf_path and os.path.exists(pdf_path):
                 # Открываем PDF файл
                 if sys.platform == 'win32':

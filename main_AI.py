@@ -2738,105 +2738,107 @@ class MainWindow(QMainWindow):
                 if match.player1 == "X":
                     winner_name = match.player2
                     loser_name = match.player1
-                    # points_win = 2
-                    # points_loser = 1
                 else:
                     winner_name = match.player1
                     loser_name = match.player2
-                    # points_win = 2
-                    # points_loser = 1
 
-            # Собираем счета по партиям
-            # ========== дополнение 0106
-            for i in range(parties_count):
-                score1 = self.score_edits_p1[i].text().strip()
-                score2 = self.score_edits_p2[i].text().strip()
-                
-                # Проверка на пустые поля с учетом статусов
-                if status1 == "Играет" and status2 == "Играет":
-                    if not score1 or not score2:
+                points_win = ""
+                score_in_game = ""
+                score_win = ""
+                points_loser = ""
+                score_loser_game = ""
+            else:
+                # Собираем счета по партиям
+                # ========== дополнение 0106
+                for i in range(parties_count):
+                    score1 = self.score_edits_p1[i].text().strip()
+                    score2 = self.score_edits_p2[i].text().strip()
+                    
+                    # Проверка на пустые поля с учетом статусов
+                    if status1 == "Играет" and status2 == "Играет":
+                        if not score1 or not score2:
+                            has_error = True
+                            error_messages.append(f"Партия {i+1}: не заполнена")
+                            continue
+                    elif status1 == "Играет" and not score1:
                         has_error = True
-                        error_messages.append(f"Партия {i+1}: не заполнена")
+                        error_messages.append(f"Партия {i+1}: не заполнен счет игрока 1")
                         continue
-                elif status1 == "Играет" and not score1:
-                    has_error = True
-                    error_messages.append(f"Партия {i+1}: не заполнен счет игрока 1")
-                    continue
-                elif status2 == "Играет" and not score2:
-                    has_error = True
-                    error_messages.append(f"Партия {i+1}: не заполнен счет игрока 2")
-                    continue
-                
-                # Если оба игрока не играют, то проверять счета не нужно
-                if status1 != "Играет" and status2 != "Играет":
-                    continue
-                # Если X нет одного игрока или обоих, то проверять не нужно
-                if (match.player1 == "X" or match.player2 == "X") or (match.player1 == "X" and match.player2 == "X"):
-                    continue
-                # Далее проверка validate_score
-                if score1 and score2:
-                    is_valid, error = self.validate_score(score1, score2)
-# ===========================                   
-                    if is_valid:
-                        s1 = int(score1)
-                        s2 = int(score2)
-                        if s1 > s2:
-                            player1_wins += 1
-                            pl1_win.append(s2)
-                            pl2_win.append(s2 * (-1))
-                        else:
-                            player2_wins += 1
-                            pl1_win.append(s1 * (-1))
-                            pl2_win.append(s1)
-                            
+                    elif status2 == "Играет" and not score2:
+                        has_error = True
+                        error_messages.append(f"Партия {i+1}: не заполнен счет игрока 2")
+                        continue
+                    
+                    # Если оба игрока не играют, то проверять счета не нужно
+                    if status1 != "Играет" and status2 != "Играет":
+                        continue
+                    # Если X нет одного игрока или обоих, то проверять не нужно
+                    if (match.player1 == "X" or match.player2 == "X") or (match.player1 == "X" and match.player2 == "X"):
+                        continue
+                    # Далее проверка validate_score
+                    if score1 and score2:
+                        is_valid, error = self.validate_score(score1, score2)
+                 
+                        if is_valid:
+                            s1 = int(score1)
+                            s2 = int(score2)
+                            if s1 > s2:
+                                player1_wins += 1
+                                pl1_win.append(s2)
+                                pl2_win.append(s2 * (-1))
+                            else:
+                                player2_wins += 1
+                                pl1_win.append(s1 * (-1))
+                                pl2_win.append(s1)
+                                
 
-                        if player1_wins == math.ceil(parties_count / 2) or player2_wins == math.ceil(parties_count / 2):
-                            break
+                            if player1_wins == math.ceil(parties_count / 2) or player2_wins == math.ceil(parties_count / 2):
+                                break
+                        else:
+                            has_error = True
+                            error_messages.append(f"Партия {i+1}: {error}")
+                            self.score_edits_p1[i].setStyleSheet("font-size: 12px; background-color: #FFB6C1;")
+                            self.score_edits_p2[i].setStyleSheet("font-size: 12px; background-color: #FFB6C1;")
                     else:
                         has_error = True
-                        error_messages.append(f"Партия {i+1}: {error}")
-                        self.score_edits_p1[i].setStyleSheet("font-size: 12px; background-color: #FFB6C1;")
-                        self.score_edits_p2[i].setStyleSheet("font-size: 12px; background-color: #FFB6C1;")
-                else:
-                    has_error = True
-                    error_messages.append(f"Партия {i+1}: не заполнена")
+                        error_messages.append(f"Партия {i+1}: не заполнена")
             
-            if has_error:
-                QMessageBox.warning(self, "Ошибка ввода", "\n".join(error_messages))
-                return
-             # Формируем score_in_game (общий счет в формате "3 : 1")
-            if player1_wins > player2_wins:
-                score_in_game = f"{player1_wins} : {player2_wins}"
-                score_loser_game = f"{player2_wins} : {player1_wins}"
-            else:
-                score_in_game = f"{player2_wins} : {player1_wins}"
-                score_loser_game = f"{player1_wins} : {player2_wins}"
+                if has_error:
+                    QMessageBox.warning(self, "Ошибка ввода", "\n".join(error_messages))
+                    return
+                # Формируем score_in_game (общий счет в формате "3 : 1")
+                if player1_wins > player2_wins:
+                    score_in_game = f"{player1_wins} : {player2_wins}"
+                    score_loser_game = f"{player2_wins} : {player1_wins}"
+                else:
+                    score_in_game = f"{player2_wins} : {player1_wins}"
+                    score_loser_game = f"{player1_wins} : {player2_wins}"
 
-            if player1_wins > player2_wins:
-                winner_name = match.player1
-                loser_name = match.player2
-                points_win = 2
-                points_loser = 1
-            else:
-                winner_name = match.player2
-                loser_name = match.player1
-                points_win = 2
-                points_loser = 1
+                if player1_wins > player2_wins:
+                    winner_name = match.player1
+                    loser_name = match.player2
+                    points_win = 2
+                    points_loser = 1
+                else:
+                    winner_name = match.player2
+                    loser_name = match.player1
+                    points_win = 2
+                    points_loser = 1
 
-            # Объединяем в строки 
-            if player1_wins > player2_wins:
-                pl1_win_str = [str(num) for num in pl1_win]
-                score_win = ','.join(pl1_win_str)
-            else:
-                pl2_win_str = [str(num) for num in pl2_win]
-                score_win = ','.join(pl2_win_str)
+                # Объединяем в строки 
+                if player1_wins > player2_wins:
+                    pl1_win_str = [str(num) for num in pl1_win]
+                    score_win = ','.join(pl1_win_str)
+                else:
+                    pl2_win_str = [str(num) for num in pl2_win]
+                    score_win = ','.join(pl2_win_str)
 
             
             # Обновляем запись в Result
             match.winner = winner_name
             match.points_win = points_win
             match.score_in_game = score_in_game
-            match.score_win = f"({score_win})"
+            match.score_win = score_win if type_table != "Круговая" else f"({score_win})"
             match.loser = loser_name
             match.points_loser = points_loser
             match.score_loser = score_loser_game

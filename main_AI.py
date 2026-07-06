@@ -2733,7 +2733,18 @@ class MainWindow(QMainWindow):
                 self.clear_result_form_compact()
                 self.load_matches_for_stage(match.system_stage) 
 
-            # Случай 4: Обычная игра (оба играют)
+            # Случай 4: Обычная игра в сетке одного игрока нет (Х)
+            if match.player1 == "X" or match.player2 == "X":
+                if match.player1 == "X":
+                    winner_name = match.player2
+                    loser_name = match.player1
+                    # points_win = 2
+                    # points_loser = 1
+                else:
+                    winner_name = match.player1
+                    loser_name = match.player2
+                    # points_win = 2
+                    # points_loser = 1
 
             # Собираем счета по партиям
             # ========== дополнение 0106
@@ -2759,7 +2770,9 @@ class MainWindow(QMainWindow):
                 # Если оба игрока не играют, то проверять счета не нужно
                 if status1 != "Играет" and status2 != "Играет":
                     continue
-                
+                # Если X нет одного игрока или обоих, то проверять не нужно
+                if (match.player1 == "X" or match.player2 == "X") or (match.player1 == "X" and match.player2 == "X"):
+                    continue
                 # Далее проверка validate_score
                 if score1 and score2:
                     is_valid, error = self.validate_score(score1, score2)

@@ -2626,7 +2626,7 @@ class MainWindow(QMainWindow):
         if not self.player1_name.text() or not self.player2_name.text():
             QMessageBox.warning(self, "Ошибка", "Сначала выберите матч двойным кликом из таблицы")
             return
-        
+
         match = self.current_matches[self.current_match_index]
         
         try:
@@ -2639,6 +2639,11 @@ class MainWindow(QMainWindow):
             pl2_win = []
             
             system = System.get_or_none(System.id == match.system_id)
+            # получаем тип таблицы круг или олимпийка
+            type_table = system.type_table
+            max_pl = system.max_player
+            number_game = int(match.tours)
+
             parties_count = system.score_flag if system.score_flag else 5
             
             # Получаем статусы игроков
@@ -2812,7 +2817,8 @@ class MainWindow(QMainWindow):
             else:
                 pl2_win_str = [str(num) for num in pl2_win]
                 score_win = ','.join(pl2_win_str)
-        
+
+            
             # Обновляем запись в Result
             match.winner = winner_name
             match.points_win = points_win
@@ -2822,6 +2828,23 @@ class MainWindow(QMainWindow):
             match.points_loser = points_loser
             match.score_loser = score_loser_game
             match.save()
+            if type_table != "Круговая":
+                #== вариант сносок ===
+                # список 1-й номер победителя 2-й проигравшего
+                snoska = self.number_of_game(number_game, type_table, max_pl) # snoska список [номер встречи победителя, номер встречи приогравшего, номер в сетке куда сносится проигравший]
+ 
+                if snoska[0] != 0:
+                    with db:  # записывает в db таблицу Result победителя и проигравшего
+                        player = winner_name
+                        for k in range(0, 2):
+                            res_id = Result.select().where((Result.title_id == self.current_title_id) & (Result.tours == snoska[k])).get() # id встречи, куда попадает победитель и проигравший
+                            # =========                            
+                            if res_id.player1 == "":
+                                res_id.player1 = player
+                            else:
+                                res_id.player2 = player
+                            res_id.save()
+                            player = loser_name
             
             # Показываем сообщение с результатом
             QMessageBox.information(self, "Успех", 
@@ -11484,7 +11507,7 @@ class MainWindow(QMainWindow):
 
         return posev_data
 
-    def _setka_8_full_made(self, fin, posev_data):
+    def setka_8_full_made(self, fin, posev_data):
         """сетка на 8 в pdf"""
         from reportlab.platypus import Table
         table = "setka_8_full"
@@ -11539,9 +11562,9 @@ class MainWindow(QMainWindow):
         # =================================
         # ============= данные игроков и встреч и размещение по сетке =============
         #================= проба поиска номера встреч
-        tds = self.find_match_numbers_in_table(data, fin, posev_data)  # находит номер строки и столбца матча на сетке
-        # =============================================================
-        # tds = self.write_in_setka(data, fin, first_mesto, table, posev_data)
+        # tds = self.find_match_numbers_in_table(data, fin, posev_data)  # находит номер строки и столбца матча на сетке
+        # ================ рабочий старый вариант ==========
+        tds = self.write_in_setka(data, fin, first_mesto, table, posev_data)
         #===============
         cw = ((0.3 * cm, 4.6 * cm, 0.4 * cm, 3.0 * cm, 0.4 * cm, 3.0 * cm, 0.4 * cm, 4.8 * cm, 1.5 * cm, 0.4 * cm))
         # основа сетки на чем чертить таблицу (ширина столбцов и рядов, их кол-во)
@@ -11670,7 +11693,7 @@ class MainWindow(QMainWindow):
 
         return name_table_final
 # ========= пробный вариант матчей в сетке =========
-    def setka_8_full_made(self, fin, posev_data):
+    def _setka_8_full_made(self, fin, posev_data):
             """сетка на 8 в pdf"""
             from reportlab.platypus import Table
             table = "setka_8_full"
@@ -12366,7 +12389,7 @@ class MainWindow(QMainWindow):
             s_2  = 32
         # posev_data = self.setka_player_after_choice(stage) # игроки 1-ого посева
         all_list = self.setka_data(stage, posev_data)
-        id_sh_name = all_list[2] # словарь {Фамилия Имя: id}
+        id_sh_name = all_list[2][0] # словарь {Фамилия Имя: id}
    
         # ==================
         tds = []
@@ -12374,7 +12397,7 @@ class MainWindow(QMainWindow):
         # ======
         # if flag_clear is False:
         #     tds.append(id_sh_name)
-    
+    # создает словарь: ключ - номер сноски знаение номер сторки
         for d in range(col_first, column_last, 2):
             for r in range(row_first, row_last):
                 key = data[r][d]
@@ -12575,7 +12598,7 @@ class MainWindow(QMainWindow):
                     short_name_win = "X"
                     short_name_los = "X"
 
-                snoska = self.numer_game(num_game, vid_setki, max_pl) # список (номер встречи победителя, номер встречи проигравшего и минус куда идет проигравший в сетке)
+                snoska = self.number_of_game(num_game, vid_setki, max_pl) # список (номер встречи победителя, номер встречи проигравшего и минус куда идет проигравший в сетке)
                 tmp_match.append(snoska[0]) # номер на сетке куда идет победитель
                 tmp_match.append(short_name_win)
                 # if num_game == place_3rd and my_win.checkBox_no_play_3.isChecked():
@@ -12584,7 +12607,7 @@ class MainWindow(QMainWindow):
                 # if visible_game == 1: # если счет в партиии
                 #     tmp_match.append(f'{res.score_in_game} {res.score_win}')
                 # else:
-                tmp_match.append(f'{res.score_in_game}')
+                tmp_match.append(f'{res.score_in_game} {res.score_win}')
                 tmp_match.append(snoska[2])
                 tmp_match.append(short_name_los)
                 match = tmp_match.copy() # список [номер куда идет победитель, ФИО побед, счет, номер куда идет проигравший, ФИО проигр]
@@ -12598,6 +12621,7 @@ class MainWindow(QMainWindow):
         tds = []
         fam_name_city = []
         fam_name = []
+        fam_name_shot = {}
         para_list = ["мужские пары", "женские пары", "смешанные пары"]
         stage = "Парный разряд" if fin in para_list else fin
         system = System.select().where((System.title_id == self.current_title_id) & (System.stage == stage)).get()  # находит system id последнего
@@ -12613,7 +12637,11 @@ class MainWindow(QMainWindow):
             player_data = posev_data[((i + 1) // 2)]            
             pl_id = player_data['player_id']
             family_city = player_data['name_city']
-            family_shot = player_data['name']
+
+            fam_name_shot[player_data['name']] = pl_id
+            
+            
+            # family_shot = player_data['name']
             # на верху фамилия, внизу город
             if family_city != 'X':
                 znak = family_city.find("/")
@@ -12624,7 +12652,7 @@ class MainWindow(QMainWindow):
                 family = 'X' 
             tds.append(family)
             fam_name_city.append(family_city)
-            fam_name.append(family_shot)
+            fam_name.append(fam_name_shot)
         all_list = [tds, fam_name_city, fam_name]
         
         return all_list
@@ -12684,10 +12712,9 @@ class MainWindow(QMainWindow):
             p_data.clear()
         return posev_data
 
-    def numer_game(self, num_game, vid_setki, max_pl):
+    def number_of_game(self, number_game, vid_setki, max_pl):
         """определяет куда записывать победителя и проигравшего по сноске в сетке, номера встреч"""
         snoska = []
-        num_game = int(num_game)
         flag_full = 0
         if vid_setki == 'Олимпийская (с розыгрышем всех мест)':
             if max_pl == 8:
@@ -12857,25 +12884,25 @@ class MainWindow(QMainWindow):
             #             69: -69, 70: -70, 71: -71, 72: -72, 73: -73, 74: -74, 75: -75, 77: -77, 78: -78, 79: -79}
             # dict_mesta = [31, 32, 35, 36, 43, 44, 47, 48, 63, 64, 67, 68, 75, 76, 79, 80]
 
-        if num_game in dict_mesta: # если встреча за места
-            snoska = [0, 0, (num_game * -1)]
+        if number_game in dict_mesta: # если встреча за места
+            snoska = [0, 0, (number_game * -1)]
         else:
-            game_winner = dict_winner[num_game]  # номер игры победителя
+            game_winner = dict_winner[number_game]  # номер игры победителя
             snoska.append(game_winner)
             if flag_full == 0: # значит полная сетка
-                game_loser = dict_loser[num_game]  # номер игры проигравшего
+                game_loser = dict_loser[number_game]  # номер игры проигравшего
             else: # значит сетка только 1-3 места и нет пригравших
                 game_loser = 0  # номер игры проигравшего
             snoska.append(game_loser)
             # для отображения в pdf (встречи с минусом)
             # if flag_full == 0:
-            game_loser = dict_loser_pdf[num_game]
+            game_loser = dict_loser_pdf[number_game]
             snoska.append(game_loser) # список: номер встречи победителя, номер - проигравшего и куда снести проигравшего
 
         return snoska
 # ====== расписание на сетке =========== 
     #вариант с поиском встречи
-    def find_match_numbers_in_table(self, table_data, fin, posev_data):
+    def _find_match_numbers_in_table(self, table_data, fin, posev_data):
             """Найти все номера встреч в таблице и их позиции"""
             
             match_positions = {}
@@ -12930,8 +12957,8 @@ class MainWindow(QMainWindow):
             style_color_schedule.append(fn)
     
         return style_color_schedule 
-
-    def _find_match_numbers_in_table(self, table_data, fin):
+# =========== рабочий старый вариант =======
+    def find_match_numbers_in_table(self, table_data, fin):
         """Найти все номера встреч в таблице и их позиции"""
         
         match_positions = {}

@@ -2615,7 +2615,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Ошибка парсинга счета: {e}")
 # ============= Сохранение результата матча с правильным форматом и обработкой неявок ======================
-    def save_match_result_compact(self):
+
         """Сохранение результата матча с правильным форматом и обработкой неявок"""
         group_list = ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]
 
@@ -2642,7 +2642,7 @@ class MainWindow(QMainWindow):
             # получаем тип таблицы круг или олимпийка
             type_table = system.type_table
             max_pl = system.max_player
-            number_game = int(match.tours)
+            
 
             parties_count = system.score_flag if system.score_flag else 5
             
@@ -2846,6 +2846,7 @@ class MainWindow(QMainWindow):
             if type_table != "Круговая":
                 #== вариант сносок ===
                 # список 1-й номер победителя 2-й проигравшего
+                number_game = int(match.tours)
                 snoska = self.number_of_game(number_game, type_table, max_pl) # snoska список [номер встречи победителя, номер встречи приогравшего, номер в сетке куда сносится проигравший]
  
                 if snoska[0] != 0:
@@ -2903,6 +2904,333 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить результат: {str(e)}")
  
+    def save_match_result_compact(self):
+        """Сохранение результата матча с правильным форматом и обработкой неявок"""
+        group_list = ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]
+
+        # ПРОВЕРКА 1: Существует ли выбранный матч
+        if not hasattr(self, 'current_matches') or not self.current_matches:
+            QMessageBox.warning(self, "Ошибка", "Нет выбранного матча. Сначала выберите матч из таблицы.")
+            return
+        
+        # ПРОВЕРКА 2: Корректный ли индекс
+        if not hasattr(self, 'current_match_index') or self.current_match_index is None:
+            QMessageBox.warning(self, "Ошибка", "Не выбран матч. Дважды кликните на матч в таблице.")
+            return
+        
+        # ПРОВЕРКА 3: Существует ли матч по этому индексу
+        if self.current_match_index >= len(self.current_matches):
+            QMessageBox.warning(self, "Ошиб", "Выбранный матч больше не существует. Обновите список.")
+            # Автоматически обновляем список
+            if hasattr(self, 'current_stage'):
+                self.load_matches_for_stage(self.current_stage)
+            return
+        
+        match = self.current_matches[self.current_match_index]
+        
+        # ПРОВЕРКА 4: Существует ли запись в БД
+        if match is None:
+            QMessageBox.warning(self, "Ошибка", "Данные матча не найдены")
+            return
+        
+        if not self.player1_name.text() or not self.player2_name.text():
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите матч двойным кликом из таблицы")
+            return
+
+        try:
+            player1_wins = 0
+            player2_wins = 0
+            has_error = False
+            error_messages = []
+            pl1_win = []
+            pl2_win = []
+            
+            system = System.get_or_none(System.id == match.system_id)
+            if not system:
+                QMessageBox.warning(self, "Ошибка", "Система проведения не найдена")
+                return
+                
+            type_table = system.type_table
+            max_pl = system.max_player
+           
+            parties_count = system.score_flag if system.score_flag else 5
+            
+            status1 = self.player1_status.currentText()
+            status2 = self.player2_status.currentText()
+    
+            # --- Обработка неявок и "X" ---
+            # Случай 1: Оба игрока не явились
+            if status1 != "Играет" and status2 != "Играет":
+                match.winner = None
+                match.points_win = 0
+                match.score_in_game = "П : П"
+                match.score_win = "П : П"
+                match.loser = None
+                match.points_loser = 0
+                match.score_loser = "П : П"
+                match.save()
+                
+                QMessageBox.warning(self, "Неявка", 
+                                f"Оба игрока не явились на матч!\n"
+                                f"Обоим засчитано техническое поражение.\n"
+                                f"Счет: П : П")
+                
+                self.clear_result_form_compact()
+                self.load_results_table_for_stage(match.system_stage)
+                self.load_matches_for_stage(match.system_stage)
+                return
+            
+            # Случай 2: Не явка игрока 1
+            if status1 != "Играет" and status2 == "Играет":
+                winner_name = match.player2
+                loser_name = match.player1
+                points_win = 2
+                points_loser = 0
+                score_in_game = "В : П"
+                score_win = "В : П"
+                score_loser = "П : В"
+                
+                match.winner = winner_name
+                match.points_win = points_win
+                match.score_in_game = score_in_game
+                match.score_win = score_win
+                match.loser = loser_name
+                match.points_loser = points_loser
+                match.score_loser = score_loser
+                match.save()
+                
+                QMessageBox.information(self, "Техническая победа", 
+                                    f"Игрок {loser_name} не явился.\n"
+                                    f"Победитель: {winner_name}\n"
+                                    f"Счет: {score_in_game}")
+                
+                self.clear_result_form_compact()
+                self.load_results_table_for_stage(match.system_stage)
+                self.load_matches_for_stage(match.system_stage)
+                return
+
+            # Случай 3: Не явка игрока 2
+            if status2 != "Играет" and status1 == "Играет":
+                winner_name = match.player1
+                loser_name = match.player2
+                points_win = 2
+                points_loser = 0
+                score_in_game = "В : П"
+                score_win = "В : П"
+                score_loser = "П : В"
+                
+                match.winner = winner_name
+                match.points_win = points_win
+                match.score_in_game = score_in_game
+                match.score_win = score_win
+                match.loser = loser_name
+                match.points_loser = points_loser
+                match.score_loser = score_loser
+                match.save()
+                
+                QMessageBox.information(self, "Техническая победа", 
+                                    f"Игрок {loser_name} не явился.\n"
+                                    f"Победитель: {winner_name}\n"
+                                    f"Счет: {score_in_game}")
+                
+                self.load_results_table_for_stage(match.system_stage)
+                self.clear_result_form_compact()
+                self.load_matches_for_stage(match.system_stage)
+                return
+
+            # Случай 4: Есть "X" (техническая победа)
+            if match.player1 == "X" or match.player2 == "X":
+                if match.player1 == "X":
+                    winner_name = match.player2
+                    loser_name = match.player1
+                else:
+                    winner_name = match.player1
+                    loser_name = match.player2
+
+                points_win = 2
+                points_loser = 0
+                score_in_game = ""
+                score_win = ""
+                score_loser = ""
+                
+                match.winner = winner_name
+                match.points_win = points_win
+                match.score_in_game = score_in_game
+                match.score_win = score_win
+                match.loser = loser_name
+                match.points_loser = points_loser
+                match.score_loser = score_loser
+                match.save()
+                
+                QMessageBox.information(self, "Техническая победа", 
+                                    f"Игрок {loser_name} не участвует.\n"
+                                    f"Победитель: {winner_name}")
+                
+                self.clear_result_form_compact()
+                self.load_results_table_for_stage(match.system_stage)
+                self.load_matches_for_stage(match.system_stage)
+                return
+
+            # --- Обычная игра ---
+            # Собираем счета по партиям
+            for i in range(parties_count):
+                score1 = self.score_edits_p1[i].text().strip()
+                score2 = self.score_edits_p2[i].text().strip()
+                
+                # Проверка на пустые поля
+                if status1 == "Играет" and status2 == "Играет":
+                    if not score1 or not score2:
+                        has_error = True
+                        error_messages.append(f"Партия {i+1}: не заполнена")
+                        continue
+                elif status1 == "Играет" and not score1:
+                    has_error = True
+                    error_messages.append(f"Партия {i+1}: не заполнен счет игрока 1")
+                    continue
+                elif status2 == "Играет" and not score2:
+                    has_error = True
+                    error_messages.append(f"Партия {i+1}: не заполнен счет игрока 2")
+                    continue
+                
+                # Валидация счетов
+                if score1 and score2:
+                    is_valid, error = self.validate_score(score1, score2)
+                    if is_valid:
+                        s1 = int(score1)
+                        s2 = int(score2)
+                        if s1 > s2:
+                            player1_wins += 1
+                            pl1_win.append(s2)
+                            pl2_win.append(s2 * (-1))
+                        else:
+                            player2_wins += 1
+                            pl1_win.append(s1 * (-1))
+                            pl2_win.append(s1)
+
+                        if player1_wins == math.ceil(parties_count / 2) or player2_wins == math.ceil(parties_count / 2):
+                            break
+                    else:
+                        has_error = True
+                        error_messages.append(f"Партия {i+1}: {error}")
+                        self.score_edits_p1[i].setStyleSheet("font-size: 12px; background-color: #FFB6C1;")
+                        self.score_edits_p2[i].setStyleSheet("font-size: 12px; background-color: #FFB6C1;")
+                else:
+                    has_error = True
+                    error_messages.append(f"Партия {i+1}: не заполнена")
+            
+            if has_error:
+                QMessageBox.warning(self, "Ошибка ввода", "\n".join(error_messages))
+                return
+            
+            # Определяем победителя
+            if player1_wins > player2_wins:
+                winner_name = match.player1
+                loser_name = match.player2
+                points_win = 2
+                points_loser = 1
+                score_in_game = f"{player1_wins} : {player2_wins}"
+                score_loser_game = f"{player2_wins} : {player1_wins}"
+                score_win = ','.join([str(num) for num in pl1_win])
+            else:
+                winner_name = match.player2
+                loser_name = match.player1
+                points_win = 2
+                points_loser = 1
+                score_in_game = f"{player2_wins} : {player1_wins}"
+                score_loser_game = f"{player1_wins} : {player2_wins}"
+                score_win = ','.join([str(num) for num in pl2_win])
+
+            # Сохраняем результат
+            match.winner = winner_name
+            match.points_win = points_win
+            match.score_in_game = score_in_game
+            match.score_win = f"({score_win})"
+            match.loser = loser_name
+            match.points_loser = points_loser
+            match.score_loser = score_loser_game
+            match.save()
+            
+            # Обновляем сетку (для олимпийской системы)
+            if type_table != "Круговая":
+                number_game = int(match.tours)
+                snoska = self.number_of_game(number_game, type_table, max_pl)
+                if snoska and snoska[0] != 0:
+                    with db.atomic():
+                        # Победитель
+                        res_id_win = Result.select().where(
+                            (Result.title_id == self.current_title_id) & 
+                            (Result.tours == snoska[0])
+                        ).get()
+                        if res_id_win.player1 == "" or res_id_win.player1 is None:
+                            res_id_win.player1 = winner_name
+                        else:
+                            res_id_win.player2 = winner_name
+                        res_id_win.save()
+                        
+                        # Проигравший (если есть куда сносить)
+                        if snoska[1] != 0:
+                            res_id_lose = Result.select().where(
+                                (Result.title_id == self.current_title_id) & 
+                                (Result.tours == snoska[1])
+                            ).get()
+                            if res_id_lose.player1 == "" or res_id_lose.player1 is None:
+                                res_id_lose.player1 = loser_name
+                            else:
+                                res_id_lose.player2 = loser_name
+                            res_id_lose.save()
+            
+            # Показываем сообщение
+            QMessageBox.information(self, "Успех", 
+                                f"Результат сохранен!\n"
+                                f"Победитель: {winner_name}\n"
+                                f"Счет: {score_in_game}")
+            
+            # === ВАЖНО: Обновление состояния ===
+            # Сохраняем текущий этап перед обновлением
+            current_stage = match.number_group
+            
+            # # Очищаем форму
+            # self.clear_result_form_compact()
+            
+            # Обновляем таблицы
+            self.load_results_table_for_stage(current_stage)
+            self.load_matches_for_stage(current_stage)
+            
+            # # СБРАСЫВАЕМ ИНДЕКС ВЫБРАННОГО МАТЧА (ВАЖНО!)
+            # self.current_match_index = None
+            # self.current_matches = []
+            
+            # Проверяем завершение этапа
+            if current_stage in ["Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]:
+                total_matches = Result.select().where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.system_stage == current_stage)
+                ).count()
+                played_matches = Result.select().where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.system_stage == current_stage) &
+                    (Result.winner.is_null(False))
+                ).count()
+                if total_matches > 0 and played_matches == total_matches:
+                    self.update_semifinal_places(current_stage)
+            else:
+                total_matches = Result.select().where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.number_group == current_stage)
+                ).count()
+                played_matches = Result.select().where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.number_group == current_stage) &
+                    (Result.winner.is_null(False))
+                ).count() 
+                if total_matches > 0 and played_matches == total_matches:
+                    self.calculate_and_save_round_robin_final_places(current_stage)
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить результат: {str(e)}")
+
     def clear_result_form_compact(self):
         """Очистка формы (компактная версия)"""
 
@@ -2959,6 +3287,7 @@ class MainWindow(QMainWindow):
         if not self.current_title_id:
             return
         
+        
         try:
             # Базовый запрос
             if stage_name in group_list:
@@ -2993,6 +3322,7 @@ class MainWindow(QMainWindow):
             # # Сортировка
             query = query.order_by(Result.number_group, Result.round)
 
+
             data = []
             for result in query:
                 winner_text = result.winner if result.winner else ""
@@ -3017,8 +3347,8 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             print(f"Ошибка загрузки таблицы: {e}")
-# =============================
-    def on_match_double_clicked(self, index):
+# ============================= рабочий =====
+    def _on_match_double_clicked(self, index):
         """Обработка двойного клика по строке таблицы для загрузки матча"""
         row = index.row()
         model = self.results_table.model()
@@ -3070,7 +3400,292 @@ class MainWindow(QMainWindow):
 
              # Устанавливаем фокус на первую партию первого игрока
             QTimer.singleShot(100, lambda: self.score_edits_p1[0].setFocus())
-  
+
+# ====== добавлена возможность при Х сохранение матча ====
+    def on_match_double_clicked(self, index):
+        """Обработка двойного клика по строке таблицы для загрузки матча"""
+        row = index.row()
+        
+        # Получаем данные из модели
+        model = self.results_table.model()
+        if not model:
+            return
+        
+        # Получаем ID матча из модели
+        match_id = model.get_match_id(row) if hasattr(model, 'get_match_id') else None
+        
+        if not match_id:
+            match_id = model.data(model.index(row, 0), Qt.UserRole)
+        
+        if match_id:
+            # Ищем матч по ID
+            for i, match in enumerate(self.current_matches):
+                if match.id == match_id:
+                    self.current_match_index = i
+                    break
+            else:
+                self.load_matches_for_stage(self.current_stage)
+                for i, match in enumerate(self.current_matches):
+                    if match.id == match_id:
+                        self.current_match_index = i
+                        break
+                else:
+                    QMessageBox.warning(self, "Ошибка", f"Матч с ID {match_id} не найден")
+                    return
+        else:
+            # Если ID нет, ищем по именам (как fallback)
+            player1 = model.data(model.index(row, 4))
+            player2 = model.data(model.index(row, 5))
+            
+            for i, match in enumerate(self.current_matches):
+                if match.player1 == player1 and match.player2 == player2:
+                    self.current_match_index = i
+                    break
+            else:
+                QMessageBox.warning(self, "Ошибка", "Матч не найден в списке")
+                return
+        
+        # Проверяем, что индекс корректен
+        if self.current_match_index is None or self.current_match_index >= len(self.current_matches):
+            QMessageBox.warning(self, "Ошибка", "Неверный индекс матча")
+            return
+        
+        match = self.current_matches[self.current_match_index]
+        
+        # Заполняем поля
+        self.player1_name.setText(match.player1 or "")
+        self.player2_name.setText(match.player2 or "")
+        self.current_match_label.setText(f"Матч: {self.current_match_index + 1}/{len(self.current_matches)}")
+        
+        # # Очищаем поля счетов
+        # self.clear_result_form_compact()
+        
+        # Проверяем наличие "X" в матче
+        has_x = False
+        if match.player1 == "X" or match.player2 == "X":
+            has_x = True
+            
+            # Если есть "X", сразу определяем победителя
+            if match.player1 == "X":
+                winner = match.player2
+                self.player1_status.setCurrentText("Не играет")
+                self.player2_status.setCurrentText("Играет")
+            else:
+                winner = match.player1
+                self.player1_status.setCurrentText("Играет")
+                self.player2_status.setCurrentText("Не играет")
+            
+            # Показываем информацию о технической победе
+            self.status_label.setText(f"Техническая победа: {winner}")
+            
+            # Автоматически сохраняем результат с "X"
+            # Используем QTimer для отложенного сохранения
+            QTimer.singleShot(100, self.save_match_with_x)
+            
+            # Возвращаемся, чтобы не продолжать загрузку
+            return
+        
+        # Если матч уже сыгран, загружаем счета
+        if match.winner and match.score_in_game:
+            score = match.score_in_game
+            if match.winner != match.player1:
+                score = ' '.join(score.split()[::-1])
+            self.parse_and_load_scores_compact(score)
+            
+            # Устанавливаем статусы
+            if match.winner == match.player1:
+                self.player1_status.setCurrentText("Играет")
+                self.player2_status.setCurrentText("Не играет")
+            elif match.winner == match.player2:
+                self.player1_status.setCurrentText("Не играет")
+                self.player2_status.setCurrentText("Играет")
+        else:
+            # Устанавливаем статусы по умолчанию
+            self.player1_status.setCurrentText("Играет")
+            self.player2_status.setCurrentText("Играет")
+            
+            # Устанавливаем фокус на первую партию
+            QTimer.singleShot(100, lambda: self.score_edits_p1[0].setFocus())
+        
+        # Устанавливаем количество партий
+        if match.system_id:
+            system = System.get_or_none(System.id == match.system_id)
+            if system:
+                parties_count = system.score_flag if system.score_flag else 5
+                self.update_scores_fields_compact(parties_count)
+                self.parties_count = parties_count
+        
+        # Включаем кнопку сохранения
+        if hasattr(self, 'save_result_btn'):
+            self.save_result_btn.setEnabled(True)
+        
+        # Устанавливаем фокус на первое поле ввода (для быстрого ввода счета)
+        if hasattr(self, 'score_edits_p1') and self.score_edits_p1:
+            QTimer.singleShot(150, lambda: self.score_edits_p1[0].setFocus())
+
+    def save_match_with_x(self):
+        """Автоматическое сохранение матча при наличии 'X'"""
+        try:
+            # Проверяем, что матч выбран
+            if not hasattr(self, 'current_matches') or not self.current_matches:
+                return
+            
+            if self.current_match_index is None or self.current_match_index >= len(self.current_matches):
+                return
+            
+            match = self.current_matches[self.current_match_index]
+            
+            # Проверяем наличие "X"
+            if match.player1 != "X" and match.player2 != "X":
+                return
+            
+            # Определяем победителя
+            if match.player1 == "X":
+                winner_name = match.player2
+                loser_name = match.player1
+            else:
+                winner_name = match.player1
+                loser_name = match.player2
+            
+            # Сохраняем результат
+            match.winner = winner_name
+            match.points_win = 2
+            match.score_in_game = ""
+            match.score_win = ""
+            match.loser = loser_name
+            match.points_loser = 0
+            match.score_loser = ""
+            match.save()
+            
+            # Обновляем сетку (для олимпийской системы)
+            system = System.get_or_none(System.id == match.system_id)
+            if system and system.type_table != "Круговая":
+                self.update_olympic_grid_after_match(match)
+            
+            # Показываем сообщение
+            QMessageBox.information(
+                self,
+                "Техническая победа",
+                f"Матч автоматически завершен!\n"
+                f"Победитель: {winner_name}\n"
+                f"Причина: отсутствие игрока {loser_name}"
+            )
+            
+            # Обновляем интерфейс
+            self.clear_result_form_compact()
+            self.load_results_table_for_stage(self.current_stage)
+            self.load_matches_for_stage(self.current_stage)
+            
+            # Сбрасываем выбор
+            self.current_match_index = None
+            self.current_match_label.setText("Матч не выбран")
+            self.player1_name.setText("")
+            self.player2_name.setText("")
+            self.status_label.setText("Готов к работе")
+            
+            # Отключаем кнопку сохранения
+            if hasattr(self, 'save_result_btn'):
+                self.save_result_btn.setEnabled(False)
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить результат: {str(e)}")
+            import traceback
+            traceback.print_exc()
+
+    def update_olympic_grid_after_match(self, match):
+        """Обновление олимпийской сетки после матча (перенос победителя и проигравшего)"""
+        try:
+            system = System.get_or_none(System.id == match.system_id)
+            if not system:
+                return
+                
+            number_game = int(match.tours)
+            max_pl = system.max_player
+            type_table = system.type_table
+            
+            # Получаем информацию о переносе
+            snoska = self.number_of_game(number_game, type_table, max_pl)
+            if not snoska or snoska[0] == 0:
+                return
+            
+            with db.atomic():
+                # Перенос победителя
+                res_id_win = Result.select().where(
+                    (Result.title_id == self.current_title_id) & 
+                    (Result.tours == snoska[0])
+                ).get_or_none()
+                
+                if res_id_win:
+                    if not res_id_win.player1 or res_id_win.player1 == "":
+                        res_id_win.player1 = match.winner
+                    else:
+                        res_id_win.player2 = match.winner
+                    res_id_win.save()
+                
+                # Перенос проигравшего (если есть)
+                if snoska[1] != 0:
+                    res_id_lose = Result.select().where(
+                        (Result.title_id == self.current_title_id) & 
+                        (Result.tours == snoska[1])
+                    ).get_or_none()
+                    
+                    if res_id_lose:
+                        if not res_id_lose.player1 or res_id_lose.player1 == "":
+                            res_id_lose.player1 = match.loser
+                        else:
+                            res_id_lose.player2 = match.loser
+                        res_id_lose.save()
+                        
+        except Exception as e:
+            print(f"Ошибка обновления сетки: {e}")
+
+    def setup_score_inputs(self):
+        """Настройка полей ввода счета с обработкой Enter"""
+        for i, (edit1, edit2) in enumerate(zip(self.score_edits_p1, self.score_edits_p2)):
+            # Назначаем обработчики для поля игрока 1
+            edit1.returnPressed.connect(lambda checked=False, idx=i: self.on_score_enter_pressed(idx, 'p1'))
+            edit1.setFocusPolicy(Qt.StrongFocus)
+            
+            # Назначаем обработчики для поля игрока 2
+            edit2.returnPressed.connect(lambda checked=False, idx=i: self.on_score_enter_pressed(idx, 'p2'))
+            edit2.setFocusPolicy(Qt.StrongFocus)
+
+    def on_score_enter_pressed(self, index, player):
+        """Обработка нажатия Enter в полях ввода счета"""
+        try:
+            # Проверяем, есть ли "X" в матче
+            if not hasattr(self, 'current_matches') or self.current_match_index is None:
+                return
+            
+            match = self.current_matches[self.current_match_index]
+            if match.player1 == "X" or match.player2 == "X":
+                # Если есть "X", переносим фокус на кнопку "Сохранить"
+                if hasattr(self, 'save_result_btn') and self.save_result_btn.isEnabled():
+                    self.save_result_btn.setFocus()
+                    self.save_result_btn.setStyleSheet("background-color: #FFA500; border: 2px solid #FF6600;")
+                    return
+            
+            # Определяем следующее поле для перехода
+            if player == 'p1':
+                # Переходим на поле игрока 2 в той же партии
+                if index < len(self.score_edits_p2):
+                    self.score_edits_p2[index].setFocus()
+            else:
+                # Переходим на следующую партию (поле игрока 1)
+                next_index = index + 1
+                if next_index < len(self.score_edits_p1):
+                    self.score_edits_p1[next_index].setFocus()
+                else:
+                    # Если это последняя партия, переносим фокус на кнопку "Сохранить"
+                    if hasattr(self, 'save_result_btn') and self.save_result_btn.isEnabled():
+                        self.save_result_btn.setFocus()
+                        self.save_result_btn.setStyleSheet("background-color: #FFA500; border: 2px solid #FF6600;")
+                    
+        except Exception as e:
+            print(f"Ошибка при обработке Enter: {e}")
+
+
+#============================================================  
     def save_title_info(self):
         """Сохранение информации о соревновании"""
         if not self.comp_name_edit.text().strip():
@@ -3780,7 +4395,7 @@ class MainWindow(QMainWindow):
                     
             except Exception as e:
                 QMessageBox.critical(self, "Ошибка", f"Ошибка поиска: {str(e)}")
-#=============================
+
     def update_left_panel_for_tab(self, tab_index):
         """Обновление левой панели в зависимости от вкладки (полная очистка)"""
         # Защита от повторного входа
@@ -3947,7 +4562,7 @@ class MainWindow(QMainWindow):
                 item.widget().deleteLater()
             elif item.layout():
                 self.clear_layout(item.layout())
-# =======================================
+
     def add_player_from_form(self):
         """Добавление участника из формы на вкладке Участники"""
         if not self.current_title_id:
@@ -4566,7 +5181,7 @@ class MainWindow(QMainWindow):
                                 f"📅 Дата рейтинга: {rating_date_str}\n"
                                 f"🏆 Тип соревнования: {self.selected_tournament_type}\n\n"
                                 f"Теперь заполните информацию о соревновании.")
-# ==========================2905
+
     def create_menu_bar(self):
         """Создание меню"""
         menubar = self.menuBar()
@@ -4756,7 +5371,7 @@ class MainWindow(QMainWindow):
         
         # Инициализируем обновление меню результатов
         self.update_results_menu()
-# ================================ 0307
+
     def open_backup_management(self):
         """Открыть диалог управления бэкапами"""
         dialog = BackupManagementDialog.BackupManagementDialog(self, backup_dir="backup_db")

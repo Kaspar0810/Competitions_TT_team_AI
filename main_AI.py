@@ -166,6 +166,22 @@ class MainWindow(QMainWindow):
         # Для фильтра по игроку
         self.player_filter_text = ""
         self.player_filter_list = []  # Список всех игроков для автодополнения
+#=========== new 0707 ===========
+        # # Настраиваем фильтры
+        # self.group_filter_combo.currentIndexChanged.connect(self.on_group_filter_changed)
+        # self.tour_filter_combo.currentIndexChanged.connect(self.on_tour_filter_changed)
+        # self.status_filter_combo.currentIndexChanged.connect(self.on_status_filter_changed)
+        
+        # # Инициализируем статусную строку
+        # self.status_label = QLabel("Готов к работе")
+        # if hasattr(self, 'statusBar'):
+        #     self.statusBar().addWidget(self.status_label)
+        # else:
+        #     # Если нет statusBar, создаем виджет для статуса
+        #     self.status_label = QLabel("Готов к работе")
+        #     self.status_label.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
+        #     layout.addWidget(self.status_label)
+
 # =========================
     def check_old_backups_on_startup(self):
         """Проверка старых бэкапов при запуске"""
@@ -2128,7 +2144,7 @@ class MainWindow(QMainWindow):
 
         # Добавьте в create_results_tab после info_frame:
         self.status_label = QLabel("")
-        self.status_label.setStyleSheet("color: red; font-size: 11px;")
+        self.status_label.setStyleSheet("color: red; font-size: 14px;")
         main_layout.addWidget(self.status_label)
         
         # Группа ввода результатов (компактная сетка)
@@ -2136,7 +2152,7 @@ class MainWindow(QMainWindow):
         input_group.setStyleSheet("""
             QGroupBox {
                 font-weight: bold;
-                font-size: 11px;
+                font-size: 12px;
                 border: 1px solid #4CAF50;
                 border-radius: 5px;
                 margin-top: 8px;
@@ -2178,7 +2194,7 @@ class MainWindow(QMainWindow):
         self.player1_status = QComboBox()
         self.player1_status.addItems(["Играет", "Не явка", "Травма", "Дискв."])
         self.player1_status.setMaximumWidth(80)
-        self.player1_status.setStyleSheet("font-size: 12px;")
+        self.player1_status.setStyleSheet("font-size: 14px;")
         self.player1_status.currentTextChanged.connect(self.update_total_score)
         grid_layout.addWidget(self.player1_status, 1, 0)
         
@@ -2186,6 +2202,7 @@ class MainWindow(QMainWindow):
         self.player1_name = QLineEdit()
         self.player1_name.setReadOnly(True)
         self.player1_name.setPlaceholderText("")
+        self.player1_name.setStyleSheet("font-size: 14px;")
         self.player1_name.setMinimumWidth(200)
         grid_layout.addWidget(self.player1_name, 1, 1)
         
@@ -2221,6 +2238,7 @@ class MainWindow(QMainWindow):
         self.player2_name = QLineEdit()
         self.player2_name.setReadOnly(True)
         self.player2_name.setPlaceholderText("")
+        self.player2_name.setStyleSheet("font-size: 14px;")
         self.player2_name.setMinimumWidth(200)
         grid_layout.addWidget(self.player2_name, 2, 1)
         
@@ -3189,17 +3207,13 @@ class MainWindow(QMainWindow):
             # Сохраняем текущий этап перед обновлением
             current_stage = match.number_group
             
-            # # Очищаем форму
-            # self.clear_result_form_compact()
+            # Очищаем форму
+            self.clear_result_form_compact()
             
             # Обновляем таблицы
             self.load_results_table_for_stage(current_stage)
             self.load_matches_for_stage(current_stage)
-            
-            # # СБРАСЫВАЕМ ИНДЕКС ВЫБРАННОГО МАТЧА (ВАЖНО!)
-            # self.current_match_index = None
-            # self.current_matches = []
-            
+                        
             # Проверяем завершение этапа
             if current_stage in ["Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]:
                 total_matches = Result.select().where(
@@ -3277,7 +3291,7 @@ class MainWindow(QMainWindow):
                 self.score_edits_p2[i].clear()
                 self.score_edits_p1[i].setEnabled(False)
                 self.score_edits_p2[i].setEnabled(False)
-# =============================== рабочая 2805
+# ============================ новая обновление статусной строки ==
     def load_results_table_for_stage(self, stage_name):
         """Загрузка таблицы результатов для выбранного этапа с фильтрацией"""
         group_list = ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]
@@ -3287,7 +3301,6 @@ class MainWindow(QMainWindow):
         if not self.current_title_id:
             return
         
-        
         try:
             # Базовый запрос
             if stage_name in group_list:
@@ -3296,7 +3309,6 @@ class MainWindow(QMainWindow):
                     (Result.system_stage == stage_name)
                 )
             else:
-               # Базовый запрос
                 query = Result.select().where(
                     (Result.title_id == self.current_title_id) &
                     (Result.number_group == stage_name)
@@ -3304,7 +3316,6 @@ class MainWindow(QMainWindow):
             
             # Применяем фильтр по группе
             if self.current_group_filter:
-                # Извлекаем номер группы из строки "Гр.X"
                 group_num = self.current_group_filter
                 query = query.where(Result.number_group == group_num)
             
@@ -3319,10 +3330,10 @@ class MainWindow(QMainWindow):
             elif self.current_status_filter == "unplayed":
                 query = query.where(Result.winner.is_null(True))
             
-            # # Сортировка
+            # Сортировка
             query = query.order_by(Result.number_group, Result.round)
 
-
+            # Формируем данные для модели
             data = []
             for result in query:
                 winner_text = result.winner if result.winner else ""
@@ -3340,13 +3351,148 @@ class MainWindow(QMainWindow):
                     'points': result.score_win
                 })
             
+            # Устанавливаем данные в модель
             self.results_table_model.setData(data)
             
-            # Обновляем ComboBoxы
-            self.update_filter_combos(stage_name)
-            
+            # Обновляем статусную строку с информацией о количестве матчей
+            self.update_status_with_match_count(query)
+                        
         except Exception as e:
             print(f"Ошибка загрузки таблицы: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def update_status_with_match_count(self, query):
+        """Обновление статусной строки с информацией о количестве матчей"""
+        try:
+            # Получаем общее количество матчей
+            total_matches = query.count()
+            
+            # Получаем количество сыгранных матчей
+            played_matches = query.where(Result.winner.is_null(False)).count()
+            
+            # Получаем количество несыгранных матчей
+            unplayed_matches = query.where(Result.winner.is_null(True)).count()
+            
+            # Формируем текст статуса
+            status_text = f"📊 Всего: {total_matches} матчей | ✅ Сыграно: {played_matches} | ⏳ Ожидает: {unplayed_matches}"
+            
+            # Добавляем информацию о текущем фильтре
+            filter_info = []
+            if self.current_group_filter:
+                filter_info.append(f"Группа: {self.current_group_filter}")
+            if self.current_tour_filter and self.current_tour_filter != "Все туры":
+                filter_info.append(f"Тур: {self.current_tour_filter}")
+            if self.current_status_filter == "played":
+                filter_info.append("✅ Только сыгранные")
+            elif self.current_status_filter == "unplayed":
+                filter_info.append("⏳ Только ожидающие")
+            
+            if filter_info:
+                status_text += f" | Фильтр: {', '.join(filter_info)}"
+            
+            # Обновляем статусную строку
+            if hasattr(self, 'status_label'):
+                self.status_label.setText(status_text)
+            else:
+                # Если используется статус-бар
+                self.statusBar().showMessage(status_text)
+                
+        except Exception as e:
+            print(f"Ошибка обновления статуса: {e}")
+
+    def update_status_after_filter(self):
+        """Обновление статусной строки после применения фильтров"""
+        try:
+            if not self.current_title_id or not self.current_stage:
+                return
+                
+            group_list = ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]
+            
+            # Базовый запрос
+            if self.current_stage in group_list:
+                query = Result.select().where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.system_stage == self.current_stage)
+                )
+            else:
+                query = Result.select().where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.number_group == self.current_stage)
+                )
+            
+            # Применяем фильтры
+            if self.current_group_filter:
+                query = query.where(Result.number_group == self.current_group_filter)
+            
+            if self.current_tour_filter and self.current_tour_filter != "Все туры":
+                query = query.where(Result.round == self.current_tour_filter)
+            
+            # Обновляем статус
+            self.update_status_with_match_count(query)
+            
+        except Exception as e:
+            print(f"Ошибка обновления статуса после фильтрации: {e}")
+
+    def show_stage_statistics(self, stage_name):
+        """Показывает статистику по этапу в отдельном окне или в статусной строке"""
+        try:
+            if not self.current_title_id:
+                return
+                
+            group_list = ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]
+            
+            # Базовый запрос
+            if stage_name in group_list:
+                query = Result.select().where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.system_stage == stage_name)
+                )
+            else:
+                query = Result.select().where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.number_group == stage_name)
+                )
+            
+            total = query.count()
+            played = query.where(Result.winner.is_null(False)).count()
+            unplayed = query.where(Result.winner.is_null(True)).count()
+            
+            # Процент завершенности
+            percent = (played / total * 100) if total > 0 else 0
+            
+            # Формируем сообщение
+            status_text = (
+                f"📊 Этап: {stage_name} | "
+                f"Всего: {total} матчей | "
+                f"✅ Сыграно: {played} ({percent:.1f}%) | "
+                f"⏳ Ожидает: {unplayed}"
+            )
+            
+            # Обновляем статусную строку
+            if hasattr(self, 'status_label'):
+                self.status_label.setText(status_text)
+            else:
+                self.statusBar().showMessage(status_text)
+                
+            return {'total': total, 'played': played, 'unplayed': unplayed, 'percent': percent}
+            
+        except Exception as e:
+            print(f"Ошибка получения статистики: {e}")
+            return None
+
+    # def setup_status_bar_style(self):
+    #     """Настройка стиля статусной строки"""
+    #     if hasattr(self, 'status_label'):
+    #         self.status_label.setStyleSheet("""
+    #             QLabel {
+    #                 padding: 2px 10px;
+    #                 font-size: 16px;
+    #                 background-color: #f0f0f0;
+    #                 border: 1px solid #ccc;
+    #                 border-radius: 3px;
+    #             }
+    #         """)
 # ============================= рабочий =====
     def _on_match_double_clicked(self, index):
         """Обработка двойного клика по строке таблицы для загрузки матча"""
@@ -3639,7 +3785,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Ошибка обновления сетки: {e}")
 
-    def setup_score_inputs(self):
+    def _setup_score_inputs(self):
         """Настройка полей ввода счета с обработкой Enter"""
         for i, (edit1, edit2) in enumerate(zip(self.score_edits_p1, self.score_edits_p2)):
             # Назначаем обработчики для поля игрока 1
@@ -3650,7 +3796,7 @@ class MainWindow(QMainWindow):
             edit2.returnPressed.connect(lambda checked=False, idx=i: self.on_score_enter_pressed(idx, 'p2'))
             edit2.setFocusPolicy(Qt.StrongFocus)
 
-    def on_score_enter_pressed(self, index, player):
+    def _on_score_enter_pressed(self, index, player):
         """Обработка нажатия Enter в полях ввода счета"""
         try:
             # Проверяем, есть ли "X" в матче
@@ -3683,7 +3829,6 @@ class MainWindow(QMainWindow):
                     
         except Exception as e:
             print(f"Ошибка при обработке Enter: {e}")
-
 
 #============================================================  
     def save_title_info(self):
@@ -15418,8 +15563,8 @@ class MainWindow(QMainWindow):
         """Применение всех фильтров и обновление таблицы"""
         if self.current_stage:
             self.load_results_table_for_stage(self.current_stage)
-
-    def update_filter_combos(self, stage_name):
+# ============= old 0607
+    def _update_filter_combos(self, stage_name):
         """Обновление списков групп и туров в фильтрах"""
         group_list = ["Квалификация", "Квалификация. 1-й полуфинал","Квалификация. 2-й полуфинал"]
 
@@ -15504,19 +15649,19 @@ class MainWindow(QMainWindow):
             model = QStringListModel(self.player_filter_list[:50])
             self.player_filter_completer.setModel(model)
 # ========== было ==========
-    def _apply_player_filter(self):
-        """Применение фильтра по игроку"""
-        self.player_filter_text = self.player_filter_edit.text().strip()
-        stage_name = self.stage_name
-        if self.player_filter_text:
-            # Обновляем информационную строку
-            self.filter_info_label.setText(f"🔍 Фильтр по игроку: {self.player_filter_text}")
+    # def _apply_player_filter(self):
+    #     """Применение фильтра по игроку"""
+    #     self.player_filter_text = self.player_filter_edit.text().strip()
+    #     stage_name = self.stage_name
+    #     if self.player_filter_text:
+    #         # Обновляем информационную строку
+    #         self.filter_info_label.setText(f"🔍 Фильтр по игроку: {self.player_filter_text}")
             
-            # Применяем фильтр ко всем этапам
-            self.load_filtered_results_all_stages(stage_name=None)
-        else:
-            # Сбрасываем фильтр
-            self.reset_player_filter()
+    #         # Применяем фильтр ко всем этапам
+    #         self.load_filtered_results_all_stages(stage_name=None)
+    #     else:
+    #         # Сбрасываем фильтр
+    #         self.reset_player_filter()
 # ====== новый вариант ========
     def apply_player_filter(self):
         """Применение фильтра по игроку с учётом текущего этапа"""
@@ -15579,56 +15724,56 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Ошибка загрузки списка игроков: {e}")
 
-    def _load_filtered_results_all_stages(self):
-        """Загрузка результатов, отфильтрованных по игроку, по всем этапам"""
-        if not self.current_title_id or not self.player_filter_text:
-            return
+    # def _load_filtered_results_all_stages(self):
+    #     """Загрузка результатов, отфильтрованных по игроку, по всем этапам"""
+    #     if not self.current_title_id or not self.player_filter_text:
+    #         return
         
-        try:
-            search_text = self.player_filter_text.lower()
+    #     try:
+    #         search_text = self.player_filter_text.lower()
             
-            # Ищем во всех результатах соревнования
-            query = Result.select().where(Result.title_id == self.current_title_id)
+    #         # Ищем во всех результатах соревнования
+    #         query = Result.select().where(Result.title_id == self.current_title_id)
             
-            # Фильтруем по игроку (поиск в player1 или player2)
-            filtered_results = []
-            for result in query:
-                player1_clean = result.player1.split(' (')[0] if ' (' in result.player1 else result.player1
-                player2_clean = result.player2.split(' (')[0] if ' (' in result.player2 else result.player2
+    #         # Фильтруем по игроку (поиск в player1 или player2)
+    #         filtered_results = []
+    #         for result in query:
+    #             player1_clean = result.player1.split(' (')[0] if ' (' in result.player1 else result.player1
+    #             player2_clean = result.player2.split(' (')[0] if ' (' in result.player2 else result.player2
                 
-                if search_text in player1_clean.lower() or search_text in player2_clean.lower():
-                    filtered_results.append(result)
+    #             if search_text in player1_clean.lower() or search_text in player2_clean.lower():
+    #                 filtered_results.append(result)
             
-            # Формируем данные для таблицы
-            data = []
-            for result in filtered_results:
-                winner_text = result.winner if result.winner else ""
-                score_text = result.score_in_game if result.score_in_game else ""
+    #         # Формируем данные для таблицы
+    #         data = []
+    #         for result in filtered_results:
+    #             winner_text = result.winner if result.winner else ""
+    #             score_text = result.score_in_game if result.score_in_game else ""
                 
-                data.append({
-                    'id': result.id,
-                    'stage': result.system_stage,
-                    'group': result.number_group,
-                    'tour': result.tours,
-                    'player1': result.player1,
-                    'player2': result.player2,
-                    'winner': winner_text,
-                    'score': score_text,
-                    'points': result.score_win
-                })
+    #             data.append({
+    #                 'id': result.id,
+    #                 'stage': result.system_stage,
+    #                 'group': result.number_group,
+    #                 'tour': result.tours,
+    #                 'player1': result.player1,
+    #                 'player2': result.player2,
+    #                 'winner': winner_text,
+    #                 'score': score_text,
+    #                 'points': result.score_win
+    #             })
             
-            self.results_table_model.setData(data)
+    #         self.results_table_model.setData(data)
             
-            # # Обновляем информацию
-            # total_matches = len(filtered_results)
-            # played_matches = sum(1 for r in filtered_results if r.winner)
-            # percent = (played_matches / total_matches * 100) if total_matches > 0 else 0
+    #         # # Обновляем информацию
+    #         # total_matches = len(filtered_results)
+    #         # played_matches = sum(1 for r in filtered_results if r.winner)
+    #         # percent = (played_matches / total_matches * 100) if total_matches > 0 else 0
             
-            # self.current_stage_label.setText(f"🔍 Поиск по игроку: {self.player_filter_text}")
-            # self.progress_label.setText(f"📊 Найдено матчей: {total_matches} | Сыграно: {played_matches} ({percent:.1f}%)")
+    #         # self.current_stage_label.setText(f"🔍 Поиск по игроку: {self.player_filter_text}")
+    #         # self.progress_label.setText(f"📊 Найдено матчей: {total_matches} | Сыграно: {played_matches} ({percent:.1f}%)")
             
-        except Exception as e:
-            print(f"Ошибка фильтрации по игроку: {e}")
+    #     except Exception as e:
+    #         print(f"Ошибка фильтрации по игроку: {e}")
 
 
     def load_filtered_results_all_stages(self, stage_name=None):
@@ -16102,128 +16247,6 @@ class MainWindow(QMainWindow):
             player['ratio_points'] = ""
         
         return players
-# =========== рабочий вариант 1706 ======= 
-    def __calculate_round_robin_standings(self, players_info, results_group):
-        """
-        Расчет мест в круговой таблице (только для групп с полными данными)
-        """
-        from collections import defaultdict
-        import re
-        
-        if not players_info:
-            return players_info
-        
-        # Копируем данные для работы
-        standings = {}
-        for idx, info in players_info.items():
-            standings[idx] = {
-                'total_points': info['total_points'],
-                'wins': info['wins'],
-                'losses': info['losses'],
-                'idx': idx,
-                'games_won': 0,      # выигранные партии
-                'games_lost': 0,     # проигранные партии
-                'points_scored': 0,  # забитые мячи
-                'points_conceded': 0 # пропущенные мячи
-            }
-        
-        # Подсчитываем выигранные/проигранные партии и забитые/пропущенные мячи
-        for result in results_group:
-            if result.winner:
-                tour = result.tours
-                mark = tour.find("-")
-                if mark == -1:
-                    continue
-                
-                idx1 = int(tour[:mark])
-                idx2 = int(tour[mark + 1:])
-                
-                # Парсим счет матча для подсчета партий и мячей
-                if result.score_in_game:
-                    # Формат счета: "3:1" или "3 : 1"
-                    score_parts = result.score_in_game.replace(" ", "").split(":")
-                    if len(score_parts) == 2:
-                        try:
-                            games_winner = int(score_parts[0])
-                            games_loser = int(score_parts[1])
-                            
-                            # Определяем победителя
-                            if result.winner == result.player1:
-                                winner_idx = idx1
-                                loser_idx = idx2
-                            else:
-                                winner_idx = idx2
-                                loser_idx = idx1
-                            
-                            # Добавляем выигранные/проигранные партии
-                            if winner_idx in standings:
-                                standings[winner_idx]['games_won'] += games_winner
-                                standings[winner_idx]['games_lost'] += games_loser
-                            if loser_idx in standings:
-                                standings[loser_idx]['games_won'] += games_loser
-                                standings[loser_idx]['games_lost'] += games_winner
-                            
-                            # Подсчет забитых и пропущенных мячей
-                            # Парсим счета партий из score_win и score_loser
-                            # self.calculate_points_scored_conceded(result, winner_idx, loser_idx, standings)
-                            
-                        except ValueError:
-                            pass
-        
-        # Сортируем игроков по очкам
-        sorted_players = sorted(standings.values(), 
-                            key=lambda x: x['total_points'], 
-                            reverse=True)
-        
-        # Группируем по очкам
-        points_groups = defaultdict(list)
-        for player in sorted_players:
-            points_groups[player['total_points']].append(player)
-        
-        # Если все очки разные
-        if len(points_groups) == len(standings):
-            for place, player in enumerate(sorted_players, 1):
-                players_info[player['idx']]['place'] = place
-                players_info[player['idx']]['ratio_points'] = ""  # Пустая строка
-
-            return players_info
-        
-        # Обрабатываем группы с одинаковыми очками
-        current_place = 1
-        for points, group in sorted(points_groups.items(), key=lambda x: x[0], reverse=True):
-            if len(group) == 1:
-                players_info[group[0]['idx']]['place'] = current_place
-                players_info[group[0]['idx']]['ratio_points'] = ""
-                current_place += 1
-            elif len(group) == 2:
-                # Два игрока - личная встреча
-                place_1, place_2 = self.resolve_two_players_tie(group, results_group, points, standings)
-                players_info[group[0]['idx']]['place'] = current_place + place_1 - 1
-                players_info[group[1]['idx']]['place'] = current_place + place_2 - 1
-                
-                # Соотношение партий
-                if place_1 < place_2:
-                    ratio_1 = 2
-                    ratio_2 = 1
-                else:
-                    ratio_1 = 1
-                    ratio_2 = 2
-                
-                players_info[group[0]['idx']]['ratio_points'] = ratio_1 if ratio_1 else ""
-                players_info[group[1]['idx']]['ratio_points'] = ratio_2 if ratio_2 else ""
-                
-                current_place += 2
-            else:
-                # Три и более игроков - считаем соотношение партий и мячей
-                resolved = self.resolve_multiple_players_tie(group, results_group, points, standings)
-                
-                for player_data in resolved:
-                    players_info[player_data['idx']]['place'] = current_place + player_data['place_in_group'] - 1
-                    players_info[player_data['idx']]['ratio_points'] = player_data.get('ratio_points', '')
-                
-                current_place += len(group)
-        
-        return players_info
 # ========новый вариант с записью мест в choice player работает 1706 ========= 
     def calculate_round_robin_standings(self, players_info, results_group, final_stage=None):
         """

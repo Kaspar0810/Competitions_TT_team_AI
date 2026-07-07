@@ -2674,7 +2674,7 @@ class MainWindow(QMainWindow):
                 match.winner = None
                 match.points_win = 0
                 match.score_in_game = "П : П"
-                match.score_win = "П : П"
+                match.score_win = ""
                 match.loser = None
                 match.points_loser = 0
                 match.score_loser = "П : П"
@@ -2698,7 +2698,7 @@ class MainWindow(QMainWindow):
                 points_win = 2
                 points_loser = 0
                 score_in_game = "В : П"
-                score_win = "В : П"
+                score_win = ""
                 score_loser = "П : В"
                 
                 # Обновляем запись в Result
@@ -2728,7 +2728,7 @@ class MainWindow(QMainWindow):
                 points_win = 2
                 points_loser = 0
                 score_in_game = "В : П"
-                score_win = "В : П"
+                score_win = ""
                 score_loser = "П : В"
                 
                 # Обновляем запись в Result
@@ -12647,8 +12647,10 @@ class MainWindow(QMainWindow):
                     snoska = self.number_of_game(num_game, vid_setki, max_pl) # список (номер встречи победителя, номер встречи проигравшего и минус куда идет проигравший в сетке)
                     tmp_match.append(snoska[0]) # номер на сетке куда идет победитель
                     tmp_match.append(short_name_win)
-
-                    tmp_match.append(f'{res.score_in_game} {res.score_win}')
+                    if res.score_win == "В : П": # если счет в партиии
+                        tmp_match.append(f'{res.score_in_game}')
+                    else:
+                        tmp_match.append(f'{res.score_in_game} {res.score_win}')
                     tmp_match.append(snoska[2])
                     tmp_match.append(short_name_los)
                     match = tmp_match.copy() # список [номер куда идет победитель, ФИО побед, счет, номер куда идет проигравший, ФИО проигр]

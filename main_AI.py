@@ -14779,13 +14779,13 @@ class MainWindow(QMainWindow):
                 details += "\n"
             
             # --- Финалы ---
-            final_choices = [c for c in player_choices if c.group and ("финал" in c.group.lower() or "Финал" in c.group)]
+            final_choices = [c for c in player_choices if c.final ]
             if final_choices:
                 details += "【 ФИНАЛЫ 】\n"
                 for fc in final_choices:
-                    details += f"  🏆 {fc.group}\n"
-                    details += f"     Посев: {fc.posev_group}\n"
-                    details += f"     Место: {fc.mesto_group if fc.mesto_group else '—'}\n"
+                    details += f"  🏆 {fc.final}\n"
+                    details += f"     Посев: {fc.posev_final}\n"
+                    details += f"     Место: {fc.mesto_final if fc.mesto_final else '—'}\n"
                 details += "\n"
             
             # Дополнительно: если есть ещё какие-то записи
@@ -16245,7 +16245,10 @@ class MainWindow(QMainWindow):
         """
         from collections import defaultdict
         import re
+
+        group_list = ["Квалификация", "Квалификация. 1-й полуфинал","Квалификация. 2-й полуфинал"]
         
+        first_place = 0
         # текущий этап
         final_stage = self.current_stage
         first_place = 0
@@ -16254,11 +16257,11 @@ class MainWindow(QMainWindow):
                 (System.title_id == self.current_title_id) &
                 (System.stage == final_stage)
             )
-
-        # получаем стартовое место в финале
-        label_string = system.label_string
-        start_place = self.parse_label_string(label_string)
-        first_place = start_place - 1
+        if final_stage not in group_list:
+            # получаем стартовое место в финале
+            label_string = system.label_string
+            start_place = self.parse_label_string(label_string)
+            first_place = start_place - 1
 
         if not players_info:
             return players_info

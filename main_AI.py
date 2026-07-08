@@ -15116,7 +15116,8 @@ class MainWindow(QMainWindow):
                 self.load_matches_for_stage(stage_name)
                 # Обновляем таблицу результатов
                 self.load_results_table_for_stage(stage_name)
-                self.tab_widget.setCurrentIndex(5)               
+                self.tab_widget.setCurrentIndex(5) 
+                self.update_filter_combos(stage_name)              
 # ============================= 2805
     def refresh_results_data(self):
         """Обновление данных результатов"""
@@ -15549,7 +15550,7 @@ class MainWindow(QMainWindow):
         if self.current_stage:
             self.load_results_table_for_stage(self.current_stage)
 # ============= old 0607
-    def _update_filter_combos(self, stage_name):
+    def update_filter_combos(self, stage_name):
         """Обновление списков групп и туров в фильтрах"""
         group_list = ["Квалификация", "Квалификация. 1-й полуфинал","Квалификация. 2-й полуфинал"]
 
@@ -16340,7 +16341,7 @@ class MainWindow(QMainWindow):
             return players_info
         
         # Обрабатываем группы с одинаковыми очками
-        current_place = 1
+        current_place = 1 + first_place
         for points, group in sorted(points_groups.items(), key=lambda x: x[0], reverse=True):
             if len(group) == 1:
                 players_info[group[0]['idx']]['place'] = current_place

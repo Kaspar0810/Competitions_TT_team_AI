@@ -3444,72 +3444,59 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Ошибка получения статистики: {e}")
             return None
-
-    # def setup_status_bar_style(self):
-    #     """Настройка стиля статусной строки"""
-    #     if hasattr(self, 'status_label'):
-    #         self.status_label.setStyleSheet("""
-    #             QLabel {
-    #                 padding: 2px 10px;
-    #                 font-size: 16px;
-    #                 background-color: #f0f0f0;
-    #                 border: 1px solid #ccc;
-    #                 border-radius: 3px;
-    #             }
-    #         """)
 # ============================= рабочий =====
-    def _on_match_double_clicked(self, index):
-        """Обработка двойного клика по строке таблицы для загрузки матча"""
-        row = index.row()
-        model = self.results_table.model()
+    # def _on_match_double_clicked(self, index):
+    #     """Обработка двойного клика по строке таблицы для загрузки матча"""
+    #     row = index.row()
+    #     model = self.results_table.model()
         
-        if row < model.rowCount():
-            player1 = model.data(model.index(row, 4))
-            player2 = model.data(model.index(row, 5))
-            winner = model.data(model.index(row, 6))
-            score = model.data(model.index(row, 7))
+    #     if row < model.rowCount():
+    #         player1 = model.data(model.index(row, 4))
+    #         player2 = model.data(model.index(row, 5))
+    #         winner = model.data(model.index(row, 6))
+    #         score = model.data(model.index(row, 7))
             
 
-            # Очищаем поля счетов
-            self.clear_result_form_compact()
+    #         # Очищаем поля счетов
+    #         self.clear_result_form_compact()
 
-            # Заполняем поля игроков (только при двойном клике)
-            self.player1_name.setText(player1)
-            self.player2_name.setText(player2)
+    #         # Заполняем поля игроков (только при двойном клике)
+    #         self.player1_name.setText(player1)
+    #         self.player2_name.setText(player2)
                         
-            # Если матч уже сыгран, загружаем счета
-            if winner != "" and score != "":
-                if winner != player1:
-                    score = ' '.join(score.split()[::-1])
-                self.parse_and_load_scores_compact(score)
-                # self.load_match_for_editing(id_match)
+    #         # Если матч уже сыгран, загружаем счета
+    #         if winner != "" and score != "":
+    #             if winner != player1:
+    #                 score = ' '.join(score.split()[::-1])
+    #             self.parse_and_load_scores_compact(score)
+    #             # self.load_match_for_editing(id_match)
 
-                # Устанавливаем победителя
-                if winner == player1:
-                    self.player1_status.setCurrentText("Играет")
-                elif winner == player2:
-                    self.player2_status.setCurrentText("Играет")
-            else:
-                # Устанавливаем фокус на первую партию первого игрока
-                QTimer.singleShot(100, lambda: self.score_edits_p1[0].setFocus())
+    #             # Устанавливаем победителя
+    #             if winner == player1:
+    #                 self.player1_status.setCurrentText("Играет")
+    #             elif winner == player2:
+    #                 self.player2_status.setCurrentText("Играет")
+    #         else:
+    #             # Устанавливаем фокус на первую партию первого игрока
+    #             QTimer.singleShot(100, lambda: self.score_edits_p1[0].setFocus())
             
-            # Находим соответствующий матч в списке
-            for i, match in enumerate(self.current_matches):
-                if match.player1 == player1 and match.player2 == player2:
-                    self.current_match_index = i
-                    self.current_match_label.setText(f"Матч: {i + 1}/{len(self.current_matches)}")
-                    break
+    #         # Находим соответствующий матч в списке
+    #         for i, match in enumerate(self.current_matches):
+    #             if match.player1 == player1 and match.player2 == player2:
+    #                 self.current_match_index = i
+    #                 self.current_match_label.setText(f"Матч: {i + 1}/{len(self.current_matches)}")
+    #                 break
             
-            # Устанавливаем количество партий
-            if self.current_matches and self.current_match_index < len(self.current_matches):
-                system = System.get_or_none(System.id == self.current_matches[self.current_match_index].system_id)
-                if system:
-                    parties_count = system.score_flag if system.score_flag else 5
-                    self.update_scores_fields_compact(parties_count)
-                    self.parties_count = parties_count
+    #         # Устанавливаем количество партий
+    #         if self.current_matches and self.current_match_index < len(self.current_matches):
+    #             system = System.get_or_none(System.id == self.current_matches[self.current_match_index].system_id)
+    #             if system:
+    #                 parties_count = system.score_flag if system.score_flag else 5
+    #                 self.update_scores_fields_compact(parties_count)
+    #                 self.parties_count = parties_count
 
-             # Устанавливаем фокус на первую партию первого игрока
-            QTimer.singleShot(100, lambda: self.score_edits_p1[0].setFocus())
+    #          # Устанавливаем фокус на первую партию первого игрока
+    #         QTimer.singleShot(100, lambda: self.score_edits_p1[0].setFocus())
 
 # ====== добавлена возможность при Х сохранение матча ====
     def on_match_double_clicked(self, index):
@@ -3566,10 +3553,7 @@ class MainWindow(QMainWindow):
         self.player1_name.setText(match.player1 or "")
         self.player2_name.setText(match.player2 or "")
         self.current_match_label.setText(f"Матч: {self.current_match_index + 1}/{len(self.current_matches)}")
-        
-        # # Очищаем поля счетов
-        # self.clear_result_form_compact()
-        
+
         # Проверяем наличие "X" в матче
         has_x = False
         if match.player1 == "X" or match.player2 == "X":
@@ -16227,6 +16211,20 @@ class MainWindow(QMainWindow):
         from collections import defaultdict
         import re
         
+        # текущий этап
+        final_stage = self.current_stage
+        first_place = 0
+        # определяем 1-е место в финале
+        system = System.get_or_none(
+                (System.title_id == self.current_title_id) &
+                (System.stage == final_stage)
+            )
+
+        # получаем стартовое место в финале
+        label_string = system.label_string
+        start_place = self.parse_label_string(label_string)
+        first_place = start_place - 1
+
         if not players_info:
             return players_info
         
@@ -16296,7 +16294,7 @@ class MainWindow(QMainWindow):
         # Если все очки разные
         if len(points_groups) == len(standings):
             for place, player in enumerate(sorted_players, 1):
-                players_info[player['idx']]['place'] = place
+                players_info[player['idx']]['place'] = place + first_place
                 players_info[player['idx']]['ratio_points'] = ""  # Пустая строка
             # Записываем места в БД
             if final_stage:
@@ -16440,6 +16438,8 @@ class MainWindow(QMainWindow):
                 print(f"Нет игроков в {final_stage}")
                 return
             
+           
+
             # Собираем информацию об игроках
             players_info = {}
             for gp in game_players:
@@ -16482,9 +16482,7 @@ class MainWindow(QMainWindow):
             
             # Вызываем функцию расчета мест с сохранением в БД
             players_info = self.calculate_round_robin_standings(players_info, results_group, final_stage)
-            
-            # print(f"Места для {final_stage} рассчитаны и сохранены")
-            
+                        
             return players_info
             
         except Exception as e:
@@ -16492,6 +16490,23 @@ class MainWindow(QMainWindow):
             import traceback
             traceback.print_exc()
             return None
+
+    def parse_label_string(self, label_string):
+        """
+        Парсинг строки label_string для определения начального места финала
+        """        
+        # 1. Пробуем распарсить русский формат "Места с X по Y"
+        russian_pattern = r'Места?\s+с\s+(\d+)\s+по\s+(\d+)'
+        russian_matches = re.findall(russian_pattern, label_string, re.IGNORECASE)
+        
+        if russian_matches:
+            for start_str, end_str in russian_matches:
+                try:
+                    start_num = int(start_str)
+                    end_num = int(end_str)
+                except ValueError:
+                    continue
+            return start_num
 # ==============================
     def calculate_games_ratio(self, player_stats):
         """Расчет соотношения выигранных/проигранных партий - возвращает строку"""
@@ -16757,7 +16772,7 @@ class MainWindow(QMainWindow):
                 s = f"{value:.{digits}f}".rstrip('0').rstrip('.')
                 return s
         return f"{value:.5f}".rstrip('0').rstrip('.')
-# ========= крутиловку из 3 со счтом в партиях считает 3105
+# ========= крутиловку из 3 со счетом в партиях считает 3105
     def calculate_internal_points_scored_conceded(self, result, winner_idx, loser_idx, internal_stats):
         """
         Подсчет забитых и пропущенных мячей для внутренней группы (только между равными игроками).
@@ -16881,7 +16896,6 @@ class MainWindow(QMainWindow):
             # updated += 1
         
         # QMessageBox.information(self, "Успех", f"Обновлено мест для {updated} участников квалификации") 
-
 #============== функция очистки таблиц DB перед повторной жеребьевкой =====
     def clear_table_DB_after_choice(self, stage):
         """очищает таблицы Choice, Result< Game_list перед повторной жеребьевкой"""

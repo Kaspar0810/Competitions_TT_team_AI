@@ -5640,9 +5640,15 @@ class MainWindow(QMainWindow):
         """Сортировка по алфавиту"""
         if not self.current_title_id:
             return
-        
+
         try:
-            query = Player.select().where(Player.title_id == self.current_title_id)
+            query = Player.select().where(
+                (Player.player != "X") & 
+                (Player.fio != "X") & 
+                (Player.fio_city != "X") & 
+                (Player.title_id == self.current_title_id)
+                )
+
             if self.current_sex:
                 query = query.where(Player.sex == self.current_sex)
             query = query.order_by(Player.player.asc())
@@ -5683,7 +5689,13 @@ class MainWindow(QMainWindow):
             return
         
         try:
-            query = Player.select().where(Player.title_id == self.current_title_id)
+            query = Player.select().where(
+                (Player.player != "X") & 
+                (Player.fio != "X") & 
+                (Player.fio_city != "X") & 
+                (Player.title_id == self.current_title_id)
+                )
+            
             if self.current_sex:
                 query = query.where(Player.sex == self.current_sex)
             query = query.order_by(Player.rank.desc())
@@ -5731,6 +5743,14 @@ class MainWindow(QMainWindow):
                     (Player.title_id == self.current_title_id) &
                     (Player.region.contains(region))
                 )
+
+                query = query.select().where(
+                (Player.player != "X") & 
+                (Player.fio != "X") & 
+                (Player.fio_city != "X") & 
+                (Player.title_id == self.current_title_id)
+                )
+
                 if self.current_sex:
                     query = query.where(Player.sex == self.current_sex)
                 
@@ -5770,6 +5790,14 @@ class MainWindow(QMainWindow):
                     (Player.title_id == self.current_title_id) &
                     (Player.city.contains(city))
                 )
+
+                query = query.select().where(
+                (Player.player != "X") & 
+                (Player.fio != "X") & 
+                (Player.fio_city != "X") & 
+                (Player.title_id == self.current_title_id)
+                )
+
                 if self.current_sex:
                     query = query.where(Player.sex == self.current_sex)
                 
@@ -5810,8 +5838,15 @@ class MainWindow(QMainWindow):
             
             try:
                 # Получаем всех игроков в соревновании
-                query = Player.select().where(Player.title_id == self.current_title_id)
+                # query = Player.select().where(Player.title_id == self.current_title_id)
                 
+                query = Player.select().where(
+                (Player.player != "X") & 
+                (Player.fio != "X") & 
+                (Player.fio_city != "X") & 
+                (Player.title_id == self.current_title_id)
+                )
+
                 if self.current_sex == "woman":
                     query = query.where(Player.sex == "woman")
                 elif self.current_sex == "man":
@@ -21294,8 +21329,6 @@ class MainWindow(QMainWindow):
         for pos in free_num:
             free_positions_with_x.append((pos, x_player_data))
 
-        # Объединяем реальных игроков и X для заполнения сетки
-        # all_players_for_grid = sportsmen_data + [x_player_data] * len(free_num)
 # =============================================================
         # из базы данных согласно местам в группе для жеребьевки сетки
         full_posev = []
@@ -21686,11 +21719,6 @@ class MainWindow(QMainWindow):
             placement = draw_out_groups_one_person(sportsmen_data, free_num)
         elif count_exit == 2:
             placement = draw_out_groups_two_person(full_posev, free_num)
-                
-        # # Размещаем X на свободные позиции
-        # for pos in free_num:
-        #     placement[pos] = x_player_data
-        #     player_list = list(placement.values())
 
         player_list = []
 

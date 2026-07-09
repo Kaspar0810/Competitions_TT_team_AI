@@ -63,6 +63,8 @@ from PyPDF2 import PdfMerger
 # В основной программе
 import auto_choice_group
 import manual_choice
+from manual_choice import choice_semifinal
+
 from db_setup import setup_database
 from import_initial_data import InitialDataImportDialog
 from begunok_full import BegunokPDF
@@ -5312,7 +5314,8 @@ class MainWindow(QMainWindow):
         semifinals_menu = drawing_menu.addMenu("Полуфиналы")
 
         semifinal_1_action = QAction("1-й полуфинал", self)
-        semifinal_1_action.triggered.connect(lambda: self.choice_semifinal_automat("Квалификация. 1-й полуфинал"))
+        semifinal_1_action.triggered.connect(lambda: self.run_drawing_for_stage("Квалификация. 1-й полуфинал"))
+        # semifinal_1_action.triggered.connect(lambda: self.choice_semifinal_automat("Квалификация. 1-й полуфинал"))
         semifinals_menu.addAction(semifinal_1_action)
 
         semifinal_2_action = QAction("2-й полуфинал", self)
@@ -11291,7 +11294,7 @@ class MainWindow(QMainWindow):
                 self.clear_table_DB_after_choice(stage_name)
 
         # Запускаем жеребьевку
-        self.drawing_for_stage(stage)
+        self.drawing_for_stage(stage_name)
 
     def run_drawing_for_final(self, final):
         """Запуск жеребьевки для финала (выбор типа: круговая или олимпийская)"""
@@ -11371,6 +11374,9 @@ class MainWindow(QMainWindow):
                 
                 # Обновляем отображение информации
                 self.update_stages_info()
+            elif stage == "Квалификация. 1-й полуфинал":
+                #авто жеребьвка групп квалификации 1-ого полуфинала
+                self.choice_semifinal_automat("Квалификация. 1-й полуфинал")
             else:
                 if type_table == "Круговая":
                     # жеребьевка финала по кругу
@@ -11387,9 +11393,11 @@ class MainWindow(QMainWindow):
         from models import Player, Coach
         athletes = []
 
+        system = System.get_or_none((System.title_id == self.current_title_id) & (System.stage == stage))
+
         # Создаем диалог для ручной жеребьевки
         dialog = QDialog(self)
-        dialog.setWindowTitle(f"Ручная жеребьевка - {stage.stage}")
+        dialog.setWindowTitle(f"Ручная жеребьевка - {stage}")
         dialog.setModal(True)
         dialog.setMinimumWidth(800)
         dialog.setMinimumHeight(600)
@@ -11397,19 +11405,21 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(dialog)
         
         # Заголовок
-        title_label = QLabel(f"Ручная жеребьевка - {stage.stage}")
+        title_label = QLabel(f"Ручная жеребьевка - {stage}")
         title_label.setStyleSheet("font-weight: bold; font-size: 14px; margin-bottom: 10px;")
         layout.addWidget(title_label)
         
         # Информация о группах
-        info_label = QLabel(f"Количество групп: {stage.total_group} | "
-                        f"Участников в группе: {stage.max_player}")
+        info_label = QLabel(f"Количество групп: {system.total_group} | "
+                        f"Участников в группе: {system.max_player}")
         info_label.setStyleSheet("color: gray; margin-bottom: 10px;")
         layout.addWidget(info_label)
         
         # =======================
-        # Получаем список игроков
-        players = Player.select().where(Player.title_id == self.current_title_id).order_by(Player.rank.desc())
+        # Получаем список игроков без Х
+        query = self.get_real_players_for_stage(exclude_x=True)
+
+        players = query.select().where(Player.title_id == self.current_title_id).order_by(Player.rank.desc())
         players_list = list(players)
         for pl in players_list:
             id = pl.id
@@ -11421,11 +11431,22 @@ class MainWindow(QMainWindow):
             gamer = [id, player, rank, region, coach]
             athletes.append(gamer)
         
-        num_groups = stage.total_group
+        num_groups = system.total_group
         id_title = self.current_title_id
         #========================
-        num_id_player = manual_choice.choice_group_manual(self, athletes, num_groups, id_title, parent=None)
+        if stage == "Квалификация":
+            num_id_player = manual_choice.choice_group_manual(self, athletes, num_groups, id_title, parent=None)
+        else:
 
+            # Вызываем функцию выбора жеребьевки полуфиналов
+            result = manual_choice.choice_semifinal(self)
+            
+            if result:
+                QMessageBox.information(self, "Успех", "Жеребьевка полуфиналов успешно завершена!")
+            else:
+                # Если пользователь отменил или произошла ошибка
+                pass
+          
         self.save_manual_drawing_for_stage(num_id_player, stage)
 
     def fill_choice_table_for_stage(self, stage):
@@ -17790,7 +17811,7 @@ class MainWindow(QMainWindow):
             )
             for choice in choices:
                 # Получаем PlayerChoice
-                player = PlayerChoice.get_or_none(PlayerChoice.id == choice.player_choice_id)
+                player = Player.get_or_none(Player.id == choice.player_choice_id)
                 if player:
                     players.append(player)
         except Exception as e:

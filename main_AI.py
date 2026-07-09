@@ -63,7 +63,7 @@ from PyPDF2 import PdfMerger
 # В основной программе
 import auto_choice_group
 import manual_choice
-from manual_choice import choice_semifinal
+# from manual_choice import choice_semifinal
 
 from db_setup import setup_database
 from import_initial_data import InitialDataImportDialog
@@ -11432,31 +11432,27 @@ class MainWindow(QMainWindow):
             athletes.append(gamer)
         
         num_groups = system.total_group
-        id_title = self.current_title_id
         #========================
-        if stage == "Квалификация":
-            num_id_player = manual_choice.choice_group_manual(self, athletes, num_groups, id_title, parent=None)
+        if stage == "Квалификация" or stage == "Квалификация. 1-й полуфинал":
+            num_id_player = manual_choice.choice_group_manual(self, athletes, num_groups, stage, parent=None)
         else:
-
-            # Вызываем функцию выбора жеребьевки полуфиналов
-            result = manual_choice.choice_semifinal(self)
+            pass
+            # # Вызываем функцию выбора жеребьевки полуфиналов
+            # result = manual_choice.choice_semifinal(self)
             
-            if result:
-                QMessageBox.information(self, "Успех", "Жеребьевка полуфиналов успешно завершена!")
-            else:
-                # Если пользователь отменил или произошла ошибка
-                pass
-          
-        self.save_manual_drawing_for_stage(num_id_player, stage)
+            # if result:
+            #     QMessageBox.information(self, "Успех", "Жеребьевка полуфиналов успешно завершена!")
+            # else:
+            #     # Если пользователь отменил или произошла ошибка
+            #     pass
+        if num_id_player is not None:  
+            self.save_manual_drawing_for_stage(num_id_player, stage)
 
     def fill_choice_table_for_stage(self, stage):
         """Заполнение таблицы Choice для конкретного этапа"""
         basic = ""
         group_num_str = ""
-        try:
-            # # Удаляем существующие записи Choice для этого соревнования (если нужно заново)
-            # Choice.delete().where(Choice.title_id == self.current_title_id).execute()
-            
+        try:           
             # Получаем всех игроков соревнования
             players = Player.select().where(Player.title_id == self.current_title_id)
             
@@ -11531,7 +11527,7 @@ class MainWindow(QMainWindow):
 
     def save_manual_drawing_for_stage(self, num_id_player, stage):
         """Сохранение ручной жеребьевки для указанного этапа"""
-        systems = System.select().where((System.title_id == self.current_title_id) and (System.stage == stage.stage)).get()
+        systems = System.select().where((System.title_id == self.current_title_id) and (System.stage == stage)).get()
         try:
                    
             for pl in num_id_player:
@@ -20917,10 +20913,10 @@ class MainWindow(QMainWindow):
             athletes.append(gamer)
         
         num_groups = 1  # Одна группа
-        id_title = self.current_title_id
+        # id_title = self.current_title_id
         
         # Используем существующий модуль manual_choice
-        num_id_player = manual_choice.choice_group_manual(self, athletes, num_groups, id_title, parent=None)
+        num_id_player = manual_choice.choice_group_manual(self, athletes, num_groups, parent=None)
         
         self.save_manual_one_table_drawing(num_id_player, system)
 

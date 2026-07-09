@@ -116,7 +116,7 @@ from collections import defaultdict
 from playhouse.migrate import * # для удаления, редактирования таблиц DB  
 
 import begunok_full
-from manual_choice import choice_group_manual  # Импортируем функцию
+# from manual_choice import choice_group_manual  # Импортируем функцию
 
 os.environ['QT_AUTO_SCREEN_SCALE_FACTOR'] = '1'
 # WindowsArguments = dpiawareness = 1

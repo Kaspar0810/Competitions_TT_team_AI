@@ -3511,7 +3511,8 @@ class MainWindow(QMainWindow):
             return
         
         # Получаем ID матча из модели
-        match_id = model.get_match_id(row) if hasattr(model, 'get_match_id') else None
+        # match_id = model.get_match_id(row) if hasattr(model, 'get_match_id') else None
+        match_id = model._data[row]['id']
         
         if not match_id:
             match_id = model.data(model.index(row, 0), Qt.UserRole)
@@ -3522,15 +3523,15 @@ class MainWindow(QMainWindow):
                 if match.id == match_id:
                     self.current_match_index = i
                     break
+            else:
+                self.load_matches_for_stage(self.current_stage)
+                for i, match in enumerate(self.current_matches):
+                    if match.id == match_id:
+                        self.current_match_index = i
+                        break
                 else:
-                    self.load_matches_for_stage(self.current_stage)
-                    for i, match in enumerate(self.current_matches):
-                        if match.id == match_id:
-                            self.current_match_index = i
-                            break
-                        else:
-                            QMessageBox.warning(self, "Ошибка", f"Матч с ID {match_id} не найден")
-                            return
+                    QMessageBox.warning(self, "Ошибка", f"Матч с ID {match_id} не найден")
+                    return
         else:
             # Если ID нет, ищем по именам (как fallback)
             player1 = model.data(model.index(row, 4))
@@ -3540,7 +3541,7 @@ class MainWindow(QMainWindow):
                 if match.player1 == player1 and match.player2 == player2:
                     self.current_match_index = i
                     break
-            else:
+            if not match.id:
                 QMessageBox.warning(self, "Ошибка", "Матч не найден в списке")
                 return
         
@@ -11433,12 +11434,11 @@ class MainWindow(QMainWindow):
         
         num_groups = system.total_group
         #========================
-        if stage == "Квалификация" or stage == "Квалификация. 1-й полуфинал":
+        if stage == "Квалификация":
             num_id_player = manual_choice.choice_group_manual(self, athletes, num_groups, stage, parent=None)
-        else:
-            pass
-            # # Вызываем функцию выбора жеребьевки полуфиналов
-            # result = manual_choice.choice_semifinal(self)
+        elif stage == "Квалификация. 1-й полуфинал":
+            # Вызываем функцию выбора жеребьевки полуфиналов
+            result = manual_choice.choice_semifinal_manual(self)
             
             # if result:
             #     QMessageBox.information(self, "Успех", "Жеребьевка полуфиналов успешно завершена!")
@@ -20913,10 +20913,9 @@ class MainWindow(QMainWindow):
             athletes.append(gamer)
         
         num_groups = 1  # Одна группа
-        # id_title = self.current_title_id
-        
+        stage = "Одна таблица"
         # Используем существующий модуль manual_choice
-        num_id_player = manual_choice.choice_group_manual(self, athletes, num_groups, parent=None)
+        num_id_player = manual_choice.choice_group_manual(self, athletes, num_groups, stage, parent=None)
         
         self.save_manual_one_table_drawing(num_id_player, system)
 

@@ -16914,27 +16914,64 @@ class MainWindow(QMainWindow):
         return title_sex
     # === запись в Choice места в квалификации
     def update_choice_places(self, stage, info):
-        """Обновить места в квалификации в таблице Choice"""
+        """
+        Обновить места в таблице Choice с учетом этапа
+        
+        Args:
+            stage: название этапа (Квалификация, Полуфинал, Финал)
+            info: словарь с информацией {'pl_id': id_игрока, 'place': место}
+        """
         if not self.current_title_id:
             QMessageBox.warning(self, "Ошибка", "Нет выбранного соревнования")
+            return False
 
-        system = System.get_or_none(
-            (System.title_id == self.current_title_id) &
-            (System.stage == stage)
-        )
-        if not system:
-            QMessageBox.warning(self, "Ошибка", "Этап 'Квалификация' не найден в системе")
-            return
-        choice = Choice.get_or_none(
-                    (Choice.title_id == self.current_title_id) &
-                    (Choice.player_choice_id == info['pl_id'])
-                )
-        if choice:
-            choice.mesto_group = info['place']
+        try:
+            # Проверяем, что info содержит необходимые данные
+            if 'pl_id' not in info or 'place' not in info:
+                QMessageBox.warning(self, "Ошибка", "Недостаточно данных для сохранения места")
+                return False
+            
+            player_id = info['pl_id']
+            place = info['place']
+            
+            # Находим или создаем запись в Choice
+            choice, created = Choice.get_or_create(
+                Choice.title_id == self.current_title_id,
+                Choice.player_choice_id == player_id,
+                defaults={
+                    'mesto_group': None,
+                    'mesto_semi_final': None,
+                    'mesto_final': None
+                }
+            )
+            
+            # Определяем, в какое поле сохранять в зависимости от этапа
+            if stage == "Квалификация":
+                choice.mesto_group = place
+                field_name = "mesto_group"
+            elif stage == "Квалификация. 1-й полуфинал" or stage == "Квалификация. 2-й полуфинал":
+                choice.mesto_semi_final = place
+                field_name = "mesto_semi_final"
+            elif stage == "Суперфинал":
+                choice.super_final = place
+                field_name = "super_final"
+            else:
+                choice.mesto_final = place
+                field_name = "mesto_final"
+            
+            # Сохраняем изменения
             choice.save()
-            # updated += 1
-        
-        # QMessageBox.information(self, "Успех", f"Обновлено мест для {updated} участников квалификации") 
+            
+            # Логируем действие
+            print(f"Сохранено место {place} для игрока {player_id} в {field_name} (этап: {stage})")
+            
+            return True
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить место: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return False
 #============== функция очистки таблиц DB перед повторной жеребьевкой =====
     def clear_table_DB_after_choice(self, stage):
         """очищает таблицы Choice, Result< Game_list перед повторной жеребьевкой"""

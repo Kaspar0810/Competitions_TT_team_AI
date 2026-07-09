@@ -3520,15 +3520,15 @@ class MainWindow(QMainWindow):
                 if match.id == match_id:
                     self.current_match_index = i
                     break
-            else:
-                self.load_matches_for_stage(self.current_stage)
-                for i, match in enumerate(self.current_matches):
-                    if match.id == match_id:
-                        self.current_match_index = i
-                        break
                 else:
-                    QMessageBox.warning(self, "Ошибка", f"Матч с ID {match_id} не найден")
-                    return
+                    self.load_matches_for_stage(self.current_stage)
+                    for i, match in enumerate(self.current_matches):
+                        if match.id == match_id:
+                            self.current_match_index = i
+                            break
+                        else:
+                            QMessageBox.warning(self, "Ошибка", f"Матч с ID {match_id} не найден")
+                            return
         else:
             # Если ID нет, ищем по именам (как fallback)
             player1 = model.data(model.index(row, 4))
@@ -11546,8 +11546,8 @@ class MainWindow(QMainWindow):
         else:
             pass        
         return pdf_path
-
-    def export_participants_to_pdf(self):
+# ========== old 0807 ===========
+    def _export_participants_to_pdf(self):
         """Экспорт списка участников в PDF с выбором сортировки"""
         from reportlab.platypus import Table, Paragraph
         
@@ -11712,6 +11712,256 @@ class MainWindow(QMainWindow):
             import traceback
             traceback.print_exc()
             QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")
+# =========== new 0907 ==========
+    def export_participants_to_pdf(self):
+        """Экспорт списка участников в PDF с выбором сортировки"""
+        from reportlab.platypus import Table, Paragraph
+
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+        
+        # Выбор типа сортировки
+        sorting_type = self.get_sorting_type()
+        if sorting_type is None:
+            return
+        
+        try:
+            # Получаем данные о соревновании
+            title = Title.get(Title.id == self.current_title_id)
+            
+            # Создаем папку table_pdf, если её нет
+            pdf_dir = "table_pdf"
+            if not os.path.exists(pdf_dir):
+                os.makedirs(pdf_dir)
+            
+            # Используем короткое имя из Title
+            short_name = title.short_name_comp if title.short_name_comp else title.name
+            if not short_name:
+                short_name = "competition"
+            import re
+            clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
+            clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
+            
+            # Сортируем список участников в зависимости от выбора
+            if sorting_type == "alpha":
+                player_list = Player.select().where(
+                    (Player.title_id == self.current_title_id) &
+                    (Player.player != "X")  # Исключаем "X"
+                ).order_by(Player.player.asc())
+                file_suffix = "alf"
+            else:
+                player_list = Player.select().where(
+                    (Player.title_id == self.current_title_id) &
+                    (Player.player != "X")  # Исключаем "X"
+                ).order_by(Player.rank.desc())
+                file_suffix = "rating"
+            
+            # Путь к файлу (в папке table_pdf)
+            file_path = os.path.join(pdf_dir, f"{clean_name}_player_list_{file_suffix}.pdf")
+            
+            if player_list.count() == 0:
+                QMessageBox.warning(self, "Ошибка", "Нет участников для экспорта")
+                return
+            
+            # Получаем параметры
+            gamer = title.gamer if title.gamer else "Участники"
+            otc = title.otchestvo if title.otchestvo else 0
+            
+            # Регистрируем шрифт для поддержки кириллицы
+            try:
+                # Путь к шрифту DejaVu (если есть)
+                font_path = os.path.join(os.path.dirname(__file__), 'fonts', 'DejaVuSerif.ttf')
+                if os.path.exists(font_path):
+                    pdfmetrics.registerFont(TTFont('DejaVuSerif', font_path))
+                    pdfmetrics.registerFont(TTFont('DejaVuSerif-Bold', font_path.replace('.ttf', '-Bold.ttf')))
+                    pdfmetrics.registerFont(TTFont('DejaVuSerif-Italic', font_path.replace('.ttf', '-Italic.ttf')))
+                else:
+                    # Используем стандартный шрифт
+                    pdfmetrics.registerFont(TTFont('DejaVuSerif', 'DejaVuSerif.ttf'))
+            except:
+                # Если шрифт не загружен, используем стандартный
+                pass
+            
+            # Подготовка данных для таблицы
+            elements = []
+            n = 0
+            
+            for player in player_list:
+                n += 1
+                # Формируем ФИО с отчеством или без
+                if otc == 1:
+                    patronymic_text = ""
+                    if player.patronymic_id:
+                        try:
+                            patronymic = Patronymic.get(Patronymic.id == player.patronymic_id)
+                            patronymic_text = patronymic.patronymic
+                        except:
+                            pass
+                    full_name = f"{player.player} {patronymic_text}".strip()
+                else:
+                    full_name = player.player
+                
+                # Форматируем дату рождения - ИСПРАВЛЕНО
+                birth_date = self.format_birth_date(player.bday)
+                
+                # Получаем тренера
+                coach_text = ""
+                if player.coach_id:
+                    try:
+                        coach = Coach.get(Coach.id == player.coach_id)
+                        coach_text = coach.coach
+                    except:
+                        pass
+                
+                # Подготовка стилей для переноса длинной строки
+                styles = getSampleStyleSheet()
+                custom_style = styles['Normal'].clone("CustomStyle")
+                custom_style.fontName = 'DejaVuSerif'
+                custom_style.fontSize = 6
+                custom_style.wordWrap = 'LTR'  # Перенос слов (LTR - Left-To-Right)
+                custom_style.leading = 6  # Межстрочный интервал
+                
+                data_row = [
+                    str(n),
+                    Paragraph(full_name, custom_style),
+                    birth_date,
+                    str(player.rank) if player.rank else "0",
+                    player.city or "",
+                    Paragraph(player.region or "", custom_style),
+                    player.razryad or "",
+                    Paragraph(coach_text, custom_style),
+                ]
+                elements.append(data_row)
+            
+            # Добавляем заголовок таблицы
+            headers = ["№", "ФИО", "Дата рожд.", "R", "Город", "Субъект РФ", "Разряд", "Тренер(ы)"]
+            elements.insert(0, headers)
+            
+            # Создаем таблицу
+            table = Table(elements, repeatRows=1)
+            
+            # Настраиваем ширину колонок
+            col_widths = [0.8*cm, 5.0*cm, 1.6*cm, 0.8*cm, 2.5*cm, 3.2*cm, 1.1*cm, 4.0*cm]
+            table._argW = col_widths
+            
+            # Стиль таблицы
+            table_style = TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSerif'),
+                ('FONTSIZE', (0, 0), (-1, -1), 7),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+                ('TOPPADDING', (0, 0), (-1, -1), 2),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('BACKGROUND', (0, 0), (8, 0), colors.yellow),
+                ('TEXTCOLOR', (0, 0), (8, 0), colors.darkblue),
+                ('LINEABOVE', (0, 0), (-1, -1), 0.5, colors.blue),
+                ('INNERGRID', (0, 0), (-1, -1), 0.2, colors.grey),
+                ('BOX', (0, 0), (-1, -1), 0.5, colors.black),
+            ])
+            
+            table.setStyle(table_style)
+            
+            # Создаем PDF документ
+            doc = SimpleDocTemplate(file_path, pagesize=A4,
+                                    topMargin=15*mm, bottomMargin=10*mm,
+                                    leftMargin=5*mm, rightMargin=5*mm)
+            
+            # Стиль заголовка
+            story = []
+            h3 = PS("normal", fontSize=12, fontName="DejaVuSerif-Italic", leftIndent=180,
+                    firstLineIndent=10, textColor="green")
+            h3.spaceAfter = 10
+            story.append(Paragraph(f'Список участников. {gamer}', h3))
+            story.append(table)
+            
+            # Добавляем информацию о сортировке
+            sort_text = "по алфавиту" if sorting_type == "alpha" else "по рейтингу"
+            
+            # Строим документ с использованием функции заголовка
+            doc.build(story, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
+            
+            QMessageBox.information(self, "Успех", 
+                                f"Список участников успешно сохранен в PDF:\n{file_path}\n"
+                                f"Сортировка: {sort_text}")
+            
+            # Предлагаем открыть файл
+            reply = QMessageBox.question(self, "Открыть файл", 
+                                        "Открыть созданный PDF файл?",
+                                        QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                if sys.platform == 'win32':
+                    os.startfile(file_path)
+                else:
+                    os.system(f'open "{file_path}"')
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")
+
+    def format_birth_date(self, bday):
+        """
+        Форматирование даты рождения для корректной обработки разных типов
+        
+        Args:
+            bday: дата рождения (может быть datetime, date, str или None)
+        
+        Returns:
+            str: отформатированная дата или "---"
+        """
+        if bday is None:
+            return "---"
+        
+        try:
+            # Если это уже строка
+            if isinstance(bday, str):
+                # Пробуем распарсить строку
+                try:
+                    from datetime import datetime
+                    # Пробуем разные форматы
+                    for fmt in ['%Y-%m-%d', '%d.%m.%Y', '%Y.%m.%d', '%d/%m/%Y', '%Y/%m/%d']:
+                        try:
+                            parsed_date = datetime.strptime(bday, fmt)
+                            return parsed_date.strftime("%d.%m.%Y")
+                        except ValueError:
+                            continue
+                    # Если не удалось распарсить, возвращаем как есть
+                    return bday
+                except:
+                    return bday
+            
+            # Если это datetime или date объект
+            if hasattr(bday, 'strftime'):
+                return bday.strftime("%d.%m.%Y")
+            
+            # Если это другой тип, пробуем преобразовать в строку
+            return str(bday)
+            
+        except Exception as e:
+            print(f"Ошибка форматирования даты: {e}")
+            return "---"
+
+    def clean_player_name(self, player_name):
+        """
+        Очистка имени игрока от специальных символов и проверка на 'X'
+        
+        Args:
+            player_name: имя игрока
+        
+        Returns:
+            str: очищенное имя или None если это "X"
+        """
+        if not player_name:
+            return None
+        
+        player_name = str(player_name).strip()
+        
+        # Проверяем на "X"
+        if player_name == "X" or player_name.upper() == "X":
+            return None
+        
+        return player_name
 # === круговые таблицы ====
     def table_made(self, pv, stage):
         """создание таблиц kg - количество групп(таблиц), g2 - наибольшое кол-во участников в группе
@@ -16933,18 +17183,13 @@ class MainWindow(QMainWindow):
             
             player_id = info['pl_id']
             place = info['place']
-            
+                          
             # Находим или создаем запись в Choice
-            choice, created = Choice.get_or_create(
-                Choice.title_id == self.current_title_id,
-                Choice.player_choice_id == player_id,
-                defaults={
-                    'mesto_group': None,
-                    'mesto_semi_final': None,
-                    'mesto_final': None
-                }
+            choice = Choice.get_or_none(
+                (Choice.title_id == self.current_title_id) &
+                (Choice.player_choice_id == player_id)               
             )
-            
+
             # Определяем, в какое поле сохранять в зависимости от этапа
             if stage == "Квалификация":
                 choice.mesto_group = place

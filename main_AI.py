@@ -17410,7 +17410,7 @@ class MainWindow(QMainWindow):
             traceback.print_exc()
             QMessageBox.critical(self, "Ошибка", f"Ошибка при жеребьевке: {str(e)}")
 
-    def create_semi_final_1(self, mesto_first, total_group):
+    def _create_semi_final_1(self, mesto_first, total_group):
         """жеребьевка 1-го полуфинала с разведением 1-х мест по регионам"""
         from collections import defaultdict
         
@@ -17545,7 +17545,258 @@ class MainWindow(QMainWindow):
         print(f"Записано игроков в Game_list: {Game_list.select().where(Game_list.system_id == system.id).count()}")
         
         return group_1_16
+# ========2-й вариант жеребьевки 1-ого полуфинал ==
+    def create_semi_final_1(self, mesto_first, total_group):
+        """жеребьевка 1-го полуфинала с разведением 1-х мест по регионам"""
+        from collections import defaultdict
+        
+        count_gr_sf = total_group // 2
+        
+        # Создаем группы для 1-го полуфинала
+        group_1_16 = []
+        for i in range(1, count_gr_sf + 1):
+            group_1_16.append({
+                'sf_group_num': i,
+                'players': [],
+                'from_groups': []
+            })
+        
+        # 1-й ЭТАП: Добавляем игроков с 1-2 мест из групп 1-16
+        for group_num in range(1, count_gr_sf + 1):
+            players = self.get_players_by_group_and_place(group_num, [mesto_first, mesto_first + 1])
+            if players:
+                for g in group_1_16:
+                    if g['sf_group_num'] == group_num:
+                        g['players'].extend(players)
+                        g['from_groups'].append(group_num)
+                        break
+        
+        # Собираем игроков с 1-2 мест из групп 17-32
+        group_17_32 = []
+        for group_num in range(count_gr_sf + 1, total_group + 1):
+            players = self.get_players_by_group_and_place(group_num, [mesto_first, mesto_first + 1])
+            if players:
+                group_17_32.append({
+                    'sf_group_num': group_num,
+                    'players': players
+                })
+        
+        # Создаем списки для распределения
+        group_num_list_1_16 = [p for p in range(1, count_gr_sf + 1)]
+        group_num_list_1_16.sort(reverse=True)  # Сортировка от большего к меньшему (16, 15, 14...)
+        
+        pending_groups = group_17_32.copy()
+        k = 0
+        conflicts = []  # Список конфликтов
+        
+        print("\n=== Начало жеребьевки 1-го полуфинала ===")
+        print(f"Группы 1-16: {group_num_list_1_16}")
+        print(f"Группы 17-32: {[g['sf_group_num'] for g in pending_groups]}")
+        print("=" * 50)
+        
+        while pending_groups:
+            source_group = pending_groups.pop(0)
+            source_group_num = source_group['sf_group_num']
+            source_players = source_group['players']
+            source_region = source_players[0].region if source_players else None
+            
+            target_group = None
+            target_group_num = None
+            found = False
+            
+            # Пытаемся найти подходящую группу
+            attempts = 0
+            max_attempts = len(group_num_list_1_16) * 2
+            
+            while not found and attempts < max_attempts:
+                if k >= len(group_num_list_1_16):
+                    k = 0
+                    attempts += 1
+                    if not pending_groups:
+                        break
+                
+                gr_num = group_num_list_1_16[k]
+                ind = self.find_index_by_group(group_1_16, gr_num)
+                
+                if ind == -1:
+                    k += 1
+                    continue
+                
+                target_group = group_1_16[ind]
+                target_group_num = gr_num
+                
+                # Проверяем регионы
+                if target_group['players']:
+                    gr_1_16_region = target_group['players'][0].region
+                    
+                    if gr_1_16_region != source_region:
+                        # Регионы разные - подходит
+                        found = True
+                        target_group['players'].extend(source_players)
+                        target_group['from_groups'].append(source_group_num)
+                        group_num_list_1_16.remove(target_group_num)
+                        k = 0
+                        print(f"✓ Группа {target_group_num} <- Группа {source_group_num} (регионы разные: {gr_1_16_region} ≠ {source_region})")
+                    else:
+                        # Регионы совпадают - пробуем следующую группу
+                        print(f"  Регионы совпадают: {gr_1_16_region} == {source_region} (Группа {target_group_num} <- Группа {source_group_num})")
+                        k += 1
+                else:
+                    # В группе пока нет игроков - подходит
+                    found = True
+                    target_group['players'].extend(source_players)
+                    target_group['from_groups'].append(source_group_num)
+                    group_num_list_1_16.remove(target_group_num)
+                    k = 0
+                    print(f"✓ Группа {target_group_num} <- Группа {source_group_num} (пустая группа)")
+            
+            # Если не нашли подходящую группу с разными регионами
+            if not found and source_players:
+                # Пытаемся найти любую свободную группу
+                if group_num_list_1_16:
+                    gr_num = group_num_list_1_16[0]
+                    ind = self.find_index_by_group(group_1_16, gr_num)
+                    if ind != -1:
+                        target_group = group_1_16[ind]
+                        target_group_num = gr_num
+                        gr_1_16_region = target_group['players'][0].region if target_group['players'] else None
+                        
+                        # Добавляем конфликт в список
+                        conflict_info = {
+                            'source_group': source_group_num,
+                            'target_group': target_group_num,
+                            'source_region': source_region,
+                            'target_region': gr_1_16_region,
+                            'players': source_players
+                        }
+                        conflicts.append(conflict_info)
+                        
+                        # Все равно размещаем игроков
+                        target_group['players'].extend(source_players)
+                        target_group['from_groups'].append(source_group_num)
+                        group_num_list_1_16.remove(target_group_num)
+                        k = 0
+                        print(f"⚠ КОНФЛИКТ: Группа {target_group_num} <- Группа {source_group_num} (регионы совпадают: {gr_1_16_region} == {source_region})")
+                else:
+                    print(f"❌ Нет свободных групп для группы {source_group_num}!")
+                    # Добавляем в список неразмещенных
+                    pending_groups.append(source_group)
+        
+        # Проверяем, остались ли неразмещенные группы
+        if pending_groups:
+            print(f"\n⚠ Внимание! Остались неразмещенные группы:")
+            for g in pending_groups:
+                print(f"  Группа {g['sf_group_num']}: {[p.family for p in g['players']]}")
+        
+        # Выводим информацию о конфликтах
+        if conflicts:
+            print("\n" + "=" * 50)
+            print("⚠ ОБНАРУЖЕНЫ КОНФЛИКТЫ РЕГИОНОВ:")
+            print("=" * 50)
+            for conf in conflicts:
+                print(f"  Группа {conf['target_group']} ← Группа {conf['source_group']}")
+                print(f"    Регионы: {conf['target_region']} == {conf['source_region']}")
+                print(f"    Игроки: {', '.join([p.family for p in conf['players']])}")
+                print("-" * 40)
+            
+            # Выдаем сообщение пользователю
+            conflict_msg = "⚠ ВНИМАНИЕ! Обнаружены конфликты регионов в 1-м полуфинале:\n\n"
+            for i, conf in enumerate(conflicts, 1):
+                conflict_msg += f"{i}. Группа {conf['target_group']} ← Группа {conf['source_group']}\n"
+                conflict_msg += f"   Регионы: {conf['target_region']} == {conf['source_region']}\n"
+                conflict_msg += f"   Игроки: {', '.join([p.family for p in conf['players']])}\n\n"
+            conflict_msg += "Игроки размещены, но рекомендуется проверить и при необходимости\n"
+            conflict_msg += "внести корректировки в ручном режиме."
+            
+            QMessageBox.warning(self, "Конфликты регионов в полуфинале", conflict_msg)
+        
+        # Получаем или создаем систему для 1-го полуфинала
+        system = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == "Квалификация. 1-й полуфинал")
+        )
+        
+        # Очищаем старые записи в Game_list и Choice для этого этапа
+        Game_list.delete().where(
+            (Game_list.title_id == self.current_title_id) &
+            (Game_list.system_id == system.id)
+        ).execute()
+        
+        Choice.update(
+            semi_final=None,
+            posev_sf=None,
+            sf_group=None
+        ).where(
+            (Choice.title_id == self.current_title_id) 
+        ).execute()
+        
+        # Заполняем данные в таблицах Game_list и Choice
+        total_players = 0
+        for sf_group in group_1_16:
+            sf_group_num = sf_group['sf_group_num']
+            players = sf_group['players']
+            
+            for idx, player in enumerate(players, 1):
+                # Обновляем Choice
+                player.semi_final = 1
+                player.posev_sf = idx
+                player.sf_group = f"{sf_group_num} группа"
+                player.save()
+                
+                # Создаем запись в Game_list
+                Game_list.create(
+                    number_group=f"{sf_group_num} группа",
+                    rank_num_player=idx,
+                    player_group=player.player_choice.id,
+                    system_id=system.id,
+                    title_id=self.current_title_id,
+                    sex=self.current_sex if self.current_sex else "man",
+                    player_double_id=None,
+                    team_id=None
+                )
+                total_players += 1
+                print(f"  Группа {sf_group_num}: игрок {idx} - {player.family} (из группы {sf_group['from_groups'][idx-1] if idx-1 < len(sf_group['from_groups']) else '?'})")
+        
+        # после цикла сохранения игроков
+        self.set_choice_flag_for_stage("Квалификация. 1-й полуфинал", flag=1)
+        
+        print(f"\n=== ИТОГИ 1-го ПОЛУФИНАЛА ===")
+        print(f"Создано {len(group_1_16)} групп")
+        print(f"Всего игроков: {total_players}")
+        print(f"Конфликтов: {len(conflicts)}")
+        print(f"Записано в Game_list: {Game_list.select().where(Game_list.system_id == system.id).count()}")
+        print("=" * 50)
+        
+        return group_1_16
 
+
+    def _find_index_by_group(self, groups, group_num):
+        """Найти индекс группы в списке по номеру группы"""
+        for i, g in enumerate(groups):
+            if g['sf_group_num'] == group_num:
+                return i
+        return -1
+
+
+    def _get_players_by_group_and_place(self, group_num, places):
+        """Получить игроков из группы по местам"""
+        players = []
+        try:
+            # Ищем Choice записи для указанной группы и мест
+            choices = Choice.select().where(
+                (Choice.title_id == self.current_title_id) &
+                (Choice.group == f"Группа {group_num}") &
+                (Choice.posev_group.in_(places))
+            )
+            for choice in choices:
+                # Получаем PlayerChoice
+                player = PlayerChoice.get_or_none(PlayerChoice.id == choice.player_choice_id)
+                if player:
+                    players.append(player)
+        except Exception as e:
+            print(f"Ошибка при получении игроков из группы {group_num}: {e}")
+        return players
+# =============================
     def create_semi_final_2(self, mesto_first, total_group):
         """жеребьевка 2-го полуфинала"""
         count_gr_sf = total_group // 2

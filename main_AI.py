@@ -1072,15 +1072,18 @@ class MainWindow(QMainWindow):
             age_short = self.format_age_to_u(vozrast)
             
             # Определяем надписи для кнопок
-            if "юноши" in sredi.lower():
+            if sredi == "юношей и девушек":
                 men_text = f"Юноши {age_short}"
                 women_text = f"Девушки {age_short}"
-            elif "мальчики" in sredi.lower():
+            elif sredi == "мальчиков и девочек":
                 men_text = f"Мальчики {age_short}"
                 women_text = f"Девочки {age_short}"
+            elif sredi == "юниоров и юниорок":
+                men_text = f"Юниоры {age_short}"
+                women_text = f"Юниорки {age_short}"
             else:
-                men_text = f"Мужчины {age_short}"
-                women_text = f"Женщины {age_short}"
+                men_text = f"Мужчины"
+                women_text = f"Женщины"
             
             # Создаем кнопку для мужчин (man)
             man_btn = QPushButton(men_text)
@@ -4154,12 +4157,15 @@ class MainWindow(QMainWindow):
 
                 # отображение заголовка и информации в QListWidget
                 self.change_label_ListWidget(index)
-                
+
             # Очищаем таблицу
             self.players_model.setData([])
         
         # Устанавливаем высоту для текущей вкладки
         self.set_tab_height(index)
+
+        #  Изменяем название кнопок от категории игроков
+        self.create_category_buttons()
 # =======================================================
     def change_label_ListWidget(self, index):
         """Смена заголовка и QListWidget в зависимости от вкладки"""

@@ -51,6 +51,7 @@ import math
 import re
 import random
 import BackupManagementDialog
+import edit_stage
 
 import pymysql
 import subprocess
@@ -5402,7 +5403,11 @@ class MainWindow(QMainWindow):
         edit_action = QAction("Параметры", self)
         edit_action.triggered.connect(lambda: QMessageBox.information(self, "Редактировать", "Параметры"))
         edit_menu.addAction(edit_action)
-        
+                    
+        edit_stages_action = QAction("Редактирование этапов", self)
+        edit_stages_action.triggered.connect(self.open_edit_stages_dialog)
+        edit_menu.addAction(edit_stages_action)
+
         # Печать
         print_menu = menubar.addMenu("Печать")
         print_action = QAction("Предпросмотр", self)
@@ -5504,6 +5509,15 @@ class MainWindow(QMainWindow):
         
         # Инициализируем обновление меню результатов
         self.update_results_menu()
+
+    def open_edit_stages_dialog(self):
+        """Открытие диалога редактирования этапов"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+        
+        dialog = edit_stage.EditStagesDialog(self, self.current_title_id)
+        dialog.exec_()
 
     def open_backup_management(self):
         """Открыть диалог управления бэкапами"""

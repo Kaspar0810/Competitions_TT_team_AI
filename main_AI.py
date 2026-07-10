@@ -4018,16 +4018,9 @@ class MainWindow(QMainWindow):
                 self.players_model.setData([])
                 self.table_header.setText("👥 Список участников - выберите соревнование из списка справа")
             QTimer.singleShot(100, self.resize_table_for_participants)
-            
-            # ===== замена QlistWidget ========
-            # скрываем заголовок прошедшие соревнования
-            self.competitions_label.setVisible(False)
-            # показываем заголовок поиск спортсменов
-            self.search_label.setVisible(True)
-            # закрываем List_Wiget соревнования 
-            self.list_widget.setVisible(False)
-            # открываем List_Wiget соревнования
-            self.search_results_list.setVisible(True)
+
+            # отображение заголовка и информации в QListWidget
+            self.change_label_ListWidget(index)
 
         elif index == 5:  # Результаты
             # Используем отдельную таблицу для результатов
@@ -4086,10 +4079,12 @@ class MainWindow(QMainWindow):
             # Скрываем секцию создания этапа
             self.stage_section.setVisible(False)
             self.seeding_info_label.hide()
-# =======================================================
+
             # скрываем фильтр соревнований      
             self.filters_widget.setVisible(False)
-            # ================== конец 2805 ====
+           
+           # отображение заголовка и информации в QListWidget
+            self.change_label_ListWidget(index)
 
         elif index == 2:  # Команды
             self.table_container.setCurrentWidget(self.teams_table_view)
@@ -4104,7 +4099,10 @@ class MainWindow(QMainWindow):
             """)
             if self.current_title_id:
                 self.load_teams_for_title()
-                
+
+            # отображение заголовка и информации в QListWidget
+            self.change_label_ListWidget(index)
+
         elif index == 3:  # Пары
             self.table_container.setCurrentWidget(self.doubles_table_view)
             self.table_header.setText("🤝 Список пар")
@@ -4117,8 +4115,10 @@ class MainWindow(QMainWindow):
                 border-radius: 3px;
             """)
             if self.current_title_id:
-                self.load_doubles_for_title()
-        
+                self.load_doubles_for_title() 
+
+            # отображение заголовка и информации в QListWidget
+            self.change_label_ListWidget(index)    
         # Для остальных вкладок
         else:
             # Показываем таблицу участников (или можно скрыть)
@@ -4129,24 +4129,60 @@ class MainWindow(QMainWindow):
                 # Скрываем секцию создания этапа
                 self.stage_section.setVisible(False)
                 
+                # отображение заголовка и информации в QListWidget
+                self.change_label_ListWidget(index)
+
             elif index == 4:  # Система
                 self.table_header.setText("⚙️ Система проведения")
                 self.filters_widget.setVisible(False)
                 # Загружаем существующие данные
                 self.load_system_data()
+
+                # отображение заголовка и информации в QListWidget
+                self.change_label_ListWidget(index)
+
             elif index == 6:  # Рейтинг
                 self.table_header.setText("⭐ Рейтинг участников")
-                self.filters_widget.setVisible(False)
+                self.filters_widget.setVisible(False)  
+
+                # отображение заголовка и информации в QListWidget
+                self.change_label_ListWidget(index)
+
             elif index == 7:  # Дополнительно
                 self.table_header.setText("ℹ️ Дополнительная информация")
                 self.filters_widget.setVisible(False)
-            
+
+                # отображение заголовка и информации в QListWidget
+                self.change_label_ListWidget(index)
+                
             # Очищаем таблицу
             self.players_model.setData([])
         
         # Устанавливаем высоту для текущей вкладки
         self.set_tab_height(index)
 # =======================================================
+    def change_label_ListWidget(self, index):
+        """Смена заголовка и QListWidget в зависимости от вкладки"""
+        if index == 1 or index == 6:
+        # ===== замена QlistWidget ========
+            # скрываем заголовок прошедшие соревнования
+            self.competitions_label.setVisible(False)
+            # показываем заголовок поиск спортсменов
+            self.search_label.setVisible(True)
+            # закрываем List_Wiget соревнования 
+            self.list_widget.setVisible(False)
+            # открываем List_Wiget соревнования
+            self.search_results_list.setVisible(True)
+        elif index == 0 or index == 2 or index == 3 or index == 4 or index == 5 or index == 7:
+            # скрываем заголовок прошедшие соревнования
+            self.competitions_label.setVisible(True)
+            # показываем заголовок поиск спортсменов
+            self.search_label.setVisible(False)
+            # закрываем List_Wiget соревнования 
+            self.list_widget.setVisible(True)
+            # открываем List_Wiget соревнования
+            self.search_results_list.setVisible(False)
+
     def format_age_to_u(self, vozrast):
         """Преобразование возраста в формат UXX"""
         if not vozrast:

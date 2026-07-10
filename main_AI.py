@@ -168,22 +168,6 @@ class MainWindow(QMainWindow):
         # Для фильтра по игроку
         self.player_filter_text = ""
         self.player_filter_list = []  # Список всех игроков для автодополнения
-#=========== new 0707 ===========
-        # # Настраиваем фильтры
-        # self.group_filter_combo.currentIndexChanged.connect(self.on_group_filter_changed)
-        # self.tour_filter_combo.currentIndexChanged.connect(self.on_tour_filter_changed)
-        # self.status_filter_combo.currentIndexChanged.connect(self.on_status_filter_changed)
-        
-        # # Инициализируем статусную строку
-        # self.status_label = QLabel("Готов к работе")
-        # if hasattr(self, 'statusBar'):
-        #     self.statusBar().addWidget(self.status_label)
-        # else:
-        #     # Если нет statusBar, создаем виджет для статуса
-        #     self.status_label = QLabel("Готов к работе")
-        #     self.status_label.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
-        #     layout.addWidget(self.status_label)
-
 # =========================
     def check_old_backups_on_startup(self):
         """Проверка старых бэкапов при запуске"""
@@ -1431,7 +1415,7 @@ class MainWindow(QMainWindow):
                 self.main_referee_edit.setText(title.referee or "")
                 
                 # Загрузка категории судьи
-                category_text = self.get_category_display(title.kat_ref or "ВК")
+                category_text = self.get_category_display(title.kat_ref or "ССВК")
                 index = self.referee_category_combo.findText(category_text)
                 if index >= 0:
                     self.referee_category_combo.setCurrentIndex(index)
@@ -1440,7 +1424,7 @@ class MainWindow(QMainWindow):
                 self.main_secretary_edit.setText(title.secretary or "")
                 
                 # Загрузка категории секретаря
-                category_text = self.get_category_display(title.kat_sec or "ВК")
+                category_text = self.get_category_display(title.kat_sec or "ССВК")
                 index = self.secretary_category_combo.findText(category_text)
                 if index >= 0:
                     self.secretary_category_combo.setCurrentIndex(index)
@@ -1571,7 +1555,7 @@ class MainWindow(QMainWindow):
         label_referee_cat = QLabel("Категория:")
         label_referee_cat.setMinimumWidth(80)
         self.new_comp_referee_cat = QComboBox()
-        self.new_comp_referee_cat.addItems(["ВК", "1К", "2К", "3К"])
+        self.new_comp_referee_cat.addItems(["ССВК", "1К", "2К", "3К"])
         self.new_comp_referee_cat.setStyleSheet("padding: 5px; font-size: 11px;")
         row5.addWidget(label_referee_cat)
         row5.addWidget(self.new_comp_referee_cat, 1)
@@ -1591,7 +1575,7 @@ class MainWindow(QMainWindow):
         label_secretary_cat = QLabel("Категория:")
         label_secretary_cat.setMinimumWidth(80)
         self.new_comp_secretary_cat = QComboBox()
-        self.new_comp_secretary_cat.addItems(["ВК", "1К", "2К", "3К"])
+        self.new_comp_secretary_cat.addItems(["ССВК", "1К", "2К", "3К"])
         self.new_comp_secretary_cat.setStyleSheet("padding: 5px; font-size: 11px;")
         row6.addWidget(label_secretary_cat)
         row6.addWidget(self.new_comp_secretary_cat, 1)
@@ -4034,7 +4018,17 @@ class MainWindow(QMainWindow):
                 self.players_model.setData([])
                 self.table_header.setText("👥 Список участников - выберите соревнование из списка справа")
             QTimer.singleShot(100, self.resize_table_for_participants)
-                    
+            
+            # ===== замена QlistWidget ========
+            # скрываем заголовок прошедшие соревнования
+            self.competitions_label.setVisible(False)
+            # показываем заголовок поиск спортсменов
+            self.search_label.setVisible(True)
+            # закрываем List_Wiget соревнования 
+            self.list_widget.setVisible(False)
+            # открываем List_Wiget соревнования
+            self.search_results_list.setVisible(True)
+
         elif index == 5:  # Результаты
             # Используем отдельную таблицу для результатов
             # Проверяем, есть ли table_view в стеке
@@ -6290,7 +6284,7 @@ class MainWindow(QMainWindow):
             self.patronymic_edit.setFocus()
             # self.fio_edit.clear()
 
-    def reset_search_label(self):
+    def _reset_search_label(self):
         """Сброс заголовка поиска"""
         if hasattr(self, 'current_tab_index') and self.current_tab_index == 1:
             if hasattr(self, 'search_label'):

@@ -14172,7 +14172,7 @@ class MainWindow(QMainWindow):
         )
 
         results = Result.select().where((Result.title_id == self.current_title_id) & (Result.system_id == system.id))
-        # results = Result.get_or_none((Result.title_id == self.current_title_id) & (Result.system_id == system.id))
+
         if results:
             for res_num in results:
                 num = res_num.tours
@@ -18482,7 +18482,6 @@ class MainWindow(QMainWindow):
                 results = results.where(Result.winner.is_null())
             elif tours == "диапазон" and list_tours:
                 results = results.where(Result.tours.in_(list_tours))
-            # else "все" - без фильтра
 
             results_list = list(results)
             if not results_list:
@@ -18492,6 +18491,7 @@ class MainWindow(QMainWindow):
 
             # Данные о соревновании
             title = Title.get_by_id(self.current_title_id)
+            vozrast = title.vozrast
             gamer_txt = title.sredi if title.sredi else "Участники"
             gm = gamer_txt[:1] if gamer_txt else "У"
 
@@ -18506,12 +18506,13 @@ class MainWindow(QMainWindow):
                 shot_stage = stage[:2]
             else:
                 shot_stage = "Ф"
-                
+
+            vozr = self.extract_age_number(vozrast)
 
             stiker_data = []
             for res in results_list:
                 # Номер группы/финала для отображения
-                if "Финал" in stage:
+                if stage not in group_list:
                     import re
                     match = re.search(r'(\d+)', res.number_group)
                     n_gr = match.group(1) if match else gm
@@ -18520,8 +18521,8 @@ class MainWindow(QMainWindow):
                     import re
                     match = re.search(r'(\d+)', res.number_group)
                     gr_num = match.group(1) if match else ""
-                    n_gr = f"{gr_num}гр" if gr_num else ""
-                    sys_stage = shot_stage
+                    n_gr = gr_num if gr_num else ""
+                    sys_stage = f"{shot_stage}"
 
                 round_num = res.round if res.round else ""
                 tours_str = res.tours if res.tours else ""
@@ -18558,23 +18559,21 @@ class MainWindow(QMainWindow):
 
                 # Шаблон бегунка (10 строк, 4 колонки)
                 d_tmp = [
-                    [n_gr, 'тур', 'вст', 'стол'],
-                    [sys_stage, round_num, tours_str, ''],
-                    [pl1_text, '', pl2_text, ''],
-                    ['', '', '', ''],
-                    ['', '', '', ''],
-                    ['', '', '', ''],
-                    ['', '', '', ''],
-                    ['', '', '', ''],
-                    ['общ счет:', '', '', ''],
-                    ['Победитель', '', '', '']
+                    [f"до {vozr}",'','гр', 'тур', 'вст', 'стол'],
+                    [sys_stage, '', n_gr, round_num, tours_str, ''],
+                    [pl1_text, '', '', pl2_text, '', ''],
+                    ['', '', '', '', '', ''],
+                    ['', '', '', '', '', ''],
+                    ['', '', '', '', '', ''],
+                    ['', '', '', '', '', ''],
+                    ['', '', '', '', '', ''],
+                    ['общ счет:', '', '', '', '', ''],
+                    ['Победитель', '', '', '', '', '']
                 ]
+
                 stiker_data.append(d_tmp)
             return stiker_data
-        # else:
-        #     self.create_full_runners_pdf(stage, subgroup, date=None, time=None) 
-        #     return
-        
+         
     def shorten_player_name(self, full_name):
         """Укорачивает длинное ФИО для бегунков"""
         parts = full_name.split()
@@ -18589,24 +18588,26 @@ class MainWindow(QMainWindow):
 
         tblstyle = []
         for p in range(0, 8):
-            tblstyle.append(('SPAN', (0, 2 + p), (1, 2 + p)))
-            tblstyle.append(('SPAN', (2, 2 + p), (3, 2 + p)))
+            tblstyle.append(('SPAN', (0, 0 ), (1, 0)))
+            tblstyle.append(('SPAN', (0, 1), (1, 1)))
+            tblstyle.append(('SPAN', (0, 2 + p), (2, 2 + p)))
+            tblstyle.append(('SPAN', (3, 2 + p), (5, 2 + p)))
 
         ts = TableStyle([
             ('FONTNAME', (0, 0), (-1, -1), "DejaVuSerif"),
             ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.black),
             ('BOX', (0, 0), (-1, -1), 1, colors.black),
-            ('FONTSIZE', (0, 1), (0, 1), 20),
+            ('FONTSIZE', (0, 1), (0, 1), 18),
             ('VALIGN', (0, 1), (0, 1), 'TOP'),
             ('ALIGN', (0, 1), (0, 1), 'CENTER'),
-            ('FONTSIZE', (0, 2), (3, 2), 7),
-            ('VALIGN', (1, 0), (3, 0), 'MIDDLE'),
-            ('FONTSIZE', (1, 1), (3, 1), 12),
-            ('VALIGN', (1, 1), (3, 1), 'MIDDLE'),
-            ('ALIGN', (1, 1), (3, 1), 'CENTER'),
-            ('FONTSIZE', (0, 0), (0, 0), 12),
-            ('VALIGN', (0, 0), (0, 0), 'MIDDLE'),
-            ('ALIGN', (0, 0), (0, 0), 'CENTER')
+            ('FONTSIZE', (2, 1), (5, 2), 12),
+            ('VALIGN', (2, 1), (5, 2), 'MIDDLE'),
+            ('FONTSIZE', (0, 2), (0, 2), 8),
+            ('VALIGN', (0, 2), (0, 2), 'MIDDLE'),
+            ('ALIGN', (0, 2), (0, 2), 'LEFT'),
+            ('FONTSIZE', (3, 2), (3, 2), 8),
+            ('VALIGN', (3, 2), (3, 2), 'MIDDLE'),
+            ('ALIGN', (3, 2), (3, 2), 'LEFT')
         ] + tblstyle)
         return ts
 
@@ -18625,7 +18626,7 @@ class MainWindow(QMainWindow):
             return None
 
         # Папка для сохранения
-        pdf_dir = "runners"
+        pdf_dir = "table_pdf"
         if not os.path.exists(pdf_dir):
             os.makedirs(pdf_dir)
 
@@ -18636,33 +18637,13 @@ class MainWindow(QMainWindow):
         clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
 
         if runner_type == "Урезанный":
-
-            # title = Title.get_by_id(self.current_title_id)
             # Получаем данные для бегунков (только несыгранные матчи)
             stiker_data = self.tbl_begunki(stage, subgroup, runner_type, tours="несыгранные")
-
-            # short_name = title.short_name_comp if title.short_name_comp else title.name
-            # clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
-            # clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
 
             filename = f"{clean_name}_runners.pdf"
 
             if not stiker_data:
                 return None
-
-            # title = Title.get_by_id(self.current_title_id)
-
-            # Папка для сохранения
-            # pdf_dir = "table_pdf"
-            # pdf_dir = "runners"
-            # if not os.path.exists(pdf_dir):
-            #     os.makedirs(pdf_dir)
-
-            # short_name = title.short_name_comp if title.short_name_comp else title.name
-            # clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
-            # clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
-
-            # filename = f"{clean_name}_runners.pdf"
 
             # Стили
             styles = getSampleStyleSheet()
@@ -18673,8 +18654,8 @@ class MainWindow(QMainWindow):
 
             # Создаём карточки бегунков
             ts = self.get_begunki_style()
-            col_widths = [1.6*cm] * 4
-            row_heights = [0.6*cm, 0.9*cm, 1*cm, 0.6*cm, 0.6*cm, 0.6*cm, 0.6*cm, 0.6*cm, 0.5*cm, 0.5*cm]
+            col_widths = [1.2*cm, 1.1*cm, 1.0*cm, 1.1*cm, 1.1*cm, 1.1*cm]
+            row_heights = [0.6*cm, 0.8*cm, 1*cm, 0.6*cm, 0.6*cm, 0.6*cm, 0.6*cm, 0.6*cm, 0.5*cm, 0.5*cm]
 
             runner_cards = []
             for match_data in stiker_data:
@@ -18696,7 +18677,7 @@ class MainWindow(QMainWindow):
                     row.append(Paragraph("", styles['Normal']))
                 table_data.append(row)
 
-            col_widths_main = [6.8*cm] * cards_per_row
+            col_widths_main = [6.9*cm] * cards_per_row
             main_table = Table(table_data, colWidths=col_widths_main)
             main_table.setStyle(TableStyle([
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),

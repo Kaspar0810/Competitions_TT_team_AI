@@ -33,7 +33,7 @@ class EditStagesDialog(QDialog):
         self.drag_data = None
         
         self.setWindowTitle("Редактирование этапов")
-        self.setMinimumSize(1000, 700)
+        self.setMinimumSize(1200, 700)
         self.setModal(True)
         
         self.init_ui()
@@ -459,8 +459,6 @@ class EditStagesDialog(QDialog):
         if current_group:
             self.on_target_group_changed(current_group)
 
-
-
     def on_group_changed(self, group_name):
         """Обработка изменения группы"""
         if not group_name:
@@ -546,6 +544,9 @@ class EditStagesDialog(QDialog):
                     
                     for gp in groups[group_name]:
                         player = Player.get_or_none(Player.id == gp.player_group.id)
+                        coach_id = player.coach_id
+                        coaches = Coach.get_or_none(Coach.id == coach_id)
+                        coach = coaches.coach
                         if player:
                             player_item = QTreeWidgetItem(group_item)
                             player_name = player.fio or player.player
@@ -553,14 +554,16 @@ class EditStagesDialog(QDialog):
                                 player_item.setText(0, f"❌ {player_name} (посев: {gp.rank_num_player})")
                                 player_item.setForeground(0, QBrush(QColor(150, 0, 0)))
                             else:
-                                player_item.setText(0, f"🏅 {player_name} (посев: {gp.rank_num_player})")
+                                player_item.setText(0, f"🏅 {player_name} (посев: {gp.rank_num_player} город: {player.city} тренер: {coach})")
                             player_item.setData(0, Qt.UserRole, {
                                 "type": "player",
                                 "id": player.id,
                                 "game_id": gp.id,
                                 "group": group_name,
                                 "position": gp.rank_num_player,
-                                "name": player_name
+                                "name": player_name,
+                                "city":player.city,
+                                "coach":coach
                             })
                             
             elif "полуфинал" in self.current_stage.lower():
@@ -588,7 +591,7 @@ class EditStagesDialog(QDialog):
                         if player:
                             player_item = QTreeWidgetItem(group_item)
                             player_name = player.fio or player.player
-                            player_item.setText(0, f"🏅 {player_name} (посев: {choice.posev_sf})")
+                            player_item.setText(0, f"🏅 {player_name} (посев: {choice.posev_sf} город: {player.city} тренер: {coach})")
                             player_item.setData(0, Qt.UserRole, {
                                 "type": "player",
                                 "id": player.id,

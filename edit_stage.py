@@ -382,76 +382,85 @@ class EditStagesDialog(QDialog):
                 
         except Exception as e:
             print(f"Ошибка загрузки этапов: {e}")
-    
+ # =======================   
     def on_stage_changed(self, stage_name):
-        """Обработка изменения этапа"""
         self.current_stage = stage_name
-        
         if not stage_name:
             return
-        
+
         try:
-            # Получаем систему
             self.current_system = System.get_or_none(
                 (System.title_id == self.title_id) &
                 (System.stage == stage_name)
             )
-            
+
             if self.current_system:
                 self.load_groups()
                 self.load_players_for_move_tab()
                 self.load_players_for_add()
-                
-                # Активируем кнопки
+                self.update_add_player_tab()  # <-- добавить
+
                 self.add_player_btn.setEnabled(True)
-                
+
         except Exception as e:
             print(f"Ошибка загрузки этапа: {e}")
-    
+ # =======================   
     def load_groups(self):
         """Загрузка групп для текущего этапа"""
         if not self.current_system:
             return
-        
-        # Обновляем group_combo
+
         self.group_combo.clear()
-        
+        self.target_group_combo.clear()  # очищаем и для вкладки "Добавить игрока"
+
         try:
             if "Квалификация" in self.current_stage and "полуфинал" not in self.current_stage:
-                # Квалификация - получаем группы из Game_list
                 groups = Game_list.select(
                     Game_list.number_group
                 ).where(
                     (Game_list.title_id == self.title_id) &
                     (Game_list.system_id == self.current_system.id)
                 ).distinct().order_by(Game_list.number_group)
-                
+
                 for group in groups:
                     self.group_combo.addItem(group.number_group)
-                    
+                    self.target_group_combo.addItem(group.number_group)
+
             elif "полуфинал" in self.current_stage.lower():
-                # Полуфинал - используем sf_group из Choice
-                groups = Choice.select(
+                semi_num = 1 if "1-й" in self.current_stage else 2
+                choices = Choice.select(
                     Choice.sf_group
                 ).where(
                     (Choice.title_id == self.title_id) &
-                    (Choice.semi_final == (1 if "1-й" in self.current_stage else 2))
+                    (Choice.semi_final == semi_num)
                 ).distinct().order_by(Choice.sf_group)
-                
-                for group in groups:
-                    if group.sf_group:
-                        self.group_combo.addItem(group.sf_group)
-                        
+
+                for choice in choices:
+                    if choice.sf_group:
+                        self.group_combo.addItem(choice.sf_group)
+                        self.target_group_combo.addItem(choice.sf_group)
+
             else:
-                # Финал - одна группа
+                # Финал или другая таблица
                 self.group_combo.addItem(self.current_stage)
-                
+                self.target_group_combo.addItem(self.current_stage)
+
             if self.group_combo.count() > 0:
                 self.group_combo.setCurrentIndex(0)
-                
+                # Обновляем позиции для вкладки "Добавить игрока"
+                self.on_target_group_changed(self.target_group_combo.currentText())
+
         except Exception as e:
             print(f"Ошибка загрузки групп: {e}")
-    
+
+    def update_add_player_tab(self):
+        """Обновление вкладки добавления игрока (группы и позиции)"""
+        current_group = self.target_group_combo.currentText()
+        if current_group:
+            self.on_target_group_changed(current_group)
+
+
+
     def on_group_changed(self, group_name):
         """Обработка изменения группы"""
         if not group_name:

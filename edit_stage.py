@@ -189,7 +189,7 @@ class EditStagesDialog(QDialog):
         layout = QVBoxLayout(tab)
         
         # Инструкция
-        info_label = QLabel("Перетащите игрока из одной группы в другую или выберите игроков для обмена местами")
+        info_label = QLabel("Перетащите игрока из одной группы в другую или выберите игроков для обмена местами (Ctrl+клик для выбора двух)")
         info_label.setStyleSheet("color: #666; font-size: 11px; padding: 5px;")
         layout.addWidget(info_label)
         
@@ -211,6 +211,7 @@ class EditStagesDialog(QDialog):
         self.groups_tree.setAcceptDrops(True)
         self.groups_tree.setDropIndicatorShown(True)
         self.groups_tree.setDragDropMode(QTreeWidget.InternalMove)
+        self.groups_tree.setSelectionMode(QTreeWidget.ExtendedSelection)  # <-- ВАЖНО: множественный выбор
         self.groups_tree.setStyleSheet("""
             QTreeWidget {
                 font-size: 12px;
@@ -226,7 +227,7 @@ class EditStagesDialog(QDialog):
         """)
         self.groups_tree.itemSelectionChanged.connect(self.on_tree_selection_changed)
         left_layout.addWidget(self.groups_tree)
-        
+    #===================================    
         splitter.addWidget(left_panel)
         
         # Правая панель - информация и кнопки
@@ -1361,35 +1362,6 @@ class EditStagesDialog(QDialog):
             import traceback
             traceback.print_exc()
     
-    def recreate_matches_for_stage(self, stage_name):
-        """Пересоздание матчей для этапа после изменений"""
-        # Получаем систему
-        system = System.get_or_none(
-            (System.title_id == self.title_id) &
-            (System.stage == stage_name)
-        )
-        if not system:
-            return
-        
-        # Получаем игроков из Game_list
-        game_players = Game_list.select().where(
-            (Game_list.title_id == self.title_id) &
-            (Game_list.system_id == system.id)
-        ).order_by(Game_list.number_group, Game_list.rank_num_player)
-        
-        if game_players.count() == 0:
-            return
-        
-        # Определяем тип таблицы и этап
-        type_table = system.type_table
-        
-        if "Круговая" in type_table or system.type_table == "Круговая":
-            # Для круговой системы - пересоздаем туры
-            self.recreate_round_robin_matches(system, game_players)
-        else:
-            # Для олимпийской системы - пересоздаем сетку
-            self.recreate_olympic_matches(system, game_players)
-    
     def recreate_round_robin_matches(self, system, game_players):
         """Пересоздание матчей для круговой системы"""
         # Группируем игроков по группам
@@ -1681,14 +1653,91 @@ class EditStagesDialog(QDialog):
                 
         except Exception as e:
             print(f"Ошибка обновления Choice: {e}")
+# ==================
+    def recreate_semifinal_matches(self, system, game_players, stage_name):
+        """Пересоздание матчей для полуфинала с переносом результатов из квалификации"""
+        # Группируем игроков по группам
+        groups = {}
+        for gp in game_players:
+            group = gp.number_group
+            if group not in groups:
+                groups[group] = []
+            groups[group].append(gp)
 
+        # Формируем структуру sf_groups для родительского метода
+        sf_groups = []
+        for group_name, players in groups.items():
+            players.sort(key=lambda x: x.rank_num_player)
+            group_players = []
+            for gp in players:
+                player = Player.get_or_none(Player.id == gp.player_group.id)
+                if player:
+                    choice = Choice.get_or_none(
+                        (Choice.title_id == self.title_id) &
+                        (Choice.player_choice == player.id)
+                    )
+                    if choice:
+                        group_players.append(choice)
+            # Извлекаем номер группы
+            import re
+            match = re.search(r'(\d+)', group_name)
+            group_num = int(match.group(1)) if match else 0
+            sf_groups.append({
+                'sf_group_num': group_num,
+                'players': group_players,
+                'from_groups': []   # не используется, но нужно для структуры
+            })
 
+        # Определяем номер полуфинала
+        semi_num = 1 if "1-й" in stage_name else 2
+
+        # Убеждаемся, что в родителе установлен правильный title_id
+        if self.parent and hasattr(self.parent, 'current_title_id'):
+            self.parent.current_title_id = self.title_id
+
+        # Вызываем родительский метод, если он доступен
+        if self.parent and hasattr(self.parent, 'create_matches_for_semi_final'):
+            self.parent.create_matches_for_semi_final(1, sf_groups, stage_name)
+        else:
+            # Fallback – упрощённая версия (без переноса результатов)
+            self.create_matches_for_semi_final_local(semi_num, sf_groups, stage_name)
+
+        # Обновляем Choice после изменений
+        self.update_choice_after_changes()
+
+    def recreate_matches_for_stage(self, stage_name):
+        """Пересоздание матчей для этапа после изменений"""
+        system = System.get_or_none(
+            (System.title_id == self.title_id) &
+            (System.stage == stage_name)
+        )
+        if not system:
+            return
+
+        game_players = Game_list.select().where(
+            (Game_list.title_id == self.title_id) &
+            (Game_list.system_id == system.id)
+        ).order_by(Game_list.number_group, Game_list.rank_num_player)
+
+        if game_players.count() == 0:
+            return
+
+        # === НОВАЯ ПРОВЕРКА ДЛЯ ПОЛУФИНАЛОВ ===
+        if "полуфинал" in stage_name.lower():
+            self.recreate_semifinal_matches(system, game_players, stage_name)
+            return
+
+        # Остальной код для круговой/олимпийской системы
+        type_table = system.type_table
+        if "Круговая" in type_table or system.type_table == "Круговая":
+            self.recreate_round_robin_matches(system, game_players)
+        else:
+            self.recreate_olympic_matches(system, game_players)
+# =======================
 def show_edit_stages_dialog(parent=None, title_id=None):
     """Функция для вызова диалога редактирования этапов"""
     dialog = EditStagesDialog(parent, title_id)
     return dialog.exec_()
-
-
 # Добавляем в главное меню
 def add_edit_stages_menu_item(menu_bar, parent_window):
     """Добавление пункта меню 'Редактирование этапов'"""

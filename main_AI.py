@@ -38,7 +38,7 @@ from models import connect_db, close_db
 from models import *
 from models_qt import (
     PlayersTableModel, TeamsTableModel, ResultsTableModel, 
-    DoublePlayersTableModel, TitlesTableModel, CoachesTableModel
+    DoublePlayersTableModel, TitlesTableModel, CoachesTableModel, RatingTableModel
 )
 
 
@@ -103,6 +103,8 @@ class MainWindow(QMainWindow):
         self.teams_model = TeamsTableModel()
         self.results_model = ResultsTableModel()
         self.double_players_model = DoublePlayersTableModel()
+        self.rating_model = RatingTableModel()
+
         
         # Данные для comboBox
         self.load_combo_data()
@@ -1002,12 +1004,47 @@ class MainWindow(QMainWindow):
         """)
         self.doubles_table_view.verticalHeader().setDefaultSectionSize(22)
         self.doubles_table_view.setModel(self.double_players_model)
+
+        # Таблица рейтинга
+        self.rating_table_view = QTableView()
+        self.rating_table_view.setSelectionBehavior(QTableView.SelectRows)
+        self.rating_table_view.setAlternatingRowColors(True)
+        self.rating_table_view.setShowGrid(True)
+        self.rating_table_view.setStyleSheet("""
+            QTableView {
+                font-size: 14px;
+                gridline-color: #ddd;
+                selection-background-color: #a0c4ff;
+            }
+            QHeaderView::section {
+                background-color: #FF9800;
+                color: white;
+                padding: 4px;
+                font-weight: bold;
+                font-size: 10px;
+                border: none;
+            }
+        """)
+        self.rating_table_view.verticalHeader().setDefaultSectionSize(22)
+        self.rating_table_view.setModel(self.rating_model)  # нужно создать модель
+        # Настройка колонок для рейтинга
+        self.rating_table_view.setColumnWidth(0, 40)   # №
+        self.rating_table_view.setColumnWidth(1, 200)  # ФИО
+        self.rating_table_view.setColumnWidth(2, 150)  # Город
+        self.rating_table_view.setColumnWidth(3, 150)  # Регион
+        self.rating_table_view.setColumnWidth(4, 60)   # Возраст
+        self.rating_table_view.setColumnWidth(5, 80)   # Рейтинг
+        # Последняя колонка растягивается
+        header = self.rating_table_view.horizontalHeader()
+        header.setSectionResizeMode(5, QHeaderView.Stretch)
+
         
         # Добавляем все таблицы в stacked widget
         self.table_container.addWidget(self.table_view)      # индекс 0
         self.table_container.addWidget(self.results_table_view)  # индекс 1
         self.table_container.addWidget(self.teams_table_view)    # индекс 2
         self.table_container.addWidget(self.doubles_table_view)  # индекс 3
+        self.table_container.addWidget(self.rating_table_view)  # индекс 4 (если уже есть другие)
         
         bottom_layout.addWidget(self.table_container)
         
@@ -1035,7 +1072,7 @@ class MainWindow(QMainWindow):
             3: 350,  # Пары
             4: 350,  # Система
             5: 200,  # Результаты - маленькая верхняя часть для формы ввода
-            6: 350,  # Рейтинг
+            6: 150,  # Рейтинг
             7: 250   # Дополнительно
         }
         
@@ -1047,10 +1084,134 @@ class MainWindow(QMainWindow):
         
         # Устанавливаем текущую вкладку - Титул
         self.tab_widget.setCurrentIndex(0)
-        
-        # # Загружаем последнее соревнование (если есть)
-        # self.load_last_competition()   
+# =============== вкладка Рейтинг work ======
+    def apply_rating_filters(self):
+            """Применение фильтров к рейтингу"""
+            if not hasattr(self, 'rating_players_data'):
+                return
 
+            age_text = self.age_filter_combo.currentText()
+            region_text = self.region_filter_edit.text().strip().lower()
+            city_text = self.city_filter_edit.text().strip().lower()
+            search_text = self.rating_search_edit.text().strip().lower()
+            top_text = self.rating_limit_combo.currentText()  # <-- добавить
+
+            filtered = []
+            for item in self.rating_players_data:
+                # Фильтр по возрасту
+                if age_text != "Все":
+                    age_limit = self.extract_age_limit(age_text)
+                    bday = item.get('birth_date')
+                    if bday:
+                        age = self.calculate_age(bday)
+                        if age is None or age >= age_limit:
+                            continue
+                    else:
+                        continue
+
+                # Фильтр по региону
+                if region_text and region_text not in (item.get('region', '') or '').lower():
+                    continue
+
+                # Фильтр по городу
+                if city_text and city_text not in (item.get('city', '') or '').lower():
+                    continue
+
+                # Поиск по имени
+                if search_text and search_text not in (item.get('fio', '') or '').lower():
+                    continue
+
+                filtered.append(item)
+                # Применяем ТОП фильтр
+                if top_text != "Все":
+                    try:
+                        limit = int(top_text.split()[1])
+                        filtered = filtered[:limit]
+                    except:
+                        pass
+            self.display_rating_players(filtered) 
+ 
+    def display_rating_players(self, players_data):
+            """Отображение списка игроков в таблице рейтинга через модель"""
+            self.rating_model.setData(players_data)
+            # Настроить ширину колонок
+            header = self.rating_table_view.horizontalHeader()
+            for i in range(self.rating_model.columnCount()):
+                header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
+
+    def calculate_age(self, birth_date):
+        """Расчет возраста на текущую дату"""
+        if not birth_date:
+            return None
+        today = date.today()
+        return today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
+
+    def extract_age_limit(self, age_text):
+        """Извлекает числовой лимит из текста возраста"""
+        import re
+        match = re.search(r'(\d+)', age_text)
+        if match:
+            return int(match.group(1))
+        return 99 
+
+    def load_rating_data(self):
+        """Загрузка данных рейтинга из таблиц R_list_*"""
+        if not self.current_title_id:
+            return
+
+        # Определяем, какой рейтинг выбран
+        rating_type = self.rating_type_combo.currentText()
+        data = []
+
+        if "Текущий" in rating_type and "мужчины" in rating_type.lower():
+            records = R_list_m.select().order_by(R_list_m.r_list.desc())
+        elif "Текущий" in rating_type and "женщины" in rating_type.lower():
+            records = R_list_d.select().order_by(R_list_d.r_list.desc())
+        elif "Январский" in rating_type and "мужчины" in rating_type.lower():
+            records = R1_list_m.select().order_by(R1_list_m.r1_list.desc())
+        elif "Январский" in rating_type and "женщины" in rating_type.lower():
+            records = R1_list_d.select().order_by(R1_list_d.r1_list.desc())
+        else:
+            records = []
+
+        # Преобразуем записи в словари
+        for rec in records:
+            if hasattr(rec, 'r_fname'):
+                fio = rec.r_fname
+                bday = rec.r_bithday
+                city = rec.r_city or ""
+                region = rec.r_region or ""
+                rating = rec.r_list
+            elif hasattr(rec, 'r1_fname'):
+                fio = rec.r1_fname
+                bday = rec.r1_bithday
+                city = rec.r1_city or ""
+                region = rec.r1_region or ""
+                rating = rec.r1_list
+            else:
+                continue
+            data.append({
+                'fio': fio,
+                'birth_date': bday,
+                'city': city,
+                'region': region,
+                'rating': rating
+            })
+
+        # Сохраняем данные для фильтрации
+        self.rating_players_data = data
+        self.apply_rating_filters()  
+
+    def on_rating_type_changed(self):
+        """Обработка смены типа рейтинга"""
+        self.load_rating_data()
+
+    def reset_rating_filters(self):
+        self.age_filter_combo.setCurrentIndex(0)
+        self.region_filter_edit.clear()
+        self.city_filter_edit.clear()
+        self.rating_search_edit.clear()
+# ===============================    
     def create_category_buttons(self):
         """Создание кнопок для переключения между категориями участников (только man/woman)"""
         # Очищаем существующие кнопки
@@ -1269,79 +1430,7 @@ class MainWindow(QMainWindow):
     def show_referee_tooltip(self, full_name, category):
         """Показать всплывающую подсказку с информацией о найденном судье"""
         # Можно показать временное сообщение или установить tooltip
-        pass  # Опционально
-
-    def _save_title_info(self):
-        """Сохранение информации о соревновании"""
-        if not self.comp_name_edit.text().strip():
-            QMessageBox.warning(self, "Ошибка", "Введите название соревнования")
-            return
-        
-        if not self.comp_city_edit.text().strip():
-            QMessageBox.warning(self, "Ошибка", "Введите город проведения")
-            return
-        
-        # Получаем данные из формы
-        title_data = {
-            'name': self.comp_name_edit.text().strip(),
-            'sredi': self.comp_sredi_combo.currentText(),
-            'vozrast': self.comp_vozrast_combo.currentText(),
-            'data_start': self.comp_start_date.date().toPyDate(),
-            'data_end': self.comp_end_date.date().toPyDate(),
-            'mesto': self.comp_mesto_edit.text().strip(),
-            'city': self.comp_city_edit.text().strip(),
-            'referee': self.main_referee_edit.text().strip(),
-            'kat_ref': self.get_category_code(self.referee_category_combo.currentText()),
-            'secretary': self.main_secretary_edit.text().strip(),
-            'kat_sec': self.get_category_code(self.secretary_category_combo.currentText()),
-            'vid_turnira': "Личное",
-            'full_name_comp': self.comp_name_edit.text().strip(),
-            'short_name_comp': self.comp_name_edit.text().strip()[:50],
-            'tab_enabled': "1",
-            'multiregion': 0,
-            'perenos': 0,
-            'otchestvo': 0,
-            'r_date': ""
-        }
-        
-        try:
-            # Сохраняем или обновляем судью в базе данных
-            self.save_or_update_referee(
-                self.main_referee_edit.text().strip(),
-                self.get_category_code(self.referee_category_combo.currentText())
-            )
-            self.save_or_update_referee(
-                self.main_secretary_edit.text().strip(),
-                self.get_category_code(self.secretary_category_combo.currentText())
-            )
-            
-            if self.current_title_id:
-                # Обновляем существующее соревнование
-                query = Title.update(**title_data).where(Title.id == self.current_title_id)
-                query.execute()
-                QMessageBox.information(self, "Успех", "Информация о соревновании обновлена")
-            else:
-                # Создаем новое соревнование
-                title = Title.create(**title_data)
-                self.current_title_id = title.id
-                QMessageBox.information(self, "Успех", f"Соревнование '{title_data['name']}' создано")
-                
-            # Обновляем список соревнований
-            self.load_titles_list()
-            
-            # Обновляем отображение в списке
-            self.competitions_label.setText(f"🏆 Текущее соревнование: {title_data['name'][:30]}...")
-            self.competitions_label.setStyleSheet("""
-                background-color: #2196F3;
-                color: white;
-                padding: 6px;
-                font-weight: bold;
-                font-size: 11px;
-                border-radius: 3px;
-            """)
-            
-        except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить данные: {str(e)}")
+        pass  # Опциональн
 
     def save_or_update_referee(self, full_name, category):
         """Сохраняет или обновляет судью в базе данных"""
@@ -2090,7 +2179,6 @@ class MainWindow(QMainWindow):
         """)
         info_layout = QHBoxLayout(info_frame)
         info_layout.setSpacing(5)
-        # info_layout.setContentsMargins(5, 2, 5, 2)
         info_layout.setContentsMargins(2, 2, 2, 2)
         
         self.current_stage_label = QLabel("Этап: Не выбран")
@@ -2347,13 +2435,13 @@ class MainWindow(QMainWindow):
                 QComboBox {
                     max-height: 26px;
                     padding: 3px 5px;
-                    font-size: 10px;
+                    font-size: 12px;
                     border: 1px solid #ccc;
                     border-radius: 3px;
                 }
                 QGroupBox {
                     font-weight: bold;
-                    font-size: 11px;
+                    font-size: 12px;
                     border: 1px solid #ccc;
                     border-radius: 5px;
                     margin-top: 10px;
@@ -2370,15 +2458,19 @@ class MainWindow(QMainWindow):
             group_layout.setSpacing(8)
             group_layout.setContentsMargins(10, 15, 10, 10)
             
-            self.rating_type = QComboBox()
-            self.rating_type.addItems(["Общий рейтинг", "По возрастным группам", "По регионам", "По городам"])
-            self.rating_type.setStyleSheet(input_style)
-            group_layout.addRow("Тип рейтинга:", self.rating_type)
+            self.rating_filter = QComboBox()
+            self.rating_filter.addItems(["Общий рейтинг", "По возрастным группам", "По регионам", "По городам"])
+            self.rating_filter.currentIndexChanged.connect(self.apply_rating_filters)  # <-- добавить
+            self.rating_filter.setStyleSheet(input_style)
+            group_layout.addRow("Тип рейтинга:", self.rating_filter)
+
             
-            self.rating_limit = QComboBox()
-            self.rating_limit.addItems(["Топ 10", "Топ 20", "Топ 50", "Топ 100", "Все"])
-            self.rating_limit.setStyleSheet(input_style)
-            group_layout.addRow("Показывать:", self.rating_limit)
+            self.rating_limit_combo = QComboBox()
+            self.rating_limit_combo.addItems(["Все", "Топ 10", "Топ 20", "Топ 50", "Топ 100"])
+            self.rating_limit_combo.currentIndexChanged.connect(self.apply_rating_filters)  # <-- добавить
+
+            self.rating_limit_combo.setStyleSheet(input_style)
+            group_layout.addRow("Показывать:", self.rating_limit_combo)
             
             main_layout.addWidget(group)
             main_layout.addStretch()
@@ -3434,60 +3526,6 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Ошибка получения статистики: {e}")
             return None
-# ============================= рабочий =====
-    # def _on_match_double_clicked(self, index):
-    #     """Обработка двойного клика по строке таблицы для загрузки матча"""
-    #     row = index.row()
-    #     model = self.results_table.model()
-        
-    #     if row < model.rowCount():
-    #         player1 = model.data(model.index(row, 4))
-    #         player2 = model.data(model.index(row, 5))
-    #         winner = model.data(model.index(row, 6))
-    #         score = model.data(model.index(row, 7))
-            
-
-    #         # Очищаем поля счетов
-    #         self.clear_result_form_compact()
-
-    #         # Заполняем поля игроков (только при двойном клике)
-    #         self.player1_name.setText(player1)
-    #         self.player2_name.setText(player2)
-                        
-    #         # Если матч уже сыгран, загружаем счета
-    #         if winner != "" and score != "":
-    #             if winner != player1:
-    #                 score = ' '.join(score.split()[::-1])
-    #             self.parse_and_load_scores_compact(score)
-    #             # self.load_match_for_editing(id_match)
-
-    #             # Устанавливаем победителя
-    #             if winner == player1:
-    #                 self.player1_status.setCurrentText("Играет")
-    #             elif winner == player2:
-    #                 self.player2_status.setCurrentText("Играет")
-    #         else:
-    #             # Устанавливаем фокус на первую партию первого игрока
-    #             QTimer.singleShot(100, lambda: self.score_edits_p1[0].setFocus())
-            
-    #         # Находим соответствующий матч в списке
-    #         for i, match in enumerate(self.current_matches):
-    #             if match.player1 == player1 and match.player2 == player2:
-    #                 self.current_match_index = i
-    #                 self.current_match_label.setText(f"Матч: {i + 1}/{len(self.current_matches)}")
-    #                 break
-            
-    #         # Устанавливаем количество партий
-    #         if self.current_matches and self.current_match_index < len(self.current_matches):
-    #             system = System.get_or_none(System.id == self.current_matches[self.current_match_index].system_id)
-    #             if system:
-    #                 parties_count = system.score_flag if system.score_flag else 5
-    #                 self.update_scores_fields_compact(parties_count)
-    #                 self.parties_count = parties_count
-
-    #          # Устанавливаем фокус на первую партию первого игрока
-    #         QTimer.singleShot(100, lambda: self.score_edits_p1[0].setFocus())
-
 # ====== добавлена возможность при Х сохранение матча ====
     def on_match_double_clicked(self, index):
         """Обработка двойного клика по строке таблицы для загрузки матча"""
@@ -4122,7 +4160,38 @@ class MainWindow(QMainWindow):
                 self.load_doubles_for_title() 
 
             # отображение заголовка и информации в QListWidget
-            self.change_label_ListWidget(index)    
+            self.change_label_ListWidget(index)
+
+        elif index == 6:  # Рейтинг
+            self.table_header.setText("⭐ Рейтинг участников")
+            self.filters_widget.setVisible(False)  
+
+            # отображение заголовка и информации в QListWidget
+            self.change_label_ListWidget(index)
+
+            self.table_container.setCurrentWidget(self.rating_table_view)  # предполагаем, что есть rating_table_view
+            # self.table_header.setText("⭐ Рейтинг участников")
+            self.table_header.setStyleSheet("""
+                background-color: #FF9800;
+                color: white;
+                padding: 6px;
+                font-weight: bold;
+                font-size: 13px;
+                border-radius: 3px;
+            """)
+            # Скрываем лишние элементы
+            self.filters_widget.setVisible(False)
+            self.stage_section.setVisible(False)
+            if hasattr(self, 'seeding_info_label'):
+                self.seeding_info_label.hide()
+            
+            # Обновляем левую панель для рейтинга
+            self.update_left_panel_for_rating_tab()
+            
+            # Загружаем рейтинговые данные
+            if self.current_title_id:
+                self.load_rating_data() 
+
         # Для остальных вкладок
         else:
             # Показываем таблицу участников (или можно скрыть)
@@ -4145,13 +4214,6 @@ class MainWindow(QMainWindow):
                 # отображение заголовка и информации в QListWidget
                 self.change_label_ListWidget(index)
 
-            elif index == 6:  # Рейтинг
-                self.table_header.setText("⭐ Рейтинг участников")
-                self.filters_widget.setVisible(False)  
-
-                # отображение заголовка и информации в QListWidget
-                self.change_label_ListWidget(index)
-
             elif index == 7:  # Дополнительно
                 self.table_header.setText("ℹ️ Дополнительная информация")
                 self.filters_widget.setVisible(False)
@@ -4167,6 +4229,313 @@ class MainWindow(QMainWindow):
 
         #  Изменяем название кнопок от категории игроков
         self.create_category_buttons()
+
+# ======================= work
+    # def _update_left_panel_for_rating_tab(self):
+    #     """Обновление левой панели для вкладки Рейтинг"""
+    #     # Очищаем панель
+    #     for i in reversed(range(self.dynamic_filters_layout.count())):
+    #         item = self.dynamic_filters_layout.itemAt(i)
+    #         if item.widget():
+    #             item.widget().deleteLater()
+    #         elif item.layout():
+    #             while item.layout().count():
+    #                 child = item.layout().takeAt(0)
+    #                 if child.widget():
+    #                     child.widget().deleteLater()
+
+    #     # Заголовок
+    #     self.action_title.setText("⭐ Рейтинг")
+    #     self.action_description.setText("Фильтрация и просмотр рейтинга участников")
+
+    #     # ---- Выбор рейтинга ----
+    #     rating_group = QGroupBox("Выбор рейтинга")
+    #     rating_layout = QVBoxLayout(rating_group)
+    #     rating_layout.setSpacing(5)
+        
+    #     self.rating_type_combo = QComboBox()
+    #     self.rating_type_combo.addItems([
+    #         "Текущий (мужчины)",
+    #         "Текущий (женщины)",
+    #         "Январский (мужчины)",
+    #         "Январский (женщины)"
+    #     ])
+    #     self.rating_type_combo.currentIndexChanged.connect(self.on_rating_type_changed)
+    #     rating_layout.addWidget(self.rating_type_combo)
+    #     self.dynamic_filters_layout.addWidget(rating_group)
+
+    #     # self.top_filter_combo = QComboBox()
+    #     # self.top_filter_combo.addItems(["Все", "Топ 10", "Топ 20", "Топ 50", "Топ 100"])
+    #     # self.top_filter_combo.currentIndexChanged.connect(self.apply_rating_filters)  # <-- добавить
+
+    #     # ---- Фильтр по возрасту ----
+    #     age_group = QGroupBox("Возраст")
+    #     age_layout = QVBoxLayout(age_group)
+    #     self.age_filter_combo = QComboBox()
+    #     self.age_filter_combo.addItems(["Все", "до 12 лет", "до 14 лет", "до 16 лет", "до 18 лет", "до 22 лет"])
+    #     self.age_filter_combo.currentIndexChanged.connect(self.apply_rating_filters)
+    #     age_layout.addWidget(self.age_filter_combo)
+    #     self.dynamic_filters_layout.addWidget(age_group)
+
+    #     # ---- Фильтр по региону ----
+    #     region_group = QGroupBox("Регион")
+    #     region_layout = QVBoxLayout(region_group)
+    #     self.region_filter_edit = QLineEdit()
+    #     self.region_filter_edit.setPlaceholderText("Введите регион...")
+    #     self.region_filter_edit.textChanged.connect(self.apply_rating_filters)
+    #     region_layout.addWidget(self.region_filter_edit)
+    #     self.dynamic_filters_layout.addWidget(region_group)
+
+    #     # ---- Фильтр по городу ----
+    #     city_group = QGroupBox("Город")
+    #     city_layout = QVBoxLayout(city_group)
+    #     self.city_filter_edit = QLineEdit()
+    #     self.city_filter_edit.setPlaceholderText("Введите город...")
+    #     self.city_filter_edit.textChanged.connect(self.apply_rating_filters)
+    #     city_layout.addWidget(self.city_filter_edit)
+    #     self.dynamic_filters_layout.addWidget(city_group)
+
+    #     # ---- Поиск по имени ----
+    #     search_group = QGroupBox("Поиск")
+    #     search_layout = QVBoxLayout(search_group)
+    #     self.rating_search_edit = QLineEdit()
+    #     self.rating_search_edit.setPlaceholderText("Введите имя игрока...")
+    #     self.rating_search_edit.textChanged.connect(self.apply_rating_filters)
+    #     search_layout.addWidget(self.rating_search_edit)
+    #     self.dynamic_filters_layout.addWidget(search_group)
+
+    #     # При изменении комбобокса возраста
+    #     def on_age_changed(text):
+    #         if text == "Все":
+    #             self.rating_model.set_age_limit(None)
+    #         else:
+    #             limit = self.extract_age_limit(text)
+    #             self.rating_model.set_age_limit(limit)
+
+    #     self.age_filter_combo.currentTextChanged.connect(on_age_changed)
+
+    #     # Регион
+    #     self.region_filter_edit.textChanged.connect(
+    #         lambda text: self.rating_model.set_region_filter(text)
+    #     )
+
+    #     # Город
+    #     self.city_filter_edit.textChanged.connect(
+    #         lambda text: self.rating_model.set_city_filter(text)
+    #     )
+
+    #     # Поиск по имени
+    #     self.rating_search_edit.textChanged.connect(
+    #         lambda text: self.rating_model.set_name_filter(text)
+    #     )
+
+    #     # ---- Кнопка сброса ----
+    #     reset_btn = QPushButton("🔄 Сбросить фильтры")
+    #     reset_btn.setStyleSheet("""
+    #         QPushButton {
+    #             background-color: #f44336;
+    #             color: white;
+    #             border: none;
+    #             border-radius: 4px;
+    #             padding: 8px;
+    #             font-size: 11px;
+    #             font-weight: bold;
+    #         }
+    #         QPushButton:hover { background-color: #d32f2f; }
+    #     """)
+    #     reset_btn.clicked.connect(self.reset_rating_filters)
+    #     self.dynamic_filters_layout.addWidget(reset_btn)
+
+    #     # Кнопка печати
+    #     print_btn = QPushButton("🖨️ Печать ТОП")
+    #     print_btn.setStyleSheet("""
+    #         QPushButton {
+    #             background-color: #2196F3;
+    #             color: white;
+    #             border: none;
+    #             border-radius: 4px;
+    #             padding: 8px;
+    #             font-size: 11px;
+    #             font-weight: bold;
+    #         }
+    #         QPushButton:hover { background-color: #1976D2; }
+    #     """)
+    #     print_btn.clicked.connect(self.print_rating_top)
+    #     self.dynamic_filters_layout.addWidget(print_btn)
+
+    #     self.dynamic_filters_layout.addStretch()
+
+    def update_left_panel_for_rating_tab(self):
+        """Обновление левой панели для вкладки Рейтинг"""
+        # Очистка панели
+        for i in reversed(range(self.dynamic_filters_layout.count())):
+            item = self.dynamic_filters_layout.itemAt(i)
+            if item.widget():
+                item.widget().deleteLater()
+            elif item.layout():
+                while item.layout().count():
+                    child = item.layout().takeAt(0)
+                    if child.widget():
+                        child.widget().deleteLater()
+
+        self.action_title.setText("⭐ Рейтинг")
+        self.action_description.setText("Фильтрация и просмотр рейтинга участников")
+
+        # Выбор рейтинга
+        rating_group = QGroupBox("Выбор рейтинга")
+        rating_layout = QVBoxLayout(rating_group)
+        self.rating_type_combo = QComboBox()
+        self.rating_type_combo.addItems([
+            "Текущий (мужчины)",
+            "Текущий (женщины)",
+            "Январский (мужчины)",
+            "Январский (женщины)"
+        ])
+        self.rating_type_combo.currentIndexChanged.connect(self.on_rating_type_changed)
+        rating_layout.addWidget(self.rating_type_combo)
+        self.dynamic_filters_layout.addWidget(rating_group)
+
+        # Возраст
+        age_group = QGroupBox("Возраст")
+        age_layout = QVBoxLayout(age_group)
+        self.age_filter_combo = QComboBox()
+        self.age_filter_combo.addItems(["Все", "до 12 лет", "до 14 лет", "до 16 лет", "до 18 лет", "до 22 лет"])
+        self.age_filter_combo.currentIndexChanged.connect(self.apply_rating_filters)
+        age_layout.addWidget(self.age_filter_combo)
+        self.dynamic_filters_layout.addWidget(age_group)
+
+        # Регион
+        region_group = QGroupBox("Регион")
+        region_layout = QVBoxLayout(region_group)
+        self.region_filter_edit = QLineEdit()
+        self.region_filter_edit.setPlaceholderText("Введите регион...")
+        self.region_filter_edit.textChanged.connect(self.apply_rating_filters)
+        region_layout.addWidget(self.region_filter_edit)
+        self.dynamic_filters_layout.addWidget(region_group)
+
+        # Город
+        city_group = QGroupBox("Город")
+        city_layout = QVBoxLayout(city_group)
+        self.city_filter_edit = QLineEdit()
+        self.city_filter_edit.setPlaceholderText("Введите город...")
+        self.city_filter_edit.textChanged.connect(self.apply_rating_filters)
+        city_layout.addWidget(self.city_filter_edit)
+        self.dynamic_filters_layout.addWidget(city_group)
+
+        # Поиск по имени
+        search_group = QGroupBox("Поиск")
+        search_layout = QVBoxLayout(search_group)
+        self.rating_search_edit = QLineEdit()
+        self.rating_search_edit.setPlaceholderText("Введите имя игрока...")
+        self.rating_search_edit.textChanged.connect(self.apply_rating_filters)
+        search_layout.addWidget(self.rating_search_edit)
+        self.dynamic_filters_layout.addWidget(search_group)
+
+        # Сброс
+        reset_btn = QPushButton("🔄 Сбросить фильтры")
+        reset_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #f44336;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 8px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #d32f2f; }
+        """)
+        reset_btn.clicked.connect(self.reset_rating_filters)
+        self.dynamic_filters_layout.addWidget(reset_btn)
+
+        self.dynamic_filters_layout.addStretch()
+
+    def print_rating_top(self):
+        """Экспорт текущего отфильтрованного списка в PDF"""
+        if not hasattr(self, 'rating_model') or self.rating_model.rowCount() == 0:
+            QMessageBox.warning(self, "Ошибка", "Нет данных для печати")
+            return
+
+        # Получаем данные из модели
+        data = []
+        for row in range(self.rating_model.rowCount()):
+            row_data = []
+            for col in range(self.rating_model.columnCount()):
+                index = self.rating_model.index(row, col)
+                row_data.append(self.rating_model.data(index, Qt.DisplayRole))
+            data.append(row_data)
+
+        # Создаём PDF
+        try:
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+            from reportlab.lib.pagesizes import A4, landscape
+            from reportlab.lib import colors
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle as PS
+            from reportlab.lib.units import cm
+            import os
+
+            # Создаём папку
+            pdf_dir = "rating_pdf"
+            if not os.path.exists(pdf_dir):
+                os.makedirs(pdf_dir)
+
+            # Имя файла
+            title = Title.get_by_id(self.current_title_id)
+            short_name = title.short_name_comp if title.short_name_comp else title.name
+            import re
+            clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
+            clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
+
+            rating_type = self.rating_type_combo.currentText()
+            filename = os.path.join(pdf_dir, f"{clean_name}_rating_{rating_type}.pdf")
+
+            # Документ
+            doc = SimpleDocTemplate(filename, pagesize=landscape(A4),
+                                    topMargin=1.5*cm, bottomMargin=1.5*cm,
+                                    leftMargin=1.5*cm, rightMargin=1.5*cm)
+
+            styles = getSampleStyleSheet()
+            title_style = PS("TitleStyle", fontSize=14, fontName="DejaVuSerif-Bold",
+                            alignment=1, spaceAfter=20, textColor=colors.darkblue)
+
+            elements = []
+            elements.append(Paragraph(f"Рейтинг участников: {title.name}", title_style))
+            elements.append(Paragraph(f"Тип рейтинга: {rating_type}", styles['Normal']))
+            elements.append(Spacer(1, 0.5*cm))
+
+            # Заголовки таблицы
+            headers = ["№", "ФИО", "Город", "Регион", "Возраст", "Рейтинг"]
+            table_data = [headers] + data
+
+            # Создаём таблицу
+            table = Table(table_data, repeatRows=1)
+            table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSerif'),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                ('TOPPADDING', (0, 0), (-1, -1), 4),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ]))
+
+            elements.append(table)
+
+            doc.build(elements)
+
+            QMessageBox.information(self, "Успех", f"PDF создан: {filename}")
+            # Открываем
+            if sys.platform == 'win32':
+                os.startfile(filename)
+            else:
+                os.system(f'open "{filename}"')
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")
 # =======================================================
     def change_label_ListWidget(self, index):
         """Смена заголовка и QListWidget в зависимости от вкладки"""
@@ -8613,7 +8982,6 @@ class MainWindow(QMainWindow):
             size /= 1024.0
         return f"{size:.2f} ТБ"
 
-
     def run_backup_db(self):
         """запуск backup db"""
         # Настройки подключения
@@ -11613,173 +11981,7 @@ class MainWindow(QMainWindow):
         else:
             pass        
         return pdf_path
-# ========== old 0807 ===========
-    def _export_participants_to_pdf(self):
-        """Экспорт списка участников в PDF с выбором сортировки"""
-        from reportlab.platypus import Table, Paragraph
-        
-        if not self.current_title_id:
-            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
-            return
-        
-        # Выбор типа сортировки
-        sorting_type = self.get_sorting_type()
-        if sorting_type is None:
-            return
-        
-        try:
-            # Получаем данные о соревновании
-            title = Title.get(Title.id == self.current_title_id)
-            
-            # Создаем папку table_pdf, если её нет
-            pdf_dir = "table_pdf"
-            if not os.path.exists(pdf_dir):
-                os.makedirs(pdf_dir)
-            
-            # Используем короткое имя из Title
-            short_name = title.short_name_comp if title.short_name_comp else title.name
-            if not short_name:
-                short_name = "competition"
-            import re
-            clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
-            clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
-            
-            # Сортируем список участников в зависимости от выбора
-            if sorting_type == "alpha":
-                player_list = Player.select().where(Player.title_id == self.current_title_id).order_by(Player.player.asc())
-                file_suffix = "alf"
-            else:
-                player_list = Player.select().where(Player.title_id == self.current_title_id).order_by(Player.rank.desc())
-                file_suffix = "rating"
-            
-            # Путь к файлу (в папке table_pdf)
-            file_path = os.path.join(pdf_dir, f"{clean_name}_player_list_{file_suffix}.pdf")
-            
-            if player_list.count() == 0:
-                QMessageBox.warning(self, "Ошибка", "Нет участников для экспорта")
-                return
-            
-            # Получаем параметры
-            gamer = title.gamer if title.gamer else "Участники"
-            otc = title.otchestvo if title.otchestvo else 0
-            
-            # Подготовка данных для таблицы
-            elements = []
-            n = 0
-            
-            for player in player_list:
-                n += 1
-                # Формируем ФИО с отчеством или без
-                if otc == 1:
-                    patronymic_text = ""
-                    if player.patronymic_id:
-                        try:
-                            patronymic = Patronymic.get(Patronymic.id == player.patronymic_id)
-                            patronymic_text = patronymic.patronymic
-                        except:
-                            pass
-                    full_name = f"{player.player} {patronymic_text}".strip()
-                else:
-                    full_name = player.player
-                
-                # Форматируем дату
-                birth_date = player.bday.strftime("%d.%m.%Y") if player.bday else "---"
-                
-                # Получаем тренера
-                coach_text = ""
-                if player.coach_id:
-                    try:
-                        coach = Coach.get(Coach.id == player.coach_id)
-                        coach_text = coach.coach
-                    except:
-                        pass
-# ==================================================                
-                # Подготовка стилей перенос длинной строки
-                styles = getSampleStyleSheet()
-                custom_style = styles['Normal'].fontName = 'DejaVuSerif'
-                custom_style = styles['Normal'].fontSize = 6
-                custom_style = styles["Normal"].clone("CustomStyle")
-                custom_style.wordWrap = 'LTR' # Перенос слов (LTR - Left-To-Right)
-                custom_style.leading = 6 # Межстрочный интервал
-                
-                data_row = [
-                    str(n),
-                    Paragraph(full_name, custom_style),
-                    birth_date,
-                    str(player.rank) if player.rank else "0",
-                    player.city or "",
-                    Paragraph(player.region or "", custom_style),
-                    player.razryad or "",
-                    Paragraph(coach_text, custom_style),
-                ]
-                elements.append(data_row)
-            
-            # Добавляем заголовок таблицы
-            headers = ["№", "ФИО", "Дата рожд.", "R", "Город", "Субъект РФ", "Разряд", "Тренер(ы)"]
-            elements.insert(0, headers)
-            
-            # Создаем таблицу
-            table = Table(elements, repeatRows=1)
-            
-            # Настраиваем ширину колонок
-            col_widths = [0.8*cm, 5.0*cm, 1.6*cm, 0.8*cm, 2.5*cm, 3.2*cm, 1.1*cm, 4.0*cm]
-            table._argW = col_widths
-            
-            # Стиль таблицы
-            table_style = TableStyle([
-                ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSerif'),
-                ('FONTSIZE', (0, 0), (-1, -1), 7),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-                ('TOPPADDING', (0, 0), (-1, -1), 2),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('BACKGROUND', (0, 0), (8, 0), colors.yellow),
-                ('TEXTCOLOR', (0, 0), (8, 0), colors.darkblue),
-                ('LINEABOVE', (0, 0), (-1, -1), 0.5, colors.blue),
-                ('INNERGRID', (0, 0), (-1, -1), 0.2, colors.grey),
-                ('BOX', (0, 0), (-1, -1), 0.5, colors.black),
-            ])
-            
-            table.setStyle(table_style)
-# ==========================================            
-            # Создаем PDF документ
-            doc = SimpleDocTemplate(file_path, pagesize=A4,
-                                    topMargin=15*mm, bottomMargin=10*mm,
-                                    leftMargin=5*mm, rightMargin=5*mm)
-           
-            # =========стиль заголовка ===========
-            story = []
-            h3 = PS("normal", fontSize=12, fontName="DejaVuSerif-Italic", leftIndent=180,
-            firstLineIndent = 10, textColor="green")  # стиль параграфа
-            h3.spaceAfter = 10  # промежуток после заголовка
-            story.append(Paragraph(f'Список участников. {gamer}', h3))
-            story.append(table)
-            
-            # Добавляем информацию о сортировке в заголовок
-            sort_text = "по алфавиту" if sorting_type == "alpha" else "по рейтингу"
-                        
-            # Строим документ с использованием функции заголовка
-            doc.build(story, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
-            
-            QMessageBox.information(self, "Успех", 
-                                f"Список участников успешно сохранен в PDF:\n{file_path}\n"
-                                f"Сортировка: {sort_text}")
-            
-            # Предлагаем открыть файл
-            reply = QMessageBox.question(self, "Открыть файл", 
-                                        "Открыть созданный PDF файл?",
-                                        QMessageBox.Yes | QMessageBox.No)
-            if reply == QMessageBox.Yes:
-                if sys.platform == 'win32':
-                    os.startfile(file_path)
-                else:
-                    os.system(f'open "{file_path}"')
-            
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")
-# =========== new 0907 ==========
+
     def export_participants_to_pdf(self):
         """Экспорт списка участников в PDF с выбором сортировки"""
         from reportlab.platypus import Table, Paragraph
@@ -14070,7 +14272,7 @@ class MainWindow(QMainWindow):
                 vid = "mix"    
 
             return vid
-# =======================================================
+
     def full_net_player(self, player_in_final):
         """максимальное количество игроков в сетке при не полном составе"""
         if player_in_final == 4:
@@ -14350,42 +14552,6 @@ class MainWindow(QMainWindow):
                         return match_dict
             else:
                 return match_dict           
-    #вариант с поиском встречи
-    def _find_match_numbers_in_table(self, table_data, fin, posev_data):
-            """Найти все номера встреч в таблице и их позиции"""
-            
-            match_positions = {}
-            schedule_positions = {}
-            schedule = {}
-            flag = 0
-            # == НАХОДИТ КАКАЯ СЕТКА (-2) ИЛИ НЕТ ====
-            systems = System.select().where((System.title_id == self.current_title_id) & (System.stage == fin)).get()
-            type_table = systems.type_table
-            if type_table == "Олимпийская (минус 2)":
-                flag = 1
-            for row_idx, row in enumerate(table_data):
-                for col_idx, cell in enumerate(row):
-                    if cell and isinstance(cell, str):
-                        # Ищем числа (положительные и отрицательные) как номера встреч
-                        # Регулярное выражение для чисел с опциональным минусом
-                        match = re.search(r'^(-?\d+)$', cell.strip())
-                        if match:
-                            match_num = int(match.group(1))
-                            if col_idx != 0 and match_num > 0:
-                                match_dict = self.find_match_numbers_and_cells_in_results_db(match_num, fin)
-                                if match_dict:
-                                    schedule_full_str = self.schedule_str(match_dict, match_num)
-                                else:
-                                    schedule_full_str = ""
-                                # ЕСЛИ СЕТКА 32-2
-                                if flag == 1 and match_num == 60:
-                                # if match_num == 60:
-                                    row_idx +=3
-                                match_positions[match_num] = (row_idx, col_idx)
-                                schedule_positions[match_num] = (row_idx, col_idx - 1)
-                                schedule[match_num] = schedule_full_str
-
-            return schedule_positions, schedule
 # =================================================
     def get_sorting_type(self):
         """Запрос типа сортировки для списка участников"""
@@ -14455,7 +14621,7 @@ class MainWindow(QMainWindow):
         if dialog.exec_() == QDialog.Accepted:
             return self.sorting_type
         return None
-# =============================================
+
     def register_fonts(self):
         """Регистрация русских шрифтов для PDF"""
         try:
@@ -14465,7 +14631,7 @@ class MainWindow(QMainWindow):
                 pdfmetrics.registerFont(TTFont('Arial', font_path))
         except:
             pass
-# ======================================================       
+     
     def tours_list(self, players_count):
         """туры таблиц по кругу в зависимости от кол-во участников"""
         # cp = players_count - 3 (индекс в списке туров)
@@ -14558,7 +14724,7 @@ class MainWindow(QMainWindow):
         else:
             # Для большего количества участников возвращаем последний вариант
             return tr[-1]
-# ============
+
     def fill_results_after_drawing(self):
         """Заполнение таблицы Result после жеребьевки квалификации"""
         if not self.current_title_id:
@@ -15347,7 +15513,7 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             print(f"Ошибка загрузки таблицы результатов: {e}")
-# =================== 2805 - рабочая =====
+
     def select_stage_for_results(self):
         """Выбор этапа для ввода результатов"""
         group_list = ["Квалификация", "Квалификация. 1-й полуфинал","Квалификация. 2-й полуфинал"]
@@ -15435,7 +15601,7 @@ class MainWindow(QMainWindow):
                 self.load_results_table_for_stage(stage_name)
                 self.tab_widget.setCurrentIndex(5) 
                 self.update_filter_combos(stage_name)              
-# ============================= 2805
+
     def refresh_results_data(self):
         """Обновление данных результатов"""
         if self.current_stage:
@@ -15614,7 +15780,7 @@ class MainWindow(QMainWindow):
                 return False, f"При счете 10 и более разница должна быть 2 очка. Текущий счет: {s1}:{s2}"
         
         return True, ""
-# ===============================
+
     def update_left_panel_for_results_tab(self):
         """Обновление левой панели для вкладки Результаты"""
         # Очищаем панель
@@ -15799,7 +15965,7 @@ class MainWindow(QMainWindow):
         
         # Загружаем список игроков для автодополнения
         self.load_players_for_filter()
-# ================================
+
     def get_button_style(self):
         """Стиль для кнопок"""
         return """
@@ -15866,7 +16032,7 @@ class MainWindow(QMainWindow):
         """Применение всех фильтров и обновление таблицы"""
         if self.current_stage:
             self.load_results_table_for_stage(self.current_stage)
-# ============= old 0607
+
     def update_filter_combos(self, stage_name):
         """Обновление списков групп и туров в фильтрах"""
         group_list = ["Квалификация", "Квалификация. 1-й полуфинал","Квалификация. 2-й полуфинал"]
@@ -15951,21 +16117,7 @@ class MainWindow(QMainWindow):
             # Показываем все имена при пустом поле
             model = QStringListModel(self.player_filter_list[:50])
             self.player_filter_completer.setModel(model)
-# ========== было ==========
-    # def _apply_player_filter(self):
-    #     """Применение фильтра по игроку"""
-    #     self.player_filter_text = self.player_filter_edit.text().strip()
-    #     stage_name = self.stage_name
-    #     if self.player_filter_text:
-    #         # Обновляем информационную строку
-    #         self.filter_info_label.setText(f"🔍 Фильтр по игроку: {self.player_filter_text}")
-            
-    #         # Применяем фильтр ко всем этапам
-    #         self.load_filtered_results_all_stages(stage_name=None)
-    #     else:
-    #         # Сбрасываем фильтр
-    #         self.reset_player_filter()
-# ====== новый вариант ========
+
     def apply_player_filter(self):
         """Применение фильтра по игроку с учётом текущего этапа"""
         if hasattr(self, 'player_filter_edit'):
@@ -16026,58 +16178,6 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             print(f"Ошибка загрузки списка игроков: {e}")
-
-    # def _load_filtered_results_all_stages(self):
-    #     """Загрузка результатов, отфильтрованных по игроку, по всем этапам"""
-    #     if not self.current_title_id or not self.player_filter_text:
-    #         return
-        
-    #     try:
-    #         search_text = self.player_filter_text.lower()
-            
-    #         # Ищем во всех результатах соревнования
-    #         query = Result.select().where(Result.title_id == self.current_title_id)
-            
-    #         # Фильтруем по игроку (поиск в player1 или player2)
-    #         filtered_results = []
-    #         for result in query:
-    #             player1_clean = result.player1.split(' (')[0] if ' (' in result.player1 else result.player1
-    #             player2_clean = result.player2.split(' (')[0] if ' (' in result.player2 else result.player2
-                
-    #             if search_text in player1_clean.lower() or search_text in player2_clean.lower():
-    #                 filtered_results.append(result)
-            
-    #         # Формируем данные для таблицы
-    #         data = []
-    #         for result in filtered_results:
-    #             winner_text = result.winner if result.winner else ""
-    #             score_text = result.score_in_game if result.score_in_game else ""
-                
-    #             data.append({
-    #                 'id': result.id,
-    #                 'stage': result.system_stage,
-    #                 'group': result.number_group,
-    #                 'tour': result.tours,
-    #                 'player1': result.player1,
-    #                 'player2': result.player2,
-    #                 'winner': winner_text,
-    #                 'score': score_text,
-    #                 'points': result.score_win
-    #             })
-            
-    #         self.results_table_model.setData(data)
-            
-    #         # # Обновляем информацию
-    #         # total_matches = len(filtered_results)
-    #         # played_matches = sum(1 for r in filtered_results if r.winner)
-    #         # percent = (played_matches / total_matches * 100) if total_matches > 0 else 0
-            
-    #         # self.current_stage_label.setText(f"🔍 Поиск по игроку: {self.player_filter_text}")
-    #         # self.progress_label.setText(f"📊 Найдено матчей: {total_matches} | Сыграно: {played_matches} ({percent:.1f}%)")
-            
-    #     except Exception as e:
-    #         print(f"Ошибка фильтрации по игроку: {e}")
-
 
     def load_filtered_results_all_stages(self, stage_name=None):
         """
@@ -16142,7 +16242,7 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             print(f"Ошибка фильтрации по игроку: {e}")
-    # ================= новое на 2905 ====
+
     def update_results_menu(self):
         """Обновление меню результатов - активирует только те пункты, которые есть в системе"""
         if not self.current_title_id:
@@ -17069,65 +17169,52 @@ class MainWindow(QMainWindow):
    
         return sorted(result, key=lambda x: x['place_in_group'])
 # ==== 3105===============
-    def _calculate_points_scored_conceded(self, result, winner_idx, loser_idx, standings):
-        score_win = result.score_win if result.score_win else ""
-        if not score_win or score_win == "т.п.":
-            return
+    # def _calculate_points_scored_conceded(self, result, winner_idx, loser_idx, standings):
+    #     score_win = result.score_win if result.score_win else ""
+    #     if not score_win or score_win == "т.п.":
+    #         return
 
-        score_win = score_win.strip('()').replace(' ', '')
-        parts = score_win.split(',')
+    #     score_win = score_win.strip('()').replace(' ', '')
+    #     parts = score_win.split(',')
 
-        total_winner_scored = 0
-        total_winner_conceded = 0
-        total_loser_scored = 0
-        total_loser_conceded = 0
+    #     total_winner_scored = 0
+    #     total_winner_conceded = 0
+    #     total_loser_scored = 0
+    #     total_loser_conceded = 0
 
-        for part in parts:
-            try:
-                diff = int(part)
-                if diff >= 0:
-                    winner_scored = 11
-                    winner_conceded = 11 - diff
-                else:
-                    winner_scored = 11 + diff
-                    winner_conceded = 11
-                loser_scored = winner_conceded
-                loser_conceded = winner_scored
+    #     for part in parts:
+    #         try:
+    #             diff = int(part)
+    #             if diff >= 0:
+    #                 winner_scored = 11
+    #                 winner_conceded = 11 - diff
+    #             else:
+    #                 winner_scored = 11 + diff
+    #                 winner_conceded = 11
+    #             loser_scored = winner_conceded
+    #             loser_conceded = winner_scored
 
-                total_winner_scored += winner_scored
-                total_winner_conceded += winner_conceded
-                total_loser_scored += loser_scored
-                total_loser_conceded += loser_conceded
-            except ValueError:
-                if ':' in part:
-                    w, l = map(int, part.split(':'))
-                    total_winner_scored += w
-                    total_winner_conceded += l
-                    total_loser_scored += l
-                    total_loser_conceded += w
-                else:
-                    continue
+    #             total_winner_scored += winner_scored
+    #             total_winner_conceded += winner_conceded
+    #             total_loser_scored += loser_scored
+    #             total_loser_conceded += loser_conceded
+    #         except ValueError:
+    #             if ':' in part:
+    #                 w, l = map(int, part.split(':'))
+    #                 total_winner_scored += w
+    #                 total_winner_conceded += l
+    #                 total_loser_scored += l
+    #                 total_loser_conceded += w
+    #             else:
+    #                 continue
 
-        if winner_idx in standings:
-            standings[winner_idx]['points_scored'] += total_winner_scored
-            standings[winner_idx]['points_conceded'] += total_winner_conceded
-        if loser_idx in standings:
-            standings[loser_idx]['points_scored'] += total_loser_scored
-            standings[loser_idx]['points_conceded'] += total_loser_conceded
+    #     if winner_idx in standings:
+    #         standings[winner_idx]['points_scored'] += total_winner_scored
+    #         standings[winner_idx]['points_conceded'] += total_winner_conceded
+    #     if loser_idx in standings:
+    #         standings[loser_idx]['points_scored'] += total_loser_scored
+    #         standings[loser_idx]['points_conceded'] += total_loser_conceded
 
-    def _format_ratio(self, value):
-        """Возвращает строку с десятичной дробью без лишних нулей, до 2 знаков, но если третий знак не ноль, то показывает больше."""
-        if value == 0:
-            return "0"
-        if value.is_integer():
-            return str(int(value))
-        # Пытаемся округлить до 2 знаков, но если после округления разница больше 0.001, то показываем 3 знака и т.д.
-        for digits in range(2, 6):
-            rounded = round(value, digits)
-            if abs(rounded - value) < 1e-8:
-                s = f"{value:.{digits}f}".rstrip('0').rstrip('.')
-                return s
-        return f"{value:.5f}".rstrip('0').rstrip('.')
 # ========= крутиловку из 3 со счетом в партиях считает 3105
     def calculate_internal_points_scored_conceded(self, result, winner_idx, loser_idx, internal_stats):
         """
@@ -17477,141 +17564,6 @@ class MainWindow(QMainWindow):
             traceback.print_exc()
             QMessageBox.critical(self, "Ошибка", f"Ошибка при жеребьевке: {str(e)}")
 
-    def _create_semi_final_1(self, mesto_first, total_group):
-        """жеребьевка 1-го полуфинала с разведением 1-х мест по регионам"""
-        from collections import defaultdict
-        
-        count_gr_sf = total_group // 2
-        
-        # Создаем группы для 1-го полуфинала
-        group_1_16 = []
-        for i in range(1, count_gr_sf + 1):
-            group_1_16.append({
-                'sf_group_num': i,
-                'players': [],
-                'from_groups': []
-            })
-        
-        # 1-й ЭТАП: Добавляем игроков с 1-2 мест из групп 1-16
-        for group_num in range(1, count_gr_sf + 1):
-            players = self.get_players_by_group_and_place(group_num, [mesto_first, mesto_first + 1])
-            if players:
-                for g in group_1_16:
-                    if g['sf_group_num'] == group_num:
-                        g['players'].extend(players)
-                        g['from_groups'].append(group_num)
-                        break
-        
-        # Собираем игроков с 1-2 мест из групп 17-32
-        group_17_32 = []
-        for group_num in range(count_gr_sf + 1, total_group + 1):
-            players = self.get_players_by_group_and_place(group_num, [mesto_first, mesto_first + 1])
-            if players:
-                group_17_32.append({
-                    'sf_group_num': group_num,
-                    'players': players
-                })
-        
-        # Создаем списки для распределения
-        group_num_list_1_16 = [p for p in range(1, count_gr_sf + 1)]
-        group_num_list_1_16.sort(reverse=True)
-        group_num_list_17_32 = [p for p in range(count_gr_sf + 1, total_group + 1)]
-        
-        pending_groups = group_17_32.copy()
-        k = 0
-        
-        while pending_groups:
-            source_group = pending_groups.pop(0)
-            source_group_num = source_group['sf_group_num']
-            target_group = None
-            
-            if k >= len(group_num_list_1_16):
-                k = 0
-                if not pending_groups:
-                    break
-            
-            gr_num = group_num_list_1_16[k]
-            ind = self.find_index_by_group(group_1_16, gr_num)
-            
-            if ind == -1:
-                k += 1
-                continue
-            
-            target_group = group_1_16[ind]
-            target_group_num = group_num_list_1_16[k]
-            
-            # Проверяем регионы
-            if target_group['players'] and source_group['players']:
-                gr_1_16_region = target_group['players'][0].region
-                gr_17_32_region = source_group['players'][0].region
-                
-                if gr_1_16_region != gr_17_32_region:
-                    target_group['players'].extend(source_group['players'])
-                    target_group['from_groups'].append(source_group_num)
-                    group_num_list_1_16.remove(target_group_num)
-                    k = 0
-                else:
-                    k += 1
-            else:
-                target_group['players'].extend(source_group['players'])
-                target_group['from_groups'].append(source_group_num)
-                group_num_list_1_16.remove(target_group_num)
-                k = 0
-        
-        # Получаем или создаем систему для 1-го полуфинала
-        system = System.get_or_none(
-            (System.title_id == self.current_title_id) &
-            (System.stage == "Квалификация. 1-й полуфинал")
-        )
-        if not system:
-            system = System.create(
-                title_id=self.current_title_id,
-                stage="Квалификация. 1-й полуфинал",
-                total_group=len(group_1_16),
-                max_player=4,
-                type_table="Круговая",
-                sex=self.current_sex if self.current_sex else "man",
-                score_flag=5
-            )
-        
-        # Очищаем старые записи в Game_list и Choice для этого этапа
-        Game_list.delete().where(
-            (Game_list.title_id == self.current_title_id) &
-            (Game_list.system_id == system.id)
-        ).execute()
-        
-        # Заполняем данные в таблицах Game_list и Choice
-        for sf_group in group_1_16:
-            sf_group_num = sf_group['sf_group_num']
-            players = sf_group['players']
-            
-            for idx, player in enumerate(players, 1):
-                # Обновляем Choice
-                player.semi_final = 1
-                player.posev_sf = idx
-                player.sf_group = f"{sf_group_num} группа"
-                player.save()
-                
-                # Создаем запись в Game_list
-                Game_list.create(
-                    number_group=f"{sf_group_num} группа",
-                    rank_num_player=idx,
-                    player_group=player.player_choice.id,
-                    system_id=system.id,
-                    title_id=self.current_title_id,
-                    sex=self.current_sex if self.current_sex else "man",
-                    player_double_id=None,
-                    team_id=None
-                )
-                print(f"  Группа {sf_group_num}: игрок {idx} - {player.family}")
-                
-        # после цикла сохранения игроков
-        self.set_choice_flag_for_stage("Квалификация. 1-й полуфинал", flag=1)
-
-        print(f"\nСоздано {len(group_1_16)} групп для 1-го полуфинала")
-        print(f"Записано игроков в Game_list: {Game_list.select().where(Game_list.system_id == system.id).count()}")
-        
-        return group_1_16
 # ========2-й вариант жеребьевки 1-ого полуфинал ==
     def create_semi_final_1(self, mesto_first, total_group):
         """жеребьевка 1-го полуфинала с разведением 1-х мест по регионам"""
@@ -17835,34 +17787,6 @@ class MainWindow(QMainWindow):
         print("=" * 50)
         
         return group_1_16
-
-
-    def _find_index_by_group(self, groups, group_num):
-        """Найти индекс группы в списке по номеру группы"""
-        for i, g in enumerate(groups):
-            if g['sf_group_num'] == group_num:
-                return i
-        return -1
-
-
-    def _get_players_by_group_and_place(self, group_num, places):
-        """Получить игроков из группы по местам"""
-        players = []
-        try:
-            # Ищем Choice записи для указанной группы и мест
-            choices = Choice.select().where(
-                (Choice.title_id == self.current_title_id) &
-                (Choice.group == f"Группа {group_num}") &
-                (Choice.posev_group.in_(places))
-            )
-            for choice in choices:
-                # Получаем PlayerChoice
-                player = Player.get_or_none(Player.id == choice.player_choice_id)
-                if player:
-                    players.append(player)
-        except Exception as e:
-            print(f"Ошибка при получении игроков из группы {group_num}: {e}")
-        return players
 # =============================
     def create_semi_final_2(self, mesto_first, total_group):
         """жеребьевка 2-го полуфинала"""
@@ -18221,7 +18145,6 @@ class MainWindow(QMainWindow):
         print(f"\nЗаписи в Choice ({choices.count()}):")
         for ch in choices:
             print(f"  Группа: {ch.sf_group}, Посев: {ch.posev_sf}, Игрок: {ch.family}")
-
 # ==== бегунки =================
     def update_runner_stages(self):
         """Обновление списка этапов для печати бегунков"""
@@ -18354,85 +18277,85 @@ class MainWindow(QMainWindow):
             print(f"Ошибка загрузки заметок: {e}")
             if hasattr(self, 'notes_text'):
                 self.notes_text.clear()
-
-    def _get_players_for_stage(self, stage):
-        """Получение всех игроков для этапа"""
-        players = []
+# ========= выяснить
+    # def _get_players_for_stage(self, stage):
+    #     """Получение всех игроков для этапа"""
+    #     players = []
         
-        system = System.get_or_none(
-            (System.title_id == self.current_title_id) &
-            (System.stage == stage)
-        )
+    #     system = System.get_or_none(
+    #         (System.title_id == self.current_title_id) &
+    #         (System.stage == stage)
+    #     )
         
-        if not system:
-            return players
+    #     if not system:
+    #         return players
         
-        # Получаем игроков из Game_list
-        game_players = Game_list.select().where(
-            (Game_list.title_id == self.current_title_id) &
-            (Game_list.system_id == system.id)
-        ).order_by(Game_list.number_group, Game_list.rank_num_player)
+    #     # Получаем игроков из Game_list
+    #     game_players = Game_list.select().where(
+    #         (Game_list.title_id == self.current_title_id) &
+    #         (Game_list.system_id == system.id)
+    #     ).order_by(Game_list.number_group, Game_list.rank_num_player)
         
-        for gp in game_players:
-            player = Player.get_or_none(Player.id == gp.player_group.id)
-            if player:
-                coach_name = ""
-                if player.coach_id:
-                    coach = Coach.get_or_none(Coach.id == player.coach_id)
-                    if coach:
-                        coach_name = coach.coach
+    #     for gp in game_players:
+    #         player = Player.get_or_none(Player.id == gp.player_group.id)
+    #         if player:
+    #             coach_name = ""
+    #             if player.coach_id:
+    #                 coach = Coach.get_or_none(Coach.id == player.coach_id)
+    #                 if coach:
+    #                     coach_name = coach.coach
                 
-                players.append({
-                    'name': player.fio if player.fio else player.player,
-                    'city': player.city or "",
-                    'region': player.region or "",
-                    'razryad': player.razryad or "",
-                    'coach': coach_name,
-                    'group': gp.number_group,
-                    'seed': gp.rank_num_player
-                })
+    #             players.append({
+    #                 'name': player.fio if player.fio else player.player,
+    #                 'city': player.city or "",
+    #                 'region': player.region or "",
+    #                 'razryad': player.razryad or "",
+    #                 'coach': coach_name,
+    #                 'group': gp.number_group,
+    #                 'seed': gp.rank_num_player
+    #             })
         
-        return players
+    #     return players
 
-    def _get_players_for_group(self, stage, group_name):
-        """Получение игроков для конкретной группы"""
-        players = []
+    # def _get_players_for_group(self, stage, group_name):
+    #     """Получение игроков для конкретной группы"""
+    #     players = []
         
-        system = System.get_or_none(
-            (System.title_id == self.current_title_id) &
-            (System.stage == stage)
-        )
+    #     system = System.get_or_none(
+    #         (System.title_id == self.current_title_id) &
+    #         (System.stage == stage)
+    #     )
         
-        if not system:
-            return players
+    #     if not system:
+    #         return players
         
-        # Получаем игроков из Game_list для указанной группы
-        game_players = Game_list.select().where(
-            (Game_list.title_id == self.current_title_id) &
-            (Game_list.system_id == system.id) &
-            (Game_list.number_group == group_name)
-        ).order_by(Game_list.rank_num_player)
+    #     # Получаем игроков из Game_list для указанной группы
+    #     game_players = Game_list.select().where(
+    #         (Game_list.title_id == self.current_title_id) &
+    #         (Game_list.system_id == system.id) &
+    #         (Game_list.number_group == group_name)
+    #     ).order_by(Game_list.rank_num_player)
         
-        for gp in game_players:
-            player = Player.get_or_none(Player.id == gp.player_group.id)
-            if player:
-                coach_name = ""
-                if player.coach_id:
-                    coach = Coach.get_or_none(Coach.id == player.coach_id)
-                    if coach:
-                        coach_name = coach.coach
+    #     for gp in game_players:
+    #         player = Player.get_or_none(Player.id == gp.player_group.id)
+    #         if player:
+    #             coach_name = ""
+    #             if player.coach_id:
+    #                 coach = Coach.get_or_none(Coach.id == player.coach_id)
+    #                 if coach:
+    #                     coach_name = coach.coach
                 
-                players.append({
-                    'name': player.fio if player.fio else player.player,
-                    'city': player.city or "",
-                    'region': player.region or "",
-                    'razryad': player.razryad or "",
-                    'coach': coach_name,
-                    'group': gp.number_group,
-                    'seed': gp.rank_num_player
-                })
+    #             players.append({
+    #                 'name': player.fio if player.fio else player.player,
+    #                 'city': player.city or "",
+    #                 'region': player.region or "",
+    #                 'razryad': player.razryad or "",
+    #                 'coach': coach_name,
+    #                 'group': gp.number_group,
+    #                 'seed': gp.rank_num_player
+    #             })
         
-        return players
+    #     return players
 
 # ================= рабочий урезанный бегунок ======
     def tbl_begunki(self, stage, subgroup, runner_type, tours="несыгранные", list_tours=None):
@@ -19049,7 +18972,7 @@ class MainWindow(QMainWindow):
         # ...
         
         QMessageBox.information(self, "Успех", f"Полный файл соревнования сохранен:\n{filename}")
-# ======== Финалы по кругу =========
+# ======== нужная функция Финалы по кругу =========
     def _extract_number_from_group(self, group_name):
         """Извлекает числовой номер из названия группы (например, 'Группа 1' -> 1, '1 группа' -> 1)."""
         import re
@@ -19370,7 +19293,6 @@ class MainWindow(QMainWindow):
             f"Создано встреч: {len(tours) * (total_players // 2)}")
         
         return assigned_players
-
 # ============================================
     def create_olimpic_final_automatically(self, stage, source_stage, exit_count):
         """автоматическая жеребьевка по олимпийской системе""" 
@@ -19630,7 +19552,7 @@ class MainWindow(QMainWindow):
                 positions.append(right)
                 right -= 1
         return positions
-
+#  === не нужная функция генерации туроы ы круг
     def _get_round_robin_tours(self, n):
         """Генерация туров для круговой системы."""
         if n <= 1:
@@ -19651,7 +19573,7 @@ class MainWindow(QMainWindow):
             # Ротация
             players = [players[0]] + [players[-1]] + players[1:-1]
         return tours
-
+# ============================================
     def transfer_results_to_final(self, final_stage, source_stage, assigned_players):
         """Переносит результаты сыгранных матчей из source_stage в final_stage."""
         # определяем system_id
@@ -20031,177 +19953,6 @@ class MainWindow(QMainWindow):
             
             return result, actual_exit_count
 #========================================= AI 
-    def _real_place_for_final(self, stage_name=None):
-        """
-        Определяет, из каких этапов и с какими местами игроки попадают в каждый финал.
-        
-        Логика:
-        - Если есть полуфиналы, то 1-й полуфинал получает из квалификации места 1..mesta_exit (обычно 1-2),
-        2-й полуфинал получает места mesta_exit+1 .. 2*mesta_exit (обычно 3-4).
-        - Если только один полуфинал, он получает все места из квалификации.
-        - Из полуфиналов в финалы места распределяются согласно mesta_exit каждого полуфинала.
-        - Если полуфиналов нет, то финалы получают места напрямую из квалификации.
-        
-        Возвращает словарь:
-        {
-            "1-й финал": {
-                "Квалификация. 1-й полуфинал": [1, 2],
-                ...
-            },
-            ...
-        }
-        """
-        from collections import defaultdict
-        import re
-        
-        systems = System.select().where(System.title_id == self.current_title_id).order_by(System.id)
-        
-        qualification = None
-        semifinal_1 = None
-        semifinal_2 = None
-        finals = []
-        
-        for system in systems:
-            if system.stage == "Квалификация":
-                qualification = system
-            elif system.stage == "Квалификация. 1-й полуфинал":
-                semifinal_1 = system
-            elif system.stage == "Квалификация. 2-й полуфинал":
-                semifinal_2 = system
-            elif "финал" in system.stage.lower() and "полуфинал" not in system.stage.lower():
-                finals.append(system)
-        
-        # Сортируем финалы по номеру
-        def extract_number(stage):
-            match = re.search(r'(\d+)', stage)
-            return int(match.group(1)) if match else 999
-        finals.sort(key=lambda s: extract_number(s.stage))
-        
-        result = {}
-        if not finals:
-            return result
-        
-        # ---- Формирование источников мест для финалов ----
-        # Источники: список словарей {'stage': имя_этапа, 'places': список_мест}
-        sources = []
-        
-        # Если есть полуфиналы, формируем источники из них
-        if semifinal_1 or semifinal_2:
-            # Определяем, сколько мест выходит из каждой группы квалификации в полуфиналы
-            exit_per_group = qualification.mesta_exit if qualification and qualification.mesta_exit else 2
-            # Всего мест в квалификации (в каждой группе) — это обычно 4, но может быть и больше.
-            # Мы будем считать, что из группы выходят exit_per_group * количество_полуфиналов мест.
-            # Если два полуфинала, то всего мест = exit_per_group * 2.
-            # Если один полуфинал, то все места (обычно 4) идут в него.
-            total_places_per_group = 0
-            if qualification:
-                # Количество игроков в группе можно получить из max_player квалификации
-                total_places_per_group = qualification.max_player or 4
-            else:
-                total_places_per_group = 4  # по умолчанию
-            
-            # Места для 1-го полуфинала (если есть)
-            if semifinal_1:
-                # Берём первые exit_per_group мест (1..exit_per_group)
-                places_1 = list(range(1, exit_per_group + 1))
-                sources.append({
-                    'stage': semifinal_1.stage,
-                    'places': places_1,
-                    'from_stage': qualification.stage if qualification else None
-                })
-            # Места для 2-го полуфинала (если есть)
-            if semifinal_2:
-                # Берём следующие exit_per_group мест (exit_per_group+1 .. 2*exit_per_group)
-                start = exit_per_group + 1
-                end = 2 * exit_per_group
-                # Проверяем, чтобы не выходить за пределы total_places_per_group
-                if end > total_places_per_group:
-                    end = total_places_per_group
-                places_2 = list(range(start, end + 1))
-                if places_2:
-                    sources.append({
-                        'stage': semifinal_2.stage,
-                        'places': places_2,
-                        'from_stage': qualification.stage if qualification else None
-                    })
-            # Если есть только один полуфинал, он получает все места из квалификации
-            if semifinal_1 and not semifinal_2:
-                # Все места от 1 до total_places_per_group
-                all_places = list(range(1, total_places_per_group + 1))
-                # Обновляем источник для semifinal_1
-                sources = [{
-                    'stage': semifinal_1.stage,
-                    'places': all_places,
-                    'from_stage': qualification.stage if qualification else None
-                }]
-        else:
-            # Полуфиналов нет, источник — квалификация (все места)
-            if qualification:
-                # Количество игроков в квалификации (общее)
-                # Лучше взять из Choice или из Game_list, но для простоты используем max_player * total_group
-                total_players = 0
-                if qualification.max_player and qualification.total_group:
-                    total_players = qualification.max_player * qualification.total_group
-                else:
-                    # Альтернативно, можно посчитать количество записей в Choice для квалификации
-                    choices = Choice.select().where(
-                        (Choice.title_id == self.current_title_id) &
-                        (Choice.group.contains("группа"))
-                    )
-                    total_players = choices.count()
-                if total_players > 0:
-                    all_places = list(range(1, total_players + 1))
-                    sources.append({
-                        'stage': qualification.stage,
-                        'places': all_places,
-                        'from_stage': None
-                    })
-        
-        # ---- Теперь распределяем места из источников по финалам ----
-        # Для каждого финала определяем, сколько мест ему нужно (max_player или mesta_exit)
-        for final in finals:
-            places_needed = final.max_player if final.max_player else (final.mesta_exit or 1)
-            final.places_needed = places_needed
-        
-        # Проходим по финалам и выделяем им блоки мест из источников
-        source_index = 0
-        place_index = 0  # индекс в текущем источнике
-        for final in finals:
-            if source_index >= len(sources):
-                break
-            source = sources[source_index]
-            places = source['places']
-            # Если текущий источник исчерпан, переходим к следующему
-            if place_index >= len(places):
-                source_index += 1
-                place_index = 0
-                continue
-            # Берём блок
-            block = places[place_index : place_index + final.places_needed]
-            if not block:
-                continue
-            # Записываем в результат
-            if final.stage not in result:
-                result[final.stage] = {}
-            # Ключ — этап-источник (если есть from_stage, используем его, иначе source['stage'])
-            key = source.get('from_stage', source['stage'])
-            result[final.stage][key] = block
-            place_index += len(block)
-        
-        # Если финалов больше, чем источников, и остались нераспределённые, 
-        # то можно добавить оставшиеся места из квалификации напрямую в финалы (если ещё есть)
-        if qualification and not sources:
-            # В этом случае все финалы получают места из квалификации
-            # (Это уже обработано в ветке else выше, но для полноты)
-            pass
-        
-        # Если указан конкретный финал, возвращаем только его
-        if stage_name:
-            return {stage_name: result.get(stage_name, {})}
-        
-        return result
-
-
     def get_players_for_final_by_places(self, stage_name):
         """
         Получение игроков для финала на основе мест выхода.
@@ -20275,204 +20026,6 @@ class MainWindow(QMainWindow):
                 result[player['group']].append(player)
         
         return result
-# =========== функция для определения мест =======
-    def __real_place_for_final(self, stage_name=None):
-        """
-        Определяет, из каких этапов и с какими местами игроки попадают в каждый финал.
-        
-        Параметры:
-            stage_name (str, optional): если указан, возвращает данные только для этого финала.
-        
-        Возвращает:
-            dict: 
-            {
-                "1-й финал": {
-                    "Квалификация. 1-й полуфинал": [1, 2],
-                    ...
-                },
-                ...
-            }
-            Ключ — название финала. Значение — словарь, где ключ — этап-источник, 
-            значение — список мест (номера мест) из этого этапа, которые попадают в финал.
-        """
-        # Получаем все системы для текущего соревнования
-        systems = System.select().where(System.title_id == self.current_title_id).order_by(System.id)
-        
-        # Разделяем этапы
-        qualification = None
-        semifinal_1 = None
-        semifinal_2 = None
-        finals = []  # список объектов System для финалов (не полуфиналов)
-        
-        for system in systems:
-            if system.stage == "Квалификация":
-                qualification = system
-            elif system.stage == "Квалификация. 1-й полуфинал":
-                semifinal_1 = system
-            elif system.stage == "Квалификация. 2-й полуфинал":
-                semifinal_2 = system
-            elif "финал" in system.stage.lower() and "полуфинал" not in system.stage.lower():
-                finals.append(system)
-        
-        # Сортируем финалы по номеру (извлекаем число из названия)
-        def extract_final_number(stage):
-            import re
-            match = re.search(r'(\d+)', stage)
-            return int(match.group(1)) if match else 999
-        finals.sort(key=lambda s: extract_final_number(s.stage))
-        
-        # Результат
-        result = {}
-        
-        # Если нет финалов, возвращаем пустой словарь
-        if not finals:
-            return result
-        
-        # ---- 1. Обработка полуфиналов ----
-        # Список источников (этапов) и их доступных мест для распределения по финалам
-        sources = []  # каждый элемент: {'stage': имя_этапа, 'places': список_мест}
-        
-        if semifinal_1:
-            # Из 1-го полуфинала выходят места 1..mesta_exit (обычно 4)
-            exit_count = semifinal_1.mesta_exit or 4
-            places = list(range(1, exit_count + 1))
-            sources.append({
-                'stage': semifinal_1.stage,
-                'places': places
-            })
-        
-        if semifinal_2:
-            exit_count = semifinal_2.mesta_exit or 4
-            places = list(range(1, exit_count + 1))
-            sources.append({
-                'stage': semifinal_2.stage,
-                'places': places
-            })
-        
-        # Если полуфиналов нет, используем квалификацию как источник
-        if not sources and qualification:
-            # Из квалификации выходят все места, которые распределяются по финалам
-            # Количество мест зависит от того, сколько игроков в финалах
-            # Но мы не знаем, сколько финалов будет, поэтому отдаём все места из квалификации
-            # (предполагаем, что все игроки квалификации распределяются по финалам)
-            # Для этого нужно знать общее количество игроков, вышедших из квалификации.
-            # Это можно вычислить: total_groups * mesta_exit (если mesta_exit > 0)
-            total_qual_players = 0
-            if qualification.total_group and qualification.mesta_exit:
-                total_qual_players = qualification.total_group * qualification.mesta_exit
-            else:
-                # Если не указано, считаем, что выходят все (но это редко)
-                total_qual_players = 0  # лучше оставить 0
-            # Лучше взять из Game_list или Choice, но для простоты используем логику:
-            # Если нет полуфиналов, то все игроки квалификации идут в финалы.
-            # Но мы не знаем, сколько мест в финалах, поэтому просто создаём источник с местами
-            # 1,2,3,... до общего числа игроков в квалификации (можно взять из Player).
-            # Однако правильнее будет взять из системы: количество групп * количество выходящих.
-            # Предположим, что в финалы выходят все игроки из квалификации (если нет полуфиналов).
-            # Тогда места будут 1,2,3,... до общего числа.
-            # Получим общее число игроков в квалификации из Choice или из Game_list.
-            # Используем Choice для этой квалификации.
-            choices = Choice.select().where(
-                (Choice.title_id == self.current_title_id) &
-                (Choice.group.contains("группа"))
-            )
-            total_qual_players = choices.count()
-            if total_qual_players > 0:
-                places = list(range(1, total_qual_players + 1))
-                sources.append({
-                    'stage': qualification.stage,
-                    'places': places
-                })
-        
-        # ---- 2. Распределение мест по финалам ----
-        # Проходим по финалам и отдаём им места из источников последовательно
-        # Для каждого источника отдаём блоки мест по количеству mesta_exit финала
-        # или по количеству мест, которые нужны финалу (mesta_exit из системы финала).
-        
-        # Сначала определим, сколько мест нужно каждому финалу
-        for final in finals:
-            # Количество мест, которые занимает этот финал (обычно mesta_exit или max_player)
-            # В круговом финале количество мест = max_player (все участники финала)
-            # В олимпийском — тоже max_player.
-            # Лучше взять max_player, так как это общее число участников в финале.
-            places_needed = final.max_player or 0
-            if places_needed == 0:
-                # Если не задано, используем mesta_exit (количество выходящих из предыдущего этапа)
-                places_needed = final.mesta_exit or 1
-            # Запоминаем потребность
-            final.places_needed = places_needed
-        
-        # Теперь распределяем места из источников по финалам
-        # Сначала заполняем финалы из полуфиналов (если есть)
-        source_index = 0
-        source_place_index = 0  # текущий индекс в списке мест источника
-        
-        for final in finals:
-            # Если закончились источники, выходим
-            if source_index >= len(sources):
-                break
-            
-            source = sources[source_index]
-            places_available = source['places']
-            
-            # Если в источнике остались места
-            if source_place_index < len(places_available):
-                # Берём блок мест для этого финала
-                block = places_available[source_place_index : source_place_index + final.places_needed]
-                # Если блок не пустой
-                if block:
-                    # Записываем в результат
-                    if final.stage not in result:
-                        result[final.stage] = {}
-                    result[final.stage][source['stage']] = block
-                    # Сдвигаем индекс
-                    source_place_index += len(block)
-                else:
-                    # Если мест не хватает, переходим к следующему источнику
-                    source_index += 1
-                    source_place_index = 0
-                    # Пробуем снова для этого же финала
-                    # (рекурсивно или через цикл, но проще продолжить)
-                    continue
-            else:
-                # Места в источнике закончились, переходим к следующему
-                source_index += 1
-                source_place_index = 0
-                # Повторяем для текущего финала
-                continue
-        
-        # Если остались финалы, а источники закончились, то берём из квалификации (если она есть)
-        if qualification and not sources:
-            # Если полуфиналов нет, то все финалы берут из квалификации
-            # Нужно распределить все места квалификации по финалам
-            # Получаем все места квалификации (1..общее_число)
-            choices = Choice.select().where(
-                (Choice.title_id == self.current_title_id) &
-                (Choice.group.contains("группа"))
-            )
-            total_qual_players = choices.count()
-            if total_qual_players > 0:
-                qual_places = list(range(1, total_qual_players + 1))
-                place_idx = 0
-                for final in finals:
-                    if final.stage not in result:
-                        result[final.stage] = {}
-                    # Если финал уже имеет источник (например, из полуфинала), пропускаем
-                    if result[final.stage]:
-                        continue
-                    needed = final.places_needed
-                    block = qual_places[place_idx : place_idx + needed]
-                    if block:
-                        result[final.stage][qualification.stage] = block
-                        place_idx += len(block)
-                    else:
-                        break
-        
-        # Если указан конкретный финал, возвращаем только его
-        if stage_name:
-            return {stage_name: result.get(stage_name, {})}
-        
-        return result
 # ==========================================
     def real_place_for_final(self, stage_name):
         """определения мест игроков, выходящих в финал для жеребьевки"""
@@ -20542,9 +20095,6 @@ class MainWindow(QMainWindow):
         #     if stage_name == stage:
 
         #         return player_max_stage[stage]
-       
-
-
 # ================================================ оригинал
     def _get_players_for_final(self, source_stage, exit_count=None):
         """
@@ -20621,29 +20171,6 @@ class MainWindow(QMainWindow):
         
         return result, actual_exit_count
 
-    def _get_circular_tour_positions(self, total_players):
-        """
-        Возвращает порядок позиций игроков в круговой таблице
-        Для 8 игроков: [1, 7, 2, 6, 3, 5, 4, 8]
-        """
-        if total_players <= 1:
-            return [1]
-        
-        positions = []
-        left = 1
-        right = total_players
-        
-        # Чередуем первый и последний
-        for i in range(total_players):
-            if i % 2 == 0:
-                positions.append(left)
-                left += 1
-            else:
-                positions.append(right)
-                right -= 1
-        
-        return positions
-
     def create_circular_matches(self, system, stage_name, players):
         """
         Создание встреч для кругового финала
@@ -20691,7 +20218,7 @@ class MainWindow(QMainWindow):
                     )
         
         print(f"Создано {len(tours) * (total_players // 2)} встреч для {stage_name}")
-
+# ========== лишняя функции генерация туров таблицы в круг
     def _get_round_robin_tours(self, n):
         """
         Генерация туров для круговой системы
@@ -20721,7 +20248,7 @@ class MainWindow(QMainWindow):
             players = [players[0]] + [players[-1]] + players[1:-1]
         
         return tours
-
+# =============================
     def create_final_round_robin(self, final_number):
         """
         Создание финала по круговой системе
@@ -20762,50 +20289,6 @@ class MainWindow(QMainWindow):
                                 f"Участников: {len([p for p in players if p])}")
         
         return players
-
-    def _transfer_results_to_final(self, final_stage, source_stage, players):
-        """Перенос результатов встреч между игроками, которые уже играли"""
-        # Получаем результаты из источника
-        source_results = Result.select().where(
-            (Result.title_id == self.current_title_id) &
-            (Result.system_stage == source_stage)
-        )
-        
-        # Создаем словарь игроков для быстрого поиска
-        player_map = {}
-        for pos, player in enumerate(players, 1):
-            if player:
-                player_map[player['choice_id']] = pos
-        
-        # Переносим результаты
-        for result in source_results:
-            # Находим позиции игроков в финале
-            pos1 = None
-            pos2 = None
-            
-            for choice_id, pos in player_map.items():
-                choice = Choice.get_by_id(choice_id)
-                if choice.family in result.player1:
-                    pos1 = pos
-                if choice.family in result.player2:
-                    pos2 = pos
-            
-            if pos1 and pos2:
-                # Обновляем результат в финале
-                final_result = Result.get_or_none(
-                    (Result.title_id == self.current_title_id) &
-                    (Result.system_stage == final_stage) &
-                    (Result.tours == f"{pos1}-{pos2}")
-                )
-                if final_result:
-                    final_result.winner = result.winner
-                    final_result.points_win = result.points_win
-                    final_result.score_in_game = result.score_in_game
-                    final_result.score_win = result.score_win
-                    final_result.loser = result.loser
-                    final_result.points_loser = result.points_loser
-                    final_result.score_loser = result.score_loser
-                    final_result.save()
 
     def create_one_table_drawing(self):
         """Создание жеребьевки для одной таблицы (круговая система)"""
@@ -21314,7 +20797,6 @@ class MainWindow(QMainWindow):
         
         return None  # Пара не найдена ни в одном туре
 
-
 # == устанавливает флаг жеребьевки в Choice =====
     def set_choice_flag_for_stage(self, stage, flag=1):
         """
@@ -21410,391 +20892,7 @@ class MainWindow(QMainWindow):
     def truncate_floor(self, number, decimals):
         factor = 10 ** decimals
         return math.floor(number * factor) / factor
-
 # ======== жеребьвка сетки ==========
-
-#========== вариант AI новый ===========
-    # def create_olympic_final_automatically(self, final_stage, source_stage=None, exit_count=None):
-    #     """
-    #     Автоматическая жеребьёвка финала по олимпийской системе (сетка).
-        
-    #     Параметры:
-    #         final_stage (str): название финала (например, "1-й финал")
-    #         source_stage (str, optional): этап-источник (если None – определяется автоматически)
-    #         exit_count (int, optional): количество выходящих из группы (если None – берётся из системы)
-        
-    #     Возвращает:
-    #         dict: таблица размещения {номер_позиции: данные_игрока или "X"}
-    #     """
-    #     if not self.current_title_id:
-    #         QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
-    #         return None
-
-    #     # 1. Получаем или создаём систему для финала
-    #     system = System.get_or_none(
-    #         (System.title_id == self.current_title_id) &
-    #         (System.stage == final_stage)
-    #     )
-    #     if not system:
-    #         # Создаём систему с типом "Олимпийская"
-    #         # Определяем максимальное число игроков (по умолчанию 8, но можно уточнить)
-    #         # Пока задаём 8, позже можно будет изменить
-    #         system = System.create(
-    #             title_id=self.current_title_id,
-    #             stage=final_stage,
-    #             total_group=1,
-    #             max_player=8,
-    #             type_table="Олимпийская (минус 2)",
-    #             sex=self.current_sex if self.current_sex else "man",
-    #             score_flag=5,
-    #             stage_exit=source_stage or "Квалификация",
-    #             mesta_exit=exit_count or 2
-    #         )
-
-    #     # 2. Определяем источник и количество выходящих
-    #     if source_stage is None:
-    #         # Логика определения источника (как в круговом финале)
-    #         if final_stage == "1-й финал":
-    #             semifinal1 = System.get_or_none(
-    #                 (System.title_id == self.current_title_id) &
-    #                 (System.stage == "Квалификация. 1-й полуфинал")
-    #             )
-    #             source_stage = "Квалификация. 1-й полуфинал" if semifinal1 else "Квалификация"
-    #         else:
-    #             semifinal2 = System.get_or_none(
-    #                 (System.title_id == self.current_title_id) &
-    #                 (System.stage == "Квалификация. 2-й полуфинал")
-    #             )
-    #             source_stage = "Квалификация. 2-й полуфинал" if semifinal2 else "Квалификация"
-
-    #     if exit_count is None:
-    #         exit_count = system.mesta_exit or 2
-
-    #     # 3. Получаем игроков из источника
-    #     players_by_group, actual_exit_count = self.get_players_for_final(source_stage, exit_count)
-    #     if not players_by_group:
-    #         QMessageBox.warning(self, "Ошибка", f"Нет игроков для финала {final_stage}")
-    #         return None
-
-    #     # 4. Преобразуем данные в формат для жеребьёвки
-    #     sportsmen_data = []
-    #     for group_name, players in players_by_group.items():
-    #         # Извлекаем номер группы
-    #         import re
-    #         match = re.search(r'(\d+)', group_name)
-    #         group_number = int(match.group(1)) if match else 0
-    #         for player in players:
-    #             sportsmen_data.append([
-    #                 player['player_id'],
-    #                 player['name'],
-    #                 player['region'],
-    #                 group_number,
-    #                 group_name,
-    #                 player['city'],
-    #                 player['rank'],
-    #                 player['place']  # место в группе
-    #             ])
-
-    #     # 5. Вызываем адаптированную жеребьёвку сетки
-    #     # Для этого нужно, чтобы методы setka_choice_number, free_place_in_setka, choice_net_automat
-    #     # были методами класса. Мы их адаптируем ниже.
-
-    #     table = self.choice_net_automat(final_stage, sportsmen_data, actual_exit_count)
-
-    #     if not table:
-    #         QMessageBox.warning(self, "Ошибка", "Не удалось провести жеребьёвку")
-    #         return None
-
-    #     # 6. Очищаем старые данные для этого финала
-    #     Game_list.delete().where(
-    #         (Game_list.title_id == self.current_title_id) &
-    #         (Game_list.system_id == system.id)
-    #     ).execute()
-    #     Result.delete().where(
-    #         (Result.title_id == self.current_title_id) &
-    #         (Result.system_stage == final_stage)
-    #     ).execute()
-    #     Choice.update(
-    #         mesto_group=0,
-    #         posev_group=0,
-    #         choice_flag=0
-    #     ).where(
-    #         (Choice.title_id == self.current_title_id) &
-    #         (Choice.group == final_stage)
-    #     ).execute()
-
-    #     # 7. Записываем игроков в Game_list и Choice
-    #     group_name = "1 группа"  # для олимпийской системы одна группа (сетка)
-    #     for pos, player_data in table.items():
-    #         if player_data == "X" or player_data is None:
-    #             continue
-    #         # player_data: [id, name, region, group_number, group, city, rank, place]
-    #         player_id = player_data[0]
-    #         # Обновляем Choice
-    #         choice = Choice.get_or_none(
-    #             (Choice.title_id == self.current_title_id) &
-    #             (Choice.player_choice == player_id)
-    #         )
-    #         if choice:
-    #             choice.group = group_name
-    #             choice.posev_group = pos
-    #             choice.mesto_group = 0
-    #             choice.choice_flag = 1
-    #             choice.save()
-    #         # Создаём запись в Game_list
-    #         Game_list.create(
-    #             number_group=group_name,
-    #             rank_num_player=pos,
-    #             player_group=player_id,
-    #             system_id=system.id,
-    #             title_id=self.current_title_id,
-    #             sex=self.current_sex if self.current_sex else "man"
-    #         )
-
-    #     # 8. Создаём матчи по олимпийской сетке
-    #     self.create_olympic_matches(system, final_stage, table)
-
-    #     # 9. Устанавливаем флаг choice_flag для всех записей Choice, участвующих в финале
-    #     self.set_choice_flag_for_stage(final_stage, group_field='group', flag=1)
-
-    #     QMessageBox.information(self, "Успех",
-    #         f"Автоматическая жеребьёвка {final_stage} по олимпийской системе завершена.\n"
-    #         f"Участников: {len([p for p in table.values() if p != 'X'])}")
-
-    #     return table
-
-    #     def setka_choice_number(self, fin, count_exit):
-    #         """Возвращает структуру посева для олимпийской сетки."""
-    #         posevs = []
-    #         posev_1 = []
-    #         posev_2 = []
-    #         posev_3 = []
-    #         posev_4 = []
-
-    #         system = System.get_or_none(
-    #             (System.title_id == self.current_title_id) &
-    #             (System.stage == fin)
-    #         )
-    #         if not system:
-    #             return []
-    #         max_player = system.max_player or 8
-
-    #         if fin == "Суперфинал":
-    #             count_exit = 1
-    #             posev_1 = [[1, 8], [4, 5], [2, 3, 6, 7]]
-    #             player_net = 8
-    #         else:
-    #             if count_exit <= 1:
-    #                 if max_player == 8:
-    #                     posev_1 = [[1, 8], [4, 5], [2, 3, 6, 7]]
-    #                 elif max_player == 16:
-    #                     posev_1 = [[1, 16], [8, 9], [4, 5, 12, 13], [2, 3, 6, 7, 10, 11, 14, 15]]
-    #                 elif max_player == 32:
-    #                     posev_1 = [[1, 32], [16, 17], [8, 9, 24, 25],
-    #                             [4, 5, 12, 13, 20, 21, 28, 29],
-    #                             [2, 3, 6, 7, 10, 11, 14, 15, 18, 19, 22, 23, 26, 27, 30, 31]]
-    #                 player_net = max_player
-    #             elif count_exit == 2:
-    #                 if max_player == 8:
-    #                     posev_1 = [[1, 8], [4, 5]]
-    #                     posev_2 = [[2, 3, 6, 7]]
-    #                 elif max_player == 16:
-    #                     posev_1 = [[1, 16], [8, 9], [4, 5, 12, 13]]
-    #                     posev_2 = [[2, 3, 6, 7, 10, 11, 14, 15]]
-    #                 elif max_player == 32:
-    #                     posev_1 = [[1, 32], [16, 17], [8, 9, 24, 25], [4, 5, 12, 13, 20, 21, 28, 29]]
-    #                     posev_2 = [[2, 3, 6, 7, 10, 11, 14, 15, 18, 19, 22, 23, 26, 27, 30, 31]]
-    #                 player_net = max_player
-
-    #         posevs.append(player_net)
-    #         if posev_1:
-    #             posevs.append(posev_1)
-    #             if posev_2:
-    #                 posevs.append(posev_2)
-    #                 if posev_3:
-    #                     posevs.append(posev_3)
-    #                     if posev_4:
-    #                         posevs.append(posev_4)
-    #         return posevs
-
-    # def free_place_in_setka(self, max_player, real_all_player_in_final, count_exit):
-    #     """Вычисляет свободные номера в сетке."""
-    #     free_number_8 = [2, 7, 6, 3]
-    #     free_number_16 = [2, 15, 7, 10, 6, 11, 3, 14]
-    #     free_number_24 = [5, 20, 8, 17, 11, 14, 2, 23]
-    #     free_number_32 = [2, 31, 15, 18, 10, 23, 7, 26, 6, 27, 11, 22, 14, 19, 3, 30]
-
-    #     count = max_player - real_all_player_in_final
-    #     if max_player == 8:
-    #         free_number = free_number_8
-    #     elif max_player == 16:
-    #         free_number = free_number_16
-    #     elif max_player == 24:
-    #         free_number = free_number_24
-    #     elif max_player == 32:
-    #         free_number = free_number_32
-    #     else:
-    #         return []
-
-    #     if count_exit == 1:
-    #         free_num = free_number[:count]
-    #     elif count_exit == 2:
-    #         fn = count if count % 2 == 0 else count + 1
-    #         free_num = free_number[:fn]
-    #     else:
-    #         free_num = free_number[:count]
-    #     return free_num
-
-    # def choice_net_automat(self, stage, sportsmen_data, count_exit):
-    #     """
-    #     Основная логика жеребьёвки олимпийской сетки.
-    #     sportsmen_data: список списков [id, name, region, group_number, group, city, rank, place]
-    #     Возвращает словарь {позиция: данные_игрока или "X"}
-    #     """
-    #     import random
-    #     from collections import defaultdict, deque
-
-    #     # Получаем структуру посева
-    #     posevs_num = self.setka_choice_number(stage, count_exit)
-    #     if not posevs_num:
-    #         return {}
-
-    #     max_player = posevs_num[0]
-    #     # Генерируем словарь seeds: {номер_посева: список_позиций}
-    #     seeds = {}
-    #     r = 1
-    #     for f in range(1, len(posevs_num)):
-    #         for positions in posevs_num[f]:
-    #             seeds[r] = positions
-    #             r += 1
-
-    #     # Сортируем спортсменов по рейтингу (по убыванию) для посева
-    #     sorted_sportsmen = sorted(enumerate(sportsmen_data), key=lambda x: x[1][6], reverse=True)
-
-    #     # Определяем свободные номера (X)
-    #     real_all_player = len(sportsmen_data)
-    #     free_num = self.free_place_in_setka(max_player, real_all_player, count_exit)
-
-    #     # Функции для определения половины и четверти
-    #     def get_half(number):
-    #         return 1 if number <= max_player // 2 else 2
-
-    #     def get_quarter(number):
-    #         if number <= max_player // 4:
-    #             return 1
-    #         elif number <= max_player // 2:
-    #             return 2
-    #         elif number <= max_player * 3 // 4:
-    #             return 3
-    #         else:
-    #             return 4
-
-    #     # Основная логика распределения (упрощённо, но работоспособно)
-    #     # Для простоты используем случайное распределение с учётом регионов (как в оригинале)
-    #     # Здесь можно реализовать полный алгоритм из предоставленного кода, но для краткости
-    #     # мы используем упрощённую версию: просто заполняем позиции по порядку, ставя X на свободные места.
-    #     placement = {i: None for i in range(1, max_player + 1)}
-
-    #     # Заполняем свободные места символом "X"
-    #     for pos in free_num:
-    #         placement[pos] = "X"
-
-    #     # Список индексов спортсменов (в порядке рейтинга)
-    #     all_indices = [idx for idx, _ in sorted_sportsmen]
-    #     # Размещаем спортсменов на оставшиеся позиции по порядку (можно улучшить алгоритм)
-    #     available_positions = [pos for pos in placement if placement[pos] is None]
-    #     for idx, pos in zip(all_indices, available_positions):
-    #         placement[pos] = sportsmen_data[idx]
-
-    #     return placement
-
-    # def create_olympic_matches(self, system, final_stage, table):
-    #     """
-    #     Создаёт матчи по олимпийской сетке.
-    #     table: словарь {позиция: данные_игрока или "X"}
-    #     """
-    #     # Получаем список позиций с реальными игроками (не X)
-    #     real_players = {pos: data for pos, data in table.items() if data != "X"}
-
-    #     if not real_players:
-    #         return
-
-    #     # Определяем количество игроков (ближайшая степень двойки)
-    #     n = len(real_players)
-    #     # Определяем размер сетки (ближайшая степень двойки, >= n)
-    #     import math
-    #     grid_size = 1
-    #     while grid_size < n:
-    #         grid_size *= 2
-
-    #     # Генерируем пары для первого раунда
-    #     # Для сетки размера N пары: (1, N), (2, N-1), ...
-    #     pairs = []
-    #     for i in range(1, grid_size // 2 + 1):
-    #         p1 = i
-    #         p2 = grid_size - i + 1
-    #         if p1 in real_players and p2 in real_players:
-    #             pairs.append((p1, p2))
-    #         elif p1 in real_players:
-    #             # Свободная позиция – автоматическая победа
-    #             pass
-    #         elif p2 in real_players:
-    #             pass
-
-    #     # Создаём записи в Result для первого раунда
-    #     group_name = "1 группа"
-    #     for round_num, (pos1, pos2) in enumerate(pairs, 1):
-    #         player1_data = real_players.get(pos1)
-    #         player2_data = real_players.get(pos2)
-    #         if player1_data and player2_data:
-    #             player1_name = self.get_player_fio_city(player1_data[0])
-    #             player2_name = self.get_player_fio_city(player2_data[0])
-    #             Result.create(
-    #                 number_group=group_name,
-    #                 system_stage=final_stage,
-    #                 player1=player1_name,
-    #                 player2=player2_name,
-    #                 tours=f"{pos1}-{pos2}",
-    #                 round=str(round_num),
-    #                 title_id=self.current_title_id,
-    #                 system_id=system.id,
-    #                 sex=self.current_sex if self.current_sex else "man"
-    #             )
-    #         elif player1_data:
-    #             # Автоматическая победа player1
-    #             Result.create(
-    #                 number_group=group_name,
-    #                 system_stage=final_stage,
-    #                 player1=player1_name,
-    #                 player2="Свободен",
-    #                 tours=f"{pos1}-{pos2}",
-    #                 round=str(round_num),
-    #                 winner=player1_name,
-    #                 points_win=2,
-    #                 score_in_game="техническая победа",
-    #                 title_id=self.current_title_id,
-    #                 system_id=system.id,
-    #                 sex=self.current_sex if self.current_sex else "man"
-    #             )
-    #         elif player2_data:
-    #             # Автоматическая победа player2
-    #             Result.create(
-    #                 number_group=group_name,
-    #                 system_stage=final_stage,
-    #                 player1="Свободен",
-    #                 player2=player2_name,
-    #                 tours=f"{pos1}-{pos2}",
-    #                 round=str(round_num),
-    #                 winner=player2_name,
-    #                 points_win=2,
-    #                 score_in_game="техническая победа",
-    #                 title_id=self.current_title_id,
-    #                 system_id=system.id,
-    #                 sex=self.current_sex if self.current_sex else "man"
-    #             )
-
-    #     print(f"Создано {len(pairs)} матчей для {final_stage}")
-#=============================
     def free_place_in_setka(self, max_player, real_all_player_in_final, count_exit):
         """вычеркиваем свободные номера в сетке"""
         free_num = []

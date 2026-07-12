@@ -4230,141 +4230,6 @@ class MainWindow(QMainWindow):
         #  Изменяем название кнопок от категории игроков
         self.create_category_buttons()
 
-# ======================= work
-    # def _update_left_panel_for_rating_tab(self):
-    #     """Обновление левой панели для вкладки Рейтинг"""
-    #     # Очищаем панель
-    #     for i in reversed(range(self.dynamic_filters_layout.count())):
-    #         item = self.dynamic_filters_layout.itemAt(i)
-    #         if item.widget():
-    #             item.widget().deleteLater()
-    #         elif item.layout():
-    #             while item.layout().count():
-    #                 child = item.layout().takeAt(0)
-    #                 if child.widget():
-    #                     child.widget().deleteLater()
-
-    #     # Заголовок
-    #     self.action_title.setText("⭐ Рейтинг")
-    #     self.action_description.setText("Фильтрация и просмотр рейтинга участников")
-
-    #     # ---- Выбор рейтинга ----
-    #     rating_group = QGroupBox("Выбор рейтинга")
-    #     rating_layout = QVBoxLayout(rating_group)
-    #     rating_layout.setSpacing(5)
-        
-    #     self.rating_type_combo = QComboBox()
-    #     self.rating_type_combo.addItems([
-    #         "Текущий (мужчины)",
-    #         "Текущий (женщины)",
-    #         "Январский (мужчины)",
-    #         "Январский (женщины)"
-    #     ])
-    #     self.rating_type_combo.currentIndexChanged.connect(self.on_rating_type_changed)
-    #     rating_layout.addWidget(self.rating_type_combo)
-    #     self.dynamic_filters_layout.addWidget(rating_group)
-
-    #     # self.top_filter_combo = QComboBox()
-    #     # self.top_filter_combo.addItems(["Все", "Топ 10", "Топ 20", "Топ 50", "Топ 100"])
-    #     # self.top_filter_combo.currentIndexChanged.connect(self.apply_rating_filters)  # <-- добавить
-
-    #     # ---- Фильтр по возрасту ----
-    #     age_group = QGroupBox("Возраст")
-    #     age_layout = QVBoxLayout(age_group)
-    #     self.age_filter_combo = QComboBox()
-    #     self.age_filter_combo.addItems(["Все", "до 12 лет", "до 14 лет", "до 16 лет", "до 18 лет", "до 22 лет"])
-    #     self.age_filter_combo.currentIndexChanged.connect(self.apply_rating_filters)
-    #     age_layout.addWidget(self.age_filter_combo)
-    #     self.dynamic_filters_layout.addWidget(age_group)
-
-    #     # ---- Фильтр по региону ----
-    #     region_group = QGroupBox("Регион")
-    #     region_layout = QVBoxLayout(region_group)
-    #     self.region_filter_edit = QLineEdit()
-    #     self.region_filter_edit.setPlaceholderText("Введите регион...")
-    #     self.region_filter_edit.textChanged.connect(self.apply_rating_filters)
-    #     region_layout.addWidget(self.region_filter_edit)
-    #     self.dynamic_filters_layout.addWidget(region_group)
-
-    #     # ---- Фильтр по городу ----
-    #     city_group = QGroupBox("Город")
-    #     city_layout = QVBoxLayout(city_group)
-    #     self.city_filter_edit = QLineEdit()
-    #     self.city_filter_edit.setPlaceholderText("Введите город...")
-    #     self.city_filter_edit.textChanged.connect(self.apply_rating_filters)
-    #     city_layout.addWidget(self.city_filter_edit)
-    #     self.dynamic_filters_layout.addWidget(city_group)
-
-    #     # ---- Поиск по имени ----
-    #     search_group = QGroupBox("Поиск")
-    #     search_layout = QVBoxLayout(search_group)
-    #     self.rating_search_edit = QLineEdit()
-    #     self.rating_search_edit.setPlaceholderText("Введите имя игрока...")
-    #     self.rating_search_edit.textChanged.connect(self.apply_rating_filters)
-    #     search_layout.addWidget(self.rating_search_edit)
-    #     self.dynamic_filters_layout.addWidget(search_group)
-
-    #     # При изменении комбобокса возраста
-    #     def on_age_changed(text):
-    #         if text == "Все":
-    #             self.rating_model.set_age_limit(None)
-    #         else:
-    #             limit = self.extract_age_limit(text)
-    #             self.rating_model.set_age_limit(limit)
-
-    #     self.age_filter_combo.currentTextChanged.connect(on_age_changed)
-
-    #     # Регион
-    #     self.region_filter_edit.textChanged.connect(
-    #         lambda text: self.rating_model.set_region_filter(text)
-    #     )
-
-    #     # Город
-    #     self.city_filter_edit.textChanged.connect(
-    #         lambda text: self.rating_model.set_city_filter(text)
-    #     )
-
-    #     # Поиск по имени
-    #     self.rating_search_edit.textChanged.connect(
-    #         lambda text: self.rating_model.set_name_filter(text)
-    #     )
-
-    #     # ---- Кнопка сброса ----
-    #     reset_btn = QPushButton("🔄 Сбросить фильтры")
-    #     reset_btn.setStyleSheet("""
-    #         QPushButton {
-    #             background-color: #f44336;
-    #             color: white;
-    #             border: none;
-    #             border-radius: 4px;
-    #             padding: 8px;
-    #             font-size: 11px;
-    #             font-weight: bold;
-    #         }
-    #         QPushButton:hover { background-color: #d32f2f; }
-    #     """)
-    #     reset_btn.clicked.connect(self.reset_rating_filters)
-    #     self.dynamic_filters_layout.addWidget(reset_btn)
-
-    #     # Кнопка печати
-    #     print_btn = QPushButton("🖨️ Печать ТОП")
-    #     print_btn.setStyleSheet("""
-    #         QPushButton {
-    #             background-color: #2196F3;
-    #             color: white;
-    #             border: none;
-    #             border-radius: 4px;
-    #             padding: 8px;
-    #             font-size: 11px;
-    #             font-weight: bold;
-    #         }
-    #         QPushButton:hover { background-color: #1976D2; }
-    #     """)
-    #     print_btn.clicked.connect(self.print_rating_top)
-    #     self.dynamic_filters_layout.addWidget(print_btn)
-
-    #     self.dynamic_filters_layout.addStretch()
-
     def update_left_panel_for_rating_tab(self):
         """Обновление левой панели для вкладки Рейтинг"""
         # Очистка панели
@@ -4448,6 +4313,26 @@ class MainWindow(QMainWindow):
         reset_btn.clicked.connect(self.reset_rating_filters)
         self.dynamic_filters_layout.addWidget(reset_btn)
 
+        # Кнопка печати
+        print_btn = QPushButton("🖨️ Печать ТОП")
+        print_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 8px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #1976D2; }
+        """)
+        print_btn.clicked.connect(self.print_rating_top)
+        self.dynamic_filters_layout.addWidget(print_btn)
+
+        # self.dynamic_filters_layout.addStretch()
+        # self.dynamic_filters_layout.addWidget(reset_btn)
+
         self.dynamic_filters_layout.addStretch()
 
     def print_rating_top(self):
@@ -4481,26 +4366,34 @@ class MainWindow(QMainWindow):
 
             # Имя файла
             title = Title.get_by_id(self.current_title_id)
+
             short_name = title.short_name_comp if title.short_name_comp else title.name
             import re
             clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
             clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
 
-            rating_type = self.rating_type_combo.currentText()
+            # rating_type = self.rating_type_combo.currentText()
+            vozrast = self.age_filter_combo.currentText()
+            vozrast = "Все возраста" if vozrast == "Все" else self.age_filter_combo.currentText() 
+            rating_type = f"{vozrast}"
+
             filename = os.path.join(pdf_dir, f"{clean_name}_rating_{rating_type}.pdf")
 
             # Документ
-            doc = SimpleDocTemplate(filename, pagesize=landscape(A4),
-                                    topMargin=1.5*cm, bottomMargin=1.5*cm,
-                                    leftMargin=1.5*cm, rightMargin=1.5*cm)
+            doc = SimpleDocTemplate(filename, pagesize=A4,
+                                    topMargin=1.0*cm, bottomMargin=1.0*cm,
+                                    leftMargin=1.0*cm, rightMargin=1.0*cm)
 
             styles = getSampleStyleSheet()
             title_style = PS("TitleStyle", fontSize=14, fontName="DejaVuSerif-Bold",
                             alignment=1, spaceAfter=20, textColor=colors.darkblue)
+            
+            zagolovok_style = PS("TitleStyle", fontSize=12, fontName="DejaVuSerif-Bold",
+                            alignment=1, spaceAfter=20, textColor=colors.darkblue)
 
             elements = []
-            elements.append(Paragraph(f"Рейтинг участников: {title.name}", title_style))
-            elements.append(Paragraph(f"Тип рейтинга: {rating_type}", styles['Normal']))
+            elements.append(Paragraph(f"Рейтинг участников: Топ сильнейших", title_style))
+            elements.append(Paragraph(f"Тип рейтинга: {rating_type}", zagolovok_style))
             elements.append(Spacer(1, 0.5*cm))
 
             # Заголовки таблицы
@@ -4511,7 +4404,7 @@ class MainWindow(QMainWindow):
             table = Table(table_data, repeatRows=1)
             table.setStyle(TableStyle([
                 ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSerif'),
-                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
                 ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),

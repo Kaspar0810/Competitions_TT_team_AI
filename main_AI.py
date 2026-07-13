@@ -9317,7 +9317,8 @@ class MainWindow(QMainWindow):
             total_groups = 1
             max_players = total_players
             stage_exit = 0
-            
+            basic = "Одна таблица"
+
             # Расчет количества игр
             if table_type == "Круговая":
                 total_games_in_stage = (total_players * (total_players - 1)) // 2
@@ -9329,6 +9330,8 @@ class MainWindow(QMainWindow):
             label_string = f"Одна таблица, {total_players} участников"
             choice_flag = 1
             source_stage = None
+
+           
 
         # === КВАЛИФИКАЦИЯ ===
         elif "Квалификация" in stage_name and "полуфинал" not in stage_name:
@@ -9367,7 +9370,6 @@ class MainWindow(QMainWindow):
                 total_games_in_stage += games
                 games_info.append(f"Гр{i}: {games} игр")
             
-            # kol_game_string = " | ".join(games_info)
             kol_game_string = str (f"{total_games_in_stage} игр.")
             # label_string = f"Квалификация: {total_groups} гр по {players_per_group} чел."
             label_string = ""
@@ -9754,6 +9756,10 @@ class MainWindow(QMainWindow):
                                 f"✅ Этап '{stage_name}' добавлен\n"
                                 f"🏆 Всего на соревновании: {total_all_games} игр.")
             
+            if stage_name == "Одна таблица":
+                # заполняет Choice
+                self.fill_choice_table() 
+
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось добавить этап: {str(e)}")    
 # ==================================
@@ -10454,17 +10460,6 @@ class MainWindow(QMainWindow):
 
         # Выбор типа жеребьевки
         self.drawing_for_stage(stage)
-
-        # drawing_type = self.get_drawing_type()
-        # if drawing_type is None:
-        #     return  # Пользователь отменил
-        
-        # if drawing_type == "auto":
-        #     self.drawing_for_stage(stage)
-        # else:
-        #     self.hide()
-        #     self.manual_drawing_for_stage(stage)
-        #     self.show()
 
     def calculate_semifinal_games(self, groups_count, players_per_group, exit_count):
         """
@@ -11222,62 +11217,102 @@ class MainWindow(QMainWindow):
                 # Находим квалификацию
                 qualification = None
                 for system in systems:
-                    if "Квалификация" in system.stage and "полуфинал" not in system.stage:
+                    if "Одна таблица" in system.stage:
+                        one_table = system
+                        break
+                    elif "Квалификация" in system.stage and "полуфинал" not in system.stage:
                         qualification = system
                         break
+                if not one_table:
+                    if not qualification:
+                        QMessageBox.warning(self, "Ошибка", "Не найдена квалификация для заполнения Choice")
+                        return
                 
-                if not qualification:
-                    QMessageBox.warning(self, "Ошибка", "Не найдена квалификация для заполнения Choice")
-                    return
+                if one_table:
+                    total_players = players.count()
+                    groups = 1
+                    # Сортируем игроков по рейтингу для посева
+                    players_sorted = players.order_by(Player.rank.desc())
+
+                    player_index = 0
+
+                    for player in players_sorted:
+                         
+                        # Получаем тренера
+                        coach_name = ""
+                        if player.coach_id:
+                            coach = Coach.get_or_none(Coach.id == player.coach_id)
+                            if coach:
+                                coach_name = coach.coach
+                        
+                        # Получаем регион
+                        region_name = player.region if player.region else ""
+                        
+                        # Создаем запись в Choice
+                        Choice.create(
+                            player_choice_id=player.id,
+                            family=player.fio or player.player,
+                            region=region_name,
+                            coach=coach_name,
+                            rank=player.rank or 0,
+                            basic="Одна таблица",
+                            group=1,
+                            posev_group=None,
+                            mesto_group=0,
+                            title_id=self.current_title_id,
+                            sex=player.sex
+                        )
+                        player_index += 1
+
+                elif qualification:
+                    # Распределяем игроков по группам
+                    total_players = players.count()
+                    groups = qualification.total_group
+                    players_per_group = total_players // groups
+                    remainder = total_players % groups
                 
-                # Распределяем игроков по группам
-                total_players = players.count()
-                groups = qualification.total_group
-                players_per_group = total_players // groups
-                remainder = total_players % groups
-                
-                # Сортируем игроков по рейтингу для посева
-                players_sorted = players.order_by(Player.rank.desc())
-                
-                group_counter = 1
-                player_index = 0
-                players_list = list(players_sorted)
-                
-                for i in range(groups):
-                    # Определяем размер группы
-                    current_group_size = players_per_group + (1 if i < remainder else 0)
+                    # Сортируем игроков по рейтингу для посева
+                    players_sorted = players.order_by(Player.rank.desc())
                     
-                    for j in range(current_group_size):
-                        if player_index < len(players_list):
-                            player = players_list[player_index]
-                            
-                            # Получаем тренера
-                            coach_name = ""
-                            if player.coach_id:
-                                coach = Coach.get_or_none(Coach.id == player.coach_id)
-                                if coach:
-                                    coach_name = coach.coach
-                            
-                            # Получаем регион
-                            region_name = player.region if player.region else ""
-                            
-                            # Создаем запись в Choice
-                            Choice.create(
-                                player_choice=player.id,
-                                family=player.fio or player.player,
-                                region=region_name,
-                                coach=coach_name,
-                                rank=player.rank or 0,
-                                basic=None,
-                                group=None,
-                                posev_group=None,
-                                mesto_group=0,
-                                title_id=self.current_title_id,
-                                sex=player.sex
-                            )
-                            player_index += 1
+                    group_counter = 1
+                    player_index = 0
+                    players_list = list(players_sorted)
                     
-                    group_counter += 1
+                    for i in range(groups):
+                        # Определяем размер группы
+                        current_group_size = players_per_group + (1 if i < remainder else 0)
+                        
+                        for j in range(current_group_size):
+                            if player_index < len(players_list):
+                                player = players_list[player_index]
+                                
+                                # Получаем тренера
+                                coach_name = ""
+                                if player.coach_id:
+                                    coach = Coach.get_or_none(Coach.id == player.coach_id)
+                                    if coach:
+                                        coach_name = coach.coach
+                                
+                                # Получаем регион
+                                region_name = player.region if player.region else ""
+                                
+                                # Создаем запись в Choice
+                                Choice.create(
+                                    player_choice=player.id,
+                                    family=player.fio or player.player,
+                                    region=region_name,
+                                    coach=coach_name,
+                                    rank=player.rank or 0,
+                                    basic=None,
+                                    group=None,
+                                    posev_group=None,
+                                    mesto_group=0,
+                                    title_id=self.current_title_id,
+                                    sex=player.sex
+                                )
+                                player_index += 1
+                        
+                        group_counter += 1
                 
                 QMessageBox.information(self, "Успех", 
                                     f"Таблица Choice заполнена.\n"
@@ -11871,6 +11906,8 @@ class MainWindow(QMainWindow):
         if type_net_str == "Олимпийская (с розыгрышем всех мест)":
             if max_pl == 8:
                 pdf_path = self.setka_8_full_made(final, posev_data)
+            elif max_pl == 16:
+                pdf_path = self.setka_16_full_made(final, posev_data)
         else:
             pass        
         return pdf_path
@@ -13601,7 +13638,7 @@ class MainWindow(QMainWindow):
     # ====
         elements.append(t)
         pv = A4
-        # добавил возможность паной сетки на 8
+        # добавил возможность парной сетки на 8
         if final == "Парный разряд":
             f = self.vid_double_game()
         else:
@@ -13635,6 +13672,200 @@ class MainWindow(QMainWindow):
         doc.build(elements, onFirstPage=self.func_zagolovok)
 
         return name_table_final
+
+    def setka_16_full_made(self, fin, posev_data):
+        """сетка на 16 в pdf"""
+        from reportlab.platypus import Table
+        table = "setka_16_full"
+        elements = []
+        data = []
+        style = []
+        column = ['']
+        column_count = column * 11
+        # добавить в аргументы функции
+        final = fin
+        titles = Title.select().where(Title.id == self.current_title_id).get()
+        vid_turnira = titles.vid_turnira
+        gamer = titles.gamer
+ 
+        finals = System.select().where((System.title_id == self.current_title_id) & (System.stage == fin)).get()
+        max_pl = finals.max_player # максимальное число игроков в сетке
+
+        if fin == "Парный разряд":
+            first_mesto = 1
+            last_mesto = 3
+            fin_title = ""
+        else:
+            first_mesto = self.get_final_start_place(fin)
+            last_mesto = max_pl if fin == "1-й финал" else first_mesto + max_pl - 1
+            fin_title = f'Финальные соревнования.({first_mesto}-{last_mesto} место)' # титул на таблице
+
+        for i in range(0, 69):
+            # column_count[10] = i  # нумерация 10 столбца для удобного просмотра таблицы
+            list_tmp = column_count.copy()
+            data.append(list_tmp) # пустая основа сетки
+        # ========= места ==========
+        y = 0
+        for i in range(0, 32, 2):
+            y += 1
+            data[i][0] = str(y)  # рисует начальные номера таблицы 1-16
+        # ========= нумерация встреч сетки ==========
+        self.draw_num(row_n=1, row_step=2, col_n=2, number_of_columns=4, number_of_game=1, player=16, data=data) # рисует номера встреч 1-32
+        self.draw_num(row_n=32, row_step=2, col_n=6, number_of_columns=2, number_of_game=17, player=4, data=data) # рисует номера встреч 1-32
+        self.draw_num(row_n=41, row_step=2, col_n=4, number_of_columns=3, number_of_game=21, player=8, data=data) # рисует номера встреч 1-32
+        self.draw_num(row_n=58, row_step=2, col_n=6, number_of_columns=2, number_of_game=29, player=4, data=data) # рисует номера встреч 1-32
+        self.draw_num_lost(row_n=29, row_step=2, col_n=6, number_of_game=13, player=2, data=data) # номера минус проигравшие встречи -1 -16
+        self.draw_num_lost(row_n=32, row_step=2, col_n=4, number_of_game=9, player=4, data=data) # номера минус проигравшие встречи -1 -16
+        self.draw_num_lost(row_n=39, row_step=2, col_n=6, number_of_game=17, player=2, data=data) # номера минус проигравшие встречи -1 -16
+        self.draw_num_lost(row_n=41, row_step=2, col_n=2, number_of_game=1, player=8, data=data) # номера минус проигравшие встречи -1 -16
+        self.draw_num_lost(row_n=58, row_step=2, col_n=4, number_of_game=21, player=4, data=data) # номера минус проигравшие встречи -1 -16
+        self.draw_num_lost(row_n=55, row_step=2, col_n=6, number_of_game=25, player=2, data=data) # номера минус проигравшие встречи -1 -16
+        self.draw_num_lost(row_n=65, row_step=2, col_n=6, number_of_game=29, player=2, data=data) # номера минус проигравшие встречи -1 -16
+    
+        data[8][8] = str(15)  # создание номеров встреч 15
+        data[25][8] = str(-15)
+        data[29][8] = str(16)  # создание номеров встреч 16
+        data[31][8] = str(-16)
+        data[37][8] = str(-19)
+        data[39][8] = str(20)
+        data[41][8] = str(-20)
+        data[44][8] = str(27)  # создание номеров встреч 27
+        data[52][8] = str(-27)
+        data[55][8] = str(28)  # создание номеров встреч 28
+        data[57][8] = str(-28)
+        data[63][8] = str(-31)
+        data[65][8] = str(32)  # создание номеров встреч 32
+        data[67][8] = str(-32)
+        #========= расписание ===========
+        # style_color_schedule = schedule_data(data, fin)
+        # ============================
+        # ============= данные игроков и встреч и размещение по сетке =============
+        tds = self.write_in_setka(data, fin, first_mesto, table, posev_data)
+        #===============
+        cw = ((0.3 * cm, 4.6 * cm, 0.4 * cm, 2.6 * cm, 0.4 * cm, 2.6 * cm, 0.4 * cm, 2.6 * cm,
+            0.4 * cm, 4.4 * cm, 1.3 * cm))
+        # основа сетки на чем чертить таблицу (ширина столбцов и рядов, их кол-во)
+        self.color_mesta(data, first_mesto, table, fin) # раскрашивает места участников красным цветом
+        t = Table(data, cw, 69 * [0.35 * cm])
+        # =========  цикл создания стиля таблицы ================
+        # ==== рисует основной столбец сетки 
+        style = self.draw_setka(1, 1, 16, style) # рисует кусок сетки(номер столбца, номер строки на 16 человека)
+        style = self.draw_setka(7, 29, 2, style) # рисует кусок сетки(номер столбца, номер строки на 32 человека)
+        style = self.draw_setka(5, 32, 4, style) # рисует кусок сетки(номер столбца, номер строки на 32 человека)
+        style = self.draw_setka(7, 39, 2, style) # рисует кусок сетки(номер столбца, номер строки на 32 человека)
+        style = self.draw_setka(3, 41, 8, style) # рисует кусок сетки(номер столбца, номер строки на 32 человека)
+        style = self.draw_setka(7, 55, 2, style) # рисует кусок сетки(номер столбца, номер строки на 32 человека)
+        style = self.draw_setka(5, 58, 4, style) # рисует кусок сетки(номер столбца, номер строки на 32 человека)
+        style = self.draw_setka(7, 65, 2, style) # рисует кусок сетки(номер столбца, номер строки на 32 человека)
+        # ======= встречи за места =====
+        for q in range(0, 11, 10):
+            fn = ('LINEABOVE', (9, q + 16), (10, q + 16),
+                1, colors.darkblue)  # за 1-2 место
+            style.append(fn)
+        for q in range(0, 3, 2):
+            fn = ('LINEABOVE', (9, q + 30), (10, q + 30),
+                1, colors.darkblue)  # за 3-4 место
+            style.append(fn)
+            fn = ('LINEABOVE', (9, q + 40), (10, q + 40),
+                1, colors.darkblue)  # за 7-8 место
+            style.append(fn)
+            fn = ('LINEABOVE', (9, q + 56), (10, q + 56),
+                1, colors.darkblue)  # за 11-12 место
+            style.append(fn)
+            fn = ('LINEABOVE', (9, q + 66), (10, q + 66),
+                1, colors.darkblue)  # за 15-16 место
+            style.append(fn)
+        for q in range(0, 4, 3):
+            fn = ('LINEABOVE', (9, q + 35), (10, q + 35),
+                1, colors.darkblue)  # за 5-6 место
+            style.append(fn)
+            fn = ('LINEABOVE', (9, q + 61), (10, q + 61),
+                1, colors.darkblue)  # за 13-14 место
+            style.append(fn)
+        for q in range(0, 6, 5):
+            fn = ('LINEABOVE', (9, q + 48), (10, q + 48),
+                1, colors.darkblue)  # за 9-10 место
+            style.append(fn)
+
+        for i in range(1, 8, 2):
+            fn = ('TEXTCOLOR', (i, 0), (i, 68), colors.black)  # цвет шрифта игроков
+            style.append(fn)
+            fn = ('TEXTCOLOR', (i + 1, 0), (i + 1, 68), colors.green)  # цвет шрифта номеров встреч
+            style.append(fn)
+            # выравнивание фамилий игроков по левому краю
+            fn = ('ALIGN', (i, 0), (i, 68), 'LEFT') 
+            style.append(fn)
+            # центрирование номеров встреч
+            fn = ('ALIGN', (i + 1, 0), (i + 1, 68), 'CENTER')
+            style.append(fn)
+        # =========== центрировать счет в партии =========
+        game = self.find_match_numbers_in_table(data, fin)  # находит номер строки и столбца матча на сетке
+        # центрировать счет в партии 
+        num_game = game[0]
+        for i in num_game.keys():
+            row_column = num_game[i]
+            row = row_column[0]
+            column = row_column[1]
+            fn = ('ALIGN', (column + 2, row + 1), (column + 2, row + 1), 'CENTER')
+            style.append(fn)
+    
+        for i in range(0, 12, 2):
+                fn = ('VALIGN', (i, 0), (i, -1), 'TOP')
+                style.append(fn)
+        # fn = ('INNERGRID', (0, 0), (-1, -1), 0.01, colors.grey)  # временное отображение сетки
+        # style.append(fn)
+        # for b in style_color_schedule:
+        #     ts.append(b)
+        ts = style   # стиль таблицы (список оформления строк и шрифта)
+        t.setStyle(TableStyle([('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
+                            ('FONTNAME', (0, 0), (-1, -1), "DejaVuSerif"),
+                            ('FONTSIZE', (0, 0), (-1, -1), 5),
+                            ('FONTNAME', (1, 0), (1, 32), "DejaVuSerif-Bold"),
+                            ('FONTSIZE', (1, 0), (1, 32), 5),
+                            ('LEADING', (1, 0), (1, 32), 5), # МЕЖСТРОЧНЫЙ ИНТЕРВАЛ В ЯЧЕЙКЕ (размер 7 = размеру шрифта значит без зазора)
+                            # 10 столбец с 0 по 68 ряд (цвет места)
+                            ('TEXTCOLOR', (10, 0), (10, 68), colors.red),
+                            #    ('ALIGN', (10, 0), (10, 68), 'RIGHT'),
+                            ('ALIGN', (9, 0), (9, 68), 'LEFT'),
+                            # цвет шрифта игроков 1 ого тура
+                            ('TEXTCOLOR', (0, 0), (0, 68), colors.blue),
+                            ('VALIGN', (0, 0), (-1, -1), 'TOP'), # TOP- вверху ячеки, MIDDLE - посередине, BOTTOM - внизу
+                            ('VALIGN', (1, 0), (1, 32), 'BOTTOM')] + ts))
+    # === надпись финала
+        h2 = PS("normal", fontSize=10, fontName="DejaVuSerif-Italic",
+                leftIndent=50, textColor=Color(1, 0, 1, 1))  # стиль параграфа (номера таблиц)
+        elements.append(Paragraph(f"{fin_title}. Одиночный разряд. {gamer}", h2))
+    # ====
+        elements.append(t)
+        pv = A4
+        # добавил возможность парной сетки на 8
+        if final == "Парный разряд":
+            f = self.vid_double_game()
+        else:
+            znak = final.rfind("-")
+            if znak == -1:
+                f = "superfinal"
+            else:
+                f = final[:znak]
+
+            pv = landscape(A4)
+
+        if tds is not None:
+            short_name = titles.short_name_comp
+            if fin == "Одна таблица":
+                name_table_final = f"{short_name}_one_table.pdf"
+            else:
+                name_table_final = f"{short_name}_{f}-final.pdf"
+        else:
+            short_name = "clear_16_full_net"  # имя для чистой сетки
+            name_table_final = f"{short_name}.pdf"
+        doc = SimpleDocTemplate(name_table_final, pagesize=pv, rightMargin=1*cm, leftMargin=1*cm, topMargin=2.2*cm, bottomMargin=1*cm)
+        # catalog = 1
+        # change_dir(catalog)
+        doc.build(elements, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
+
+        return tds
+
 # ========= пробный вариант матчей в сетке =========
     def _setka_8_full_made(self, fin, posev_data):
             """сетка на 8 в pdf"""
@@ -17061,53 +17292,6 @@ class MainWindow(QMainWindow):
                         k += 1
    
         return sorted(result, key=lambda x: x['place_in_group'])
-# ==== 3105===============
-    # def _calculate_points_scored_conceded(self, result, winner_idx, loser_idx, standings):
-    #     score_win = result.score_win if result.score_win else ""
-    #     if not score_win or score_win == "т.п.":
-    #         return
-
-    #     score_win = score_win.strip('()').replace(' ', '')
-    #     parts = score_win.split(',')
-
-    #     total_winner_scored = 0
-    #     total_winner_conceded = 0
-    #     total_loser_scored = 0
-    #     total_loser_conceded = 0
-
-    #     for part in parts:
-    #         try:
-    #             diff = int(part)
-    #             if diff >= 0:
-    #                 winner_scored = 11
-    #                 winner_conceded = 11 - diff
-    #             else:
-    #                 winner_scored = 11 + diff
-    #                 winner_conceded = 11
-    #             loser_scored = winner_conceded
-    #             loser_conceded = winner_scored
-
-    #             total_winner_scored += winner_scored
-    #             total_winner_conceded += winner_conceded
-    #             total_loser_scored += loser_scored
-    #             total_loser_conceded += loser_conceded
-    #         except ValueError:
-    #             if ':' in part:
-    #                 w, l = map(int, part.split(':'))
-    #                 total_winner_scored += w
-    #                 total_winner_conceded += l
-    #                 total_loser_scored += l
-    #                 total_loser_conceded += w
-    #             else:
-    #                 continue
-
-    #     if winner_idx in standings:
-    #         standings[winner_idx]['points_scored'] += total_winner_scored
-    #         standings[winner_idx]['points_conceded'] += total_winner_conceded
-    #     if loser_idx in standings:
-    #         standings[loser_idx]['points_scored'] += total_loser_scored
-    #         standings[loser_idx]['points_conceded'] += total_loser_conceded
-
 # ========= крутиловку из 3 со счетом в партиях считает 3105
     def calculate_internal_points_scored_conceded(self, result, winner_idx, loser_idx, internal_stats):
         """
@@ -19196,7 +19380,9 @@ class MainWindow(QMainWindow):
 
         # 1. Определяем источник игроков
         if source_stage is None:
-            if stage == "1-й финал":
+            if stage == "Одна таблица":
+                source_stage = "Одна таблица"
+            elif stage == "1-й финал":
                 # Сначала проверяем наличие 1-го полуфинала
                 semifinal1 = System.get_or_none(
                     (System.title_id == self.current_title_id) &
@@ -19219,6 +19405,8 @@ class MainWindow(QMainWindow):
         # 2. Получаем игроков из источника
         if "полуфинал" in source_stage.lower():
             players_by_group, actual_exit_count = self.get_players_for_final(stage, exit_count=None)
+        elif stage == "Одна таблица":
+            players_by_group = self.get_players_from_one_table(stage, exit_count=None)
         else:
             players_by_group = self.get_players_from_qualification_for_final(stage, exit_count)
         
@@ -19227,7 +19415,7 @@ class MainWindow(QMainWindow):
             return None
         
         # 3. Сортируем группы по номеру
-        sorted_groups = sorted(players_by_group.keys(), key=self._extract_number_from_group) 
+        # sorted_groups = sorted(players_by_group.keys(), key=self._extract_number_from_group) 
 
         # 4. Жеребьевка сетки автоматом
         num_id_player = self.choice_net_automat(stage, players_by_group)
@@ -19761,6 +19949,34 @@ class MainWindow(QMainWindow):
                     })
         
         return players
+# ======= новая функция для одной таблицы сетки ====    
+    def get_players_from_one_table(self, stage_name, exit_count):
+            """
+            Получение игроков из списка для Одной таблицы
+            """
+            players = defaultdict(list)
+            
+            # Получаем полуфинал
+            onetable = System.get_or_none(
+                (System.title_id == self.current_title_id) &
+                (System.stage == stage_name)
+            )
+            if not onetable:
+                return players
+
+            choice = Choice.select().where(Choice.title_id == self.current_title_id)
+            for ch in choice:
+                players[ch.group].append({
+                    'choice_id': ch.id,
+                    'player_id': ch.player_choice.id,
+                    'name': ch.family,
+                    'city': "",
+                    'region': ch.region,
+                    'rank': ch.rank or 0,
+                    'place': 0
+                })
+            
+            return players
 # ============== мой вариант жеребьевки
     def get_players_for_final(self, stage_name, exit_count=None):
             """
@@ -19810,7 +20026,6 @@ class MainWindow(QMainWindow):
              # =========== мой вариант =====
             # агружает игроков только с местами для финала
             result = self.real_place_for_final(stage_name)
-            # place_for_final = result[0]['place_stage']
             place_for_final = result['place_stage']
             # ==========
             
@@ -19933,7 +20148,7 @@ class MainWindow(QMainWindow):
 
         for h in system:
             stage = h.stage
-            if stage in group_list:
+            if stage in group_list or stage == "Одна таблица":
                 place_stage = [k for k in range(1, h.max_player + 1)]
                 player_max_stage[stage] = place_stage
         mesta_stage = []
@@ -20194,7 +20409,9 @@ class MainWindow(QMainWindow):
             (System.title_id == self.current_title_id) &
             (System.stage == "Одна таблица")
         )
-        
+        # определяем тип таблицы
+        type_table = system.type_table
+
         if not system:
             QMessageBox.warning(self, "Ошиб", "Этап 'Одна таблица' не найден в системе.\n"
                             "Сначала добавьте этап на вкладке 'Система'")
@@ -20221,7 +20438,13 @@ class MainWindow(QMainWindow):
             return
         
         if drawing_type == "auto":
-            self.auto_one_table_drawing(system)
+            if type_table == "круговая":
+                self.auto_one_table_drawing(system)
+            else:
+                exit_count = 1
+                source_stage = None
+                stage = "Одна таблица"
+                self.create_olimpic_final_automatically(stage, source_stage, exit_count)
         else:
             self.manual_one_table_drawing(system)
 
@@ -20875,14 +21098,19 @@ class MainWindow(QMainWindow):
         # номер для посева
         posevs_num = self.setka_choice_number(stage, count_exit)
         # Получаем результаты мест в группах согласно выходу из групп
-        result = self.real_place_for_final(stage_name=stage)       
-        nums = result['place_stage']
-
-        # реальное число игроков в финале
-        if stage_exit == "Квалификация":
-            real_all_player_in_final = len(choice.select().where(Choice.mesto_group.in_(nums))) # реальное число игроков в сетке
+        # result = self.real_place_for_final(stage_name=stage) 
+        if stage != "Одна таблица": 
+            result = self.real_place_for_final(stage_name=stage)      
+            nums = result['place_stage']
+            # реальное число игроков в финале
+            if stage_exit == "Квалификация":
+                real_all_player_in_final = len(choice.select().where(Choice.mesto_group.in_(nums))) # реальное число игроков в сетке
+            else:
+                real_all_player_in_final = len(choice.select().where(Choice.mesto_semi_final.in_(nums))) # реальное число игроков в сетке
         else:
-            real_all_player_in_final = len(choice.select().where(Choice.mesto_semi_final.in_(nums))) # реальное число игроков в сетке
+            real_all_player_in_final = len(choice.select().where(Choice.basic == "Одна таблица")) # реальное число игроков в сетке
+            count_exit = 1
+            nums = [1]
         # свободные номера в сетке
         free_num = self.free_place_in_setka(max_player, real_all_player_in_final, count_exit)
         #  спортсмены для посева ===

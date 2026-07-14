@@ -13641,6 +13641,8 @@ class MainWindow(QMainWindow):
         # добавил возможность парной сетки на 8
         if final == "Парный разряд":
             f = self.vid_double_game()
+        elif final == "Одна таблица":
+            pass
         else:
             znak = final.rfind("-")
             if znak == -1:
@@ -13841,6 +13843,8 @@ class MainWindow(QMainWindow):
         # добавил возможность парной сетки на 8
         if final == "Парный разряд":
             f = self.vid_double_game()
+        elif final == "Одна таблица":
+          pass
         else:
             znak = final.rfind("-")
             if znak == -1:
@@ -13850,21 +13854,28 @@ class MainWindow(QMainWindow):
 
             pv = landscape(A4)
 
+        t_id = Title.get(Title.id == self.current_title_id)
         if tds is not None:
-            short_name = titles.short_name_comp
+            if tds is not None:
+                short_name = t_id.short_name_comp
             if fin == "Одна таблица":
                 name_table_final = f"{short_name}_one_table.pdf"
-            else:
+            elif fin == "Парный разряд" :
+                name_table_final = f"{short_name}_double_{f}.pdf"
+            elif fin == "Суперфинал":
+                name_table_final = f"{short_name}_{f}.pdf"
+            elif fin != "Суперфинал":
                 name_table_final = f"{short_name}_{f}-final.pdf"
         else:
             short_name = "clear_16_full_net"  # имя для чистой сетки
             name_table_final = f"{short_name}.pdf"
-        doc = SimpleDocTemplate(name_table_final, pagesize=pv, rightMargin=1*cm, leftMargin=1*cm, topMargin=2.2*cm, bottomMargin=1*cm)
-        # catalog = 1
-        # change_dir(catalog)
-        doc.build(elements, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
 
-        return tds
+        doc = SimpleDocTemplate(name_table_final, pagesize=pv, rightMargin=1*cm, leftMargin=1*cm, topMargin=3*cm, bottomMargin=1*cm)
+
+        doc.build(elements, onFirstPage=self.func_zagolovok)
+
+        return name_table_final
+
 
 # ========= пробный вариант матчей в сетке =========
     def _setka_8_full_made(self, fin, posev_data):

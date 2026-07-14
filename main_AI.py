@@ -2611,6 +2611,12 @@ class MainWindow(QMainWindow):
                     (Result.title_id == self.current_title_id) &
                     (Result.system_stage == stage_name)
                 ).order_by(Result.number_group, Result.round))
+            elif stage_name == "Одна таблица":
+                # Получаем все матчи для выбранного этапа
+                self.current_matches = list(Result.select().where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.system_stage == stage_name)
+                ).order_by(Result.round))
             else:
                 # Получаем все матчи для выбранного этапа
                 self.current_matches = list(Result.select().where(
@@ -3350,6 +3356,11 @@ class MainWindow(QMainWindow):
         try:
             # Базовый запрос
             if stage_name in group_list:
+                query = Result.select().where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.system_stage == stage_name)
+                )
+            elif stage_name == "Одна таблица":
                 query = Result.select().where(
                     (Result.title_id == self.current_title_id) &
                     (Result.system_stage == stage_name)
@@ -12401,7 +12412,7 @@ class MainWindow(QMainWindow):
         """
         from reportlab.platypus import Table
         from collections import defaultdict
-        group_list = [ "Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]
+        group_list = ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]
         dict_table = {}
         
         try:
@@ -12429,7 +12440,9 @@ class MainWindow(QMainWindow):
             max_players_in_stage = max_pl  # из параметра функции
 
             for group_num in range(1, kg + 1):
-                if stage not in group_list:
+                if stage == "Одна таблица":
+                    group_key = f"{group_num} группа"
+                elif stage not in group_list:
                     group_key = stage
                 else:
                     group_key = f"{group_num} группа"   
@@ -15683,10 +15696,16 @@ class MainWindow(QMainWindow):
                 ).count()
             else:
                 # Считаем количество сыгранных матчей в финалах
-                total_matches = Result.select().where(
-                    (Result.title_id == self.current_title_id) &
-                    (Result.number_group == stage.stage)
-                ).count()
+                if stage.stage == "Одна таблица":
+                    total_matches = Result.select().where(
+                        (Result.title_id == self.current_title_id) &
+                        (Result.system_stage == stage.stage)
+                    ).count()
+                else:
+                    total_matches = Result.select().where(
+                        (Result.title_id == self.current_title_id) &
+                        (Result.number_group == stage.stage)
+                    ).count()
             
             played_matches = Result.select().where(
                 (Result.title_id == self.current_title_id) &
@@ -19644,27 +19663,6 @@ class MainWindow(QMainWindow):
                 positions.append(right)
                 right -= 1
         return positions
-#  === не нужная функция генерации туроы ы круг
-    def _get_round_robin_tours(self, n):
-        """Генерация туров для круговой системы."""
-        if n <= 1:
-            return []
-        players = list(range(1, n + 1))
-        if n % 2 == 1:
-            players.append(0)
-            n += 1
-        tours = []
-        for _ in range(n - 1):
-            tour = []
-            for i in range(n // 2):
-                p1 = players[i]
-                p2 = players[n - 1 - i]
-                if p1 != 0 and p2 != 0:
-                    tour.append((p1, p2))
-            tours.append(tour)
-            # Ротация
-            players = [players[0]] + [players[-1]] + players[1:-1]
-        return tours
 # ============================================
     def transfer_results_to_final(self, final_stage, source_stage, assigned_players):
         """Переносит результаты сыгранных матчей из source_stage в final_stage."""
@@ -20313,7 +20311,10 @@ class MainWindow(QMainWindow):
         
         for tour_idx, matches in enumerate(tours, 1):
             for match in matches:
-                pos1, pos2 = match
+                positions = match.split('-')
+                pos1 = int(positions[0])  # переводим в индекс массива
+                pos2 = int(positions[1])
+                # pos1, pos2 = match
                 if pos1 in player_by_position and pos2 in player_by_position:
                     player1 = player_by_position[pos1]
                     player2 = player_by_position[pos2]
@@ -20338,35 +20339,35 @@ class MainWindow(QMainWindow):
         
         print(f"Создано {len(tours) * (total_players // 2)} встреч для {stage_name}")
 # ========== лишняя функции генерация туров таблицы в круг
-    def _get_round_robin_tours(self, n):
-        """
-        Генерация туров для круговой системы
-        Возвращает список туров, каждый тур - список пар [(1,2), (3,4), ...]
-        """
-        if n <= 1:
-            return []
+    # def _get_round_robin_tours(self, n):
+    #     """
+    #     Генерация туров для круговой системы
+    #     Возвращает список туров, каждый тур - список пар [(1,2), (3,4), ...]
+    #     """
+    #     if n <= 1:
+    #         return []
         
-        if n % 2 == 1:
-            # Нечетное количество участников - добавляем фиктивного
-            players = list(range(1, n + 1)) + [0]
-            n += 1
-        else:
-            players = list(range(1, n + 1))
+    #     if n % 2 == 1:
+    #         # Нечетное количество участников - добавляем фиктивного
+    #         players = list(range(1, n + 1)) + [0]
+    #         n += 1
+    #     else:
+    #         players = list(range(1, n + 1))
         
-        tours = []
-        for round_num in range(n - 1):
-            round_matches = []
-            for i in range(n // 2):
-                p1 = players[i]
-                p2 = players[n - 1 - i]
-                if p1 != 0 and p2 != 0:
-                    round_matches.append((p1, p2))
-            tours.append(round_matches)
+    #     tours = []
+    #     for round_num in range(n - 1):
+    #         round_matches = []
+    #         for i in range(n // 2):
+    #             p1 = players[i]
+    #             p2 = players[n - 1 - i]
+    #             if p1 != 0 and p2 != 0:
+    #                 round_matches.append((p1, p2))
+    #         tours.append(round_matches)
             
-            # Ротация (фиксированный элемент остается на месте)
-            players = [players[0]] + [players[-1]] + players[1:-1]
+    #         # Ротация (фиксированный элемент остается на месте)
+    #         players = [players[0]] + [players[-1]] + players[1:-1]
         
-        return tours
+    #     return tours
 # =============================
     def create_final_round_robin(self, final_number):
         """
@@ -20449,7 +20450,7 @@ class MainWindow(QMainWindow):
             return
         
         if drawing_type == "auto":
-            if type_table == "круговая":
+            if type_table == "Круговая":
                 self.auto_one_table_drawing(system)
             else:
                 exit_count = 1
@@ -20642,7 +20643,8 @@ class MainWindow(QMainWindow):
             return
         
         # Получаем туры для круговой системы
-        tours = self.get_round_robin_tours(total_players)
+        # tours = self.get_round_robin_tours(total_players)
+        tours = self.tours_list(total_players)
         
         group_name = "1 группа"
         
@@ -20653,7 +20655,10 @@ class MainWindow(QMainWindow):
         
         for tour_idx, matches in enumerate(tours, 1):
             for match in matches:
-                pos1, pos2 = match
+                positions = match.split('-')
+                pos1 = int(positions[0])  # переводим в индекс массива
+                pos2 = int(positions[1])
+                # pos1, pos2 = match
                 if pos1 in player_by_position and pos2 in player_by_position:
                     player1 = player_by_position[pos1]
                     player2 = player_by_position[pos2]

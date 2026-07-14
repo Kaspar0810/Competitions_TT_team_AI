@@ -12521,7 +12521,7 @@ class MainWindow(QMainWindow):
                 }
 # ===============================            
             # ===== ЭТАП 2: ЗАПОЛНЯЕМ РЕЗУЛЬТАТАМИ ИЗ RESULT =====
-            if stage in group_list:
+            if stage in group_list or stage == "Одна таблица":
                 results = Result.select().where(
                     (Result.title_id == self.current_title_id) &
                     (Result.system_stage == stage)
@@ -12534,7 +12534,7 @@ class MainWindow(QMainWindow):
             
             # Сначала подсчитываем количество матчей в каждой группе
             for group_num in range(1, kg + 1):
-                if stage in group_list:
+                if stage in group_list or stage == "Одна таблица":
                     group_key = f"{group_num} группа"
                 else:
                     group_key = stage
@@ -12565,6 +12565,8 @@ class MainWindow(QMainWindow):
                 # если групповой этап
                 if stage in group_list:
                     results_group = results.where(Result.number_group == f"{group_num} группа")
+                elif stage == "Одна таблица":
+                    results_group = results.where(Result.system_stage == stage)         
                 else:
                     results_group = results.where(Result.number_group == stage)
                 

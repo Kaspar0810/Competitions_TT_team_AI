@@ -5694,6 +5694,13 @@ class MainWindow(QMainWindow):
         participants_list_action = QAction("📋 Список участников (PDF)", self)
         participants_list_action.triggered.connect(self.export_participants_to_pdf)
         view_menu.addAction(participants_list_action)
+
+        # Список регионов
+        self.regions_action = QAction("📋 Список регионов", self)
+        self.regions_action.triggered.connect(self.export_regions_to_pdf)
+        view_menu.addAction(self.regions_action)
+        
+        view_menu.addSeparator()
         
         # Расписание (если есть система)
         schedule_action = QAction("📅 Расписание (PDF)", self)
@@ -5738,7 +5745,7 @@ class MainWindow(QMainWindow):
         results_view_menu.addAction(self.results_menu_actions["Суперфинал"])
         
         view_menu.addSeparator()
-        
+
         fullscreen_action = QAction("Полный экран", self)
         fullscreen_action.triggered.connect(self.toggle_fullscreen)
         view_menu.addAction(fullscreen_action)
@@ -12172,6 +12179,106 @@ class MainWindow(QMainWindow):
             return None
         
         return player_name
+
+    def export_regions_to_pdf(self):
+        """Экспорт списка регионов в PDF"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+
+        try:
+            # Получаем участников текущего соревнования
+            players = Player.select().where(Player.title_id == self.current_title_id)
+            if players.count() == 0:
+                QMessageBox.warning(self, "Ошибка", "Нет участников в соревновании")
+                return
+
+            # Собираем регионы и считаем количество участников
+            regions_count = {}
+            for player in players:
+                region = player.region.strip() if player.region else "Не указан"
+                regions_count[region] = regions_count.get(region, 0) + 1
+
+            # Сортируем по убыванию количества участников, затем по алфавиту
+            sorted_regions = sorted(regions_count.items(), key=lambda x: (-x[1], x[0]))
+
+            # Создаём папку, если её нет
+            pdf_dir = "table_pdf"
+            if not os.path.exists(pdf_dir):
+                os.makedirs(pdf_dir)
+
+            # Имя файла
+            title = Title.get_by_id(self.current_title_id)
+            short_name = title.short_name_comp if title.short_name_comp else title.name
+            import re
+            clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
+            clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
+            filename = os.path.join(pdf_dir, f"{clean_name}_regions.pdf")
+
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+            # from reportlab.lib.pagesizes import A4
+            # from reportlab.lib import colors
+            # from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle as PS
+            # from reportlab.lib.units import cm
+
+            # Создаём документ
+            doc = SimpleDocTemplate(filename, pagesize=A4,
+                                    topMargin=2*cm, bottomMargin=1.5*cm,
+                                    leftMargin=1.5*cm, rightMargin=1.5*cm)
+
+            styles = getSampleStyleSheet()
+            title_style = PS("TitleStyle", fontSize=14, fontName="DejaVuSerif-Bold",
+                            alignment=1, spaceAfter=20, textColor=colors.darkblue)
+            header_style = PS("HeaderStyle", fontSize=10, fontName="DejaVuSerif-Bold",
+                            alignment=1, textColor=colors.white)
+
+            elements = []
+
+            # Заголовок
+            elements.append(Paragraph("Список регионов участников", title_style))
+            elements.append(Spacer(1, 0.5*cm))
+
+            # Данные таблицы
+            table_data = [["№", "Регион", "Кол-во участников"]]
+            for i, (region, count) in enumerate(sorted_regions, 1):
+                table_data.append([str(i), region, str(count)])
+
+            # Таблица
+            table = Table(table_data, colWidths=[1.5*cm, 12*cm, 3*cm], repeatRows=1)
+            table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSerif'),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                ('TOPPADDING', (0, 0), (-1, -1), 4),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ]))
+
+            elements.append(table)
+
+            # Строим документ с использованием func_zagolovok
+            doc.build(elements, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
+
+            QMessageBox.information(self, "Успех", f"Список регионов сохранён в PDF:\n{filename}")
+
+            # Предлагаем открыть файл
+            reply = QMessageBox.question(self, "Открыть файл", 
+                                        "Открыть созданный PDF файл?",
+                                        QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                if sys.platform == 'win32':
+                    os.startfile(filename)
+                else:
+                    os.system(f'open "{filename}"')
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")
+
 # === круговые таблицы ====
     def table_made(self, pv, stage):
         """создание таблиц kg - количество групп(таблиц), g2 - наибольшое кол-во участников в группе
@@ -18491,7 +18598,7 @@ class MainWindow(QMainWindow):
             return None
 
         # Получаем результаты
-        if stage in group_list:
+        if stage in group_list or stage == "Одна таблица":
             results = Result.select().where(
                 (Result.title_id == self.current_title_id) &
                 (Result.system_stage == stage)
@@ -18505,6 +18612,14 @@ class MainWindow(QMainWindow):
         if runner_type == "Урезанный":
             # ====  Одна таблица ====
             if stage != "Одна таблица":            
+                # Фильтруем по номеру группы/финала
+                if subgroup != "Все группы" and subgroup != "Все финалы":
+                    results = results.where(Result.number_group == subgroup)
+            elif stage == "Одна таблица":
+                 # Фильтруем по номеру группы/финала
+                if subgroup != "Все группы" and subgroup != "Все финалы":
+                    results = results.where(Result.number_group == "1 группа")
+            else:
                 # Фильтруем по номеру группы/финала
                 if subgroup != "Все группы" and subgroup != "Все финалы":
                     results = results.where(Result.number_group == subgroup)
@@ -18535,7 +18650,7 @@ class MainWindow(QMainWindow):
             elif stage == "Квалификация. 2-й полуфинал":
                 shot_stage = "ПФ2"
             elif stage == "Одна таблица":
-                shot_stage = stage[:2]
+                shot_stage = "Ф"
             else:
                 shot_stage = "Ф"
 
@@ -18544,11 +18659,14 @@ class MainWindow(QMainWindow):
             stiker_data = []
             for res in results_list:
                 # Номер группы/финала для отображения
-                if stage not in group_list:
+                if stage == "Одна таблица":
+                    sys_stage = f"{shot_stage}"
+                    n_gr = ""
+                elif stage not in group_list:
                     import re
                     match = re.search(r'(\d+)', res.number_group)
                     n_gr = match.group(1) if match else gm
-                    sys_stage = f"{n_gr}{shot_stage}"
+                    sys_stage = f"{n_gr}{shot_stage}"                
                 else:
                     import re
                     match = re.search(r'(\d+)', res.number_group)

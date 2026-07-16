@@ -14032,7 +14032,8 @@ class MainWindow(QMainWindow):
         titles = Title.select().where(Title.id == self.current_title_id).get()
         gamer = titles.gamer
 
-        max_pl = sys.max_player # максимальное число игроков в сетке
+        finals = System.select().where((System.title_id == self.current_title_id) & (System.stage == fin)).get()
+        max_pl = finals.max_player # максимальное число игроков в сетке
 
         if fin == "Парный разряд":
             first_mesto = 1
@@ -14108,6 +14109,7 @@ class MainWindow(QMainWindow):
         data[201][10] = str(number_of_game)  # создание номеров встреч 68
         self.draw_num_lost(row_n=140, row_step=2, col_n=0, number_of_game=1, player=16, data=data) # номера минус проигравшие встречи -1 -16
         self.draw_num_lost(row_n=172, row_step=2, col_n=4, number_of_game=57, player=4, data=data) # номера минус проигравшие встречи -1 -16
+        self.draw_num_lost(row_n=179, row_step=2, col_n=0, number_of_game=49, player=8, data=data) # номера минус проигравшие встречи -1 -16
         self.draw_num_lost(row_n=197, row_step=2, col_n=0, number_of_game=69, player=4, data=data) # номера минус проигравшие встречи -1 -16
         self.draw_num_lost(row_n=168, row_step=2, col_n=8, number_of_game=61, player=2, data=data) # номера минус проигравшие встречи -1 -16
         self.draw_num_lost(row_n=182, row_step=2, col_n=8, number_of_game=65, player=2, data=data) # номера минус проигравшие встречи -1 -16
@@ -14118,13 +14120,13 @@ class MainWindow(QMainWindow):
         # style_color_schedule = self.schedule_data(data, fin)
         # ============================
         # ============= данные игроков и встреч и размещение по сетке =============
-        tds = self.write_in_setka(data, fin, first_mesto, table)
+        tds = self.write_in_setka(data, fin, first_mesto, table, posev_data)
         #===============
         cw = ((0.2 * cm, 3.8 * cm, 0.35 * cm, 2.7 * cm, 0.35 * cm, 2.7 * cm, 0.35 * cm, 2.7 * cm, 0.35 * cm,
             2.5 * cm, 0.35 * cm, 3.0 * cm, 0.3 * cm))
         # основа сетки на чем чертить таблицу (ширина столбцов и рядов, их кол-во)
         style_color = self.color_mesta(data, first_mesto, table, fin) # раскрашивает места участников красным цветом
-        t = Table(data, cw, strok * [0.35 * cm])
+        t = Table(data, cw, strok * [0.36 * cm])
         # =========  цикл создания стиля таблицы =======
         # ========= 1 страница =========
         style = self.draw_setka(1, 3, 32, style) # рисует кусок сетки(номер столбца, номер строки на 32 человека)
@@ -14222,8 +14224,8 @@ class MainWindow(QMainWindow):
         ts = style   # стиль таблицы (список оформления строк и шрифта)
         for b in style_color:
             ts.append(b)
-        for b in self.style_color_schedule:
-            ts.append(b)
+        # for b in self.style_color_schedule:
+        #     ts.append(b)
         t.setStyle(TableStyle([('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
                             ('FONTNAME', (0, 0), (-1, -1), "DejaVuSerif"),
                             ('FONTSIZE', (0, 0), (-1, -1), 5),
@@ -14251,17 +14253,26 @@ class MainWindow(QMainWindow):
             pv = landscape(A4)
         t_id = Title.get(Title.id == self.current_title_id)
         if tds is not None:
-            short_name = t_id.short_name_comp
-            name_table_final = f"{short_name}_{f}-final.pdf"
+            if tds is not None:
+                short_name = t_id.short_name_comp
+            if fin == "Одна таблица":
+                name_table_final = f"{short_name}_one_table.pdf"
+            elif fin == "Парный разряд" :
+                name_table_final = f"{short_name}_double_{f}.pdf"
+            elif fin == "Суперфинал":
+                name_table_final = f"{short_name}_{f}.pdf"
+            elif fin != "Суперфинал":
+                name_table_final = f"{short_name}_{f}-final.pdf"
         else:
-            short_name = "clear_32_full_net"
+            short_name = "clear_32_full_net"  # имя для чистой сетки
+
             name_table_final = f"{short_name}.pdf"
-        doc = SimpleDocTemplate(name_table_final, pagesize=pv, rightMargin=1*cm, leftMargin=1*cm, topMargin=3.5*cm, bottomMargin=1.0*cm)
-        # catalog = 1
-        # change_dir(catalog)
+
+        doc = SimpleDocTemplate(name_table_final, pagesize=pv, rightMargin=1*cm, leftMargin=1*cm, topMargin=3*cm, bottomMargin=1*cm)
+
         doc.build(elements, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
-        os.chdir("..")
-        return tds
+
+        return name_table_final
 
 # ========= пробный вариант матчей в сетке =========
     def _setka_8_full_made(self, fin, posev_data):
@@ -14805,6 +14816,31 @@ class MainWindow(QMainWindow):
                     break
             player_in_final_full = 2 ** m
         return player_in_final_full  
+
+    def draw_mesta(self, row, col, player, style):
+        """рисует линии встреч за место"""
+        p = 0
+        if player == 2:
+            p = 4
+        elif player == 4:
+            p = 4
+        elif player == 8:
+            p = 6
+        elif player == 16:
+            p = 10
+
+        col_f = 11
+
+        if col == 9:
+            col_f = col + 2
+        else:
+            col_f = col + 1
+
+        for l in range(row, row + p + 1, p):
+            fn = ('LINEABOVE', (col, l), (col_f, l), 1, colors.darkblue)  # рисует линии мест 5-6 места (4 чел)
+            style.append(fn)
+        return style
+    
 # ====== расписание на сетке =========== 
     def schedule_data(self, data, fin):
         """расписание на стетке"""
@@ -19793,7 +19829,7 @@ class MainWindow(QMainWindow):
         choice = Choice.select().where(Choice.title_id == self.current_title_id)
 
         # 1. Определяем источник игроков
-        if source_stage is None:
+        if source_stage is not None:
             if stage == "Одна таблица":
                 source_stage = "Одна таблица"
             elif stage == "1-й финал":
@@ -20722,37 +20758,7 @@ class MainWindow(QMainWindow):
                     )
         
         print(f"Создано {len(tours) * (total_players // 2)} встреч для {stage_name}")
-# ========== лишняя функции генерация туров таблицы в круг
-    # def _get_round_robin_tours(self, n):
-    #     """
-    #     Генерация туров для круговой системы
-    #     Возвращает список туров, каждый тур - список пар [(1,2), (3,4), ...]
-    #     """
-    #     if n <= 1:
-    #         return []
-        
-    #     if n % 2 == 1:
-    #         # Нечетное количество участников - добавляем фиктивного
-    #         players = list(range(1, n + 1)) + [0]
-    #         n += 1
-    #     else:
-    #         players = list(range(1, n + 1))
-        
-    #     tours = []
-    #     for round_num in range(n - 1):
-    #         round_matches = []
-    #         for i in range(n // 2):
-    #             p1 = players[i]
-    #             p2 = players[n - 1 - i]
-    #             if p1 != 0 and p2 != 0:
-    #                 round_matches.append((p1, p2))
-    #         tours.append(round_matches)
-            
-    #         # Ротация (фиксированный элемент остается на месте)
-    #         players = [players[0]] + [players[-1]] + players[1:-1]
-        
-    #     return tours
-# =============================
+
     def create_final_round_robin(self, final_number):
         """
         Создание финала по круговой системе

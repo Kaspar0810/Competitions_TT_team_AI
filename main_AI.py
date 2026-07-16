@@ -4137,10 +4137,7 @@ class MainWindow(QMainWindow):
                 # Если есть выбранный этап, загружаем его
                 if hasattr(self, 'current_stage') and self.current_stage:
                     self.load_results_table_for_stage(self.current_stage)
-                # else:
-                #     # Показываем диалог выбора этапа
-                #     QTimer.singleShot(100, self.select_stage_for_results)
-            
+
             # Скрываем секцию создания этапа
             self.stage_section.setVisible(False)
             self.seeding_info_label.hide()
@@ -13502,6 +13499,96 @@ class MainWindow(QMainWindow):
                 snoska.append(game_loser) # список: номер встречи победителя, номер - проигравшего и куда снести проигравшего
 
             return snoska
+    
+    def check_olympic_pairs_conflicts(self, stage_name):
+        """
+        Проверяет пары в олимпийской сетке на конфликты по региону и тренеру.
+        Выводит информацию в виде сообщения.
+        
+        Аргументы:
+            stage_name (str): название этапа (финала) для проверки.
+        """
+        stage_name = self.current_stage
+        # Получаем систему для данного этапа
+        system = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == stage_name)
+        )
+        if not system:
+            QMessageBox.warning(self, "Ошибка", f"Система для этапа {stage_name} не найдена")
+            return
+
+        # Получаем всех игроков в этом этапе (из Game_list)
+        game_players = Game_list.select().where(
+            (Game_list.title_id == self.current_title_id) &
+            (Game_list.system_id == system.id)
+        ).order_by(Game_list.rank_num_player)
+
+        if game_players.count() == 0:
+            QMessageBox.warning(self, "Ошибка", f"Нет игроков в этапе {stage_name}")
+            return
+
+        # Собираем данные по игрокам: позиция -> данные (игрок, регион, тренер)
+        players_by_pos = {}
+        for gp in game_players:
+            player = Player.get_or_none(Player.id == gp.player_group.id)
+            if not player:
+                continue
+            region = player.region or ""
+            coach = ""
+            if player.coach_id:
+                coach_obj = Coach.get_or_none(Coach.id == player.coach_id)
+                if coach_obj:
+                    coach = coach_obj.coach or ""
+            players_by_pos[gp.rank_num_player] = {
+                'player': player,
+                'region': region,
+                'coach': coach
+            }
+
+        total_players = len(players_by_pos)
+        if total_players % 2 != 0:
+            QMessageBox.warning(self, "Ошибка", "Нечетное количество игроков в сетке")
+            return
+
+        # Формируем пары: 1-2, 3-4, ...
+        conflicts = []  # список строк с описанием конфликтов
+        for pos in range(1, total_players, 2):
+            pos1 = pos
+            pos2 = pos + 1
+            if pos1 not in players_by_pos or pos2 not in players_by_pos:
+                continue  # на случай пропусков (но их быть не должно)
+
+            p1_data = players_by_pos[pos1]
+            p2_data = players_by_pos[pos2]
+            p1 = p1_data['player']
+            p2 = p2_data['player']
+
+            # Проверка региона
+            region_conflict = False
+            if p1_data['region'] and p2_data['region'] and p1_data['region'] == p2_data['region']:
+                region_conflict = True
+
+            # Проверка тренера
+            coach_conflict = False
+            if p1_data['coach'] and p2_data['coach'] and p1_data['coach'] == p2_data['coach']:
+                coach_conflict = True
+
+            if region_conflict or coach_conflict:
+                conflict_msg = f"Встреча {pos2 // 2}: {p1.fio or p1.player} vs {p2.fio or p2.player}"
+                if region_conflict:
+                    conflict_msg += f" | Регион: {p1_data['region']}"
+                if coach_conflict:
+                    conflict_msg += f" | Тренер: {p1_data['coach']}"
+                conflicts.append(conflict_msg)
+
+        # Вывод результатов
+        if conflicts:
+            msg = f"Обнаружены конфликты в парах сетки ({len(conflicts)}):\n\n" + "\n".join(conflicts)
+            QMessageBox.warning(self, "Конфликты в парах", msg)
+        else:
+            QMessageBox.information(self, "Проверка пар", "Все пары сетки не имеют конфликтов по региону и тренеру.")
+
 # ============= Сетки по олимпийской системе в PDF =========================================  
     def func_zagolovok(self, canvas, doc):
             """создание заголовка страниц для PDF"""
@@ -13991,10 +14078,10 @@ class MainWindow(QMainWindow):
             znak = final.rfind("-")
             if znak == -1:
                 f = "superfinal"
+                pv = landscape(A4)
             else:
                 f = final[:znak]
 
-            pv = landscape(A4)
 
         t_id = Title.get(Title.id == self.current_title_id)
         if tds is not None:
@@ -16523,6 +16610,19 @@ class MainWindow(QMainWindow):
         export_btn.setStyleSheet(self.get_button_style())
         export_btn.clicked.connect(self.export_results_to_pdf)
         self.dynamic_filters_layout.addWidget(export_btn)
+
+        # Разделитель
+        line5 = QFrame()
+        line5.setFrameShape(QFrame.HLine)
+        line5.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
+        self.dynamic_filters_layout.addWidget(line5)
+
+        # Кнопка проверки сетки
+        check_paris_btn = QPushButton("✅ Проверка пар в сетке")
+        check_paris_btn.setMinimumHeight(35)
+        check_paris_btn.setStyleSheet(self.get_button_style())
+        check_paris_btn.clicked.connect(self.check_olympic_pairs_conflicts)
+        self.dynamic_filters_layout.addWidget(check_paris_btn)
         
         self.dynamic_filters_layout.addStretch()
         
@@ -19940,6 +20040,8 @@ class MainWindow(QMainWindow):
         
         QMessageBox.information(self, "Успех",
             f"Автоматическая жеребьёвка {stage} завершена.")
+        
+        self.check_olympic_pairs_conflicts(stage)
     
     def number_game_of_net(self, final):
         """определяем количество игр в сетке"""

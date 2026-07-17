@@ -8,17 +8,17 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QTabWidget, QTableView, QMenuBar, QAction, QLabel,
     QFrame, QSizePolicy, QMessageBox, QListWidget, QListWidgetItem,
-    QLineEdit, QDateEdit, QComboBox, QGroupBox, QFormLayout,
+    QLineEdit, QDateEdit, QComboBox, QGroupBox, QFormLayout, QStyledItemDelegate,
     QScrollArea, QSplitter, QInputDialog, QHeaderView, QAbstractItemView,
     QDialog, QProgressBar, QFileDialog, QMenu, QProgressDialog, QTextEdit, QSpinBox
 )
 from PyQt5.QtWidgets import QGridLayout  # Добавьте в импорт
 from PyQt5.QtCore import Qt, QDate, QSize, pyqtSignal, QThread
 from PyQt5.QtGui import QFont, QColor, QIntValidator
-from PyQt5.QtCore import QTimer
+from PyQt5.QtCore import QTimer, QTime
 from PyQt5.QtWidgets import QCompleter
 from PyQt5.QtCore import QStringListModel
-from PyQt5.QtWidgets import QStackedWidget
+from PyQt5.QtWidgets import QStackedWidget, QTableWidget, QTableWidgetItem, QTimeEdit
 
 from reportlab.pdfbase.pdfmetrics import registerFontFamily
 from reportlab.lib import colors
@@ -64,11 +64,64 @@ from PyPDF2 import PdfMerger
 # В основной программе
 import auto_choice_group
 import manual_choice
-# from manual_choice import choice_semifinal
 
 from db_setup import setup_database
 from import_initial_data import InitialDataImportDialog
 from begunok_full import BegunokPDF
+# ======================== 1-й вариан расписания ======
+from PyQt5.QtWidgets import QStyledItemDelegate, QSpinBox
+
+class TableSpinDelegate(QStyledItemDelegate):
+    def __init__(self, min_val, max_val, parent=None):
+        super().__init__(parent)
+        self.min_val = min_val
+        self.max_val = max_val
+
+    def createEditor(self, parent, option, index):
+        editor = QSpinBox(parent)
+        editor.setMinimum(self.min_val)
+        editor.setMaximum(self.max_val)
+        return editor
+
+    def setEditorData(self, editor, index):
+        value = index.model().data(index, Qt.DisplayRole)
+        try:
+            editor.setValue(int(value))
+        except:
+            editor.setValue(self.min_val)
+
+    def setModelData(self, editor, model, index):
+        value = editor.value()
+        model.setData(index, value, Qt.DisplayRole)
+
+class SpinBoxDelegate(QStyledItemDelegate):
+    """Делегат для ячейки с QSpinBox (номер стола)"""
+    def __init__(self, minimum, maximum, parent=None):
+        super().__init__(parent)
+        self.minimum = minimum
+        self.maximum = maximum
+
+    def createEditor(self, parent, option, index):
+        editor = QSpinBox(parent)
+        editor.setMinimum(self.minimum)
+        editor.setMaximum(self.maximum)
+        editor.setFrame(False)
+        return editor
+
+    def setEditorData(self, editor, index):
+        value = index.model().data(index, Qt.EditRole)
+        if value is not None:
+            try:
+                editor.setValue(int(value))
+            except:
+                editor.setValue(self.minimum)
+
+    def setModelData(self, editor, model, index):
+        value = editor.value()
+        model.setData(index, value, Qt.EditRole)
+
+    def updateEditorGeometry(self, editor, option, index):
+        editor.setGeometry(option.rect)
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -790,6 +843,8 @@ class MainWindow(QMainWindow):
         right_panel_layout = QVBoxLayout(self.right_panel)
         right_panel_layout.setContentsMargins(0, 0, 0, 0)
         right_panel_layout.setSpacing(3)
+
+        
         
         # В методе init_ui, после создания правой панели:
         self.competitions_label = QLabel("🏆 Прошедшие соревнования")
@@ -1073,7 +1128,7 @@ class MainWindow(QMainWindow):
             4: 350,  # Система
             5: 200,  # Результаты - маленькая верхняя часть для формы ввода
             6: 150,  # Рейтинг
-            7: 250   # Дополнительно
+            7: 550   # Дополнительно
         }
         
         # Устанавливаем начальную высоту
@@ -2476,126 +2531,810 @@ class MainWindow(QMainWindow):
             main_layout.addStretch()
             
             return tab_widget
-    
+# ======== начальный вариант ======
+    def _create_extra_tab(self):
+        """Вкладка Дополнительно - печать бегунков, заметки и расписание"""
+        tab_widget = QWidget()
+        main_layout = QHBoxLayout(tab_widget)
+        main_layout.setSpacing(10)
+        main_layout.setContentsMargins(10, 10, 10, 10)
+
+        # ---------- ЛЕВАЯ КОЛОНКА (вертикально) ----------
+        left_widget = QWidget()
+        left_layout = QVBoxLayout(left_widget)
+        left_layout.setSpacing(10)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+
+        # ---- 1. Печать бегунков ----
+        print_group = QGroupBox("🏃 Печать бегунков")
+        print_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                font-size: 12px;
+                border: 2px solid #4CAF50;
+                border-radius: 8px;
+                margin-top: 10px;
+            }
+            QGroupBox::title {
+                color: #4CAF50;
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 8px 0 8px;
+            }
+        """)
+        print_layout = QFormLayout(print_group)
+        print_layout.setSpacing(10)
+        print_layout.setContentsMargins(15, 15, 15, 15)
+
+        self.runner_type_combo = QComboBox()
+        self.runner_type_combo.addItems(["Урезанный", "Полный"])
+        self.runner_type_combo.setStyleSheet("padding: 5px; font-size: 11px;")
+        print_layout.addRow("Тип бегунка:", self.runner_type_combo)
+
+        self.stage_for_runner_combo = QComboBox()
+        self.stage_for_runner_combo.setStyleSheet("padding: 5px; font-size: 11px;")
+        self.stage_for_runner_combo.currentTextChanged.connect(self.on_runner_stage_changed)
+        print_layout.addRow("Этап:", self.stage_for_runner_combo)
+
+        self.subgroup_for_runner_combo = QComboBox()
+        self.subgroup_for_runner_combo.setStyleSheet("padding: 5px; font-size: 11px;")
+        print_layout.addRow("Группа/Финал:", self.subgroup_for_runner_combo)
+
+        print_btn = QPushButton("🖨️ Печать бегунков")
+        print_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                padding: 8px 15px;
+                font-size: 12px;
+                font-weight: bold;
+                border-radius: 5px;
+            }
+            QPushButton:hover { background-color: #45a049; }
+        """)
+        print_btn.clicked.connect(self.print_runners)
+        print_layout.addRow("", print_btn)
+
+        left_layout.addWidget(print_group)
+
+        # ---- 2. Заметки ----
+        notes_group = QGroupBox("📝 Заметки")
+        notes_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                font-size: 12px;
+                border: 2px solid #2196F3;
+                border-radius: 8px;
+                margin-top: 10px;
+            }
+            QGroupBox::title {
+                color: #2196F3;
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 8px 0 8px;
+            }
+        """)
+        notes_layout = QVBoxLayout(notes_group)
+        notes_layout.setContentsMargins(10, 15, 10, 10)
+
+        self.notes_text = QTextEdit()
+        self.notes_text.setPlaceholderText("Добавить заметки о соревновании...")
+        self.notes_text.setStyleSheet("""
+            QTextEdit {
+                padding: 8px;
+                font-size: 11px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                min-height: 100px;
+            }
+        """)
+        notes_layout.addWidget(self.notes_text)
+
+        save_notes_btn = QPushButton("💾 Сохранить заметки")
+        save_notes_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                padding: 6px 12px;
+                font-size: 11px;
+                font-weight: bold;
+                border-radius: 4px;
+            }
+            QPushButton:hover { background-color: #1976D2; }
+        """)
+        save_notes_btn.clicked.connect(self.save_notes)
+        notes_layout.addWidget(save_notes_btn)
+
+        left_layout.addWidget(notes_group)
+        left_layout.addStretch()
+# ===== work ====
+        # # ---------- ПРАВАЯ КОЛОНКА (расписание) ----------
+        # schedule_group = QGroupBox("📅 Расписание (олимпийская система)")
+        # schedule_group.setStyleSheet("""
+        #     QGroupBox {
+        #         font-weight: bold;
+        #         font-size: 12px;
+        #         border: 2px solid #FF9800;
+        #         border-radius: 8px;
+        #         margin-top: 10px;
+        #     }
+        #     QGroupBox::title {
+        #         color: #FF9800;
+        #         subcontrol-origin: margin;
+        #         left: 10px;
+        #         padding: 0 8px 0 8px;
+        #     }
+        # """)
+        # schedule_layout = QVBoxLayout(schedule_group)
+        # schedule_layout.setSpacing(8)
+        # schedule_layout.setContentsMargins(10, 15, 10, 10)
+
+        # # Выбор этапа
+        # stage_schedule_layout = QHBoxLayout()
+        # stage_schedule_layout.addWidget(QLabel("Этап:"))
+        # self.schedule_stage_combo = QComboBox()
+        # self.schedule_stage_combo.currentIndexChanged.connect(self.on_schedule_stage_changed)
+        # stage_schedule_layout.addWidget(self.schedule_stage_combo, 1)
+        # schedule_layout.addLayout(stage_schedule_layout)
+
+        # # Таблица матчей
+        # self.schedule_table = QTableWidget()
+        # self.schedule_table.setColumnCount(6)
+        # self.schedule_table.setHorizontalHeaderLabels(["№ встречи", "Игрок 1", "Игрок 2", "Дата", "Время", "Стол"])
+        # self.schedule_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        # self.schedule_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        # self.schedule_table.setSelectionBehavior(QTableWidget.SelectRows)
+        # self.schedule_table.setSelectionMode(QTableWidget.ExtendedSelection)
+        # self.schedule_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        # self.schedule_table.setStyleSheet("""
+        #     QTableWidget {
+        #         font-size: 11px;
+        #         gridline-color: #ddd;
+        #         selection-background-color: #a0c4ff;
+        #     }
+        #     QTableWidget::item {
+        #         padding: 2px;
+        #     }
+        # """)
+        # schedule_layout.addWidget(self.schedule_table)
+
+        # # Панель управления
+        # control_panel = QWidget()
+        # control_layout = QHBoxLayout(control_panel)
+        # control_layout.setSpacing(10)
+
+        # control_layout.addWidget(QLabel("Дата:"))
+        # self.schedule_date_edit = QDateEdit()
+        # self.schedule_date_edit.setDate(QDate.currentDate())
+        # self.schedule_date_edit.setCalendarPopup(True)
+        # self.schedule_date_edit.setDisplayFormat("dd.MM.yyyy")
+        # control_layout.addWidget(self.schedule_date_edit)
+
+        # control_layout.addWidget(QLabel("Время:"))
+        # self.schedule_time_combo = QComboBox()
+        # self.schedule_time_combo.setEditable(True)
+        # self.schedule_time_combo.setStyleSheet("padding: 3px;")
+        # self.populate_time_combo()
+        # control_layout.addWidget(self.schedule_time_combo)
+
+        # control_layout.addWidget(QLabel("Стол:"))
+        # self.schedule_table_spin = QSpinBox()
+        # self.schedule_table_spin.setMinimum(1)
+        # self.schedule_table_spin.setMaximum(10)
+        # self.schedule_table_spin.setValue(1)
+        # control_layout.addWidget(self.schedule_table_spin)
+
+        # self.apply_schedule_btn = QPushButton("📌 Назначить выбранным")
+        # self.apply_schedule_btn.clicked.connect(self.apply_schedule_to_selected)
+        # control_layout.addWidget(self.apply_schedule_btn)
+
+        # self.apply_range_btn = QPushButton("📌 Назначить диапазону")
+        # self.apply_range_btn.clicked.connect(self.apply_schedule_to_range)
+        # control_layout.addWidget(self.apply_range_btn)
+
+        # self.clear_schedule_btn = QPushButton("🗑️ Очистить выбранные")
+        # self.clear_schedule_btn.clicked.connect(self.clear_schedule_for_selected)
+        # control_layout.addWidget(self.clear_schedule_btn)
+
+        # schedule_layout.addWidget(control_panel)
+
+        # # Информация о количестве столов
+        # info_label = QLabel("Количество столов: " + str(getattr(self, 'system_tables', 4)))
+        # info_label.setStyleSheet("color: #666; font-size: 10px;")
+        # schedule_layout.addWidget(info_label)
+
+        # # Добавляем правую часть с бóльшим весом
+        # main_layout.addWidget(left_widget, 1)
+        # main_layout.addWidget(schedule_group, 3)
+
+        # # Загружаем этапы для комбобоксов
+        # self.update_runner_stages()
+        # self.update_schedule_stages()
+
+        # return tab_widget
+
+# ===============
+# ---------- ПРАВАЯ КОЛОНКА (расписание) ----------
+        schedule_group = QGroupBox("📅 Расписание (олимпийская система)")
+        schedule_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                font-size: 12px;
+                border: 2px solid #FF9800;
+                border-radius: 8px;
+                margin-top: 10px;
+            }
+            QGroupBox::title {
+                color: #FF9800;
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 8px 0 8px;
+            }
+        """)
+        schedule_layout = QVBoxLayout(schedule_group)
+        schedule_layout.setSpacing(8)
+        schedule_layout.setContentsMargins(10, 15, 10, 10)
+
+        # Выбор этапа
+        stage_schedule_layout = QHBoxLayout()
+        stage_schedule_layout.addWidget(QLabel("Этап:"))
+        self.schedule_stage_combo = QComboBox()
+        self.schedule_stage_combo.currentIndexChanged.connect(self.on_schedule_stage_changed)
+        stage_schedule_layout.addWidget(self.schedule_stage_combo, 1)
+        schedule_layout.addLayout(stage_schedule_layout)
+
+        # Таблица матчей
+        self.schedule_table = QTableWidget()
+        self.schedule_table.setColumnCount(6)
+        self.schedule_table.setHorizontalHeaderLabels(["№ встречи", "Игрок 1", "Игрок 2", "Дата", "Время", "Стол"])
+        self.schedule_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.schedule_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        self.schedule_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.schedule_table.setSelectionMode(QTableWidget.ExtendedSelection)
+        self.schedule_table.setEditTriggers(QTableWidget.DoubleClicked | QTableWidget.EditKeyPressed)  # разрешаем редактирование
+        self.schedule_table.setStyleSheet("""
+            QTableWidget {
+                font-size: 11px;
+                gridline-color: #ddd;
+                selection-background-color: #a0c4ff;
+            }
+            QTableWidget::item {
+                padding: 2px;
+            }
+        """)
+        # Назначаем делегат для валидации номера стола
+        self.max_tables = getattr(self, 'system_tables', 4)
+        self.schedule_table.setItemDelegateForColumn(5, SpinBoxDelegate(1, self.max_tables, self))
+
+        # Панель управления
+        control_panel = QWidget()
+        control_layout = QHBoxLayout(control_panel)
+        control_layout.setSpacing(10)
+
+        # Дата – теперь QComboBox с датами соревнования
+        control_layout.addWidget(QLabel("Дата:"))
+        self.schedule_date_combo = QComboBox()
+        self.schedule_date_combo.setEditable(True)
+        self.schedule_date_combo.setInsertPolicy(QComboBox.NoInsert)
+        self.schedule_date_combo.setStyleSheet("padding: 3px;")
+        control_layout.addWidget(self.schedule_date_combo)
+
+        # Время
+        control_layout.addWidget(QLabel("Время:"))
+        self.schedule_time_edit = QTimeEdit()
+        self.schedule_time_edit.setTime(QTime.currentTime())
+        self.schedule_time_edit.setDisplayFormat("HH:mm")
+        control_layout.addWidget(self.schedule_time_edit)
+
+        # Стол – теперь можно вводить в ячейку, но оставим спиннер для массового назначения
+        control_layout.addWidget(QLabel("Стол (массово):"))
+        self.schedule_table_spin = QSpinBox()
+        self.schedule_table_spin.setMinimum(1)
+        self.schedule_table_spin.setMaximum(self.max_tables)
+        self.schedule_table_spin.setValue(1)
+        control_layout.addWidget(self.schedule_table_spin)
+
+        # Кнопки
+        self.apply_schedule_btn = QPushButton("📌 Применить к выбранным")
+        self.apply_schedule_btn.clicked.connect(self.apply_schedule_to_selected)
+        control_layout.addWidget(self.apply_schedule_btn)
+
+        self.apply_range_btn = QPushButton("📌 Применить к диапазону")
+        self.apply_range_btn.clicked.connect(self.apply_schedule_to_range)
+        control_layout.addWidget(self.apply_range_btn)
+
+        self.assign_tables_btn = QPushButton("🔄 Назначить столы по порядку")
+        self.assign_tables_btn.clicked.connect(self.assign_tables_sequentially)
+        control_layout.addWidget(self.assign_tables_btn)
+
+        self.clear_schedule_btn = QPushButton("🗑️ Очистить выбранные")
+        self.clear_schedule_btn.clicked.connect(self.clear_schedule_for_selected)
+        control_layout.addWidget(self.clear_schedule_btn)
+
+        schedule_layout.addWidget(control_panel)
+
+        # Информация о количестве столов
+        info_label = QLabel("Количество столов: " + str(self.max_tables))
+        info_label.setStyleSheet("color: #666; font-size: 10px;")
+        schedule_layout.addWidget(info_label)
+
+        # Загружаем даты соревнования
+        self.load_competition_dates()
+
+        schedule_layout.addStretch()
+# ========================
+
+    def _load_schedule_matches(self, stage_name):
+        """Загрузка матчей этапа в таблицу расписания с числовой сортировкой"""
+        self.schedule_table.setVisible(True)
+        self.schedule_table.setRowCount(0)
+
+        system = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == stage_name)
+        )
+        if not system:
+            return
+
+        # Получаем все матчи этапа (Result) и сортируем по числовому значению tours
+        results = Result.select().where(
+            (Result.title_id == self.current_title_id) &
+            (Result.system_id == system.id)
+        )
+
+        # Сортировка как числа
+        results_list = list(results)
+        results_list.sort(key=lambda r: int(r.tours) if r.tours and r.tours.isdigit() else 0)
+
+        self.schedule_table.setRowCount(len(results_list))
+
+        for row, result in enumerate(results_list):
+            # Номер встречи
+            self.schedule_table.setItem(row, 0, QTableWidgetItem(str(result.tours)))
+            # Игрок 1
+            self.schedule_table.setItem(row, 1, QTableWidgetItem(result.player1 or ""))
+            # Игрок 2
+            self.schedule_table.setItem(row, 2, QTableWidgetItem(result.player2 or ""))
+            # Дата
+            date_str = result.schedule_date.strftime("%d.%m.%Y") if result.schedule_date else ""
+            self.schedule_table.setItem(row, 3, QTableWidgetItem(date_str))
+            # Время
+            time_str = result.schedule_time.strftime("%H:%M") if result.schedule_time else ""
+            self.schedule_table.setItem(row, 4, QTableWidgetItem(time_str))
+            # Стол
+            self.schedule_table.setItem(row, 5, QTableWidgetItem(str(result.schedule_table) if result.schedule_table else ""))
+
+        self.schedule_table.resizeColumnsToContents()
+
+    def _update_schedule_stages(self):
+        """Обновление списка этапов для расписания (только олимпийские)"""
+        self.schedule_stage_combo.clear()
+        if not self.current_title_id:
+            return
+
+        stages = System.select().where(System.title_id == self.current_title_id).order_by(System.id)
+        for stage in stages:
+            if "Олимпийская" in stage.type_table or "Сетка" in stage.type_table:
+                self.schedule_stage_combo.addItem(stage.stage)
+
+    def _apply_schedule_to_selected(self):
+        selected_rows = set()
+        for item in self.schedule_table.selectedItems():
+            selected_rows.add(item.row())
+        if not selected_rows:
+            QMessageBox.warning(self, "Ошибка", "Не выбраны встречи для назначения")
+            return
+
+        date = self.schedule_date_edit.date().toPyDate()
+        table = self.schedule_table_spin.value()
+        time_str = self.schedule_time_combo.currentText()
+        if time_str:
+            time = QTime.fromString(time_str, "HH:mm").toPyTime()
+        else:
+            time = None
+        
+        reply = QMessageBox.question(
+            self,
+            "Подтверждение",
+            f"Назначить расписание для {len(selected_rows)} встреч?\n"
+            f"Дата: {date.strftime('%d.%m.%Y')}, Время: {time.strftime('%H:%M')}, Стол: {table}",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if reply != QMessageBox.Yes:
+            return
+
+        stage_name = self.schedule_stage_combo.currentText()
+        system = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == stage_name)
+        )
+        if not system:
+            return
+
+        for row in selected_rows:
+            tour = self.schedule_table.item(row, 0).text()
+            if not tour:
+                continue
+            result = Result.get_or_none(
+                (Result.title_id == self.current_title_id) &
+                (Result.system_id == system.id) &
+                (Result.tours == tour)
+            )
+            if result:
+                result.schedule_date = date
+                result.schedule_time = time
+                result.schedule_table = table
+                result.save()
+
+        self.load_schedule_matches(stage_name)
+        QMessageBox.information(self, "Успех", f"Расписание назначено для {len(selected_rows)} встреч")
+
+    def _populate_time_combo(self):
+        """Заполняет комбобокс временем с 09:00 до 21:00 с шагом 5 минут"""
+        self.schedule_time_combo.clear()
+        start = QTime(9, 0)
+        end = QTime(21, 0)
+        current = start
+        while current <= end:
+            self.schedule_time_combo.addItem(current.toString("HH:mm"), current)
+            current = current.addSecs(5 * 60)  # +5 минут
+        # Устанавливаем текущее время, округлённое до ближайших 5 минут вперёд
+        now = QTime.currentTime()
+        # Округляем до ближайших 5 минут вверх
+        minute = now.minute()
+        remainder = minute % 5
+        if remainder != 0:
+            now = now.addSecs((5 - remainder) * 60)
+        # Если время позже 21:00, ставим 21:00
+        if now > end:
+            now = end
+        index = self.schedule_time_combo.findText(now.toString("HH:mm"))
+        if index >= 0:
+            self.schedule_time_combo.setCurrentIndex(index)
+        else:
+            self.schedule_time_combo.setCurrentIndex(0)
+
+    def _on_schedule_stage_changed(self):
+
+        stage_name = self.schedule_stage_combo.currentText()
+        if not stage_name:
+            return
+        
+        system = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == stage_name)
+        )
+        if not system:
+            return
+        
+        if "Олимпийская" not in system.type_table and "Сетка" not in system.type_table:
+            QMessageBox.warning(self, "Ошибка", "Выбранный этап не является олимпийской системой.\nРасписание доступно только для сеток.")
+            self.schedule_table.setRowCount(0)
+            return
+        
+        # Обновляем максимальное количество столов
+        self.max_tables = getattr(self, 'system_tables', 4)
+        self.schedule_table_spin.setMaximum(self.max_tables)
+        
+        # Пересоздаём делегат для столбца "Стол"
+        self.schedule_table.setItemDelegateForColumn(5, SpinBoxDelegate(1, self.max_tables, self))
+        
+        # Загружаем матчи
+        self.load_schedule_matches(stage_name)
+
+# =========== последний вариант 
     def create_extra_tab(self):
-            """Вкладка Дополнительно - печать бегунков и заметки"""
-            tab_widget = QWidget()
-            main_layout = QHBoxLayout(tab_widget)
-            main_layout.setSpacing(10)
-            main_layout.setContentsMargins(10, 10, 10, 10)
-            
-            # ===== ГРУППА ПЕЧАТИ БЕГУНКОВ =====
-            print_group = QGroupBox("🏃 Печать бегунков")
-            print_group.setStyleSheet("""
-                QGroupBox {
-                    font-weight: bold;
-                    font-size: 12px;
-                    border: 2px solid #4CAF50;
-                    border-radius: 8px;
-                    margin-top: 10px;
-                }
-                QGroupBox::title {
-                    color: #4CAF50;
-                    subcontrol-origin: margin;
-                    left: 10px;
-                    padding: 0 8px 0 8px;
-                }
-            """)
-            print_layout = QFormLayout(print_group)
-            print_layout.setSpacing(10)
-            print_layout.setContentsMargins(15, 15, 15, 15)
-            
-            # Тип бегунка (полный/урезанный)
-            self.runner_type_combo = QComboBox()
-            self.runner_type_combo.addItems(["Урезанный","Полный"])
-            self.runner_type_combo.setStyleSheet("padding: 5px; font-size: 11px;")
-            print_layout.addRow("Тип бегунка:", self.runner_type_combo)
-            
-            # Выбор этапа
-            self.stage_for_runner_combo = QComboBox()
-            self.stage_for_runner_combo.setStyleSheet("padding: 5px; font-size: 11px;")
-            self.stage_for_runner_combo.currentTextChanged.connect(self.on_runner_stage_changed)
-            print_layout.addRow("Этап:", self.stage_for_runner_combo)
-            
-            # Выбор группы/финала (зависит от этапа)
-            self.subgroup_for_runner_combo = QComboBox()
-            self.subgroup_for_runner_combo.setStyleSheet("padding: 5px; font-size: 11px;")
-            print_layout.addRow("Группа/Финал:", self.subgroup_for_runner_combo)
-            
-            # Кнопка печати
-            print_btn = QPushButton("🖨️ Печать бегунков")
-            print_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #4CAF50;
-                    color: white;
-                    padding: 8px 15px;
-                    font-size: 12px;
-                    font-weight: bold;
-                    border-radius: 5px;
-                }
-                QPushButton:hover { background-color: #45a049; }
-            """)
-            print_btn.clicked.connect(self.print_runners)
-            print_layout.addRow("", print_btn)
-            
-            main_layout.addWidget(print_group)
-            
-            # ===== ГРУППА ЗАМЕТОК =====
-            notes_group = QGroupBox("📝 Заметки")
-            notes_group.setStyleSheet("""
-                QGroupBox {
-                    font-weight: bold;
-                    font-size: 12px;
-                    border: 2px solid #2196F3;
-                    border-radius: 8px;
-                    margin-top: 10px;
-                }
-                QGroupBox::title {
-                    color: #2196F3;
-                    subcontrol-origin: margin;
-                    left: 10px;
-                    padding: 0 8px 0 8px;
-                }
-            """)
-            notes_layout = QVBoxLayout(notes_group)
-            notes_layout.setContentsMargins(10, 15, 10, 10)
-            
-            self.notes_text = QTextEdit()
-            self.notes_text.setPlaceholderText("Добавить заметки о соревновании...")
-            self.notes_text.setStyleSheet("""
-                QTextEdit {
-                    padding: 8px;
-                    font-size: 11px;
-                    border: 1px solid #ccc;
-                    border-radius: 4px;
-                    min-height: 100px;
-                }
-            """)
-            notes_layout.addWidget(self.notes_text)
-            
-            # Кнопка сохранения заметок
-            save_notes_btn = QPushButton("💾 Сохранить заметки")
-            save_notes_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #2196F3;
-                    color: white;
-                    padding: 6px 12px;
-                    font-size: 11px;
-                    font-weight: bold;
-                    border-radius: 4px;
-                }
-                QPushButton:hover { background-color: #1976D2; }
-            """)
-            save_notes_btn.clicked.connect(self.save_notes)
-            notes_layout.addWidget(save_notes_btn)
-            
-            main_layout.addWidget(notes_group)
-                        
-            # Загружаем этапы для комбобокса
-            self.update_runner_stages()
-            
-            return tab_widget
-# ======================
+        """Вкладка Дополнительно - печать бегунков, заметки и расписание"""
+        tab_widget = QWidget()
+        main_layout = QHBoxLayout(tab_widget)
+        main_layout.setSpacing(10)
+        main_layout.setContentsMargins(10, 10, 10, 10)
+
+        # ---------- ЛЕВАЯ КОЛОНКА (вертикально) ----------
+        left_widget = QWidget()
+        left_layout = QVBoxLayout(left_widget)
+        left_layout.setSpacing(10)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+
+        # ---- 1. Печать бегунков ----
+        print_group = QGroupBox("🏃 Печать бегунков")
+        print_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                font-size: 12px;
+                border: 2px solid #4CAF50;
+                border-radius: 8px;
+                margin-top: 10px;
+            }
+            QGroupBox::title {
+                color: #4CAF50;
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 8px 0 8px;
+            }
+        """)
+        print_layout = QFormLayout(print_group)
+        print_layout.setSpacing(10)
+        print_layout.setContentsMargins(15, 15, 15, 15)
+
+        self.runner_type_combo = QComboBox()
+        self.runner_type_combo.addItems(["Урезанный", "Полный"])
+        self.runner_type_combo.setStyleSheet("padding: 5px; font-size: 11px;")
+        print_layout.addRow("Тип бегунка:", self.runner_type_combo)
+
+        self.stage_for_runner_combo = QComboBox()
+        self.stage_for_runner_combo.setStyleSheet("padding: 5px; font-size: 11px;")
+        self.stage_for_runner_combo.currentTextChanged.connect(self.on_runner_stage_changed)
+        print_layout.addRow("Этап:", self.stage_for_runner_combo)
+
+        self.subgroup_for_runner_combo = QComboBox()
+        self.subgroup_for_runner_combo.setStyleSheet("padding: 5px; font-size: 11px;")
+        print_layout.addRow("Группа/Финал:", self.subgroup_for_runner_combo)
+
+        print_btn = QPushButton("🖨️ Печать бегунков")
+        print_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                padding: 8px 15px;
+                font-size: 12px;
+                font-weight: bold;
+                border-radius: 5px;
+            }
+            QPushButton:hover { background-color: #45a049; }
+        """)
+        print_btn.clicked.connect(self.print_runners)
+        print_layout.addRow("", print_btn)
+
+        left_layout.addWidget(print_group)
+
+        # ---- 2. Заметки ----
+        notes_group = QGroupBox("📝 Заметки")
+        notes_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                font-size: 12px;
+                border: 2px solid #2196F3;
+                border-radius: 8px;
+                margin-top: 10px;
+            }
+            QGroupBox::title {
+                color: #2196F3;
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 8px 0 8px;
+            }
+        """)
+        notes_layout = QVBoxLayout(notes_group)
+        notes_layout.setContentsMargins(10, 15, 10, 10)
+
+        self.notes_text = QTextEdit()
+        self.notes_text.setPlaceholderText("Добавить заметки о соревновании...")
+        self.notes_text.setStyleSheet("""
+            QTextEdit {
+                padding: 8px;
+                font-size: 11px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                min-height: 100px;
+            }
+        """)
+        notes_layout.addWidget(self.notes_text)
+
+        save_notes_btn = QPushButton("💾 Сохранить заметки")
+        save_notes_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                padding: 6px 12px;
+                font-size: 11px;
+                font-weight: bold;
+                border-radius: 4px;
+            }
+            QPushButton:hover { background-color: #1976D2; }
+        """)
+        save_notes_btn.clicked.connect(self.save_notes)
+        notes_layout.addWidget(save_notes_btn)
+
+        left_layout.addWidget(notes_group)
+        left_layout.addStretch()
+
+# ---------- ПРАВАЯ КОЛОНКА (расписание) ----------
+        schedule_group = QGroupBox("📅 Расписание (олимпийская система)")
+        schedule_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                font-size: 12px;
+                border: 2px solid #FF9800;
+                border-radius: 8px;
+                margin-top: 10px;
+            }
+            QGroupBox::title {
+                color: #FF9800;
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 8px 0 8px;
+            }
+        """)
+        schedule_layout = QVBoxLayout(schedule_group)
+        schedule_layout.setSpacing(8)
+        schedule_layout.setContentsMargins(10, 15, 10, 10)
+
+        # Выбор этапа
+        stage_schedule_layout = QHBoxLayout()
+        stage_schedule_layout.addWidget(QLabel("Этап:"))
+        self.schedule_stage_combo = QComboBox()
+        self.schedule_stage_combo.currentIndexChanged.connect(self.on_schedule_stage_changed)
+        stage_schedule_layout.addWidget(self.schedule_stage_combo, 1)
+        schedule_layout.addLayout(stage_schedule_layout)
+
+        # Таблица матчей
+        self.schedule_table = QTableWidget()
+        self.schedule_table.setColumnCount(6)
+        self.schedule_table.setHorizontalHeaderLabels(["№ встречи", "Игрок 1", "Игрок 2", "Дата", "Время", "Стол"])
+        self.schedule_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.schedule_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        self.schedule_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.schedule_table.setSelectionMode(QTableWidget.ExtendedSelection)
+        self.schedule_table.setEditTriggers(QTableWidget.DoubleClicked | QTableWidget.EditKeyPressed)  # разрешаем редактирование
+        self.schedule_table.setStyleSheet("""
+            QTableWidget {
+                font-size: 11px;
+                gridline-color: #ddd;
+                selection-background-color: #a0c4ff;
+            }
+            QTableWidget::item {
+                padding: 2px;
+            }
+        """)
+        schedule_layout.addWidget(self.schedule_table)
+        self.max_tables = getattr(self, 'system_tables', 4)
+        self.schedule_table.setItemDelegateForColumn(5, SpinBoxDelegate(1, self.max_tables, self))
+        self.schedule_table.itemChanged.connect(self.on_schedule_table_item_changed)
+
+        # Панель управления
+        control_panel = QWidget()
+        control_layout = QHBoxLayout(control_panel)
+        control_layout.setSpacing(10)
+
+        # Дата – теперь QComboBox с датами соревнования
+        control_layout.addWidget(QLabel("Дата:"))
+        self.schedule_date_combo = QComboBox()
+        self.schedule_date_combo.setEditable(True)
+        self.schedule_date_combo.setInsertPolicy(QComboBox.NoInsert)
+        self.schedule_date_combo.setStyleSheet("padding: 3px;")
+        control_layout.addWidget(self.schedule_date_combo)
+
+        # Время
+        control_layout.addWidget(QLabel("Время:"))
+        self.schedule_time_combo = QComboBox()
+        self.schedule_time_combo.setEditable(True)
+        self.schedule_time_combo.setStyleSheet("padding: 3px;")
+        self.populate_time_combo()
+        control_layout.addWidget(self.schedule_time_combo)
+
+        # Стол – теперь можно вводить в ячейку, но оставим спиннер для массового назначения
+        control_layout.addWidget(QLabel("Стол (массово):"))
+        self.schedule_table_spin = QSpinBox()
+        self.schedule_table_spin.setMinimum(1)
+        self.schedule_table_spin.setMaximum(self.max_tables)
+        self.schedule_table_spin.setValue(1)
+        control_layout.addWidget(self.schedule_table_spin)
+
+        # Кнопки
+        self.apply_schedule_btn = QPushButton("📌 Применить к выбранным")
+        self.apply_schedule_btn.clicked.connect(self.apply_schedule_to_selected)
+        control_layout.addWidget(self.apply_schedule_btn)
+
+        self.apply_range_btn = QPushButton("📌 Применить к диапазону")
+        self.apply_range_btn.clicked.connect(self.apply_schedule_to_range)
+        control_layout.addWidget(self.apply_range_btn)
+
+        self.assign_tables_btn = QPushButton("🔄 Назначить столы по порядку")
+        self.assign_tables_btn.clicked.connect(self.assign_tables_sequentially)
+        control_layout.addWidget(self.assign_tables_btn)
+
+        self.clear_schedule_btn = QPushButton("🗑️ Очистить выбранные")
+        self.clear_schedule_btn.clicked.connect(self.clear_schedule_for_selected)
+        control_layout.addWidget(self.clear_schedule_btn)
+
+        schedule_layout.addWidget(control_panel)
+
+        # Информация о количестве столов
+        info_label = QLabel("Количество столов: " + str(self.max_tables))
+        info_label.setStyleSheet("color: #666; font-size: 10px;")
+        schedule_layout.addWidget(info_label)
+
+        # # Загружаем даты соревнования
+        # self.load_competition_dates()
+
+        schedule_layout.addStretch()
+#===============================================================
+        # Добавляем правую часть с бóльшим весом
+        main_layout.addWidget(left_widget, 1)
+        main_layout.addWidget(schedule_group, 3)
+
+        # Загружаем этапы для комбобоксов
+        self.update_runner_stages()
+        self.update_schedule_stages()
+
+        return tab_widget
+# ====== расписание для сетки и груповых таблиц ======
+    def load_schedule_matches(self, stage_name):
+        """Загрузка матчей этапа в таблицу расписания с числовой сортировкой"""
+        self.schedule_table.setRowCount(0)
+
+        system = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == stage_name)
+        )
+        if not system:
+            self.status_label.setText(f"❌ Система для этапа '{stage_name}' не найдена")
+            return
+
+        results = Result.select().where(
+            (Result.title_id == self.current_title_id) &
+            (Result.system_id == system.id)
+        )
+
+        if results.count() == 0:
+            self.status_label.setText(f"⚠️ Для этапа '{stage_name}' нет матчей (system_id={system.id})")
+            return
+
+        self.status_label.setText(f"✅ Загружено {results.count()} матчей для этапа '{stage_name}'")
+
+        # Сортировка как числа
+        results_list = list(results)
+        results_list.sort(key=lambda r: int(r.tours) if r.tours and r.tours.isdigit() else 0)
+
+        self.schedule_table.setRowCount(len(results_list))
+    
+        for row, result in enumerate(results_list):
+            # Номер встречи
+            self.schedule_table.setItem(row, 0, QTableWidgetItem(str(result.tours)))
+            # Игрок 1
+            self.schedule_table.setItem(row, 1, QTableWidgetItem(result.player1 or ""))
+            # Игрок 2
+            self.schedule_table.setItem(row, 2, QTableWidgetItem(result.player2 or ""))
+            # Дата
+            date_str = result.schedule_date.strftime("%d.%m.%Y") if result.schedule_date else ""
+            self.schedule_table.setItem(row, 3, QTableWidgetItem(date_str))
+            # Время
+            time_str = result.schedule_time.strftime("%H:%M") if result.schedule_time else ""
+            self.schedule_table.setItem(row, 4, QTableWidgetItem(time_str))
+            # Стол
+            self.schedule_table.setItem(row, 5, QTableWidgetItem(str(result.schedule_table) if result.schedule_table else ""))
+
+        self.schedule_table.resizeColumnsToContents()
+#
+    def update_schedule_stages(self):
+        """Обновление списка этапов для расписания (только олимпийские)"""
+        self.schedule_stage_combo.clear()
+        if not self.current_title_id:
+            return
+
+        stages = System.select().where(System.title_id == self.current_title_id).order_by(System.id)
+        for stage in stages:
+            if "Олимпийская" in stage.type_table or "Сетка" in stage.type_table:
+                self.schedule_stage_combo.addItem(stage.stage)
+#
+    def load_competition_dates(self):
+        """Заполняет QComboBox датами в диапазоне соревнования"""
+        self.schedule_date_combo.clear()
+        if not self.current_title_id:
+            return
+        title = Title.get_or_none(Title.id == self.current_title_id)
+        if not title or not title.data_start or not title.data_end:
+            return
+        start = title.data_start
+        end = title.data_end
+        current = start
+        while current <= end:
+            self.schedule_date_combo.addItem(current.strftime("%d.%m.%Y"))
+            current += timedelta(days=1)
+        if self.schedule_date_combo.count() > 0:
+            self.schedule_date_combo.setCurrentIndex(0)
+#
     def load_matches_for_stage(self, stage_name):
         """Загрузка матчей для выбранного этапа"""
         group_list = ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]
@@ -2636,7 +3375,7 @@ class MainWindow(QMainWindow):
                     self.parties_count = parties_count
                 
                 self.current_match_label.setText(f"Матч: 1/{len(self.current_matches)}")
- 
+
             else:
                 self.current_match_label.setText("Матч: 0/0")
                 self.clear_result_form_compact()
@@ -2646,65 +3385,301 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             print(f"Ошибка загрузки матчей: {e}")
-# =================================
-    # def _load_match_for_editing(self, id_match):
-    #     """Загрузка матча для редактирования с отображением статусов"""
-    #     # if index < 0 or index >= len(self.current_matches):
-    #     #     return
+
+    def on_schedule_stage_changed(self):
+        stage_name = self.schedule_stage_combo.currentText()
+        if not stage_name:
+            return
         
-    #     match = self.current_matches[index]
-    #     self.current_match_index = index
-    #     self.current_match_label.setText(f"Матч: {index + 1}/{len(self.current_matches)}")
+        system = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == stage_name)
+        )
+        if not system:
+            return
         
-    #     # Получаем количество партий из системы
-    #     system = System.get_or_none(System.id == match.system_id)
-    #     if system:
-    #         parties_count = system.score_flag if system.score_flag else 5
-    #         self.update_scores_fields_compact(parties_count)
-    #         self.parties_count = parties_count
+        if "Олимпийская" not in system.type_table and "Сетка" not in system.type_table:
+            QMessageBox.warning(self, "Ошибка", "Выбранный этап не является олимпийской системой.\nРасписание доступно только для сеток.")
+            self.schedule_table.setRowCount(0)
+            return
         
-    #     # Заполняем информацию об игроках
-    #     self.player1_name.setText(match.player1)
-    #     self.player2_name.setText(match.player2)
+        # Обновляем максимальное количество столов
+        self.max_tables = getattr(self, 'system_tables', 4)
+        self.schedule_table_spin.setMaximum(self.max_tables)
         
-    #     # Сбрасываем статусы по умолчанию
-    #     self.player1_status.setCurrentIndex(0)  # "Играет"
-    #     self.player2_status.setCurrentIndex(0)  # "Играет"
+        # Пересоздаём делегат для столбца "Стол"
+        self.schedule_table.setItemDelegateForColumn(5, SpinBoxDelegate(1, self.max_tables, self))
         
-    #     # Очищаем поля
-    #     self.clear_result_form_compact()
-        
-    #     # Если уже есть результат, проверяем был ли это технический результат
-    #     if match.score_in_game:
-    #         if match.score_in_game == "В : П" or match.score_in_game == "П : В":
-    #             # Технический результат
-    #             if match.winner == match.player1:
-    #                 # Победил игрок 1
-    #                 if match.score_in_game == "В : П":
-    #                     self.player1_status.setCurrentText("Играет")
-    #                     self.player2_status.setCurrentText("Не явка")
-    #                     self.player1_name.setStyleSheet("background-color: #90EE90;")
-    #                     self.player2_name.setStyleSheet("background-color: #FFB6C1;")
-    #             elif match.winner == match.player2:
-    #                 # Победил игрок 2
-    #                 if match.score_in_game == "В : П":
-    #                     self.player1_status.setCurrentText("Не явка")
-    #                     self.player2_status.setCurrentText("Играет")
-    #                     self.player1_name.setStyleSheet("background-color: #FFB6C1;")
-    #                     self.player2_name.setStyleSheet("background-color: #90EE90;")
-    #             else:
-    #                 # Оба не явились
-    #                 self.player1_status.setCurrentText("Не явка")
-    #                 self.player2_status.setCurrentText("Не явка")
-    #                 self.player1_name.setStyleSheet("background-color: #FFB6C1;")
-    #                 self.player2_name.setStyleSheet("background-color: #FFB6C1;")
-    #         else:
-    #             # Обычная игра - загружаем счета
-    #             self.parse_and_load_scores_compact(match.score_in_game)
-        
-    #     # Обновляем общий счет и подсветку
-    #     self.update_total_score()
-# =================================================
+        # Загружаем матчи
+        self.load_schedule_matches(stage_name)
+
+    def assign_tables_sequentially(self):
+        """Назначить столы по порядку для выбранных строк (или всех, если ничего не выбрано)"""
+        selected_rows = set()
+        for item in self.schedule_table.selectedItems():
+            selected_rows.add(item.row())
+        if not selected_rows:
+            # Если ничего не выбрано, берём все строки
+            selected_rows = set(range(self.schedule_table.rowCount()))
+        if not selected_rows:
+            QMessageBox.warning(self, "Ошибка", "Нет строк для назначения")
+            return
+
+        # Получаем текущее значение стола для начала
+        start_table = self.schedule_table_spin.value()
+        table = start_table
+        for row in sorted(selected_rows):
+            # Устанавливаем стол в ячейку
+            self.schedule_table.setItem(row, 5, QTableWidgetItem(str(table)))
+            table += 1
+            if table > self.max_tables:
+                table = 1  # циклически
+        # Сохраняем в БД для этих строк (вызываем обновление)
+        self.save_table_values(selected_rows) 
+#
+    def save_table_values(self, rows):
+        """Сохраняет значения столов из таблицы в БД для указанных строк"""
+        stage_name = self.schedule_stage_combo.currentText()
+        system = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == stage_name)
+        )
+        if not system:
+            return
+        for row in rows:
+            tour_item = self.schedule_table.item(row, 0)
+            if not tour_item:
+                continue
+            tour = tour_item.text()
+            result = Result.get_or_none(
+                (Result.title_id == self.current_title_id) &
+                (Result.system_id == system.id) &
+                (Result.tours == tour)
+            )
+            if not result:
+                continue
+            # Сохраняем стол
+            table_item = self.schedule_table.item(row, 5)
+            if table_item:
+                try:
+                    table_val = int(table_item.text())
+                    result.schedule_table = table_val
+                    result.save()
+                except:
+                    pass  
+#
+    def on_schedule_table_item_changed(self, item):
+        if item.column() != 5:  # только столбец "Стол"
+            return
+        row = item.row()
+        tour = self.schedule_table.item(row, 0).text()
+        if not tour:
+            return
+        try:
+            table_num = int(item.text())
+        except:
+            return
+        # Проверяем, что номер стола в допустимом диапазоне
+        if table_num < 1 or table_num > self.max_tables:
+            QMessageBox.warning(self, "Ошибка", f"Номер стола должен быть от 1 до {self.max_tables}")
+            # Возвращаем предыдущее значение
+            self.load_schedule_matches(self.schedule_stage_combo.currentText())
+            return
+        # Обновляем в БД
+        stage_name = self.schedule_stage_combo.currentText()
+        system = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == stage_name)
+        )
+        if not system:
+            return
+        result = Result.get_or_none(
+            (Result.title_id == self.current_title_id) &
+            (Result.system_id == system.id) &
+            (Result.tours == tour)
+        )
+        if result:
+            result.schedule_table = table_num
+            result.save()  
+#
+    def apply_schedule_to_selected(self):
+        selected_rows = set()
+        for item in self.schedule_table.selectedItems():
+            selected_rows.add(item.row())
+        if not selected_rows:
+            QMessageBox.warning(self, "Ошибка", "Не выбраны встречи для назначения")
+            return
+
+        date = self.schedule_date_combo.currentText()
+        time_str = self.schedule_time_combo.currentText()
+        if not time_str:
+            QMessageBox.warning(self, "Ошибка", "Выберите время")
+            return
+        time = QTime.fromString(time_str, "HH:mm").toPyTime()
+        table = self.schedule_table_spin.value()
+
+        reply = QMessageBox.question(
+            self,
+            "Подтверждение",
+            f"Назначить расписание для {len(selected_rows)} встреч?\n"
+            f"Дата: {date}, Время: {time_str}, Стол: {table}",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if reply != QMessageBox.Yes:
+            return
+
+        stage_name = self.schedule_stage_combo.currentText()
+        system = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == stage_name)
+        )
+        if not system:
+            return
+
+        for row in selected_rows:
+            tour = self.schedule_table.item(row, 0).text()
+            if not tour:
+                continue
+            result = Result.get_or_none(
+                (Result.title_id == self.current_title_id) &
+                (Result.system_id == system.id) &
+                (Result.tours == tour)
+            )
+            if result:
+                result.schedule_date = date
+                result.schedule_time = time
+                result.schedule_table = table
+                result.save()
+
+        self.load_schedule_matches(stage_name)
+        QMessageBox.information(self, "Успех", f"Расписание назначено для {len(selected_rows)} встреч")
+
+    def apply_schedule_to_range(self):
+            """Назначить расписание для диапазона встреч (от номера до номера)"""
+            # Запрашиваем диапазон
+            from PyQt5.QtWidgets import QInputDialog
+            range_text, ok = QInputDialog.getText(
+                self,
+                "Диапазон встреч",
+                "Введите диапазон номеров встреч (например, 1-8 или 1,3,5):"
+            )
+            if not ok or not range_text:
+                return
+            
+            # Парсим диапазон
+            numbers = set()
+            parts = range_text.replace(' ', '').split(',')
+            for part in parts:
+                if '-' in part:
+                    try:
+                        start, end = map(int, part.split('-'))
+                        numbers.update(range(start, end + 1))
+                    except:
+                        pass
+                else:
+                    try:
+                        numbers.add(int(part))
+                    except:
+                        pass
+            
+            if not numbers:
+                QMessageBox.warning(self, "Ошибка", "Не удалось распознать диапазон")
+                return
+            
+            # Находим строки, соответствующие этим номерам
+            rows_to_select = []
+            for row in range(self.schedule_table.rowCount()):
+                tour_item = self.schedule_table.item(row, 0)
+                if tour_item:
+                    try:
+                        tour_num = int(tour_item.text())
+                        if tour_num in numbers:
+                            rows_to_select.append(row)
+                    except:
+                        pass
+            
+            if not rows_to_select:
+                QMessageBox.warning(self, "Ошибка", "Ни одна встреча не соответствует указанному диапазону")
+                return
+            
+            # Выделяем строки
+            self.schedule_table.clearSelection()
+            for row in rows_to_select:
+                self.schedule_table.selectRow(row)
+            
+            # Применяем расписание к выделенным
+            self.apply_schedule_to_selected()
+
+    def clear_schedule_for_selected(self):
+            """Очистить дату, время и стол для выбранных строк"""
+            selected_rows = set()
+            for item in self.schedule_table.selectedItems():
+                selected_rows.add(item.row())
+            
+            if not selected_rows:
+                QMessageBox.warning(self, "Ошибка", "Не выбраны встречи для очистки")
+                return
+            
+            reply = QMessageBox.question(
+                self,
+                "Подтверждение",
+                f"Очистить расписание для {len(selected_rows)} встреч?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if reply != QMessageBox.Yes:
+                return
+            
+            stage_name = self.schedule_stage_combo.currentText()
+            system = System.get_or_none(
+                (System.title_id == self.current_title_id) &
+                (System.stage == stage_name)
+            )
+            if not system:
+                return
+            
+            for row in selected_rows:
+                tour = self.schedule_table.item(row, 0).text()
+                result = Result.get_or_none(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.system_id == system.id) &
+                    (Result.tours == tour)
+                )
+                if result:
+                    result.schedule_date = None
+                    result.schedule_time = None
+                    result.schedule_table = None
+                    result.save()
+            
+            self.load_schedule_matches(stage_name)
+            QMessageBox.information(self, "Успех", f"Расписание очищено для {len(selected_rows)} встреч")
+
+    def populate_time_combo(self):
+        """Заполняет комбобокс временем с 09:00 до 21:00 с шагом 5 минут"""
+        self.schedule_time_combo.clear()
+        start = QTime(9, 0)
+        end = QTime(21, 0)
+        current = start
+        while current <= end:
+            self.schedule_time_combo.addItem(current.toString("HH:mm"), current)
+            current = current.addSecs(5 * 60)  # +5 минут
+        # Устанавливаем текущее время, округлённое до ближайших 5 минут вперёд
+        now = QTime.currentTime()
+        # Округляем до ближайших 5 минут вверх
+        minute = now.minute()
+        remainder = minute % 5
+        if remainder != 0:
+            now = now.addSecs((5 - remainder) * 60)
+        # Если время позже 21:00, ставим 21:00
+        if now > end:
+            now = end
+        index = self.schedule_time_combo.findText(now.toString("HH:mm"))
+        if index >= 0:
+            self.schedule_time_combo.setCurrentIndex(index)
+        else:
+            self.schedule_time_combo.setCurrentIndex(0)
+
+
+# ==================================================
     def parse_and_load_scores_compact(self, score_string):
         """Парсинг строки счета и загрузка в поля"""
         try:
@@ -4017,6 +4992,9 @@ class MainWindow(QMainWindow):
 
                 # Обновляем список этапов для бегунков
                 self.update_runner_stages()
+
+                # Обновляем список этапов для расписания      
+                self.update_schedule_stages()
 # ==================================================
     def update_finals_menu_after_selection(self):
         """Обновление меню финалов после выбора соревнования"""
@@ -4087,6 +5065,9 @@ class MainWindow(QMainWindow):
             # отображение заголовка и информации в QListWidget
             self.change_label_ListWidget(index)
 
+            # Показываем список соревнований на вкладке Дополнительно   
+            self.right_panel.setVisible(True)
+            
         elif index == 5:  # Результаты
             # Используем отдельную таблицу для результатов
             # Проверяем, есть ли table_view в стеке
@@ -4147,6 +5128,9 @@ class MainWindow(QMainWindow):
            
            # отображение заголовка и информации в QListWidget
             self.change_label_ListWidget(index)
+
+            # Показываем список соревнований на вкладке Дополнительно
+            self.right_panel.setVisible(True)
 
         elif index == 2:  # Команды
             self.table_container.setCurrentWidget(self.teams_table_view)
@@ -4225,6 +5209,9 @@ class MainWindow(QMainWindow):
                 # отображение заголовка и информации в QListWidget
                 self.change_label_ListWidget(index)
 
+                # Показываем список соревнований на вкладке Дополнительно
+                self.right_panel.setVisible(True)
+
             elif index == 4:  # Система
                 self.table_header.setText("⚙️ Система проведения")
                 self.filters_widget.setVisible(False)
@@ -4234,6 +5221,9 @@ class MainWindow(QMainWindow):
                 # отображение заголовка и информации в QListWidget
                 self.change_label_ListWidget(index)
 
+                # Показываем список соревнований на вкладке Дополнительно
+                self.right_panel.setVisible(True)
+
             elif index == 7:  # Дополнительно
                 self.table_header.setText("ℹ️ Дополнительная информация")
                 self.filters_widget.setVisible(False)
@@ -4241,9 +5231,15 @@ class MainWindow(QMainWindow):
                 # отображение заголовка и информации в QListWidget
                 self.change_label_ListWidget(index)
 
+                # Скрываем вкладку Дополнительно
+                self.right_panel.setVisible(False)
+
+                # Загружаем даты соревнования
+                self.load_competition_dates()
+
             # Очищаем таблицу
             self.players_model.setData([])
-        
+            
         # Устанавливаем высоту для текущей вкладки
         self.set_tab_height(index)
 
@@ -15171,8 +16167,82 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 import traceback
                 traceback.print_exc()
-                QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")                
-# ========== проба поска ячеек для результатов ====
+                QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")   
+#  =================== новое расписание
+
+    # def on_schedule_stage_changed(self):
+    #     """Загрузка матчей при смене этапа расписания"""
+    #     stage_name = self.schedule_stage_combo.currentText()
+    #     if not stage_name:
+    #         return
+        
+    #     # Проверяем, что этап олимпийский
+    #     system = System.get_or_none(
+    #         (System.title_id == self.current_title_id) &
+    #         (System.stage == stage_name)
+    #     )
+    #     if not system:
+    #         return
+        
+    #     if "Олимпийская" not in system.type_table and "Сетка" not in system.type_table:
+    #         QMessageBox.warning(self, "Ошибка", "Выбранный этап не является олимпийской системой.\nРасписание доступно только для сеток.")
+    #         self.schedule_table.setRowCount(0)
+    #         return
+        
+    #     # Обновляем максимальное количество столов
+    #     if hasattr(self, 'system_tables'):
+    #         self.schedule_table_spin.setMaximum(self.system_tables)
+    #     else:
+    #         self.schedule_table_spin.setMaximum(4)
+        
+    #     # Загружаем матчи
+    #     self.load_schedule_matches(stage_name)
+
+    # def load_schedule_matches(self, stage_name):
+    #     """Загрузка матчей этапа в таблицу расписания"""
+    #     self.schedule_table.setRowCount(0)
+        
+    #     system = System.get_or_none(
+    #         (System.title_id == self.current_title_id) &
+    #         (System.stage == stage_name)
+    #     )
+    #     if not system:
+    #         return
+        
+    #     # Получаем все матчи этапа (Result)
+    #     results = Result.select().where(
+    #         (Result.title_id == self.current_title_id) &
+    #         (Result.system_id == system.id)
+    #     ).order_by(Result.tours)
+        
+    #     self.schedule_table.setRowCount(results.count())
+        
+    #     for row, result in enumerate(results):
+    #         # Номер встречи
+    #         self.schedule_table.setItem(row, 0, QTableWidgetItem(str(result.tours)))
+    #         # Игрок 1
+    #         self.schedule_table.setItem(row, 1, QTableWidgetItem(result.player1 or ""))
+    #         # Игрок 2
+    #         self.schedule_table.setItem(row, 2, QTableWidgetItem(result.player2 or ""))
+    #         # Дата
+    #         date_str = result.schedule_date.strftime("%d.%m.%Y") if result.schedule_date else ""
+    #         self.schedule_table.setItem(row, 3, QTableWidgetItem(date_str))
+    #         # Время
+    #         time_str = result.schedule_time.strftime("%H:%M") if result.schedule_time else ""
+    #         self.schedule_table.setItem(row, 4, QTableWidgetItem(time_str))
+    #         # Стол
+    #         self.schedule_table.setItem(row, 5, QTableWidgetItem(str(result.schedule_table) if result.schedule_table else ""))
+        
+    #     self.schedule_table.resizeColumnsToContents()
+
+    
+
+    
+
+    
+# =======================
+
+# ========== проба поиска ячеек для результатов ====
     def find_match_numbers_and_cells_in_results_db(self, match_num, fin):
             """ищет cтроку в таблице -Result- по номеру встречи"""
             match_dict = {}
@@ -16117,14 +17187,6 @@ class MainWindow(QMainWindow):
             self.player2_scores[i].clear()
         self.player1_status.setCurrentIndex(0)
         self.player2_status.setCurrentIndex(0)
-
-    def next_match(self):
-        """Переход к следующему матчу"""
-        current_index = self.match_combo.currentIndex()
-        if current_index >= 0 and current_index < self.match_combo.count() - 1:
-            self.match_combo.setCurrentIndex(current_index + 1)
-        else:
-            QMessageBox.information(self, "Информация", "Это последний матч")
 
     def load_results_table(self):
         """Загрузка таблицы результатов"""
@@ -20034,7 +21096,10 @@ class MainWindow(QMainWindow):
             with db:
                 results = Result(number_group=stage, system_stage="Финальный", player1="", player2="",
                                 tours=i, title_id=self.current_title_id, system_id=system.id).save()
-      
+# ===================================
+        # После цикла создания матчей и перед установкой флага
+        self.update_schedule_stages()
+#=====================================
         # 9. Устанавливаем флаг choice_flag для записей Choice, участвующих в финале
         self.set_choice_flag_for_stage(stage, flag=1)
         
@@ -20705,35 +21770,6 @@ class MainWindow(QMainWindow):
             for res_place in place_players:
                 if res_place['stage'] == stage_name:
                     return res_place
-
-        # if stage not in group_list:
-        #     if stage == "1-й финал":
-        #         mesto_first = 1
-        #     else:
-        #         mesto_first = result[0]
-        #     mesto_end = mesto_first + p.mesta_exit
-        #     for m in range(mesto_first, mesto_end):
-        #         place.append(m)
-
-        #     stage_place[p.stage_exit] = place.copy()
-        #     place_players[stage] = stage_place
-        #     result = [item for item in place_stage if item not in place]
-        #     # place_players[stage] = stage_place
-        #     # player_max_stage[p.stage_exit] = result
-        #     player_max_stage = defaultdict(list)
-        #     systems = System.get_or_none(System.id == p.id)
-        #     if systems:
-        #         player_max_stage[stage].append({
-        #             'stage_exit': systems.stage_exit,
-        #             'count_exit': systems.mesta_exit,
-        #             'place_stage': place.copy()
-        #         })
-
-        #     place.clear()
-
-        #     if stage_name == stage:
-
-        #         return player_max_stage[stage]
 # ================================================ оригинал
     def _get_players_for_final(self, source_stage, exit_count=None):
         """
@@ -22668,9 +23704,6 @@ class RatingFileDialog(QDialog):
                 count = self.players_model.rowCount()
                 age_text = f" ({title.vozrast})" if title.vozrast else ""
                 self.table_header.setText(f"👥 {title.name}{age_text} - {sex_text} ({count} чел.)")
-
-
-
 
 def main():  
     # Сначала проверяем БД

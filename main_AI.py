@@ -2759,7 +2759,7 @@ class MainWindow(QMainWindow):
         self.update_schedule_stages()
 
         return tab_widget
-# ====== расписание для сетки и груповых таблиц ======
+# ====== Создание расписания для сетки и груповых таблиц ======
     def load_schedule_matches(self, stage_name):
         """Загрузка матчей этапа в таблицу расписания с числовой сортировкой"""
         self.schedule_table.setRowCount(0)
@@ -2890,24 +2890,23 @@ class MainWindow(QMainWindow):
         stage_name = self.schedule_stage_combo.currentText()
         if not stage_name:
             return
-        
         system = System.get_or_none(
             (System.title_id == self.current_title_id) &
             (System.stage == stage_name)
         )
         if not system:
             return
-        
         if "Олимпийская" not in system.type_table and "Сетка" not in system.type_table:
-            QMessageBox.warning(self, "Ошибка", "Выбранный этап не является олимпийской системой.\nРасписание доступно только для сеток.")
+            QMessageBox.warning(self, "Ошибка", "Выбранный этап не является олимпийской системой.")
             self.schedule_table.setRowCount(0)
             return
-        
-        # # Обновляем максимальное количество столов
         self.max_tables = getattr(self, 'system_tables', 4)
-                
-        # Загружаем матчи
         self.load_schedule_matches(stage_name)
+        # Обновляем фильтры даты и времени
+        self.update_schedule_filter_combos()
+        # Сбрасываем скрытие строк
+        for row in range(self.schedule_table.rowCount()):
+            self.schedule_table.setRowHidden(row, False)
 
     def assign_tables_sequentially(self):
         """Назначить столы по порядку для выбранных строк (или всех, если ничего не выбрано)"""
@@ -3091,19 +3090,38 @@ class MainWindow(QMainWindow):
 
     def apply_schedule_filters(self):
         """Применяет фильтры по дате и времени к таблице расписания"""
-        if not hasattr(self, 'schedule_table'):
-            return
         date_filter = self.schedule_date_filter_combo.currentText()
         time_filter = self.schedule_time_filter_combo.currentText()
 
+        # Если дата изменилась, обновляем список времени для этой даты
+        self.schedule_time_filter_combo.blockSignals(True)
+        current_time = self.schedule_time_filter_combo.currentText()
+        self.schedule_time_filter_combo.clear()
+        self.schedule_time_filter_combo.addItem("Все время")
+        times = self.get_schedule_times(date_filter)
+        for time_obj in times:
+            self.schedule_time_filter_combo.addItem(time_obj.strftime("%H:%M"))
+        # Пытаемся восстановить выбранное время, если оно есть в новом списке
+        if current_time != "Все время":
+            idx = self.schedule_time_filter_combo.findText(current_time)
+            if idx >= 0:
+                self.schedule_time_filter_combo.setCurrentIndex(idx)
+            else:
+                # если время не найдено, оставляем "Все время"
+                self.schedule_time_filter_combo.setCurrentIndex(0)
+        else:
+            self.schedule_time_filter_combo.setCurrentIndex(0)
+        self.schedule_time_filter_combo.blockSignals(False)
+
+        # Теперь применяем фильтр к строкам таблицы
         for row in range(self.schedule_table.rowCount()):
-            date_item = self.schedule_table.item(row, 3)  # столбец "Дата"
-            time_item = self.schedule_table.item(row, 4)  # столбец "Время"
+            date_item = self.schedule_table.item(row, 3)
+            time_item = self.schedule_table.item(row, 4)
             show = True
             if date_filter != "Все даты" and date_item:
                 if date_item.text() != date_filter:
                     show = False
-            if time_filter != "Все время" and time_item:
+            if time_filter != "Все время" and time_item and show:
                 if time_item.text() != time_filter:
                     show = False
             self.schedule_table.setRowHidden(row, not show)
@@ -3317,6 +3335,83 @@ class MainWindow(QMainWindow):
         self.dynamic_filters_layout.addWidget(about_btn)
 
         self.dynamic_filters_layout.addStretch()
+
+    def update_schedule_filter_combos(self):
+        """Обновляет комбобоксы фильтров даты и времени на основе расписания"""
+        # Блокируем сигналы, чтобы избежать рекурсии
+        self.schedule_date_filter_combo.blockSignals(True)
+        self.schedule_time_filter_combo.blockSignals(True)
+
+        # Заполняем даты
+        self.schedule_date_filter_combo.clear()
+        self.schedule_date_filter_combo.addItem("Все даты")
+        dates = self.get_schedule_dates()
+        for date_obj in dates:
+            if date_obj:
+                self.schedule_date_filter_combo.addItem(date_obj.strftime("%d.%m.%Y"))
+
+        # Заполняем время (пока все, т.к. дата = 'Все даты')
+        self.schedule_time_filter_combo.clear()
+        self.schedule_time_filter_combo.addItem("Все время")
+        times = self.get_schedule_times("Все даты")
+        for time_obj in times:
+            self.schedule_time_filter_combo.addItem(time_obj.strftime("%H:%M"))
+
+        self.schedule_date_filter_combo.blockSignals(False)
+        self.schedule_time_filter_combo.blockSignals(False)
+
+        # Применяем фильтры (показываем все строки)
+        self.apply_schedule_filters()
+
+    def get_schedule_dates(self):
+        """Возвращает список уникальных дат из расписания для текущего этапа"""
+        stage_name = self.schedule_stage_combo.currentText()
+        if not stage_name:
+            return []
+        system = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == stage_name)
+        )
+        if not system:
+            return []
+        # Получаем все даты из Result для этого этапа (не NULL)
+        results = Result.select(Result.schedule_date).where(
+            (Result.title_id == self.current_title_id) &
+            (Result.system_id == system.id) &
+            (Result.schedule_date.is_null(False))
+        ).distinct().order_by(Result.schedule_date)
+        dates = [r.schedule_date for r in results if r.schedule_date]
+        return dates
+
+    def get_schedule_times(self, date_filter=None):
+        """Возвращает список уникальных времён из расписания для текущего этапа.
+        Если date_filter указан (строка вида 'дд.мм.гггг'), то возвращает времена только для этой даты.
+        Иначе – все времена (если 'Все даты').
+        """
+        stage_name = self.schedule_stage_combo.currentText()
+        if not stage_name:
+            return []
+        system = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == stage_name)
+        )
+        if not system:
+            return []
+
+        query = Result.select(Result.schedule_time).where(
+            (Result.title_id == self.current_title_id) &
+            (Result.system_id == system.id) &
+            (Result.schedule_time.is_null(False))
+        )
+        if date_filter and date_filter != "Все даты":
+            # Преобразуем строку в объект date
+            try:
+                date_obj = datetime.strptime(date_filter, "%d.%m.%Y").date()
+                query = query.where(Result.schedule_date == date_obj)
+            except:
+                pass
+        times = query.distinct().order_by(Result.schedule_time)
+        return [t.schedule_time for t in times if t.schedule_time]
 # ==================================================
     def parse_and_load_scores_compact(self, score_string):
         """Парсинг строки счета и загрузка в поля"""

@@ -2542,7 +2542,7 @@ class MainWindow(QMainWindow):
         # ---------- ЛЕВАЯ КОЛОНКА (вертикально) ----------
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
-        left_layout.setSpacing(10)
+        left_layout.setSpacing(5)
         left_layout.setContentsMargins(0, 0, 0, 0)
 
         # ---- 1. Печать бегунков ----
@@ -2614,6 +2614,8 @@ class MainWindow(QMainWindow):
                 padding: 0 8px 0 8px;
             }
         """)
+        # Разрешаем группе растягиваться по вертикали
+        notes_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         notes_layout = QVBoxLayout(notes_group)
         notes_layout.setContentsMargins(10, 15, 10, 10)
 
@@ -2646,8 +2648,9 @@ class MainWindow(QMainWindow):
         notes_layout.addWidget(save_notes_btn)
 
         left_layout.addWidget(notes_group)
-        left_layout.addStretch()
 
+        main_layout.addStretch()
+#========================
         # ---------- ПРАВАЯ КОЛОНКА (расписание) ----------
         schedule_group = QGroupBox("📅 Расписание (олимпийская система)")
         schedule_group.setStyleSheet("""

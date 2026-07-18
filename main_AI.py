@@ -20071,6 +20071,8 @@ class MainWindow(QMainWindow):
         date - дата матча (опционально)
         time - время матча (опционально)
         """
+        group_list = ["Квалификация", "Квалификация. 1-й полуфинал","Квалификация. 2-й полуфинал"]
+
         if not self.current_title_id:
             return []
         
@@ -20080,7 +20082,9 @@ class MainWindow(QMainWindow):
         results = Result.select().where(Result.title_id == self.current_title_id)
         
         # Фильтр по этапу
-        if stage and stage not in ["Все этапы", ""]:
+        if stage not in group_list:
+            results = results.where(Result.number_group == stage)
+        else:
             results = results.where(Result.system_stage == stage)
         
         # Фильтр по группе/финалу
@@ -21488,7 +21492,7 @@ class MainWindow(QMainWindow):
         """определения мест игроков, выходящих в финал для жеребьевки"""
         
         group_list = ["Квалификация", "Квалификация. 1-й полуфинал","Квалификация. 2-й полуфинал"]
-        stage_place = {}
+        # stage_place = {}
         place_players = []
         place = []
         player_max_stage = {}

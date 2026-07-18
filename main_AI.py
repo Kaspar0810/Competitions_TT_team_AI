@@ -2839,7 +2839,15 @@ class MainWindow(QMainWindow):
             QTableWidget::item {
                 padding: 2px;
             }
-        """)
+            QHeaderView::section {
+            background-color: #2196F3;
+            color: white;
+            padding: 4px;
+            font-weight: bold;
+            font-size: 10px;
+                border: none;
+            }
+            """)
         self.schedule_table.itemChanged.connect(self.on_schedule_table_item_changed)
         # Убираем делегат – пользователь вводит номер стола с клавиатуры
         schedule_layout.addWidget(self.schedule_table, 1)  # stretch = 1, чтобы таблица занимала всё оставшееся место

@@ -14516,7 +14516,7 @@ class MainWindow(QMainWindow):
         data[25][6] = str(-11)
         data[30][6] = str(-12)
         #========= расписание ===========
-        # style_color_schedule = self.schedule_data(data, fin)
+        style_color_schedule = self.schedule_data(data, fin)
         # =================================
         # ============= данные игроков и встреч и размещение по сетке =============
         #================= проба поиска номера встреч
@@ -14580,8 +14580,8 @@ class MainWindow(QMainWindow):
         # style.append(fn)
         # =========================   
         ts = style   # стиль таблицы (список оформления строк и шрифта)
-        # for b in style_color_schedule:
-        #     ts.append(b)
+        for b in style_color_schedule:
+            ts.append(b)
         t.setStyle(TableStyle([('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
                             ('FONTNAME', (0, 0), (-1, -1), "DejaVuSerif"),
                             ('FONTSIZE', (0, 0), (-1, -1), 6),
@@ -14717,7 +14717,7 @@ class MainWindow(QMainWindow):
         data[65][8] = str(32)  # создание номеров встреч 32
         data[67][8] = str(-32)
         #========= расписание ===========
-        # style_color_schedule = schedule_data(data, fin)
+        style_color_schedule = self.schedule_data(data, fin)
         # ============================
         # ============= данные игроков и встреч и размещение по сетке =============
         tds = self.write_in_setka(data, fin, first_mesto, table, posev_data)
@@ -14794,8 +14794,8 @@ class MainWindow(QMainWindow):
                 style.append(fn)
         # fn = ('INNERGRID', (0, 0), (-1, -1), 0.01, colors.grey)  # временное отображение сетки
         # style.append(fn)
-        # for b in style_color_schedule:
-        #     ts.append(b)
+        for b in style_color_schedule:
+            ts.append(b)
         ts = style   # стиль таблицы (список оформления строк и шрифта)
         t.setStyle(TableStyle([('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
                             ('FONTNAME', (0, 0), (-1, -1), "DejaVuSerif"),
@@ -14953,7 +14953,7 @@ class MainWindow(QMainWindow):
         self.draw_num_lost(row_n=201, row_step=2, col_n=8, number_of_game=77, player=2, data=data) # номера минус проигравшие встречи -1 -16
         # ============================= ВСТАВИТЬ РАСПИСАНИЕ ====================
         #========= расписание ===========
-        # style_color_schedule = self.schedule_data(data, fin)
+        style_color_schedule = self.schedule_data(data, fin)
         # ============================
         # ============= данные игроков и встреч и размещение по сетке =============
         tds = self.write_in_setka(data, fin, first_mesto, table, posev_data)
@@ -15060,8 +15060,8 @@ class MainWindow(QMainWindow):
         ts = style   # стиль таблицы (список оформления строк и шрифта)
         for b in style_color:
             ts.append(b)
-        # for b in self.style_color_schedule:
-        #     ts.append(b)
+        for b in style_color_schedule:
+            ts.append(b)
         t.setStyle(TableStyle([('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
                             ('FONTNAME', (0, 0), (-1, -1), "DejaVuSerif"),
                             ('FONTSIZE', (0, 0), (-1, -1), 5),

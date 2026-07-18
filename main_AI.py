@@ -15110,6 +15110,177 @@ class MainWindow(QMainWindow):
 
         return name_table_final
 
+
+# ======  написание стадий сетки ===============
+    def get_match_title(self, i, game, highest_place, mp):
+        """
+        Определяет название стадии матча по его номеру в турнирной сетке
+        на основе структуры из Excel-файла.
+        
+        Аргументы:
+        match_number (int): Номер встречи
+        highest_place (int): Наивысшее место в данной сетке
+        total_players (int): Количество участников (8, 16 или 32)
+        
+        Возвращает:
+        str: Название стадии матча
+        """
+        match_number = i
+        # Проверка корректности параметров
+        valid_sizes = [8, 16, 32]
+        if mp not in valid_sizes:
+            return f"Ошибка: поддерживаются только сетки на {valid_sizes} участников"
+        
+        # Расчет базовых параметров
+        if mp == 32:
+            max_match = game
+            # Структура для 32 участников (как в Excel)
+            main_rounds = {
+                'first_round': (1, 16, f"1/16 финала"),
+                'second_round': (17, 24, f"1/8 финала"),
+                'quarter': (25, 28, f"1/4 финала"),
+                'semi': (29, 30, f"1/2 финала"),
+                'final': (31, 31, f"финал")
+            }       
+            # Стыковые матчи - распределение мест
+            consolation = [
+                # Места 33-36 (финал основной сетки)
+                {'matches': [32], 'offset': 2, 'type': 'final_group'},            
+                # Места 37-40
+                {'matches': [33, 34, 35, 36], 'offset': 4, 'type': 'full_group_4'},
+                # Места 33-36 (финал основной сетки)
+                {'matches': [37, 38, 39, 40,  41, 42, 43, 44], 'offset': 8, 'type': 'full_group_8'},           
+                # Места 45-48
+                {'matches': [45, 46, 47, 48], 'offset': 12, 'type': 'full_group_4'},
+                # Места 53-56
+                {'matches': [49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64], 'offset': 16, 'type': 'full_group_16'},
+                # Места 53-56
+                {'matches': [65, 66, 67, 68], 'offset': 20, 'type': 'full_group_4'},
+                # Места 57-60
+                {'matches': [69, 70, 71, 72, 73, 74, 75, 76], 'offset': 24, 'type': 'full_group_8'},
+                # Места 61-64
+                {'matches': [77, 78, 79, 80], 'offset': 28, 'type': 'full_group_4'},
+            ]
+        elif mp == 16:
+            max_match = game
+            # Структура для 16 участников
+            main_rounds = {
+                'first_round': (1, 8, f"1/8 финала"),
+                'quarter': (9, 12, f"1/4 финала"),
+                'semi': (13, 14, f"1/2 финала"),
+                'final': (15, 15, f"финал")
+            }
+            
+            consolation = [
+                # Места 17-18 (финал основной сетки)
+                {'matches': [19, 20], 'offset': 0, 'type': 'final_group'},
+                # Места 19-22
+                {'matches': [16, 17, 18, 21], 'offset': 2, 'type': 'mixed_group'},
+                # Места 23-26
+                {'matches': [22, 23, 24, 25], 'offset': 6, 'type': 'full_group'},
+                # Места 27-30
+                {'matches': [26, 27, 28, 29], 'offset': 10, 'type': 'full_group'},
+                # Места 31-32
+                {'matches': [30, 31, 32, 33], 'offset': 14, 'type': 'full_group'},
+            ]
+        else:  # total_players == 8
+            max_match = game
+            # Структура для 8 участников
+            main_rounds = {
+                'first_round': (1, 4, f"1/4 финала"),
+                'semi': (5, 6, f"1/2 финала"),
+                'final': (7, 7, f"финал")
+            }
+            
+            consolation = [
+                # Места 9-10 (финал основной сетки)
+                {'matches': [9, 10], 'offset': 0, 'type': 'final_group'},
+                # Места 11-14
+                {'matches': [8, 11, 12, 13], 'offset': 2, 'type': 'mixed_group'},
+                # Места 15-16
+                {'matches': [14, 15, 16, 17], 'offset': 6, 'type': 'full_group'},
+            ]
+        
+        # Проверка на допустимый номер матча
+        if match_number < 1 or match_number > max_match:
+            return f"Матч {match_number} (вне диапазона для {mp} участников)"
+        
+        # Проверка основной сетки
+        for round_name, round_data in main_rounds.items():
+            start, end, title = round_data
+            if start <= match_number <= end:
+                return title
+        
+        # Проверка стыковых матчей
+        for group in consolation:
+            if match_number in group['matches']:
+                idx = group['matches'].index(match_number)
+                offset = group['offset']
+                
+                if group['type'] == 'final_group':
+                    # Для финальной группы (1 матча)
+                    if idx == 0:  # Финал за highest_place - highest_place+1
+                        return f"за {highest_place + offset}-{highest_place + offset + 1} место"
+                    else:  # Матч за highest_place+2 - highest_place+3
+                        return f"за {highest_place + offset + 2}-{highest_place + offset + 3} место"         
+                elif group['type'] == 'full_group_4':
+                    # Полная группа из 2 матчей
+                    if idx == 0 or idx == 1:  # Полуфиналы
+                        start_place = highest_place + offset
+                        end_place = highest_place + offset + 3
+                        return f"За {start_place}-{end_place} место"
+                    elif idx == 2:  # Финал группы
+                        return f"за {highest_place + offset}-{highest_place + offset + 1} место"
+                    else:  # Матч за 3-4 место в группе
+                        return f"за {highest_place + offset + 2}-{highest_place + offset + 3} место"
+                elif group['type'] == 'full_group_8':
+                    # Полная группа из 4 матчей 8 человек
+                    if idx == 0 or idx == 1 or idx == 2 or idx == 3:  # четверть финал
+                        start_place = highest_place + offset
+                        end_place = highest_place + offset + 7
+                        return f"За {start_place}-{end_place} место"
+                    elif idx == 4 or idx == 5:  # Полуфинал группы
+                        return f"за {highest_place + offset}-{highest_place + offset + 3} место"
+                    elif idx == 6:
+                        return f"за {highest_place + offset}-{highest_place + offset + 1} место"
+                    else:  # Матч за 3-4 место в группе
+                        return f"за {highest_place + offset + 2}-{highest_place + offset + 3} место"
+                elif group['type'] == 'full_group_16':
+                    # Полная группа из 8 матчей 16 человек
+                    if idx == 0 or idx == 1 or idx == 2 or idx == 3 or idx == 4 or idx == 5 or idx == 6 or idx == 7 :  # Полуфиналы
+                        start_place = highest_place + offset
+                        end_place = highest_place + offset + 15
+                        return f"За {start_place}-{end_place} место"
+                    elif idx == 8 or idx == 9 or idx == 10 or idx == 11:  # Финал группы
+                        return f"за {highest_place + offset}-{highest_place + offset + 7} место"
+                    elif idx == 12 or idx == 13:  # Полуфинал группы
+                        return f"за {highest_place + offset}-{highest_place + offset + 3} место"
+                    elif idx == 14:
+                        return f"за {highest_place + offset}-{highest_place + offset + 1} место"
+                    else:  # Матч за 3-4 место в группе
+                        return f"за {highest_place + offset + 2}-{highest_place + offset + 3} место"
+                
+                elif group['type'] == 'mixed_group':
+                    # Смешанная группа (адаптация для 16 и 8 участников)
+                    if idx == 0 or idx == 1:  # Полуфиналы
+                        start_place = highest_place + offset
+                        end_place = highest_place + offset + 3
+                        return f"{start_place}-{end_place} место"
+                    elif idx == 2:  # Финал
+                        return f"за {highest_place + offset}-{highest_place + offset + 1} место"
+                    else:  # Матч за 3-4 место
+                        return f"за {highest_place + offset + 2}-{highest_place + offset + 3} место"
+
+    def whrite_stadia_on_net(self, game, highest_place, mp):
+        """записывает стадию в таблицу -Result-,
+          game - количество игр в сетке,
+            highest_place  - наивысшее место, mp - число игроков в сетке"""
+        
+        match_titles = {}
+        for i in range(1, game + 1):
+            match_titles[i] = self.get_match_title(i, game, highest_place, mp)
+        return match_titles
+                
 # ========= пробный вариант матчей в сетке =========
     def _setka_8_full_made(self, fin, posev_data):
             """сетка на 8 в pdf"""

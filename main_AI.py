@@ -2649,6 +2649,102 @@ class MainWindow(QMainWindow):
         left_layout.addStretch()
 
 # ---------- ПРАВАЯ КОЛОНКА (расписание) ----------
+        # schedule_group = QGroupBox("📅 Расписание (олимпийская система)")
+        # schedule_group.setStyleSheet("""
+        #     QGroupBox {
+        #         font-weight: bold;
+        #         font-size: 12px;
+        #         border: 2px solid #FF9800;
+        #         border-radius: 8px;
+        #         margin-top: 10px;
+        #     }
+        #     QGroupBox::title {
+        #         color: #FF9800;
+        #         subcontrol-origin: margin;
+        #         left: 10px;
+        #         padding: 0 8px 0 8px;
+        #     }
+        # """)
+        # schedule_layout = QVBoxLayout(schedule_group)
+        # schedule_layout.setSpacing(8)
+        # schedule_layout.setContentsMargins(10, 15, 10, 10)
+
+        # # Выбор этапа
+        # stage_schedule_layout = QHBoxLayout()
+        # stage_schedule_layout.addWidget(QLabel("Этап:"))
+        # self.schedule_stage_combo = QComboBox()
+        # self.schedule_stage_combo.currentIndexChanged.connect(self.on_schedule_stage_changed)
+        # stage_schedule_layout.addWidget(self.schedule_stage_combo, 1)
+        # schedule_layout.addLayout(stage_schedule_layout)
+
+        # # Таблица матчей
+        # self.schedule_table = QTableWidget()
+        # self.schedule_table.setColumnCount(6)
+        # self.schedule_table.setHorizontalHeaderLabels(["№ встречи", "Игрок 1", "Игрок 2", "Дата", "Время", "Стол"])
+        # self.schedule_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        # self.schedule_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        # self.schedule_table.setSelectionBehavior(QTableWidget.SelectRows)
+        # self.schedule_table.setSelectionMode(QTableWidget.ExtendedSelection)
+        # self.schedule_table.setEditTriggers(QTableWidget.DoubleClicked | QTableWidget.EditKeyPressed)  # разрешаем редактирование
+        # self.schedule_table.setStyleSheet("""
+        #     QTableWidget {
+        #         font-size: 11px;
+        #         gridline-color: #ddd;
+        #         selection-background-color: #a0c4ff;
+        #     }
+        #     QTableWidget::item {
+        #         padding: 2px;
+        #     }
+        # """)
+        # schedule_layout.addWidget(self.schedule_table)
+
+        # self.schedule_table.setEditTriggers(QTableWidget.DoubleClicked | QTableWidget.EditKeyPressed)
+        # # Убираем делегат – пользователь может вводить текст напрямую
+        # self.schedule_table.itemChanged.connect(self.on_schedule_table_item_changed)
+
+        # # Панель управления
+        # control_panel = QWidget()
+        # control_layout = QHBoxLayout(control_panel)
+        # control_layout.setSpacing(10)
+
+        # # Дата – теперь QComboBox с датами соревнования
+        # control_layout.addWidget(QLabel("Дата:"))
+        # self.schedule_date_combo = QComboBox()
+        # self.schedule_date_combo.setEditable(True)
+        # self.schedule_date_combo.setInsertPolicy(QComboBox.NoInsert)
+        # self.schedule_date_combo.setStyleSheet("padding: 3px;")
+        # control_layout.addWidget(self.schedule_date_combo)
+
+        # # Время
+        # control_layout.addWidget(QLabel("Время:"))
+        # self.schedule_time_combo = QComboBox()
+        # self.schedule_time_combo.setEditable(True)
+        # self.schedule_time_combo.setStyleSheet("padding: 3px;")
+        # self.populate_time_combo()
+        # control_layout.addWidget(self.schedule_time_combo)
+
+        # # Кнопки
+        # self.apply_schedule_btn = QPushButton("📌 Применить к выбранным")
+        # self.apply_schedule_btn.clicked.connect(self.apply_schedule_to_selected)
+        # control_layout.addWidget(self.apply_schedule_btn)
+
+        # self.apply_range_btn = QPushButton("📌 Применить к диапазону")
+        # self.apply_range_btn.clicked.connect(self.apply_schedule_to_range)
+        # control_layout.addWidget(self.apply_range_btn)
+
+        # self.assign_tables_btn = QPushButton("🔄 Назначить столы по порядку")
+        # self.assign_tables_btn.clicked.connect(self.assign_tables_sequentially)
+        # control_layout.addWidget(self.assign_tables_btn)
+
+        # self.clear_schedule_btn = QPushButton("🗑️ Очистить выбранные")
+        # self.clear_schedule_btn.clicked.connect(self.clear_schedule_for_selected)
+        # control_layout.addWidget(self.clear_schedule_btn)
+
+        # schedule_layout.addWidget(control_panel)
+
+        # schedule_layout.addStretch()
+#============== 1707============
+        # ---------- ПРАВАЯ КОЛОНКА (расписание) ----------
         schedule_group = QGroupBox("📅 Расписание (олимпийская система)")
         schedule_group.setStyleSheet("""
             QGroupBox {
@@ -2666,67 +2762,50 @@ class MainWindow(QMainWindow):
             }
         """)
         schedule_layout = QVBoxLayout(schedule_group)
-        schedule_layout.setSpacing(8)
-        schedule_layout.setContentsMargins(10, 15, 10, 10)
+        schedule_layout.setSpacing(5)
+        schedule_layout.setContentsMargins(5, 10, 5, 5)
 
-        # Выбор этапа
-        stage_schedule_layout = QHBoxLayout()
-        stage_schedule_layout.addWidget(QLabel("Этап:"))
-        self.schedule_stage_combo = QComboBox()
-        self.schedule_stage_combo.currentIndexChanged.connect(self.on_schedule_stage_changed)
-        stage_schedule_layout.addWidget(self.schedule_stage_combo, 1)
-        schedule_layout.addLayout(stage_schedule_layout)
-
-        # Таблица матчей
-        self.schedule_table = QTableWidget()
-        self.schedule_table.setColumnCount(6)
-        self.schedule_table.setHorizontalHeaderLabels(["№ встречи", "Игрок 1", "Игрок 2", "Дата", "Время", "Стол"])
-        self.schedule_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        self.schedule_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
-        self.schedule_table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.schedule_table.setSelectionMode(QTableWidget.ExtendedSelection)
-        self.schedule_table.setEditTriggers(QTableWidget.DoubleClicked | QTableWidget.EditKeyPressed)  # разрешаем редактирование
-        self.schedule_table.setStyleSheet("""
-            QTableWidget {
-                font-size: 11px;
-                gridline-color: #ddd;
-                selection-background-color: #a0c4ff;
-            }
-            QTableWidget::item {
-                padding: 2px;
-            }
-        """)
-        schedule_layout.addWidget(self.schedule_table)
-
-        self.schedule_table.setEditTriggers(QTableWidget.DoubleClicked | QTableWidget.EditKeyPressed)
-        # Убираем делегат – пользователь может вводить текст напрямую
-        self.schedule_table.itemChanged.connect(self.on_schedule_table_item_changed)
-
-        # Панель управления
+        # ---- Верхняя панель управления (горизонтальная) ----
         control_panel = QWidget()
         control_layout = QHBoxLayout(control_panel)
-        control_layout.setSpacing(10)
+        control_layout.setSpacing(8)
+        control_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Дата – теперь QComboBox с датами соревнования
+        # Этап
+        control_layout.addWidget(QLabel("Этап:"))
+        self.schedule_stage_combo = QComboBox()
+        self.schedule_stage_combo.currentIndexChanged.connect(self.on_schedule_stage_changed)
+        control_layout.addWidget(self.schedule_stage_combo, 1)
+
+        # Дата
         control_layout.addWidget(QLabel("Дата:"))
         self.schedule_date_combo = QComboBox()
         self.schedule_date_combo.setEditable(True)
         self.schedule_date_combo.setInsertPolicy(QComboBox.NoInsert)
-        self.schedule_date_combo.setStyleSheet("padding: 3px;")
+        self.schedule_date_combo.setMinimumWidth(100)
         control_layout.addWidget(self.schedule_date_combo)
 
         # Время
         control_layout.addWidget(QLabel("Время:"))
         self.schedule_time_combo = QComboBox()
         self.schedule_time_combo.setEditable(True)
-        self.schedule_time_combo.setStyleSheet("padding: 3px;")
+        self.schedule_time_combo.setMinimumWidth(80)
         self.populate_time_combo()
         control_layout.addWidget(self.schedule_time_combo)
 
+        # # Стол (массово)
+        # control_layout.addWidget(QLabel("Стол:"))
+        # self.schedule_table_spin = QSpinBox()
+        # self.schedule_table_spin.setMinimum(1)
+        # self.schedule_table_spin.setMaximum(self.max_tables)
+        # self.schedule_table_spin.setValue(1)
+        # self.schedule_table_spin.setMaximumWidth(60)
+        # control_layout.addWidget(self.schedule_table_spin)
+
         # Кнопки
-        self.apply_schedule_btn = QPushButton("📌 Применить к выбранным")
-        self.apply_schedule_btn.clicked.connect(self.apply_schedule_to_selected)
-        control_layout.addWidget(self.apply_schedule_btn)
+        self.apply_selected_btn = QPushButton("📌 Применить к выбранным")
+        self.apply_selected_btn.clicked.connect(self.apply_schedule_to_selected)
+        control_layout.addWidget(self.apply_selected_btn)
 
         self.apply_range_btn = QPushButton("📌 Применить к диапазону")
         self.apply_range_btn.clicked.connect(self.apply_schedule_to_range)
@@ -2742,7 +2821,36 @@ class MainWindow(QMainWindow):
 
         schedule_layout.addWidget(control_panel)
 
-        schedule_layout.addStretch()
+        # Таблица матчей (растягивается)
+        self.schedule_table = QTableWidget()
+        self.schedule_table.setColumnCount(6)
+        self.schedule_table.setHorizontalHeaderLabels(["№ встречи", "Игрок 1", "Игрок 2", "Дата", "Время", "Стол"])
+        self.schedule_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.schedule_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        self.schedule_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.schedule_table.setSelectionMode(QTableWidget.ExtendedSelection)
+        self.schedule_table.setEditTriggers(QTableWidget.DoubleClicked | QTableWidget.EditKeyPressed)
+        self.schedule_table.setStyleSheet("""
+            QTableWidget {
+                font-size: 11px;
+                gridline-color: #ddd;
+                selection-background-color: #a0c4ff;
+            }
+            QTableWidget::item {
+                padding: 2px;
+            }
+        """)
+        self.schedule_table.itemChanged.connect(self.on_schedule_table_item_changed)
+        # Убираем делегат – пользователь вводит номер стола с клавиатуры
+        schedule_layout.addWidget(self.schedule_table, 1)  # stretch = 1, чтобы таблица занимала всё оставшееся место
+
+        # # Информация о количестве столов (можно убрать или оставить маленькой строкой)
+        # info_label = QLabel("Количество столов: " + str(self.max_tables))
+        # info_label.setStyleSheet("color: #666; font-size: 9px; margin-top: 2px;")
+        # schedule_layout.addWidget(info_label)
+
+        # Добавляем правую часть в основной layout с бóльшим весом
+        main_layout.addWidget(schedule_group, 3)
 #===============================================================
         # Добавляем правую часть с бóльшим весом
         main_layout.addWidget(left_widget, 1)

@@ -20309,7 +20309,7 @@ class MainWindow(QMainWindow):
             match_num = res.tours if res.tours else ""
             
             # Стадия (для сетки)
-            if type_table == "сетка":
+            if type_table != "Круговая":
                 stage_text = res.stage_net if res.stage_net else ""
             else:
                 stage_text = res.round if res.round else ""
@@ -20914,7 +20914,6 @@ class MainWindow(QMainWindow):
     def create_olimpic_final_automatically(self, stage, source_stage, exit_count):
         """автоматическая жеребьевка по олимпийской системе""" 
 
-        # stage_name = stage.stage
         system = System.get_or_none((System.title_id == self.current_title_id) & (System.stage == stage))
         choice = Choice.select().where(Choice.title_id == self.current_title_id)
 
@@ -21006,11 +21005,18 @@ class MainWindow(QMainWindow):
                 title_id=self.current_title_id,
                 sex=self.current_sex if self.current_sex else "man") 
             
-        # # 7. Создаём туры и матчи
+        # # 7. Создаём туры и матчи заполняем Results
         max_pl = system.max_player
         # число игр в сетке
         total_game = self.number_game_of_net(stage)
+# =========== проба записи стадии ====
+        # наивысшее место 
+        highest_place = self.get_final_start_place(stage)
+        # определяет количество игр в сетке
+        game = self.number_game_of_net(stage)
 
+        self.get_match_title(i, game, highest_place, max_pl)
+# =======================
         # присваивает встречи 1-ого тура и записывает в тбл Results
         for i in range(1, max_pl // 2 + 1):   
             pl1 = posev_data[i * 2 - 1]['name_city']
@@ -21025,8 +21031,17 @@ class MainWindow(QMainWindow):
                 results = Result(number_group=stage, system_stage="Финальный", player1="", player2="",
                                 tours=i, title_id=self.current_title_id, system_id=system.id).save()
 # ===================================
-        # После цикла создания матчей и перед установкой флага
-        self.update_schedule_stages()
+        # # # После цикла создания матчей и перед установкой флага
+        # self.update_schedule_stages()
+        # записывает стадии сетки в Result
+        stadia = self.whrite_stadia_on_net(game, highest_place, max_pl)
+
+        results_stadia = Result.select().where((Result.title_id == self.current_title_id) & (Result.system_id == system.id))
+
+        for k in results_stadia:
+            num_game = int(k.tours)
+            stadia_str = stadia[num_game]
+            Result.update(stage_net=stadia_str).where(Result.id == k).execute()
 #=====================================
         # 9. Устанавливаем флаг choice_flag для записей Choice, участвующих в финале
         self.set_choice_flag_for_stage(stage, flag=1)
@@ -21665,9 +21680,9 @@ class MainWindow(QMainWindow):
         group_list = ["Квалификация", "Квалификация. 1-й полуфинал","Квалификация. 2-й полуфинал"]
         # stage_place = {}
         place_players = []
-        place = []
+        # place = []
         player_max_stage = {}
-        mesto_first = 1
+        # mesto_first = 1
         system = System.select().where(System.title_id == self.current_title_id)
 
         for h in system:

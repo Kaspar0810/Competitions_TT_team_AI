@@ -3014,6 +3014,8 @@ class MainWindow(QMainWindow):
             return
         self.apply_schedule_to_rows(list(selected_rows))
 
+        self.update_schedule_filter_combos()
+
     def apply_schedule_to_range(self):
         """Назначить расписание для диапазона встреч (без выделения)"""
         range_text, ok = QInputDialog.getText(

@@ -2698,19 +2698,19 @@ class MainWindow(QMainWindow):
         control_layout.addWidget(self.schedule_time_combo)
 
         # Кнопки
-        self.apply_selected_btn = QPushButton("📌 Применить к выбранным")
+        self.apply_selected_btn = QPushButton("📌 Применить\n к выбранным")
         self.apply_selected_btn.clicked.connect(self.apply_schedule_to_selected)
         control_layout.addWidget(self.apply_selected_btn)
 
-        self.apply_range_btn = QPushButton("📌 Применить к диапазону")
+        self.apply_range_btn = QPushButton("📌 Применить\n к диапазону")
         self.apply_range_btn.clicked.connect(self.apply_schedule_to_range)
         control_layout.addWidget(self.apply_range_btn)
 
-        self.assign_tables_btn = QPushButton("🔄 Назначить столы по порядку")
+        self.assign_tables_btn = QPushButton("🔄 Назначить\n столы по порядку")
         self.assign_tables_btn.clicked.connect(self.assign_tables_sequentially)
         control_layout.addWidget(self.assign_tables_btn)
 
-        self.clear_schedule_btn = QPushButton("🗑️ Очистить выбранные")
+        self.clear_schedule_btn = QPushButton("🗑️ Очистить\n выбранные")
         self.clear_schedule_btn.clicked.connect(self.clear_schedule_for_selected)
         control_layout.addWidget(self.clear_schedule_btn)
 
@@ -4863,19 +4863,10 @@ class MainWindow(QMainWindow):
                 self.right_panel.setVisible(True)
 
             elif index == 7:  # Дополнительно
-                # self.table_header.setText("ℹ️ Дополнительная информация")
-                # self.filters_widget.setVisible(False)
 
-                # # отображение заголовка и информации в QListWidget
-                # self.change_label_ListWidget(index)
+                # Загружаем даты соревнования
+                self.load_competition_dates()
 
-                # # Скрываем вкладку Дополнительно
-                # self.right_panel.setVisible(False)
-
-                # # Загружаем даты соревнования
-                # self.load_competition_dates()
-            # =========1707
-                # self.table_container.setCurrentWidget(self.schedule_container)  # если таблица в контейнере
                 self.table_header.setText("📅 Расписание матчей")
                 self.table_header.setStyleSheet("""
                     background-color: #FF9800;

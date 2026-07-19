@@ -1128,7 +1128,7 @@ class MainWindow(QMainWindow):
             4: 350,  # Система
             5: 200,  # Результаты - маленькая верхняя часть для формы ввода
             6: 150,  # Рейтинг
-            7: 550   # Дополнительно
+            7: 640   # Дополнительно
         }
         
         # Устанавливаем начальную высоту
@@ -2722,7 +2722,7 @@ class MainWindow(QMainWindow):
         # Таблица матчей (растягивается)
         self.schedule_table = QTableWidget()
         self.schedule_table.setColumnCount(6)
-        self.schedule_table.setHorizontalHeaderLabels(["№ встречи", "Игрок 1", "Игрок 2", "Дата", "Время", "Стол"])
+        self.schedule_table.setHorizontalHeaderLabels(["№ встр.", "Игрок 1", "Игрок 2", "Дата", "Время", "Стол"])
         self.schedule_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.schedule_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         self.schedule_table.setSelectionBehavior(QTableWidget.SelectRows)
@@ -3199,67 +3199,6 @@ class MainWindow(QMainWindow):
         else:
             self.schedule_time_combo.setCurrentIndex(0)
 
-    def apply_schedule_to_rows(self, rows):
-        """Применить текущие дату, время и стол к списку строк (индексы)"""
-        if not rows:
-            QMessageBox.warning(self, "Ошибка", "Не выбраны встречи для назначения")
-            return
-
-        date = self.schedule_date_combo.currentText()
-        if not date:
-            QMessageBox.warning(self, "Ошибка", "Выберите дату")
-            return
-        try:
-            date_obj = datetime.strptime(date, "%d.%m.%Y").date()
-        except:
-            QMessageBox.warning(self, "Ошибка", "Некорректная дата")
-            return
-
-        time_str = self.schedule_time_combo.currentText()
-        if not time_str:
-            QMessageBox.warning(self, "Ошибка", "Выберите время")
-            return
-        time_obj = datetime.strptime(time_str, "%H:%M").time()
-
-        # table = self.schedule_table_spin.value()
-
-        reply = QMessageBox.question(
-            self,
-            "Подтверждение",
-            f"Назначить расписание для {len(rows)} встреч?\n"
-            f"Дата: {date}, Время: {time_str}",
-            QMessageBox.Yes | QMessageBox.No
-        )
-        if reply != QMessageBox.Yes:
-            return
-
-        stage_name = self.schedule_stage_combo.currentText()
-        system = System.get_or_none(
-            (System.title_id == self.current_title_id) &
-            (System.stage == stage_name)
-        )
-        if not system:
-            return
-
-        for row in rows:
-            tour = self.schedule_table.item(row, 0).text()
-            table = self.schedule_table.item(row, 5).text()
-            if not tour:
-                continue
-            result = Result.get_or_none(
-                (Result.title_id == self.current_title_id) &
-                (Result.system_id == system.id) &
-                (Result.tours == tour)
-            )
-            if result:
-                result.schedule_date = date_obj
-                result.schedule_time = time_obj
-                result.schedule_table = table
-                result.save()
-
-        self.load_schedule_matches(stage_name)
-        QMessageBox.information(self, "Успех", f"Расписание назначено для {len(rows)} встреч")
-
     def update_left_panel_for_extra_tab(self):
         """Обновление левой панели для вкладки Дополнительно (фильтры расписания + кнопки действий)"""
         # Очистка панели
@@ -3417,6 +3356,127 @@ class MainWindow(QMainWindow):
                 pass
         times = query.distinct().order_by(Result.schedule_time)
         return [t.schedule_time for t in times if t.schedule_time]
+# =======================================
+    def apply_schedule_to_rows(self, rows):
+        """Применить текущие дату, время и стол к списку строк (индексы) и проверить конфликты после сохранения"""
+        if not rows:
+            QMessageBox.warning(self, "Ошибка", "Не выбраны встречи для назначения")
+            return
+
+        date = self.schedule_date_combo.currentText()
+        if not date:
+            QMessageBox.warning(self, "Ошибка", "Выберите дату")
+            return
+        try:
+            date_obj = datetime.strptime(date, "%d.%m.%Y").date()
+        except:
+            QMessageBox.warning(self, "Ошибка", "Некорректная дата")
+            return
+
+        time_str = self.schedule_time_combo.currentText()
+        if not time_str:
+            QMessageBox.warning(self, "Ошибка", "Выберите время")
+            return
+        time_obj = datetime.strptime(time_str, "%H:%M").time()
+
+        # # Номер стола (из спиннера)
+        # table = self.schedule_table_spin.value()
+
+        # Подтверждение
+        reply = QMessageBox.question(
+            self,
+            "Подтверждение",
+            f"Назначить расписание для {len(rows)} встреч?\n"
+            f"Дата: {date}, Время: {time_str}",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if reply != QMessageBox.Yes:
+            return
+
+        stage_name = self.schedule_stage_combo.currentText()
+        system = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == stage_name)
+        )
+        if not system:
+            QMessageBox.warning(self, "Ошибка", "Система не найдена")
+            return
+
+        # ---- ШАГ 1: Сохраняем данные ----
+        saved_rows = []
+        for row in rows:
+            tour = self.schedule_table.item(row, 0).text()
+            table = self.schedule_table.item(row, 5).text()
+            if not tour:
+                continue
+            result = Result.get_or_none(
+                (Result.title_id == self.current_title_id) &
+                (Result.system_id == system.id) &
+                (Result.tours == tour)
+            )
+            if result:
+                result.schedule_date = date_obj
+                result.schedule_time = time_obj
+                result.schedule_table = table
+                result.save()
+                saved_rows.append(row)
+
+        if not saved_rows:
+            QMessageBox.warning(self, "Ошибка", "Не удалось сохранить ни одной записи")
+            return
+
+        # ---- ШАГ 2: Проверяем конфликты (после сохранения) ----
+        conflicts = self.check_all_schedule_conflicts(system.id)
+
+        if conflicts:
+            conflict_msg = "Обнаружены конфликты расписания (одинаковые дата+время+стол):\n\n"
+            for c in conflicts[:20]:  # ограничим вывод, чтобы не перегружать
+                conflict_msg += (f"• Матч {c['tour1']} и матч {c['tour2']} "
+                                f"на {c['date']} в {c['time']} за столом {c['table']}\n")
+            if len(conflicts) > 20:
+                conflict_msg += f"\n... и еще {len(conflicts) - 20} конфликтов"
+            QMessageBox.warning(self, "Конфликты расписания", conflict_msg)
+        else:
+            QMessageBox.information(self, "Успех", f"Расписание назначено для {len(saved_rows)} встреч. Конфликтов не обнаружено.")
+
+        # Обновляем таблицу
+        self.load_schedule_matches(stage_name)
+
+    def check_all_schedule_conflicts(self, system_id):
+        """
+        Проверяет все записи Result для данного system_id на конфликты (одинаковые date+time+table).
+        Возвращает список конфликтов, каждый конфликт – словарь с полями tour1, tour2, date, time, table.
+        """
+        conflicts = []
+        results = Result.select().where(
+            (Result.title_id == self.current_title_id) &
+            (Result.system_id == system_id) &
+            (Result.schedule_date.is_null(False)) &
+            (Result.schedule_time.is_null(False)) &
+            (Result.schedule_table.is_null(False))
+        )
+
+        # Группируем по (date, time, table)
+        groups = {}
+        for res in results:
+            key = (res.schedule_date, res.schedule_time, res.schedule_table)
+            if key not in groups:
+                groups[key] = []
+            groups[key].append(res.tours)
+
+        # Если в группе больше 1 матча – конфликт
+        for (date, time, table), tours in groups.items():
+            if len(tours) > 1:
+                for i in range(len(tours)):
+                    for j in range(i + 1, len(tours)):
+                        conflicts.append({
+                            'tour1': tours[i],
+                            'tour2': tours[j],
+                            'date': date.strftime("%d.%m.%Y"),
+                            'time': time.strftime("%H:%M"),
+                            'table': table
+                        })
+        return conflicts
 # ==================================================
     def parse_and_load_scores_compact(self, score_string):
         """Парсинг строки счета и загрузка в поля"""
@@ -4976,12 +5036,16 @@ class MainWindow(QMainWindow):
                     font-size: 13px;
                     border-radius: 3px;
                 """)
+                # скрывает отдельные окна
                 self.filters_widget.setVisible(False)
                 self.stage_section.setVisible(False)
+                self.right_panel.setVisible(False)
+                # self.table_container.setVisible(False)
+                # self.table_view.setVisible(False)
+
                 if hasattr(self, 'seeding_info_label'):
                     self.seeding_info_label.hide()
-                self.right_panel.setVisible(False)
-
+                
                 # Вызываем специальный метод для левой панели
                 self.update_left_panel_for_extra_tab()
 
@@ -5101,9 +5165,6 @@ class MainWindow(QMainWindow):
         """)
         print_btn.clicked.connect(self.print_rating_top)
         self.dynamic_filters_layout.addWidget(print_btn)
-
-        # self.dynamic_filters_layout.addStretch()
-        # self.dynamic_filters_layout.addWidget(reset_btn)
 
         self.dynamic_filters_layout.addStretch()
 
@@ -5704,12 +5765,6 @@ class MainWindow(QMainWindow):
                             btn.clicked.connect(self.about_dialog)
                         elif btn_text == "📝 Просмотреть заметки":
                             btn.clicked.connect(self.show_notes_dialog)   
-                        # Кнопка просмотра заметок
-                        # view_notes_btn = QPushButton("📝 Просмотреть заметки")
-                        # view_notes_btn.setMinimumHeight(35)
-                        # view_notes_btn.setStyleSheet(self.get_button_style())
-                        # view_notes_btn.clicked.connect(self.show_notes_dialog)
-                        # self.dynamic_filters_layout.addWidget(view_notes_btn)
                                     
                     self.dynamic_filters_layout.addWidget(btn)
         

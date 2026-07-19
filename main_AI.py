@@ -2721,10 +2721,14 @@ class MainWindow(QMainWindow):
 
         # Таблица матчей (растягивается)
         self.schedule_table = QTableWidget()
-        self.schedule_table.setColumnCount(6)
-        self.schedule_table.setHorizontalHeaderLabels(["№ встр.", "Игрок 1", "Игрок 2", "Дата", "Время", "Стол"])
+        self.schedule_table.setColumnCount(7)
+        self.schedule_table.setHorizontalHeaderLabels(
+            ["№ вст.", "Игрок 1", "Игрок 2", "Дата", "Время", "Стол", "Стадия"]
+        )
+        # Настройка ширины столбцов
         self.schedule_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.schedule_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        self.schedule_table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeToContents)
         self.schedule_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.schedule_table.setSelectionMode(QTableWidget.ExtendedSelection)
         self.schedule_table.setEditTriggers(QTableWidget.DoubleClicked | QTableWidget.EditKeyPressed)
@@ -2807,9 +2811,15 @@ class MainWindow(QMainWindow):
             self.schedule_table.setItem(row, 4, QTableWidgetItem(time_str))
             # Стол
             self.schedule_table.setItem(row, 5, QTableWidgetItem(str(result.schedule_table) if result.schedule_table else ""))
+            # После получения result
+            stage_net = result.stage_net if result.stage_net else ""
+            self.schedule_table.setItem(row, 6, QTableWidgetItem(stage_net))
 
         self.schedule_table.resizeColumnsToContents()
-#
+
+        # После заполнения обновляем фильтр стадий
+        self.update_stage_filter_combo()
+
     def update_schedule_stages(self):
         """Обновление списка этапов для расписания (только олимпийские)"""
         self.schedule_stage_combo.clear()
@@ -2905,6 +2915,9 @@ class MainWindow(QMainWindow):
             return
         self.max_tables = getattr(self, 'system_tables', 4)
         self.load_schedule_matches(stage_name)
+
+        # Обновляем комбобокс стадий
+        self.update_stage_filter_combo()
         # Обновляем фильтры даты и времени
         self.update_schedule_filter_combos()
         # Сбрасываем скрытие строк
@@ -3094,41 +3107,29 @@ class MainWindow(QMainWindow):
             current = current.addSecs(5 * 60)
 
     def apply_schedule_filters(self):
-        """Применяет фильтры по дате и времени к таблице расписания"""
+        """Применяет фильтры по дате, времени и стадии к таблице расписания"""
+        if not hasattr(self, 'schedule_table'):
+            return
         date_filter = self.schedule_date_filter_combo.currentText()
         time_filter = self.schedule_time_filter_combo.currentText()
+        stage_filter = self.schedule_stage_filter_combo.currentText() if hasattr(self, 'schedule_stage_filter_combo') else "Все стадии"
 
-        # Если дата изменилась, обновляем список времени для этой даты
-        self.schedule_time_filter_combo.blockSignals(True)
-        current_time = self.schedule_time_filter_combo.currentText()
-        self.schedule_time_filter_combo.clear()
-        self.schedule_time_filter_combo.addItem("Все время")
-        times = self.get_schedule_times(date_filter)
-        for time_obj in times:
-            self.schedule_time_filter_combo.addItem(time_obj.strftime("%H:%M"))
-        # Пытаемся восстановить выбранное время, если оно есть в новом списке
-        if current_time != "Все время":
-            idx = self.schedule_time_filter_combo.findText(current_time)
-            if idx >= 0:
-                self.schedule_time_filter_combo.setCurrentIndex(idx)
-            else:
-                # если время не найдено, оставляем "Все время"
-                self.schedule_time_filter_combo.setCurrentIndex(0)
-        else:
-            self.schedule_time_filter_combo.setCurrentIndex(0)
-        self.schedule_time_filter_combo.blockSignals(False)
-
-        # Теперь применяем фильтр к строкам таблицы
         for row in range(self.schedule_table.rowCount()):
-            date_item = self.schedule_table.item(row, 3)
-            time_item = self.schedule_table.item(row, 4)
+            date_item = self.schedule_table.item(row, 3)   # Дата
+            time_item = self.schedule_table.item(row, 4)   # Время
+            stage_item = self.schedule_table.item(row, 6)  # Стадия
             show = True
+
             if date_filter != "Все даты" and date_item:
                 if date_item.text() != date_filter:
                     show = False
-            if time_filter != "Все время" and time_item and show:
+            if show and time_filter != "Все время" and time_item:
                 if time_item.text() != time_filter:
                     show = False
+            if show and stage_filter != "Все стадии" and stage_item:
+                if stage_item.text() != stage_filter:
+                    show = False
+
             self.schedule_table.setRowHidden(row, not show)
 
     def clear_schedule_for_selected(self):
@@ -3238,6 +3239,15 @@ class MainWindow(QMainWindow):
         self.schedule_time_filter_combo.currentIndexChanged.connect(self.apply_schedule_filters)
         time_layout.addWidget(self.schedule_time_filter_combo, 1)
         self.dynamic_filters_layout.addLayout(time_layout)
+
+        # ---- Фильтр по стадии ----
+        stage_filter_layout = QHBoxLayout()
+        stage_filter_layout.addWidget(QLabel("Стадия:"))
+        self.schedule_stage_filter_combo = QComboBox()
+        self.schedule_stage_filter_combo.addItem("Все стадии")
+        self.schedule_stage_filter_combo.currentIndexChanged.connect(self.apply_schedule_filters)
+        stage_filter_layout.addWidget(self.schedule_stage_filter_combo, 1)
+        self.dynamic_filters_layout.addLayout(stage_filter_layout)
 
         # Разделитель
         line = QFrame()
@@ -3356,7 +3366,28 @@ class MainWindow(QMainWindow):
                 pass
         times = query.distinct().order_by(Result.schedule_time)
         return [t.schedule_time for t in times if t.schedule_time]
-# =======================================
+
+    def update_stage_filter_combo(self):
+        """Обновляет список стадий в фильтре на основе текущей таблицы"""
+        if not hasattr(self, 'schedule_stage_filter_combo'):
+            return
+        self.schedule_stage_filter_combo.blockSignals(True)
+        current_text = self.schedule_stage_filter_combo.currentText()
+        self.schedule_stage_filter_combo.clear()
+        self.schedule_stage_filter_combo.addItem("Все стадии")
+        stages = set()
+        for row in range(self.schedule_table.rowCount()):
+            item = self.schedule_table.item(row, 6)
+            if item and item.text():
+                stages.add(item.text())
+        for stage in sorted(stages):
+            self.schedule_stage_filter_combo.addItem(stage)
+        # Восстанавливаем предыдущее значение, если оно есть
+        index = self.schedule_stage_filter_combo.findText(current_text)
+        if index >= 0:
+            self.schedule_stage_filter_combo.setCurrentIndex(index)
+        self.schedule_stage_filter_combo.blockSignals(False)
+
     def apply_schedule_to_rows(self, rows):
         """Применить текущие дату, время и стол к списку строк (индексы) и проверить конфликты после сохранения"""
         if not rows:
@@ -5040,8 +5071,6 @@ class MainWindow(QMainWindow):
                 self.filters_widget.setVisible(False)
                 self.stage_section.setVisible(False)
                 self.right_panel.setVisible(False)
-                # self.table_container.setVisible(False)
-                # self.table_view.setVisible(False)
 
                 if hasattr(self, 'seeding_info_label'):
                     self.seeding_info_label.hide()
@@ -16150,80 +16179,6 @@ class MainWindow(QMainWindow):
                 import traceback
                 traceback.print_exc()
                 QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")   
-#  =================== новое расписание
-
-    # def on_schedule_stage_changed(self):
-    #     """Загрузка матчей при смене этапа расписания"""
-    #     stage_name = self.schedule_stage_combo.currentText()
-    #     if not stage_name:
-    #         return
-        
-    #     # Проверяем, что этап олимпийский
-    #     system = System.get_or_none(
-    #         (System.title_id == self.current_title_id) &
-    #         (System.stage == stage_name)
-    #     )
-    #     if not system:
-    #         return
-        
-    #     if "Олимпийская" not in system.type_table and "Сетка" not in system.type_table:
-    #         QMessageBox.warning(self, "Ошибка", "Выбранный этап не является олимпийской системой.\nРасписание доступно только для сеток.")
-    #         self.schedule_table.setRowCount(0)
-    #         return
-        
-    #     # Обновляем максимальное количество столов
-    #     if hasattr(self, 'system_tables'):
-    #         self.schedule_table_spin.setMaximum(self.system_tables)
-    #     else:
-    #         self.schedule_table_spin.setMaximum(4)
-        
-    #     # Загружаем матчи
-    #     self.load_schedule_matches(stage_name)
-
-    # def load_schedule_matches(self, stage_name):
-    #     """Загрузка матчей этапа в таблицу расписания"""
-    #     self.schedule_table.setRowCount(0)
-        
-    #     system = System.get_or_none(
-    #         (System.title_id == self.current_title_id) &
-    #         (System.stage == stage_name)
-    #     )
-    #     if not system:
-    #         return
-        
-    #     # Получаем все матчи этапа (Result)
-    #     results = Result.select().where(
-    #         (Result.title_id == self.current_title_id) &
-    #         (Result.system_id == system.id)
-    #     ).order_by(Result.tours)
-        
-    #     self.schedule_table.setRowCount(results.count())
-        
-    #     for row, result in enumerate(results):
-    #         # Номер встречи
-    #         self.schedule_table.setItem(row, 0, QTableWidgetItem(str(result.tours)))
-    #         # Игрок 1
-    #         self.schedule_table.setItem(row, 1, QTableWidgetItem(result.player1 or ""))
-    #         # Игрок 2
-    #         self.schedule_table.setItem(row, 2, QTableWidgetItem(result.player2 or ""))
-    #         # Дата
-    #         date_str = result.schedule_date.strftime("%d.%m.%Y") if result.schedule_date else ""
-    #         self.schedule_table.setItem(row, 3, QTableWidgetItem(date_str))
-    #         # Время
-    #         time_str = result.schedule_time.strftime("%H:%M") if result.schedule_time else ""
-    #         self.schedule_table.setItem(row, 4, QTableWidgetItem(time_str))
-    #         # Стол
-    #         self.schedule_table.setItem(row, 5, QTableWidgetItem(str(result.schedule_table) if result.schedule_table else ""))
-        
-    #     self.schedule_table.resizeColumnsToContents()
-
-    
-
-    
-
-    
-# =======================
-
 # ========== проба поиска ячеек для результатов ====
     def find_match_numbers_and_cells_in_results_db(self, match_num, fin):
             """ищет cтроку в таблице -Result- по номеру встречи"""

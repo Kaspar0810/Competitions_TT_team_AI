@@ -6534,6 +6534,11 @@ class MainWindow(QMainWindow):
         
         # Просмотр
         view_menu = menubar.addMenu("Просмотр")
+
+        # Добавляем подменю "Двойные фамилии"
+        duplicate_surnames_action = QAction("Двойные фамилии", self)
+        duplicate_surnames_action.triggered.connect(self.export_duplicate_surnames_to_pdf)
+        print_menu.addAction(duplicate_surnames_action)
         
         # Список участников
         participants_list_action = QAction("📋 Список участников (PDF)", self)
@@ -12961,6 +12966,144 @@ class MainWindow(QMainWindow):
                 else:
                     os.system(f'open "{file_path}"')
             
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")
+
+    def export_duplicate_surnames_to_pdf(self):
+        """Экспорт списка спортсменов с повторяющимися фамилиями в PDF"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+
+        try:
+            # Получаем всех участников текущего соревнования
+            players = Player.select().where(Player.title_id == self.current_title_id)
+
+            if players.count() == 0:
+                QMessageBox.warning(self, "Ошибка", "Нет участников в соревновании")
+                return
+
+            # Группируем по фамилии (извлекаем фамилию из поля fio или player)
+            surname_groups = {}
+            for player in players:
+                # Если есть fio, используем его, иначе player
+                full_name = player.fio if player.fio else player.player
+                if not full_name:
+                    continue
+
+                # Извлекаем фамилию (первое слово)
+                surname = full_name.split()[0] if full_name.split() else full_name
+
+                # Игнорируем "X"
+                if surname == "X":
+                    continue
+
+                # Добавляем в группу
+                if surname not in surname_groups:
+                    surname_groups[surname] = []
+                surname_groups[surname].append(player)
+
+            # Оставляем только группы с более чем одним спортсменом
+            duplicate_groups = {s: players_list for s, players_list in surname_groups.items() if len(players_list) > 1}
+
+            if not duplicate_groups:
+                QMessageBox.information(self, "Информация", "Спортсменов с повторяющимися фамилиями не найдено")
+                return
+
+            # Создаём PDF
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+            from reportlab.lib.pagesizes import A4
+            from reportlab.lib import colors
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle as PS
+            from reportlab.lib.units import cm
+            import os
+
+            # Папка для сохранения
+            pdf_dir = "table_pdf"
+            if not os.path.exists(pdf_dir):
+                os.makedirs(pdf_dir)
+
+            # Имя файла
+            title = Title.get_by_id(self.current_title_id)
+            short_name = title.short_name_comp if title.short_name_comp else title.name
+            import re
+            clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
+            clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
+
+            filename = os.path.join(pdf_dir, f"{clean_name}_duplicate_surnames.pdf")
+
+            # Документ
+            doc = SimpleDocTemplate(filename, pagesize=A4,
+                                    topMargin=2*cm, bottomMargin=1.5*cm,
+                                    leftMargin=1.5*cm, rightMargin=1.5*cm)
+
+            styles = getSampleStyleSheet()
+            title_style = PS("TitleStyle", fontSize=14, fontName="DejaVuSerif-Bold",
+                            alignment=1, spaceAfter=20, textColor=colors.darkblue)
+
+            elements = []
+
+            # Заголовок
+            elements.append(Paragraph("Список спортсменов с повторяющимися фамилиями", title_style))
+            elements.append(Paragraph(f"Соревнование: {title.name}", styles['Normal']))
+            elements.append(Spacer(1, 0.5*cm))
+
+            # Для каждой фамилии создаём таблицу
+            for surname, players_list in sorted(duplicate_groups.items()):
+                # Заголовок фамилии
+                surname_style = PS("SurnameStyle", fontSize=12, fontName="DejaVuSerif-Bold",
+                                textColor=colors.blue, spaceAfter=8, spaceBefore=12)
+                elements.append(Paragraph(f"Фамилия: {surname} ({len(players_list)} чел.)", surname_style))
+
+                # Таблица с данными
+                table_data = [["№", "ФИО", "Город", "Регион", "Разряд", "Рейтинг"]]
+                for idx, player in enumerate(players_list, 1):
+                    fio = player.fio if player.fio else player.player
+                    city = player.city or ""
+                    region = player.region or ""
+                    razryad = player.razryad or ""
+                    rank = str(player.rank) if player.rank else "0"
+                    table_data.append([str(idx), fio, city, region, razryad, rank])
+
+                table = Table(table_data, colWidths=[1*cm, 5*cm, 3*cm, 4*cm, 2*cm, 2*cm], repeatRows=1)
+                table.setStyle(TableStyle([
+                    ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSerif'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 9),
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                    ('TOPPADDING', (0, 0), (-1, -1), 4),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                ]))
+
+                elements.append(table)
+                elements.append(Spacer(1, 0.3*cm))
+
+            # Информация о количестве
+            total_players = sum(len(p) for p in duplicate_groups.values())
+            info_style = PS("InfoStyle", fontSize=10, fontName="DejaVuSerif-Italic",
+                            alignment=1, spaceBefore=20, textColor=colors.gray)
+            elements.append(Paragraph(f"Всего спортсменов с повторяющимися фамилиями: {total_players}", info_style))
+
+            # Строим документ
+            doc.build(elements, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
+
+            QMessageBox.information(self, "Успех", f"Список спортсменов с повторяющимися фамилиями сохранён:\n{filename}")
+
+            # Предлагаем открыть файл
+            reply = QMessageBox.question(self, "Открыть файл", 
+                                        "Открыть созданный PDF файл?",
+                                        QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                if sys.platform == 'win32':
+                    os.startfile(filename)
+                else:
+                    os.system(f'open "{filename}"')
+
         except Exception as e:
             import traceback
             traceback.print_exc()

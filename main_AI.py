@@ -71,57 +71,8 @@ from begunok_full import BegunokPDF
 # ======================== 1-й вариан расписания ======
 from PyQt5.QtWidgets import QStyledItemDelegate, QSpinBox
 
-class TableSpinDelegate(QStyledItemDelegate):
-    def __init__(self, min_val, max_val, parent=None):
-        super().__init__(parent)
-        self.min_val = min_val
-        self.max_val = max_val
 
-    def createEditor(self, parent, option, index):
-        editor = QSpinBox(parent)
-        editor.setMinimum(self.min_val)
-        editor.setMaximum(self.max_val)
-        return editor
 
-    def setEditorData(self, editor, index):
-        value = index.model().data(index, Qt.DisplayRole)
-        try:
-            editor.setValue(int(value))
-        except:
-            editor.setValue(self.min_val)
-
-    def setModelData(self, editor, model, index):
-        value = editor.value()
-        model.setData(index, value, Qt.DisplayRole)
-
-class SpinBoxDelegate(QStyledItemDelegate):
-    """Делегат для ячейки с QSpinBox (номер стола)"""
-    def __init__(self, minimum, maximum, parent=None):
-        super().__init__(parent)
-        self.minimum = minimum
-        self.maximum = maximum
-
-    def createEditor(self, parent, option, index):
-        editor = QSpinBox(parent)
-        editor.setMinimum(self.minimum)
-        editor.setMaximum(self.maximum)
-        editor.setFrame(False)
-        return editor
-
-    def setEditorData(self, editor, index):
-        value = index.model().data(index, Qt.EditRole)
-        if value is not None:
-            try:
-                editor.setValue(int(value))
-            except:
-                editor.setValue(self.minimum)
-
-    def setModelData(self, editor, model, index):
-        value = editor.value()
-        model.setData(index, value, Qt.EditRole)
-
-    def updateEditorGeometry(self, editor, option, index):
-        editor.setGeometry(option.rect)
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -6551,6 +6502,22 @@ class MainWindow(QMainWindow):
         view_menu.addAction(self.regions_action)
         
         view_menu.addSeparator()
+
+        # Добавляем подменю "Список ГСК"
+        gsk_menu = view_menu.addMenu("📋 Список ГСК")
+
+        # Подпункты
+        create_gsk_action = QAction("Создать", self)
+        create_gsk_action.triggered.connect(self.create_gsk_list)
+        gsk_menu.addAction(create_gsk_action)
+
+        edit_gsk_action = QAction("Редактировать", self)
+        edit_gsk_action.triggered.connect(self.edit_gsk_list)
+        gsk_menu.addAction(edit_gsk_action)
+
+        view_gsk_action = QAction("Просмотр", self)
+        view_gsk_action.triggered.connect(self.view_gsk_list)
+        gsk_menu.addAction(view_gsk_action)
         
         # Расписание (если есть система)
         schedule_action = QAction("📅 Расписание (PDF)", self)
@@ -7611,6 +7578,7 @@ class MainWindow(QMainWindow):
                     defaults={
                         'city': '',
                         'category': self.new_comp_referee_cat.currentText(),
+                        'position': 'Гл. судья',   # добавляем
                         'signature': None
                     }
                 )
@@ -7623,6 +7591,7 @@ class MainWindow(QMainWindow):
                     defaults={
                         'city': '',
                         'category': self.new_comp_secretary_cat.currentText(),
+                        'position': 'Гл. секретарь',   # добавляем
                         'signature': None
                     }
                 )
@@ -12655,12 +12624,7 @@ class MainWindow(QMainWindow):
         elif stage == "Квалификация. 1-й полуфинал":
             # Вызываем функцию выбора жеребьевки полуфиналов
             result = manual_choice.choice_semifinal_manual(self)
-            
-            # if result:
-            #     QMessageBox.information(self, "Успех", "Жеребьевка полуфиналов успешно завершена!")
-            # else:
-            #     # Если пользователь отменил или произошла ошибка
-            #     pass
+
         if num_id_player is not None:  
             self.save_manual_drawing_for_stage(num_id_player, stage)
 
@@ -13270,6 +13234,10 @@ class MainWindow(QMainWindow):
             import traceback
             traceback.print_exc()
             QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")
+#=========== ГСК==========
+
+ 
+
 
 # === круговые таблицы ====
     def table_made(self, pv, stage):
@@ -23183,6 +23151,368 @@ class MainWindow(QMainWindow):
             k += 1
 
         return table
+#==========класс ГСК ======
+    def create_gsk_list(self):
+        """Создание/редактирование состава ГСК"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+        dialog = GskManagementDialog(self, self.current_title_id)
+        dialog.exec_()
+
+    def edit_gsk_list(self):
+        """Редактирование состава ГСК (то же самое, что и create)"""
+        self.create_gsk_list()
+
+    def view_gsk_list(self):
+        """Просмотр списка ГСК (генерирует PDF)"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+
+        # Собираем данные
+        title = Title.get_by_id(self.current_title_id)
+        members = GskMember.select().where(GskMember.title_id == self.current_title_id)
+
+        gsk_list = []
+        # Главный судья
+        if title.referee:
+            gsk_list.append({
+                'family': self._parse_referee_string(title.referee)['family'],
+                'city': self._parse_referee_string(title.referee)['city'],
+                'category': title.kat_ref or 'ССВК',
+                'position': 'Гл. судья'
+            })
+        # Секретарь
+        if title.secretary:
+            gsk_list.append({
+                'family': self._parse_referee_string(title.secretary)['family'],
+                'city': self._parse_referee_string(title.secretary)['city'],
+                'category': title.kat_sec or 'ССВК',
+                'position': 'Гл. секретарь'
+            })
+        # Остальные
+        for m in members:
+            ref = m.referee_id  
+            gsk_mem = Referee.get_or_none(Referee.id == ref)          
+            gsk_list.append({
+                'family': gsk_mem.family,
+                'city': gsk_mem.city or '',
+                'category': gsk_mem.category,
+                'position': m.position
+            })
+
+        if not gsk_list:
+            QMessageBox.warning(self, "Ошибка", "Нет данных для создания списка ГСК")
+            return
+
+        # Создаём PDF
+        self._export_gsk_pdf(gsk_list)
+
+    def _parse_referee_string(self, ref_str):
+        if not ref_str:
+            return {'family': '', 'city': ''}
+        if '/' in ref_str:
+            parts = ref_str.split('/', 1)
+            return {'family': parts[0].strip(), 'city': parts[1].strip()}
+        return {'family': ref_str.strip(), 'city': ''}
+
+    def _export_gsk_pdf(self, gsk_list):
+        """Генерирует PDF со списком ГСК"""
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib import colors
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle as PS
+        from reportlab.lib.units import cm
+        import os
+
+        title = Title.get_by_id(self.current_title_id)
+        short_name = title.short_name_comp if title.short_name_comp else title.name
+        import re
+        clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
+        clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
+
+        pdf_dir = "table_pdf"
+        if not os.path.exists(pdf_dir):
+            os.makedirs(pdf_dir)
+        filename = os.path.join(pdf_dir, f"{clean_name}_GSK_list.pdf")
+
+        doc = SimpleDocTemplate(filename, pagesize=A4,
+                                topMargin=2*cm, bottomMargin=1.5*cm,
+                                leftMargin=1.5*cm, rightMargin=1.5*cm)
+
+        styles = getSampleStyleSheet()
+        title_style = PS("TitleStyle", fontSize=14, fontName="DejaVuSerif-Bold",
+                        alignment=1, spaceAfter=20, textColor=colors.darkblue)
+
+        elements = []
+        elements.append(Paragraph(f"Соревнование: {title.name}", title_style))
+        elements.append(Paragraph("Список главной судейской коллегии (ГСК)", title_style))
+        
+        elements.append(Spacer(1, 0.5*cm))
+
+        table_data = [["№", "ФИО", "Город", "Категория", "Должность"]]
+        for idx, ref in enumerate(gsk_list, 1):
+            table_data.append([
+                str(idx),
+                ref['family'],
+                ref['city'],
+                ref['category'],
+                ref['position']
+            ])
+
+        table = Table(table_data, colWidths=[1*cm, 5*cm, 3*cm, 2.5*cm, 4*cm], repeatRows=1)
+        table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSerif'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.yellow),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.blue),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ]))
+
+        elements.append(table)
+        doc.build(elements, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
+
+        QMessageBox.information(self, "Успех", f"Список ГСК сохранён в:\n{filename}")
+        if sys.platform == 'win32':
+            os.startfile(filename)
+        else:
+            os.system(f'open "{filename}"')
+
+from models import Referee, GskMember, Title
+
+class GskManagementDialog(QDialog):
+    def __init__(self, parent=None, title_id=None):
+        super().__init__(parent)
+        self.parent = parent
+        self.title_id = title_id
+        self.setWindowTitle("Управление составом ГСК")
+        self.setMinimumSize(700, 500)
+        self.setModal(True)
+
+        self.init_ui()
+        self.load_data()
+
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+
+        # Информация о соревновании
+        self.title_label = QLabel()
+        layout.addWidget(self.title_label)
+
+        # Таблица
+        self.table = QTableWidget()
+        self.table.setColumnCount(4)
+        self.table.setHorizontalHeaderLabels(["№", "ФИО", "Город/Категория", "Должность"])
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        layout.addWidget(self.table)
+
+        # Панель добавления
+        add_widget = QWidget()
+        add_layout = QHBoxLayout(add_widget)
+        add_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.referee_combo = QComboBox()
+        self.referee_combo.addItem("Выберите судью")
+        add_layout.addWidget(QLabel("Добавить:"))
+        add_layout.addWidget(self.referee_combo, 1)
+
+        self.position_combo = QComboBox()
+        self.position_combo.addItems([
+            "Зам. Гл. судьи",
+            "Зам. Гл. секретаря",
+            "Ведущий судья",
+            "Судья",
+            "Технический секретарь"
+        ])
+        add_layout.addWidget(QLabel("Должность:"))
+        add_layout.addWidget(self.position_combo)
+
+        add_btn = QPushButton("➕ Добавить")
+        add_btn.clicked.connect(self.add_member)
+        add_layout.addWidget(add_btn)
+
+        layout.addWidget(add_widget)
+
+        # Кнопки
+        btn_layout = QHBoxLayout()
+        self.save_btn = QPushButton("💾 Сохранить")
+        self.save_btn.setStyleSheet("background-color: #4CAF50; color: white;")
+        self.save_btn.clicked.connect(self.save_changes)
+
+        close_btn = QPushButton("❌ Отмена")
+        close_btn.clicked.connect(self.reject)
+
+        btn_layout.addWidget(self.save_btn)
+        btn_layout.addStretch()
+        btn_layout.addWidget(close_btn)
+        layout.addLayout(btn_layout)
+
+        self.load_referees()
+
+    def load_referees(self):
+        """Загружает список судей в comboBox"""
+        self.referee_combo.blockSignals(True)
+        self.referee_combo.clear()
+        self.referee_combo.addItem("Выберите судью")
+        referees = Referee.select().order_by(Referee.family)
+        for ref in referees:
+            self.referee_combo.addItem(f"{ref.family} ({ref.city or '—'})", ref.id)
+        self.referee_combo.blockSignals(False)
+
+    def load_data(self):
+        """Загружает текущий состав ГСК из Title и gskmember"""
+        title = Title.get_by_id(self.title_id)
+        self.title_label.setText(f"Соревнование: {title.name}")
+
+        # Получаем главного судью и секретаря из Title (для отображения, но не редактирования)
+        self.main_referee = self._parse_referee(title.referee)
+        self.main_secretary = self._parse_referee(title.secretary)
+
+        # Загружаем остальных из gskmember
+        members = GskMember.select().where(GskMember.title_id == self.title_id)
+        self.members_data = []
+        for m in members:
+            ref = m.referee_id
+            gsk_mem = Referee.get_or_none(Referee.id == ref)
+            self.members_data.append({
+                'id': m.id,
+                'ref_id': gsk_mem.id,
+                'family': gsk_mem.family,
+                'city': gsk_mem.city or '',
+                'category': gsk_mem.category,
+                'position': m.position
+            })
+
+        self.refresh_table()
+
+    def _parse_referee(self, ref_str):
+        if not ref_str:
+            return None
+        if '/' in ref_str:
+            parts = ref_str.split('/', 1)
+            return {'family': parts[0].strip(), 'city': parts[1].strip()}
+        return {'family': ref_str.strip(), 'city': ''}
+
+    def refresh_table(self):
+        """Обновляет таблицу"""
+        self.table.setRowCount(0)
+        row = 0
+
+        # Добавляем главного судью (если есть)
+        if self.main_referee:
+            self.table.insertRow(row)
+            self._set_table_row(row, self.main_referee['family'], self.main_referee['city'], "Гл. судья", readonly=True)
+            row += 1
+
+        # Добавляем секретаря (если есть)
+        if self.main_secretary:
+            self.table.insertRow(row)
+            self._set_table_row(row, self.main_secretary['family'], self.main_secretary['city'], "Гл. секретарь", readonly=True)
+            row += 1
+
+        # Добавляем остальных
+        for idx, item in enumerate(self.members_data, start=1):
+            self.table.insertRow(row)
+            self._set_table_row(row, item['family'], f"{item['city']} ({item['category']})", item['position'])
+            # Сохраняем ID записи в UserRole для удаления
+            self.table.item(row, 0).setData(Qt.UserRole, item['id'])
+            row += 1
+
+        # Добавляем кнопку удаления для редактируемых строк (кроме первых двух)
+        for r in range(2, self.table.rowCount()):
+            del_btn = QPushButton("🗑️")
+            del_btn.setStyleSheet("background-color: #f44336; color: white;")
+            del_btn.clicked.connect(lambda checked, row=r: self.delete_member(row))
+            self.table.setCellWidget(r, 3, del_btn)
+
+    def _set_table_row(self, row, family, city_category, position, readonly=False):
+        self.table.setItem(row, 0, QTableWidgetItem(str(row + 1)))
+        self.table.setItem(row, 1, QTableWidgetItem(family))
+        self.table.setItem(row, 2, QTableWidgetItem(city_category))
+        self.table.setItem(row, 3, QTableWidgetItem(position))
+        if readonly:
+            for col in range(4):
+                item = self.table.item(row, col)
+                if item:
+                    item.setBackground(Qt.lightGray)
+                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+
+    def add_member(self):
+        """Добавляет выбранного судью в список"""
+        ref_id = self.referee_combo.currentData()
+        if not ref_id:
+            QMessageBox.warning(self, "Ошибка", "Выберите судью")
+            return
+        position = self.position_combo.currentText()
+        if not position:
+            QMessageBox.warning(self, "Ошибка", "Выберите должность")
+            return
+
+        # Проверяем, не добавлен ли уже этот судья
+        for item in self.members_data:
+            if item['ref_id'] == ref_id:
+                QMessageBox.warning(self, "Ошибка", "Этот судья уже добавлен")
+                return
+        # Также проверяем, не является ли он главным судьёй или секретарём
+        if self.main_referee and self.main_referee['family'] == Referee.get_by_id(ref_id).family:
+            QMessageBox.warning(self, "Ошибка", "Этот судья уже является главным судьёй")
+            return
+        if self.main_secretary and self.main_secretary['family'] == Referee.get_by_id(ref_id).family:
+            QMessageBox.warning(self, "Ошибка", "Этот судья уже является главным секретарём")
+            return
+
+        ref = Referee.get_by_id(ref_id)
+        self.members_data.append({
+            'id': None,  # новый, ещё не сохранён
+            'ref_id': ref_id,
+            'family': ref.family,
+            'city': ref.city or '',
+            'category': ref.category,
+            'position': position
+        })
+        self.refresh_table()
+
+    def delete_member(self, row):
+        """Удаляет члена ГСК из списка (не из БД до сохранения)"""
+        item = self.table.item(row, 0)
+        record_id = item.data(Qt.UserRole) if item else None
+        if record_id:
+            # Удаляем из self.members_data
+            for idx, m in enumerate(self.members_data):
+                if m['id'] == record_id:
+                    del self.members_data[idx]
+                    break
+        else:
+            # Если это ещё не сохранённая запись, удаляем по ref_id
+            family = self.table.item(row, 1).text()
+            for idx, m in enumerate(self.members_data):
+                if m['family'] == family and m['id'] is None:
+                    del self.members_data[idx]
+                    break
+        self.refresh_table()
+
+    def save_changes(self):
+        """Сохраняет состав ГСК в базу данных"""
+        # Удаляем существующие записи для этого соревнования
+        GskMember.delete().where(GskMember.title_id == self.title_id).execute()
+
+        # Сохраняем всех членов (кроме главного судьи и секретаря из Title)
+        for m in self.members_data:
+            GskMember.create(
+                title_id=self.title_id,
+                referee_id=m['ref_id'],
+                position=m['position']
+            )
+
+        QMessageBox.information(self, "Успех", "Состав ГСК сохранён")
+        self.accept()
 
 # =================================
 class RatingLoaderThread(QThread):

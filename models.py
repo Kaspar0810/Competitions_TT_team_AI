@@ -357,6 +357,12 @@ class Choice_double_player(BaseModel):
         db_table = "choice_double_players"
         order_by = "r_sum"
 
+class GskMember(BaseModel):
+    title = ForeignKeyField(Title, backref='gsk_members')
+    referee = ForeignKeyField(Referee, backref='gsk_entries')
+    position = CharField(max_length=50)  # должность: 'Зам. Гл. судьи', 'Зам. Гл. секретаря', 'Ведущий судья', 'Судья', 'Секретарь'
+
+    
 # Функция для подключения к БД
 def connect_db():
     if db.is_closed():

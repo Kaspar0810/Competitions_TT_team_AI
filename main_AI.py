@@ -5783,6 +5783,9 @@ class MainWindow(QMainWindow):
         coach_text = self.coach_edit.text().strip()
         rank_text = self.rank_edit.text().strip()
         
+        # Приводим область к виду обл.
+        region = self.normalize_region(region)
+
         # Форматируем ФИО
         fio_input =f"{fio_input} {patronymic_text}"
         formatted_fio = self.format_fio_for_display(fio_input)
@@ -5952,6 +5955,19 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось добавить участника: {str(e)}")
+
+    def normalize_region(self, region_name):
+        """
+        Заменяет 'область' на 'обл.' и другие типичные сокращения в названии региона.
+        """
+        if not region_name:
+            return region_name
+        # Заменяем 'область' на 'обл.' (с учётом пробелов и регистра)
+        region_name = region_name.replace(' область', ' обл.').replace('область', 'обл.')
+        # Дополнительные сокращения (опционально)
+        region_name = region_name.replace(' автономный округ', ' АО').replace('автономный округ', 'АО')
+        region_name = region_name.replace(' край', ' кр.').replace('край', 'кр.')
+        return region_name
 
     def delete_player_from_table(self):
         """Удаление выбранного участника с записью в таблицу Delete_player"""
@@ -13172,10 +13188,7 @@ class MainWindow(QMainWindow):
             filename = os.path.join(pdf_dir, f"{clean_name}_regions.pdf")
 
             from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-            # from reportlab.lib.pagesizes import A4
-            # from reportlab.lib import colors
-            # from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle as PS
-            # from reportlab.lib.units import cm
+
 
             # Создаём документ
             doc = SimpleDocTemplate(filename, pagesize=A4,
@@ -13204,8 +13217,8 @@ class MainWindow(QMainWindow):
             table.setStyle(TableStyle([
                 ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSerif'),
                 ('FONTSIZE', (0, 0), (-1, -1), 9),
-                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.yellow),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.blue),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
@@ -13234,10 +13247,6 @@ class MainWindow(QMainWindow):
             import traceback
             traceback.print_exc()
             QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")
-#=========== ГСК==========
-
- 
-
 
 # === круговые таблицы ====
     def table_made(self, pv, stage):
@@ -20003,86 +20012,7 @@ class MainWindow(QMainWindow):
             print(f"Ошибка загрузки заметок: {e}")
             if hasattr(self, 'notes_text'):
                 self.notes_text.clear()
-# ========= выяснить
-    # def _get_players_for_stage(self, stage):
-    #     """Получение всех игроков для этапа"""
-    #     players = []
-        
-    #     system = System.get_or_none(
-    #         (System.title_id == self.current_title_id) &
-    #         (System.stage == stage)
-    #     )
-        
-    #     if not system:
-    #         return players
-        
-    #     # Получаем игроков из Game_list
-    #     game_players = Game_list.select().where(
-    #         (Game_list.title_id == self.current_title_id) &
-    #         (Game_list.system_id == system.id)
-    #     ).order_by(Game_list.number_group, Game_list.rank_num_player)
-        
-    #     for gp in game_players:
-    #         player = Player.get_or_none(Player.id == gp.player_group.id)
-    #         if player:
-    #             coach_name = ""
-    #             if player.coach_id:
-    #                 coach = Coach.get_or_none(Coach.id == player.coach_id)
-    #                 if coach:
-    #                     coach_name = coach.coach
-                
-    #             players.append({
-    #                 'name': player.fio if player.fio else player.player,
-    #                 'city': player.city or "",
-    #                 'region': player.region or "",
-    #                 'razryad': player.razryad or "",
-    #                 'coach': coach_name,
-    #                 'group': gp.number_group,
-    #                 'seed': gp.rank_num_player
-    #             })
-        
-    #     return players
-
-    # def _get_players_for_group(self, stage, group_name):
-    #     """Получение игроков для конкретной группы"""
-    #     players = []
-        
-    #     system = System.get_or_none(
-    #         (System.title_id == self.current_title_id) &
-    #         (System.stage == stage)
-    #     )
-        
-    #     if not system:
-    #         return players
-        
-    #     # Получаем игроков из Game_list для указанной группы
-    #     game_players = Game_list.select().where(
-    #         (Game_list.title_id == self.current_title_id) &
-    #         (Game_list.system_id == system.id) &
-    #         (Game_list.number_group == group_name)
-    #     ).order_by(Game_list.rank_num_player)
-        
-    #     for gp in game_players:
-    #         player = Player.get_or_none(Player.id == gp.player_group.id)
-    #         if player:
-    #             coach_name = ""
-    #             if player.coach_id:
-    #                 coach = Coach.get_or_none(Coach.id == player.coach_id)
-    #                 if coach:
-    #                     coach_name = coach.coach
-                
-    #             players.append({
-    #                 'name': player.fio if player.fio else player.player,
-    #                 'city': player.city or "",
-    #                 'region': player.region or "",
-    #                 'razryad': player.razryad or "",
-    #                 'coach': coach_name,
-    #                 'group': gp.number_group,
-    #                 'seed': gp.rank_num_player
-    #             })
-        
-    #     return players
-
+  
 # ================= рабочий урезанный бегунок ======
     def tbl_begunki(self, stage, subgroup, runner_type, tours="несыгранные", list_tours=None):
         """
@@ -23246,7 +23176,6 @@ class MainWindow(QMainWindow):
                         alignment=1, spaceAfter=20, textColor=colors.darkblue)
 
         elements = []
-        elements.append(Paragraph(f"Соревнование: {title.name}", title_style))
         elements.append(Paragraph("Список главной судейской коллегии (ГСК)", title_style))
         
         elements.append(Spacer(1, 0.5*cm))

@@ -16231,24 +16231,26 @@ class MainWindow(QMainWindow):
                                         leftMargin=15*mm, rightMargin=15*mm)
                 
                 styles = getSampleStyleSheet()
-                title_style = ParagraphStyle(
-                    'CustomTitle',
-                    parent=styles['Heading1'],
-                    fontSize=16,
-                    alignment=1,
-                    spaceAfter=20
-                )
+                title_style = PS("TitleStyle", fontSize=12, fontName="DejaVuSerif-Bold",
+                            alignment=1, spaceAfter=20, textColor=colors.darkblue)
+                # title_style = ParagraphStyle(
+                #     'CustomTitle',
+                #     parent=styles['Heading1'],
+                #     fontSize=16,
+                #     alignment=1,
+                #     spaceAfter=20
+                # )
                 
                 elements = []
                 
                 # Заголовок
                 elements.append(Paragraph(f"Расписание соревнований", title_style))
-                elements.append(Paragraph(f"{title.name}", styles['Heading2']))
+                elements.append(Paragraph(f"{title.name}", title_style))
                 elements.append(Spacer(1, 10*mm))
                 
                 # Данные по этапам
                 for idx, stage in enumerate(stages, 1):
-                    elements.append(Paragraph(f"Этап {idx}: {stage['stage']}", styles['Heading3']))
+                    elements.append(Paragraph(f"Этап {idx}: {stage['stage']}", title_style))
                     elements.append(Spacer(1, 5*mm))
                     
                     if len(choices_data) > 0:
@@ -16261,7 +16263,7 @@ class MainWindow(QMainWindow):
                             groups[group_name].append(choice)
                         
                         for group_name, group_choices in groups.items():
-                            elements.append(Paragraph(f"{group_name}", styles['Heading4']))
+                            elements.append(Paragraph(f"{group_name}", title_style))
                             
                             # Таблица участников группы
                             data = [['№', 'ФИО', 'Рейтинг']]
@@ -16274,11 +16276,12 @@ class MainWindow(QMainWindow):
                                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                                 ('GRID', (0, 0), (-1, -1), 1, colors.black),
                                 ('FONTSIZE', (0, 0), (-1, -1), 9),
+                                ('FONTNAME', (0, 0), (-1, -1), "DejaVuSerif")
                             ]))
                             elements.append(table)
                             elements.append(Spacer(1, 5*mm))
                     else:
-                        elements.append(Paragraph("Жеребьевка не проведена", styles['Normal']))
+                        elements.append(Paragraph("Жеребьевка не проведена", title_style))
                     
                     elements.append(Spacer(1, 10*mm))
                 

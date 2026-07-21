@@ -1079,7 +1079,7 @@ class MainWindow(QMainWindow):
             4: 350,  # Система
             5: 200,  # Результаты - маленькая верхняя часть для формы ввода
             6: 150,  # Рейтинг
-            7: 640   # Дополнительно
+            7: 720   # Дополнительно
         }
         
         # Устанавливаем начальную высоту
@@ -2482,21 +2482,21 @@ class MainWindow(QMainWindow):
             main_layout.addStretch()
             
             return tab_widget 
-# =========== последний вариант 
+#=============================== 
     def create_extra_tab(self):
         """Вкладка Дополнительно - печать бегунков, заметки и расписание"""
         tab_widget = QWidget()
-        main_layout = QHBoxLayout(tab_widget)
+        main_layout = QVBoxLayout(tab_widget)
         main_layout.setSpacing(10)
         main_layout.setContentsMargins(10, 10, 10, 10)
 
-        # ---------- ЛЕВАЯ КОЛОНКА (вертикально) ----------
-        left_widget = QWidget()
-        left_layout = QVBoxLayout(left_widget)
-        left_layout.setSpacing(5)
-        left_layout.setContentsMargins(0, 0, 0, 0)
+        # ---- ВЕРХНЯЯ ЧАСТЬ (30%) - горизонтально: бегунки + заметки ----
+        top_widget = QWidget()
+        top_layout = QHBoxLayout(top_widget)
+        top_layout.setSpacing(10)
+        top_layout.setContentsMargins(0, 0, 0, 0)
 
-        # ---- 1. Печать бегунков ----
+        # 1. Печать бегунков
         print_group = QGroupBox("🏃 Печать бегунков")
         print_group.setStyleSheet("""
             QGroupBox {
@@ -2514,7 +2514,7 @@ class MainWindow(QMainWindow):
             }
         """)
         print_layout = QFormLayout(print_group)
-        print_layout.setSpacing(10)
+        print_layout.setSpacing(8)
         print_layout.setContentsMargins(15, 15, 15, 15)
 
         self.runner_type_combo = QComboBox()
@@ -2546,9 +2546,9 @@ class MainWindow(QMainWindow):
         print_btn.clicked.connect(self.print_runners)
         print_layout.addRow("", print_btn)
 
-        left_layout.addWidget(print_group)
+        top_layout.addWidget(print_group, 1)  # stretch 1
 
-        # ---- 2. Заметки ----
+        # 2. Заметки
         notes_group = QGroupBox("📝 Заметки")
         notes_group.setStyleSheet("""
             QGroupBox {
@@ -2565,7 +2565,6 @@ class MainWindow(QMainWindow):
                 padding: 0 8px 0 8px;
             }
         """)
-        # Разрешаем группе растягиваться по вертикали
         notes_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         notes_layout = QVBoxLayout(notes_group)
         notes_layout.setContentsMargins(10, 15, 10, 10)
@@ -2598,11 +2597,11 @@ class MainWindow(QMainWindow):
         save_notes_btn.clicked.connect(self.save_notes)
         notes_layout.addWidget(save_notes_btn)
 
-        left_layout.addWidget(notes_group)
+        top_layout.addWidget(notes_group, 1)  # stretch 1
 
-        main_layout.addStretch()
-#========================
-        # ---------- ПРАВАЯ КОЛОНКА (расписание) ----------
+        main_layout.addWidget(top_widget, 2)  # stretch 3 (30%)
+
+        # ---- НИЖНЯЯ ЧАСТЬ (70%) - расписание ----
         schedule_group = QGroupBox("📅 Расписание (олимпийская система)")
         schedule_group.setStyleSheet("""
             QGroupBox {
@@ -2623,19 +2622,17 @@ class MainWindow(QMainWindow):
         schedule_layout.setSpacing(5)
         schedule_layout.setContentsMargins(5, 10, 5, 5)
 
-        # ---- Верхняя панель управления (горизонтальная) ----
+        # Панель управления (горизонтальная)
         control_panel = QWidget()
         control_layout = QHBoxLayout(control_panel)
         control_layout.setSpacing(8)
         control_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Этап
         control_layout.addWidget(QLabel("Этап:"))
         self.schedule_stage_combo = QComboBox()
         self.schedule_stage_combo.currentIndexChanged.connect(self.on_schedule_stage_changed)
         control_layout.addWidget(self.schedule_stage_combo, 1)
 
-        # Дата
         control_layout.addWidget(QLabel("Дата:"))
         self.schedule_date_combo = QComboBox()
         self.schedule_date_combo.setEditable(True)
@@ -2643,7 +2640,6 @@ class MainWindow(QMainWindow):
         self.schedule_date_combo.setMinimumWidth(100)
         control_layout.addWidget(self.schedule_date_combo)
 
-        # Время
         control_layout.addWidget(QLabel("Время:"))
         self.schedule_time_combo = QComboBox()
         self.schedule_time_combo.setEditable(True)
@@ -2651,32 +2647,30 @@ class MainWindow(QMainWindow):
         self.populate_time_combo()
         control_layout.addWidget(self.schedule_time_combo)
 
-        # Кнопки
-        self.apply_selected_btn = QPushButton("📌 Применить\n к выбранным")
+        self.apply_selected_btn = QPushButton("📌 Применить к выбранным")
         self.apply_selected_btn.clicked.connect(self.apply_schedule_to_selected)
         control_layout.addWidget(self.apply_selected_btn)
 
-        self.apply_range_btn = QPushButton("📌 Применить\n к диапазону")
+        self.apply_range_btn = QPushButton("📌 Применить к диапазону")
         self.apply_range_btn.clicked.connect(self.apply_schedule_to_range)
         control_layout.addWidget(self.apply_range_btn)
 
-        self.assign_tables_btn = QPushButton("🔄 Назначить\n столы по порядку")
+        self.assign_tables_btn = QPushButton("🔄 Назначить столы по порядку")
         self.assign_tables_btn.clicked.connect(self.assign_tables_sequentially)
         control_layout.addWidget(self.assign_tables_btn)
 
-        self.clear_schedule_btn = QPushButton("🗑️ Очистить\n выбранные")
+        self.clear_schedule_btn = QPushButton("🗑️ Очистить выбранные")
         self.clear_schedule_btn.clicked.connect(self.clear_schedule_for_selected)
         control_layout.addWidget(self.clear_schedule_btn)
 
         schedule_layout.addWidget(control_panel)
 
-        # Таблица матчей (растягивается)
+        # Таблица расписания (растягивается)
         self.schedule_table = QTableWidget()
         self.schedule_table.setColumnCount(7)
         self.schedule_table.setHorizontalHeaderLabels(
             ["№ вст.", "Игрок 1", "Игрок 2", "Дата", "Время", "Стол", "Стадия"]
         )
-        # Настройка ширины столбцов
         self.schedule_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.schedule_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         self.schedule_table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeToContents)
@@ -2693,24 +2687,18 @@ class MainWindow(QMainWindow):
                 padding: 2px;
             }
             QHeaderView::section {
-            background-color: #2196F3;
-            color: white;
-            padding: 4px;
-            font-weight: bold;
-            font-size: 10px;
+                background-color: #2196F3;
+                color: white;
+                padding: 4px;
+                font-weight: bold;
+                font-size: 10px;
                 border: none;
             }
-            """)
+        """)
         self.schedule_table.itemChanged.connect(self.on_schedule_table_item_changed)
-        # Убираем делегат – пользователь вводит номер стола с клавиатуры
-        schedule_layout.addWidget(self.schedule_table, 1)  # stretch = 1, чтобы таблица занимала всё оставшееся место
+        schedule_layout.addWidget(self.schedule_table, 1)  # растягивается
 
-        # Добавляем правую часть в основной layout с бóльшим весом
-        main_layout.addWidget(schedule_group, 3)
-#===============================================================
-        # Добавляем правую часть с бóльшим весом
-        main_layout.addWidget(left_widget, 1)
-        main_layout.addWidget(schedule_group, 3)
+        main_layout.addWidget(schedule_group, 8)  # stretch 7 (70%)
 
         # Загружаем этапы для комбобоксов
         self.update_runner_stages()
@@ -4800,11 +4788,19 @@ class MainWindow(QMainWindow):
         # ОБНОВЛЯЕМ ЛЕВУЮ ПАНЕЛЬ
         self.update_left_panel_for_tab(index)
 
+        self.table_header.setVisible(True)
+        self.table_container.setVisible(True)
+
         # Управление видимостью секции создания этапа
-        if hasattr(self, 'stage_section'):
-            # Показываем секцию создания этапа только на вкладке "Система" (индекс 4)
+        if hasattr(self, 'stage_section'):         
+        # Показываем секцию создания этапа только на вкладке "Система" (индекс 4)
             self.stage_section.setVisible(index == 4)
-            
+
+        if index != 7:
+            self.table_container.setVisible(True)
+        else:
+            self.table_container.setVisible(False) 
+
         # Переключаем таблицу в зависимости от вкладки
         if index == 1:  # Участники
             # Скрываем секцию создания этапа
@@ -5036,7 +5032,15 @@ class MainWindow(QMainWindow):
                 # Загружаем матчи, если этап уже выбран
                 if self.schedule_stage_combo.count() > 0:
                     self.on_schedule_stage_changed()
-
+                #===================
+                self.table_header.setVisible(False)    # скрываем заголовок
+                self.table_container.setVisible(False) # скрываем контейнер с таблицей
+                self.filters_widget.setVisible(False)
+                self.stage_section.setVisible(False)
+                if hasattr(self, 'seeding_info_label'):
+                    self.seeding_info_label.hide()
+                self.right_panel.setVisible(False)
+                #===================
             # Очищаем таблицу
             self.players_model.setData([])
             

@@ -3244,6 +3244,19 @@ class MainWindow(QMainWindow):
         line.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
         self.dynamic_filters_layout.addWidget(line)
 
+         # ---- Кнопка печати расписания ----
+        print_schedule_btn = QPushButton("🖨️ Печать расписания групп")
+        print_schedule_btn.setMinimumHeight(35)
+        print_schedule_btn.setStyleSheet(self.get_button_style())
+        print_schedule_btn.clicked.connect(self.print_schedule_pdf)
+        self.dynamic_filters_layout.addWidget(print_schedule_btn)
+
+        # Разделитель
+        line = QFrame()
+        line.setFrameShape(QFrame.HLine)
+        line.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
+        self.dynamic_filters_layout.addWidget(line)
+
         # ---- Кнопки действий ----
         actions_title = QLabel("📋 Действия")
         actions_title.setStyleSheet("font-weight: bold; font-size: 12px; margin-top: 5px;")
@@ -4138,6 +4151,156 @@ class MainWindow(QMainWindow):
                 self.score_edits_p1[i].setEnabled(False)
                 self.score_edits_p2[i].setEnabled(False)
 
+    def print_schedule_pdf(self):
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        # from reportlab.lib.pagesizes import A4
+        # from reportlab.lib import colors
+        # from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle as PS
+        # from reportlab.lib.units import cm
+        # import os
+
+        """Создание PDF-файла с расписанием матчей, сгруппированных по группам"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+
+        if self.schedule_table.rowCount() == 0:
+            QMessageBox.warning(self, "Ошибка", "Нет данных для печати расписания")
+            return
+
+        try:
+            from reportlab.platypus import Table, KeepTogether
+
+            # Создаём папку для PDF
+            pdf_dir = "table_pdf"
+            if not os.path.exists(pdf_dir):
+                os.makedirs(pdf_dir)
+
+            # Имя файла
+            title = Title.get_by_id(self.current_title_id)
+            short_name = title.short_name_comp if title.short_name_comp else title.name
+            import re
+            clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
+            clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
+
+            stage_name = self.schedule_stage_combo.currentText()
+            filename = os.path.join(pdf_dir, f"{clean_name}_{stage_name}_schedule.pdf")
+            name_schedule = f"{clean_name}_{stage_name}_schedule.pdf"
+            # Собираем данные из таблицы
+            rows_data = []
+            for row in range(self.schedule_table.rowCount()):
+                # Пропускаем скрытые строки (если фильтры применены)
+                if self.schedule_table.isRowHidden(row):
+                    continue
+                # Извлекаем данные
+                tour = self.schedule_table.item(row, 0).text()       # № встречи
+                group = self.schedule_table.item(row, 1).text()      # Группа/Финал
+                player1 = self.schedule_table.item(row, 2).text()    # Игрок 1
+                player2 = self.schedule_table.item(row, 3).text()    # Игрок 2
+                date = self.schedule_table.item(row, 4).text()       # Дата
+                time = self.schedule_table.item(row, 5).text()       # Время
+                table_num = self.schedule_table.item(row, 6).text()  # Стол
+                match = self.schedule_table.item(row, 7).text()      # Встреча (например, 1-2)
+
+
+                if not group:
+                    group = stage_name  # если группа не указана, используем название этапа
+
+                rows_data.append({
+                    'group': group,
+                    'tour': tour,
+                    'match': match,
+                    'date': date,
+                    'time': time,
+                    'table': table_num,
+                    'player1': player1,
+                    'player2': player2
+                })
+
+            if not rows_data:
+                QMessageBox.warning(self, "Ошибка", "Нет данных для печати (возможно, все строки скрыты фильтрами)")
+                return
+
+            # Группируем по полю 'group'
+            groups = {}
+            for item in rows_data:
+                grp = item['group']
+                if grp not in groups:
+                    groups[grp] = []
+                groups[grp].append(item)
+
+            # Создаём документ (альбомная ориентация для широкой таблицы)
+            doc = SimpleDocTemplate(filename, pagesize=landscape(A4),
+                                    topMargin=2.0*cm, bottomMargin=2.0*cm,
+                                    leftMargin=1.5*cm, rightMargin=1.5*cm)
+
+            styles = getSampleStyleSheet()
+            title_style = PS("TitleStyle", fontSize=14, fontName="DejaVuSerif-Bold",
+                            alignment=1, spaceAfter=20, textColor=colors.darkblue)
+            group_style = PS("GroupStyle", fontSize=12, fontName="DejaVuSerif-Bold",
+                            alignment=0, spaceAfter=12, textColor=colors.green)
+
+            elements = []
+
+            # Общий заголовок
+            elements.append(Paragraph(f"Расписание матчей", title_style))
+            # Для каждой группы создаём отдельную страницу (или раздел)
+            for group_name, matches in groups.items():
+                elements.append(Paragraph(f"{group_name}", group_style))
+                # Заголовок таблицы
+                table_data = [["№", "Встреча", "Дата", "Время", "Стол", "1-й игрок", "2-й игрок"]]
+                for idx, m in enumerate(matches, 1):
+                    table_data.append([
+                        str(idx),
+                        m['tour'],
+                        m['date'],
+                        m['time'],
+                        m['table'],
+                        m['player1'],
+                        m['player2']
+                    ])
+
+                # Ширины колонок (в см)
+
+                col_widths = [1.0*cm, 2.0*cm, 2.5*cm, 2.0*cm, 1.5*cm, 9.0*cm, 9.0*cm]
+                rH = 0.45*cm
+
+                table = Table(table_data, colWidths=col_widths, rowHeights=[rH] * len(table_data), repeatRows=1)
+
+                table.setStyle(TableStyle([
+                    ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSerif'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 8),
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                    ('TOPPADDING', (0, 0), (-1, -1), 4),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                ]))
+
+                elements.append(table)
+
+            # doc = SimpleDocTemplate(name_schedule, pagesize=A4, rightMargin=1*cm, leftMargin=1*cm, topMargin=4*cm, bottomMargin=2*cm)
+            # Строим документ с функцией заголовка
+            doc.build(elements, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
+
+            QMessageBox.information(self, "Успех", f"Расписание сохранено в PDF:\n{filename}")
+
+            # Предлагаем открыть файл
+            reply = QMessageBox.question(self, "Открыть файл",
+                                        "Открыть созданный PDF файл?",
+                                        QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                if sys.platform == 'win32':
+                    os.startfile(filename)
+                else:
+                    os.system(f'open "{filename}"')
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")
 # ============================ новая обновление статусной строки ==
     def load_results_table_for_stage(self, stage_name):
         """Загрузка таблицы результатов для выбранного этапа с фильтрацией"""

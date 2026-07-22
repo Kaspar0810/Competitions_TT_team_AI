@@ -4025,6 +4025,9 @@ class MainWindow(QMainWindow):
             match.loser = loser_name
             match.points_loser = points_loser
             match.score_loser = score_loser_game
+            match.schedule_date = None
+            match.schedule_time = None
+            match.schedule_table = ""
             match.save()
             
             # Обновляем сетку (для олимпийской системы)
@@ -4036,6 +4039,7 @@ class MainWindow(QMainWindow):
                         # Победитель
                         res_id_win = Result.select().where(
                             (Result.title_id == self.current_title_id) & 
+                            (Result.system_id == system.id) &
                             (Result.tours == snoska[0])
                         ).get()
                         if res_id_win.player1 == "" or res_id_win.player1 is None:
@@ -4047,7 +4051,8 @@ class MainWindow(QMainWindow):
                         # Проигравший (если есть куда сносить)
                         if snoska[1] != 0:
                             res_id_lose = Result.select().where(
-                                (Result.title_id == self.current_title_id) & 
+                                (Result.title_id == self.current_title_id) &
+                                (Result.system_id == system.id) & 
                                 (Result.tours == snoska[1])
                             ).get()
                             if res_id_lose.player1 == "" or res_id_lose.player1 is None:
@@ -4077,10 +4082,12 @@ class MainWindow(QMainWindow):
             if current_stage in ["Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]:
                 total_matches = Result.select().where(
                     (Result.title_id == self.current_title_id) &
+                    (Result.system_id == system.id) &
                     (Result.system_stage == current_stage)
                 ).count()
                 played_matches = Result.select().where(
                     (Result.title_id == self.current_title_id) &
+                    (Result.system_id == system.id) &
                     (Result.system_stage == current_stage) &
                     (Result.winner.is_null(False))
                 ).count()
@@ -4089,10 +4096,12 @@ class MainWindow(QMainWindow):
             else:
                 total_matches = Result.select().where(
                     (Result.title_id == self.current_title_id) &
+                    (Result.system_id == system.id) &
                     (Result.number_group == current_stage)
                 ).count()
                 played_matches = Result.select().where(
                     (Result.title_id == self.current_title_id) &
+                    (Result.system_id == system.id) &
                     (Result.number_group == current_stage) &
                     (Result.winner.is_null(False))
                 ).count() 
@@ -16225,18 +16234,18 @@ class MainWindow(QMainWindow):
         return style_color   
 
     
-        def vid_double_game(self):
-            """Определяет кто играет в парных играх"""
-            double_vid = self.tableView.model().index(0, 2).data() # данные ячейки tableView
+    def vid_double_game(self):
+        """Определяет кто играет в парных играх"""
+        double_vid = self.tableView.model().index(0, 2).data() # данные ячейки tableView
 
-            if double_vid == "мужские пары":
-                vid = "man"
-            elif double_vid == "женские пары":
-                vid = "woman"
-            elif double_vid == "смешанные пары":
-                vid = "mix"    
+        if double_vid == "мужские пары":
+            vid = "man"
+        elif double_vid == "женские пары":
+            vid = "woman"
+        elif double_vid == "смешанные пары":
+            vid = "mix"    
 
-            return vid
+        return vid
 
     def full_net_player(self, player_in_final):
         """максимальное количество игроков в сетке при не полном составе"""

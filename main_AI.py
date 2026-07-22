@@ -2965,7 +2965,8 @@ class MainWindow(QMainWindow):
                     pass  
 #
     def on_schedule_table_item_changed(self, item):
-        if item.column() != 5:  # только столбец "Стол"
+        # if item.column() != 5:  # только столбец "Стол"
+        if item.column() != 6:  # только столбец "Стол"
             return
         row = item.row()
         tour = self.schedule_table.item(row, 0).text()
@@ -3424,12 +3425,14 @@ class MainWindow(QMainWindow):
         saved_rows = []
         for row in rows:
             tour = self.schedule_table.item(row, 0).text()
+            group = self.schedule_table.item(row, 1).text()
             table = self.schedule_table.item(row, 6).text()
             if not tour:
                 continue
             result = Result.get_or_none(
                 (Result.title_id == self.current_title_id) &
                 (Result.system_id == system.id) &
+                (Result.number_group == group) &
                 (Result.tours == tour)
             )
             if result:

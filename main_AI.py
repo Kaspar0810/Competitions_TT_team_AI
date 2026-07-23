@@ -5,8 +5,8 @@ import platform
 
 # from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QTabWidget, QTableView, QMenuBar, QAction, QLabel,
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QDialogButtonBox,
+    QPushButton, QTabWidget, QTableView, QMenuBar, QAction, QLabel, QCheckBox,
     QFrame, QSizePolicy, QMessageBox, QListWidget, QListWidgetItem,
     QLineEdit, QDateEdit, QComboBox, QGroupBox, QFormLayout, QStyledItemDelegate,
     QScrollArea, QSplitter, QInputDialog, QHeaderView, QAbstractItemView,
@@ -2654,9 +2654,13 @@ class MainWindow(QMainWindow):
         self.apply_range_btn.clicked.connect(self.apply_schedule_to_range)
         control_layout.addWidget(self.apply_range_btn)
 
-        self.assign_tables_btn = QPushButton("🔄 Назначить столы по порядку")
-        self.assign_tables_btn.clicked.connect(self.assign_tables_sequentially)
-        control_layout.addWidget(self.assign_tables_btn)
+        # self.assign_tables_btn = QPushButton("🔄 Назначить столы по порядку")
+        # self.assign_tables_btn.clicked.connect(self.assign_tables_sequentially)
+        # control_layout.addWidget(self.assign_tables_btn)
+
+        self.assign_tables_btn = QPushButton("📋 Назначить столы")
+        self.assign_tables_btn.clicked.connect(self.assign_tables_dialog) 
+        control_layout.addWidget(self.assign_tables_btn)  
 
         self.clear_schedule_btn = QPushButton("🗑️ Очистить выбранные")
         self.clear_schedule_btn.clicked.connect(self.clear_schedule_for_selected)
@@ -4162,12 +4166,7 @@ class MainWindow(QMainWindow):
 
     def print_schedule_pdf(self):
         from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-        # from reportlab.lib.pagesizes import A4
-        # from reportlab.lib import colors
-        # from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle as PS
-        # from reportlab.lib.units import cm
-        # import os
-
+     
         """Создание PDF-файла с расписанием матчей, сгруппированных по группам"""
         if not self.current_title_id:
             QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
@@ -4310,6 +4309,272 @@ class MainWindow(QMainWindow):
             import traceback
             traceback.print_exc()
             QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")
+
+    # def _assign_tables_dialog():
+    #     """Расширенный диалог выбора номера столов"""
+    #     time_str = my_win.timeEdit_schedule.text()
+    #     date_str = format_date_schedule()
+    #     count_table = int(my_win.lineEdit_all_table.text())
+    #     # Создаем кастомный диалог
+    #     dialog = QtWidgets.QDialog(my_win)
+    #     dialog.setWindowTitle("Номера столов")
+    #     dialog.setModal(True)
+    #     dialog.setMinimumWidth(400)
+        
+    #     layout = QtWidgets.QVBoxLayout(dialog)
+        
+    #     # Поле ввода
+    #     label = QtWidgets.QLabel("Введите номера столов для встреч:")
+    #     layout.addWidget(label)
+        
+    #     line_edit = QtWidgets.QLineEdit()
+    #     line_edit.setPlaceholderText("Пример: 1,3,5 или 1-5 или 1,3,5-7")
+    #     layout.addWidget(line_edit)
+        
+    #     # Информация о количестве строк
+    #     from PyQt5.QtCore import QModelIndex
+    #     model = my_win.tableView_schedule.model()
+    #     if model:
+    #         row_count = model.rowCount(QModelIndex())  # Важно: передаем пустой индекс
+    #         info_label = QtWidgets.QLabel(f"Всего строк в таблице: {row_count}")
+    #         info_label.setStyleSheet("color: gray;")
+    #         layout.addWidget(info_label)
+        
+    #     # Опции выбора
+    #     options_group = QtWidgets.QGroupBox("Опции")
+    #     options_layout = QtWidgets.QVBoxLayout()
+        
+    #     clear_current = QtWidgets.QCheckBox("Очистить текущее выделение")
+    #     clear_current.setChecked(True)
+    #     options_layout.addWidget(clear_current)
+        
+    #     scroll_to_selection = QtWidgets.QCheckBox("Прокрутить к выделению")
+    #     scroll_to_selection.setChecked(True)
+    #     options_layout.addWidget(scroll_to_selection)
+        
+    #     options_group.setLayout(options_layout)
+    #     layout.addWidget(options_group)
+        
+    #     # Кнопки
+    #     buttons = QtWidgets.QDialogButtonBox(
+    #         QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
+    #     )
+    #     buttons.accepted.connect(dialog.accept)
+    #     buttons.rejected.connect(dialog.reject)
+    #     layout.addWidget(buttons)
+        
+    #     # Показываем диалог
+    #     if dialog.exec_() == QtWidgets.QDialog.Accepted:
+    #         text = line_edit.text()
+    #         if not text:
+    #             return
+                
+    #         try:
+    #             k = 0
+    #             rows_to_select = []
+    #             # Парсинг ввода
+    #             parts = text.replace(' ', '').split(',')
+    #             for part in parts:
+    #                 if '-' in part:
+    #                     start, end = map(int, part.split('-'))
+    #                     if start < end:
+    #                         for n in range(start, end + 1):
+    #                             rows_to_select.append(n)
+    #                     else:
+    #                         for n in range(start, end - 1, -1):
+    #                             rows_to_select.append(n)
+    #                 else:
+    #                     rows_to_select.append(int(part))
+
+    #             indices = my_win.tableView_schedule.selectionModel().selectedRows()            
+    #             for index in sorted(indices):
+    #                 rows = index.row()
+    #                 id_vst = my_win.tableView_schedule.model().index(rows, 0).data() # данные ячейки tableView
+    #                 table_num = rows_to_select[k]
+    #                 app = Result.update(schedule_date=date_str, schedule_time=time_str, schedule_table=table_num).where(Result.id == id_vst)                
+    #                 app.execute()
+    #                 k += 1
+
+    #             # Выделение строк
+    #             selection_model = my_win.tableView_schedule.selectionModel()
+                
+    #             if clear_current.isChecked():
+    #                 selection_model.clearSelection()
+                
+    #             if model is None:
+    #                 QtWidgets.QMessageBox.warning(
+    #                     my_win, "Предупреждение", "Модель данных не найдена"
+    #                 )
+    #                 return
+                
+    #             from PyQt5.QtCore import QModelIndex, QItemSelectionModel
+    #             row_count = model.rowCount(QModelIndex())
+                
+    #             if row_count == 0:
+    #                 QtWidgets.QMessageBox.warning(
+    #                     my_win, "Предупреждение", "Таблица пуста"
+    #                 )
+    #                 return
+                
+    #             selected_count = 0
+    #             first_selected = None
+                
+    #             for row in sorted(rows_to_select):
+    #                 # Проверяем границы (индексация с 1 для пользователя)
+    #                 if 1 <= row <= row_count:
+    #                     index = model.index(row - 1, 0, QModelIndex())
+    #                     selection_model.select(
+    #                         index, 
+    #                         QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows
+    #                     )
+    #                     selected_count += 1
+    #                     if first_selected is None:
+    #                         first_selected = row - 1
+    #                 else:
+    #                     QtWidgets.QMessageBox.warning(
+    #                         my_win, 
+    #                         "Предупреждение", 
+    #                         f"Строка {row} не существует (всего строк: {row_count})"
+    #                     )
+                
+    #             # Прокрутка к первому выбранному
+    #             if scroll_to_selection.isChecked() and first_selected is not None:
+    #                 my_win.tableView_schedule.scrollTo(
+    #                     model.index(first_selected, 0, QModelIndex())
+    #                 )
+                
+    #             # Результат
+    #             if selected_count > count_table:
+    #                 QtWidgets.QMessageBox.information(
+    #                     my_win, "Ошибка", f"Число столов меньше,выделеных строк: {selected_count}"
+    #                 )
+                
+    #         except ValueError:
+    #             QtWidgets.QMessageBox.critical(
+    #                 my_win, 
+    #                 "Ошибка", 
+    #                 "Некорректный формат ввода.\nИспользуйте числа, запятые и дефисы."
+    #             )
+
+    def assign_tables_dialog(self):
+        """Диалог для ввода номеров столов и назначения их выбранным строкам"""
+
+        # Проверяем, что есть выбранные строки
+        selected_rows = set()
+        for item in self.schedule_table.selectedItems():
+            selected_rows.add(item.row())
+        if not selected_rows:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите строки для назначения столов")
+            return
+
+        # Создаём диалог
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Назначение номеров столов")
+        dialog.setModal(True)
+        dialog.setMinimumWidth(400)
+
+        layout = QVBoxLayout(dialog)
+
+        label = QLabel("Введите номера столов для выбранных встреч:")
+        layout.addWidget(label)
+
+        line_edit = QLineEdit()
+        line_edit.setPlaceholderText("Пример: 1,3,5 или 1-5 или 1,3,5-7")
+        layout.addWidget(line_edit)
+
+        # Информация о количестве выбранных строк
+        info_label = QLabel(f"Выбрано строк: {len(selected_rows)}")
+        info_label.setStyleSheet("color: gray;")
+        layout.addWidget(info_label)
+
+        # Опции
+        options_group = QGroupBox("Опции")
+        options_layout = QVBoxLayout()
+        clear_current = QCheckBox("Очистить текущее выделение")
+        clear_current.setChecked(True)
+        options_layout.addWidget(clear_current)
+        scroll_to_selection = QCheckBox("Прокрутить к выделению")
+        scroll_to_selection.setChecked(True)
+        options_layout.addWidget(scroll_to_selection)
+        options_group.setLayout(options_layout)
+        layout.addWidget(options_group)
+
+        # Кнопки
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+
+        if dialog.exec_() != QDialog.Accepted:
+            return
+
+        text = line_edit.text().strip()
+        if not text:
+            QMessageBox.warning(self, "Ошибка", "Введите номера столов")
+            return
+
+        # Парсим ввод
+        table_numbers = []
+        try:
+            parts = text.replace(' ', '').split(',')
+            for part in parts:
+                if '-' in part:
+                    start, end = map(int, part.split('-'))
+                    if start < end:
+                        table_numbers.extend(range(start, end + 1))
+                    else:
+                        table_numbers.extend(range(start, end - 1, -1))
+                else:
+                    table_numbers.append(int(part))
+        except ValueError:
+            QMessageBox.critical(self, "Ошибка", "Некорректный формат ввода.\nИспользуйте числа, запятые и дефисы.")
+            return
+
+        if not table_numbers:
+            return
+
+        # Применяем номера столов к выбранным строкам (по порядку, циклически)
+        sorted_rows = sorted(selected_rows)
+        if len(table_numbers) < len(sorted_rows):
+            # Если номеров меньше, чем строк, повторяем циклически
+            table_numbers = table_numbers * (len(sorted_rows) // len(table_numbers) + 1)
+        table_numbers = table_numbers[:len(sorted_rows)]
+
+        stage_name = self.schedule_stage_combo.currentText()
+        system = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == stage_name)
+        )
+        if not system:
+            QMessageBox.warning(self, "Ошибка", "Система не найдена")
+            return
+
+        # Обновляем каждую строку
+        for row_idx, table_num in zip(sorted_rows, table_numbers):
+            tour = self.schedule_table.item(row_idx, 0).text()
+            if not tour:
+                continue
+            result = Result.get_or_none(
+                (Result.title_id == self.current_title_id) &
+                (Result.system_id == system.id) &
+                (Result.tours == tour)
+            )
+            if result:
+                result.schedule_table = table_num
+                result.save()
+
+        # Обновляем таблицу
+        self.load_schedule_matches(stage_name)
+
+        # Очищаем выделение, если нужно
+        if clear_current.isChecked():
+            self.schedule_table.clearSelection()
+
+        # Прокручиваем к первому выбранному (если нужно)
+        if scroll_to_selection.isChecked() and sorted_rows:
+            self.schedule_table.scrollToItem(self.schedule_table.item(sorted_rows[0], 0))
+
+        QMessageBox.information(self, "Успех", f"Назначено {len(sorted_rows)} столов")             
 # ============================ новая обновление статусной строки ==
     def load_results_table_for_stage(self, stage_name):
         """Загрузка таблицы результатов для выбранного этапа с фильтрацией"""
@@ -4356,7 +4621,7 @@ class MainWindow(QMainWindow):
             
             # Сортировка
             query = query.order_by(Result.number_group, Result.round)
-# ===================
+
             # Получаем все записи
             results = list(query)
 
@@ -16461,14 +16726,7 @@ class MainWindow(QMainWindow):
                 styles = getSampleStyleSheet()
                 title_style = PS("TitleStyle", fontSize=12, fontName="DejaVuSerif-Bold",
                             alignment=1, spaceAfter=20, textColor=colors.darkblue)
-                # title_style = ParagraphStyle(
-                #     'CustomTitle',
-                #     parent=styles['Heading1'],
-                #     fontSize=16,
-                #     alignment=1,
-                #     spaceAfter=20
-                # )
-                
+                 
                 elements = []
                 
                 # Заголовок
@@ -16529,7 +16787,10 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 import traceback
                 traceback.print_exc()
-                QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")   
+                QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")  
+
+
+                
 # ========== проба поиска ячеек для результатов ====
     def find_match_numbers_and_cells_in_results_db(self, match_num, fin):
             """ищет cтроку в таблице -Result- по номеру встречи"""

@@ -3,7 +3,6 @@ import sys
 import os
 import platform
 
-# from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QDialogButtonBox,
     QPushButton, QTabWidget, QTableView, QMenuBar, QAction, QLabel, QCheckBox,
@@ -53,7 +52,7 @@ import random
 import BackupManagementDialog
 import edit_stage
 
-import pymysql
+# import pymysql
 import subprocess
 import openpyxl as op
 
@@ -2654,10 +2653,6 @@ class MainWindow(QMainWindow):
         self.apply_range_btn.clicked.connect(self.apply_schedule_to_range)
         control_layout.addWidget(self.apply_range_btn)
 
-        # self.assign_tables_btn = QPushButton("🔄 Назначить столы по порядку")
-        # self.assign_tables_btn.clicked.connect(self.assign_tables_sequentially)
-        # control_layout.addWidget(self.assign_tables_btn)
-
         self.assign_tables_btn = QPushButton("📋 Назначить столы")
         self.assign_tables_btn.clicked.connect(self.assign_tables_dialog) 
         control_layout.addWidget(self.assign_tables_btn)  
@@ -4289,7 +4284,6 @@ class MainWindow(QMainWindow):
 
                 elements.append(table)
 
-            # doc = SimpleDocTemplate(name_schedule, pagesize=A4, rightMargin=1*cm, leftMargin=1*cm, topMargin=4*cm, bottomMargin=2*cm)
             # Строим документ с функцией заголовка
             doc.build(elements, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
 
@@ -4309,152 +4303,6 @@ class MainWindow(QMainWindow):
             import traceback
             traceback.print_exc()
             QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")
-
-    # def _assign_tables_dialog():
-    #     """Расширенный диалог выбора номера столов"""
-    #     time_str = my_win.timeEdit_schedule.text()
-    #     date_str = format_date_schedule()
-    #     count_table = int(my_win.lineEdit_all_table.text())
-    #     # Создаем кастомный диалог
-    #     dialog = QtWidgets.QDialog(my_win)
-    #     dialog.setWindowTitle("Номера столов")
-    #     dialog.setModal(True)
-    #     dialog.setMinimumWidth(400)
-        
-    #     layout = QtWidgets.QVBoxLayout(dialog)
-        
-    #     # Поле ввода
-    #     label = QtWidgets.QLabel("Введите номера столов для встреч:")
-    #     layout.addWidget(label)
-        
-    #     line_edit = QtWidgets.QLineEdit()
-    #     line_edit.setPlaceholderText("Пример: 1,3,5 или 1-5 или 1,3,5-7")
-    #     layout.addWidget(line_edit)
-        
-    #     # Информация о количестве строк
-    #     from PyQt5.QtCore import QModelIndex
-    #     model = my_win.tableView_schedule.model()
-    #     if model:
-    #         row_count = model.rowCount(QModelIndex())  # Важно: передаем пустой индекс
-    #         info_label = QtWidgets.QLabel(f"Всего строк в таблице: {row_count}")
-    #         info_label.setStyleSheet("color: gray;")
-    #         layout.addWidget(info_label)
-        
-    #     # Опции выбора
-    #     options_group = QtWidgets.QGroupBox("Опции")
-    #     options_layout = QtWidgets.QVBoxLayout()
-        
-    #     clear_current = QtWidgets.QCheckBox("Очистить текущее выделение")
-    #     clear_current.setChecked(True)
-    #     options_layout.addWidget(clear_current)
-        
-    #     scroll_to_selection = QtWidgets.QCheckBox("Прокрутить к выделению")
-    #     scroll_to_selection.setChecked(True)
-    #     options_layout.addWidget(scroll_to_selection)
-        
-    #     options_group.setLayout(options_layout)
-    #     layout.addWidget(options_group)
-        
-    #     # Кнопки
-    #     buttons = QtWidgets.QDialogButtonBox(
-    #         QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
-    #     )
-    #     buttons.accepted.connect(dialog.accept)
-    #     buttons.rejected.connect(dialog.reject)
-    #     layout.addWidget(buttons)
-        
-    #     # Показываем диалог
-    #     if dialog.exec_() == QtWidgets.QDialog.Accepted:
-    #         text = line_edit.text()
-    #         if not text:
-    #             return
-                
-    #         try:
-    #             k = 0
-    #             rows_to_select = []
-    #             # Парсинг ввода
-    #             parts = text.replace(' ', '').split(',')
-    #             for part in parts:
-    #                 if '-' in part:
-    #                     start, end = map(int, part.split('-'))
-    #                     if start < end:
-    #                         for n in range(start, end + 1):
-    #                             rows_to_select.append(n)
-    #                     else:
-    #                         for n in range(start, end - 1, -1):
-    #                             rows_to_select.append(n)
-    #                 else:
-    #                     rows_to_select.append(int(part))
-
-    #             indices = my_win.tableView_schedule.selectionModel().selectedRows()            
-    #             for index in sorted(indices):
-    #                 rows = index.row()
-    #                 id_vst = my_win.tableView_schedule.model().index(rows, 0).data() # данные ячейки tableView
-    #                 table_num = rows_to_select[k]
-    #                 app = Result.update(schedule_date=date_str, schedule_time=time_str, schedule_table=table_num).where(Result.id == id_vst)                
-    #                 app.execute()
-    #                 k += 1
-
-    #             # Выделение строк
-    #             selection_model = my_win.tableView_schedule.selectionModel()
-                
-    #             if clear_current.isChecked():
-    #                 selection_model.clearSelection()
-                
-    #             if model is None:
-    #                 QtWidgets.QMessageBox.warning(
-    #                     my_win, "Предупреждение", "Модель данных не найдена"
-    #                 )
-    #                 return
-                
-    #             from PyQt5.QtCore import QModelIndex, QItemSelectionModel
-    #             row_count = model.rowCount(QModelIndex())
-                
-    #             if row_count == 0:
-    #                 QtWidgets.QMessageBox.warning(
-    #                     my_win, "Предупреждение", "Таблица пуста"
-    #                 )
-    #                 return
-                
-    #             selected_count = 0
-    #             first_selected = None
-                
-    #             for row in sorted(rows_to_select):
-    #                 # Проверяем границы (индексация с 1 для пользователя)
-    #                 if 1 <= row <= row_count:
-    #                     index = model.index(row - 1, 0, QModelIndex())
-    #                     selection_model.select(
-    #                         index, 
-    #                         QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows
-    #                     )
-    #                     selected_count += 1
-    #                     if first_selected is None:
-    #                         first_selected = row - 1
-    #                 else:
-    #                     QtWidgets.QMessageBox.warning(
-    #                         my_win, 
-    #                         "Предупреждение", 
-    #                         f"Строка {row} не существует (всего строк: {row_count})"
-    #                     )
-                
-    #             # Прокрутка к первому выбранному
-    #             if scroll_to_selection.isChecked() and first_selected is not None:
-    #                 my_win.tableView_schedule.scrollTo(
-    #                     model.index(first_selected, 0, QModelIndex())
-    #                 )
-                
-    #             # Результат
-    #             if selected_count > count_table:
-    #                 QtWidgets.QMessageBox.information(
-    #                     my_win, "Ошибка", f"Число столов меньше,выделеных строк: {selected_count}"
-    #                 )
-                
-    #         except ValueError:
-    #             QtWidgets.QMessageBox.critical(
-    #                 my_win, 
-    #                 "Ошибка", 
-    #                 "Некорректный формат ввода.\nИспользуйте числа, запятые и дефисы."
-    #             )
 
     def assign_tables_dialog(self):
         """Диалог для ввода номеров столов и назначения их выбранным строкам"""
@@ -7009,6 +6857,11 @@ class MainWindow(QMainWindow):
         self.regions_action = QAction("📋 Список регионов", self)
         self.regions_action.triggered.connect(self.export_regions_to_pdf)
         view_menu.addAction(self.regions_action)
+
+        # Итоговый протокол
+        final_protocol_action = QAction("📋 Итоговый протокол", self)
+        final_protocol_action.triggered.connect(self.export_final_protocol_pdf)
+        view_menu.addAction(final_protocol_action)
         
         view_menu.addSeparator()
 
@@ -13241,6 +13094,158 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка при сохранении: {str(e)}")
 # ========= Создание PDF файлов ===========
+    def export_final_protocol_pdf(self):
+        """Экспорт итогового протокола с местами участников"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+
+        try:
+            # Получаем участников, отсортированных по месту (mesto)
+            players_list = Player.select().where(
+                (Player.title_id == self.current_title_id) &
+                (Player.player != "X") &
+                (Player.mesto > 0)  # только те, у кого есть место
+            ).order_by(Player.mesto.asc())
+
+            if players_list.count() == 0:
+                QMessageBox.warning(self, "Ошибка", "Нет участников с присвоенными местами")
+                return
+
+            # Создаём папку, если её нет
+            pdf_dir = "table_pdf"
+            if not os.path.exists(pdf_dir):
+                os.makedirs(pdf_dir)
+
+            # Имя файла
+            title = Title.get_by_id(self.current_title_id)
+
+            gamer = title.gamer if title.gamer else "Участники"
+            otc = title.otchestvo if title.otchestvo else 0
+
+            short_name = title.short_name_comp if title.short_name_comp else title.name
+            import re
+            clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
+            clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
+
+            filename = os.path.join(pdf_dir, f"{clean_name}_final_protocol.pdf")
+
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+
+            styles = getSampleStyleSheet()
+            title_style = PS("TitleStyle", fontSize=14, fontName="DejaVuSerif-Bold",
+                            alignment=1, spaceAfter=20, textColor=colors.darkblue)
+
+            # Подготовка данных для таблицы
+            elements = []
+            
+            for player in players_list:
+                place_text = f"{player.mesto} место"
+                # Формируем ФИО с отчеством или без
+                if otc == 1:
+                    patronymic_text = ""
+                    if player.patronymic_id:
+                        try:
+                            patronymic = Patronymic.get(Patronymic.id == player.patronymic_id)
+                            patronymic_text = patronymic.patronymic
+                        except:
+                            pass
+                    full_name = f"{player.player} {patronymic_text}".strip()
+                else:
+                    full_name = player.player
+                
+                # Форматируем дату рождения - ИСПРАВЛЕНО
+                birth_date = self.format_birth_date(player.bday)
+                
+                # Получаем тренера
+                coach_text = ""
+                if player.coach_id:
+                    try:
+                        coach = Coach.get(Coach.id == player.coach_id)
+                        coach_text = coach.coach
+                    except:
+                        pass
+                
+                # Подготовка стилей для переноса длинной строки
+                styles = getSampleStyleSheet()
+                custom_style = styles['Normal'].clone("CustomStyle")
+                custom_style.fontName = 'DejaVuSerif'
+                custom_style.fontSize = 6
+                custom_style.wordWrap = 'LTR'  # Перенос слов (LTR - Left-To-Right)
+                custom_style.leading = 6  # Межстрочный интервал
+                
+                data_row = [
+                    str(place_text),
+                    Paragraph(full_name, custom_style),
+                    birth_date,
+                    str(player.rank) if player.rank else "0",
+                    player.city or "",
+                    Paragraph(player.region or "", custom_style),
+                    player.razryad or "",
+                    Paragraph(coach_text, custom_style),
+                ]
+                elements.append(data_row)
+            
+            # Добавляем заголовок таблицы
+            headers = ["Место", "ФИО", "Дата рожд.", "R", "Город", "Субъект РФ", "Разряд", "Тренер(ы)"]
+            elements.insert(0, headers)
+                        
+            # Настраиваем ширину колонок
+            col_widths = [1.28*cm, 5.0*cm, 1.5*cm, 0.7*cm, 2.5*cm, 3.2*cm, 1.0*cm, 4.0*cm]
+            rH = 0.46*cm
+            # Создаем таблицу
+            table = Table(elements, colWidths=col_widths, rowHeights=[rH] * len(elements), repeatRows=1)
+
+            # Стиль таблицы
+            table_style = TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSerif'),
+                ('FONTSIZE', (0, 0), (-1, -1), 7),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+                ('TOPPADDING', (0, 0), (-1, -1), 2),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('BACKGROUND', (0, 0), (8, 0), colors.yellow),
+                ('TEXTCOLOR', (0, 0), (8, 0), colors.darkblue),
+                ('LINEABOVE', (0, 0), (-1, -1), 0.3, colors.grey),
+                ('INNERGRID', (0, 0), (-1, -1), 0.1, colors.grey),
+                ('BOX', (0, 0), (-1, -1), 0.5, colors.darkblue),
+            ])
+            
+            table.setStyle(table_style)
+            
+            # Создаем PDF документ
+            doc = SimpleDocTemplate(filename, pagesize=A4,
+                                    topMargin=30*mm, bottomMargin=10*mm,
+                                    leftMargin=5*mm, rightMargin=5*mm)
+            
+            # Стиль заголовка
+            story = []
+            h3 = PS("normal", fontSize=12, fontName="DejaVuSerif-Italic", leftIndent=180,
+                    firstLineIndent=10, textColor="green")
+            h3.spaceAfter = 10
+            story.append(Paragraph(f'Итоговый протокол. {gamer}', h3))
+            story.append(table)
+                        
+            # Строим документ с использованием функции заголовка
+            doc.build(story, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
+
+            QMessageBox.information(self, "Успех", f"Итоговый протокол сохранён в:\n{filename}")
+
+            # Предлагаем открыть файл
+            reply = QMessageBox.question(self, "Открыть файл",
+                                        "Открыть созданный PDF файл?",
+                                        QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                if sys.platform == 'win32':
+                    os.startfile(filename)
+                else:
+                    os.system(f'open "{filename}"')
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")
+
     def determine_net_type(self, final, posev_data):
         """определяем какая сетка для финала используется""" 
         system = System.select().where((System.title_id == self.current_title_id) & (System.stage == final)).get()
@@ -13307,26 +13312,11 @@ class MainWindow(QMainWindow):
             if player_list.count() == 0:
                 QMessageBox.warning(self, "Ошибка", "Нет участников для экспорта")
                 return
-            
+#=====================================            
             # Получаем параметры
             gamer = title.gamer if title.gamer else "Участники"
             otc = title.otchestvo if title.otchestvo else 0
-            
-            # Регистрируем шрифт для поддержки кириллицы
-            try:
-                # Путь к шрифту DejaVu (если есть)
-                font_path = os.path.join(os.path.dirname(__file__), 'fonts', 'DejaVuSerif.ttf')
-                if os.path.exists(font_path):
-                    pdfmetrics.registerFont(TTFont('DejaVuSerif', font_path))
-                    pdfmetrics.registerFont(TTFont('DejaVuSerif-Bold', font_path.replace('.ttf', '-Bold.ttf')))
-                    pdfmetrics.registerFont(TTFont('DejaVuSerif-Italic', font_path.replace('.ttf', '-Italic.ttf')))
-                else:
-                    # Используем стандартный шрифт
-                    pdfmetrics.registerFont(TTFont('DejaVuSerif', 'DejaVuSerif.ttf'))
-            except:
-                # Если шрифт не загружен, используем стандартный
-                pass
-            
+                        
             # Подготовка данных для таблицы
             elements = []
             n = 0
@@ -13383,12 +13373,11 @@ class MainWindow(QMainWindow):
             elements.insert(0, headers)
             
             # Создаем таблицу
-            table = Table(elements, repeatRows=1)
-            
-            # Настраиваем ширину колонок
+             # Настраиваем ширину колонок
             col_widths = [0.8*cm, 5.0*cm, 1.6*cm, 0.8*cm, 2.5*cm, 3.2*cm, 1.1*cm, 4.0*cm]
-            table._argW = col_widths
-            
+            rH = 0.46*cm
+            table = Table(elements, colWidths=col_widths, rowHeights=[rH] * len(elements), repeatRows=1)
+        
             # Стиль таблицы
             table_style = TableStyle([
                 ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSerif'),
@@ -13399,16 +13388,16 @@ class MainWindow(QMainWindow):
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('BACKGROUND', (0, 0), (8, 0), colors.yellow),
                 ('TEXTCOLOR', (0, 0), (8, 0), colors.darkblue),
-                ('LINEABOVE', (0, 0), (-1, -1), 0.5, colors.blue),
-                ('INNERGRID', (0, 0), (-1, -1), 0.2, colors.grey),
-                ('BOX', (0, 0), (-1, -1), 0.5, colors.black),
+                ('LINEABOVE', (0, 0), (-1, -1), 0.3, colors.grey),
+                ('INNERGRID', (0, 0), (-1, -1), 0.1, colors.grey),
+                ('BOX', (0, 0), (-1, -1), 0.5, colors.darkblue),
             ])
             
             table.setStyle(table_style)
             
             # Создаем PDF документ
             doc = SimpleDocTemplate(file_path, pagesize=A4,
-                                    topMargin=15*mm, bottomMargin=10*mm,
+                                    topMargin=25*mm, bottomMargin=10*mm,
                                     leftMargin=5*mm, rightMargin=5*mm)
             
             # Стиль заголовка
@@ -13424,7 +13413,7 @@ class MainWindow(QMainWindow):
             
             # Строим документ с использованием функции заголовка
             doc.build(story, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
-            
+#=======================================================================            
             QMessageBox.information(self, "Успех", 
                                 f"Список участников успешно сохранен в PDF:\n{file_path}\n"
                                 f"Сортировка: {sort_text}")

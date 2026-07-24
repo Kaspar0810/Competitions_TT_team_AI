@@ -6758,7 +6758,13 @@ class MainWindow(QMainWindow):
         competitions_menu.addAction(open_comp_action)
         
         competitions_menu.addSeparator()
-        
+      
+        delete_comp_action = QAction("🗑️ Удалить соревнование", self)
+        delete_comp_action.triggered.connect(self.delete_competition_dialog)
+        competitions_menu.addAction(delete_comp_action)
+
+        competitions_menu.addSeparator()
+
         # Жеребьевка - подменю
         drawing_menu = competitions_menu.addMenu("🎲 Жеребьевка")
 
@@ -10203,6 +10209,161 @@ class MainWindow(QMainWindow):
         self.tab_widget.setCurrentIndex(0)
         QMessageBox.information(self, "Открытие соревнования", 
                             "Выберите соревнование из списка справа")
+
+    def delete_competition_dialog(self):
+        """Открывает диалог со списком соревнований для удаления"""
+        titles = Title.select().order_by(Title.data_start.desc())
+        if titles.count() == 0:
+            QMessageBox.information(self, "Информация", "Нет доступных соревнований для удаления")
+            return
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Удаление соревнований")
+        dialog.setModal(True)
+        dialog.setMinimumSize(600, 400)
+
+        layout = QVBoxLayout(dialog)
+
+        info_label = QLabel("Выберите соревнования для удаления (можно несколько):")
+        layout.addWidget(info_label)
+
+        # Список с возможностью множественного выбора
+        list_widget = QListWidget()
+        list_widget.setSelectionMode(QListWidget.MultiSelection)
+        for title in titles:
+            start = title.data_start.strftime("%d.%m.%Y") if title.data_start else "---"
+            item_text = f"{title.name}  ({start})  | {title.sredi} {title.vozrast}"
+            item = QListWidgetItem(item_text)
+            item.setData(Qt.UserRole, title.id)
+            list_widget.addItem(item)
+        layout.addWidget(list_widget)
+
+        # Кнопки
+        btn_layout = QHBoxLayout()
+        delete_btn = QPushButton("🗑️ Удалить выбранные")
+        delete_btn.setStyleSheet("background-color: #f44336; color: white;")
+        delete_btn.clicked.connect(lambda: self._confirm_delete_titles(list_widget, dialog))
+        cancel_btn = QPushButton("Отмена")
+        cancel_btn.clicked.connect(dialog.reject)
+
+        btn_layout.addWidget(delete_btn)
+        btn_layout.addStretch()
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+
+        dialog.exec_()
+
+    def _confirm_delete_titles(self, list_widget, dialog):
+        """Подтверждение и удаление выбранных соревнований"""
+        selected_items = list_widget.selectedItems()
+        if not selected_items:
+            QMessageBox.warning(self, "Ошибка", "Выберите хотя бы одно соревнование")
+            return
+
+        title_ids = [item.data(Qt.UserRole) for item in selected_items]
+        names = [item.text().split('  ')[0] for item in selected_items]
+
+        reply = QMessageBox.question(
+            self,
+            "Подтверждение удаления",
+            f"Вы действительно хотите удалить {len(title_ids)} соревнований?\n\n"
+            f"Будут удалены:\n" + "\n".join(f"• {name}" for name in names) +
+            "\n\nВсе связанные данные (участники, результаты, система) будут полностью удалены.\n"
+            "Это действие необратимо!",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+
+        if reply != QMessageBox.Yes:
+            return
+
+        # Выполняем удаление
+        deleted_count = 0
+        errors = []
+        for title_id in title_ids:
+            try:
+                self._delete_title_with_relations(title_id)
+                deleted_count += 1
+            except Exception as e:
+                errors.append(f"Ошибка при удалении ID {title_id}: {str(e)}")
+
+        # Обновляем список соревнований
+        self.load_titles_list()
+
+        # Если удалили текущее соревнование, сбрасываем его
+        if self.current_title_id in title_ids:
+            self.current_title_id = None
+            self.clear_competition_info()
+
+        if errors:
+            QMessageBox.warning(
+                self,
+                "Удаление завершено с ошибками",
+                f"Удалено: {deleted_count}\n"
+                f"Ошибок: {len(errors)}\n\n" + "\n".join(errors[:5]) +
+                (f"\n... и еще {len(errors)-5}" if len(errors) > 5 else "")
+            )
+        else:
+            QMessageBox.information(self, "Успех", f"Удалено {deleted_count} соревнований")
+
+        dialog.accept()
+
+    def _delete_title_with_relations(self, title_id):
+        """Удаляет соревнование и все связанные данные"""
+        # Удаляем записи в таблицах, связанных с соревнованием
+        # Порядок важен: сначала дочерние, потом главные
+
+        # 1. Удаляем Choice
+        Choice.delete().where(Choice.title_id == title_id).execute()
+
+        # 2. Удаляем Game_list
+        Game_list.delete().where(Game_list.title_id == title_id).execute()
+
+        # 3. Удаляем Result
+        Result.delete().where(Result.title_id == title_id).execute()
+
+        # 4. Удаляем System
+        System.delete().where(System.title_id == title_id).execute()
+
+        # 5. Удаляем Players
+        Player.delete().where(Player.title_id == title_id).execute()
+
+        # 6. Удаляем Team (если есть)
+        Team.delete().where(Team.title_id == title_id).execute()
+
+        # 7. Удаляем Players_double (если есть)
+        Players_double.delete().where(Players_double.title_id == title_id).execute()
+
+        # 8. Удаляем GskMember (если есть)
+        GskMember.delete().where(GskMember.title_id == title_id).execute()
+
+        # 9. Удаляем Choice_Team (если есть)
+        Choice_Team.delete().where(Choice_Team.title_id == title_id).execute()
+
+        # 10. Наконец, удаляем сам Title
+        Title.delete().where(Title.id == title_id).execute()
+
+    def clear_competition_info(self):
+        """Очищает информацию о текущем соревновании на вкладке Титул"""
+        self.comp_name_label.setText("-")
+        self.comp_short_name_label.setText("-")
+        self.comp_full_name_label.setText("-")
+        self.comp_sredi_label.setText("-")
+        self.comp_vozrast_label.setText("-")
+        self.comp_dates_label.setText("-")
+        self.comp_mesto_label.setText("-")
+        self.comp_referee_label.setText("-")
+        self.comp_referee_category_label.setText("-")
+        self.comp_secretary_label.setText("-")
+        self.comp_secretary_category_label.setText("-")
+        self.comp_type_info_label.setText("-")
+
+        # Отключаем вкладки
+        for i in range(self.tab_widget.count()):
+            self.tab_widget.setTabEnabled(i, False)
+        self.tab_widget.setTabEnabled(0, True)  # только Титул
+        self.tab_widget.setCurrentIndex(0)
+        
 # ============================     
     def create_system_tab(self):
         """Вкладка Система - только отображение информации о этапах"""

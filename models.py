@@ -108,6 +108,8 @@ class Title(BaseModel):
     r_date = CharField()
     vid_turnira = CharField(15)
     notes = TextField(null=True, default='')  # Заметки о соревновании
+    table_on_comp = IntegerField(null=True, default=4)   # количество столов
+    time_on_match = IntegerField(null=True, default=15)  # время на матч (минуты)
 
     class Meta:
         db_table = "titles"

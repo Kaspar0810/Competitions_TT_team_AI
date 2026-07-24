@@ -52,7 +52,6 @@ import random
 import BackupManagementDialog
 import edit_stage
 
-# import pymysql
 import subprocess
 import openpyxl as op
 
@@ -2896,7 +2895,8 @@ class MainWindow(QMainWindow):
             return
 
         # Проверку на олимпийскую систему убираем – загружаем все этапы
-        self.max_tables = getattr(self, 'system_tables', 4)
+        # self.max_tables = getattr(self, 'system_tables', 4)
+        self.max_tables = self.get_competition_tables()
 
         self.load_schedule_matches(stage_name)
         # Сбрасываем фильтры (показываем все строки)
@@ -2987,7 +2987,7 @@ class MainWindow(QMainWindow):
         
         if table_num < 1 or table_num > self.max_tables:
             QMessageBox.warning(self, "Ошибка", f"Номер стола должен быть от 1 до {self.max_tables}")
-            self.load_schedule_matches(self.schedule_stage_combo.currentText())
+            # self.load_schedule_matches(self.schedule_stage_combo.currentText())
             return
 
         # Обновляем в БД
@@ -7901,6 +7901,10 @@ class MainWindow(QMainWindow):
     def save_new_competition(self):
         """Сохранение нового соревнования"""
         name = self.new_comp_name.text().strip()
+
+        title.table_on_comp = 4
+        title.time_on_match = 15
+
         if not name:
             QMessageBox.warning(self, "Ошибка", "Введите название соревнования")
             return
@@ -10471,14 +10475,25 @@ class MainWindow(QMainWindow):
         # Проверяем статус игроков перед созданием системы
         if not self.check_players_status():
             return
-        
-        # Запрашиваем параметры системы (только один раз)
+
         if not hasattr(self, 'system_tables') or not hasattr(self, 'match_time'):
             tables, match_time = self.get_system_parameters()
             if tables is None or match_time is None:
-                return  # Пользователь отменил ввод параметров
+                return
             self.system_tables = tables
             self.match_time = match_time
+            # Сохраняем в Title
+            title = Title.get_by_id(self.current_title_id)
+            title.table_on_comp = tables
+            title.time_on_match = match_time
+            title.save()
+        # # Запрашиваем параметры системы (только один раз)
+        # if not hasattr(self, 'system_tables') or not hasattr(self, 'match_time'):
+        #     tables, match_time = self.get_system_parameters()
+        #     if tables is None or match_time is None:
+        #         return  # Пользователь отменил ввод параметров
+        #     self.system_tables = tables
+        #     self.match_time = match_time
         
         # Получаем данные из формы
         stage_name = self.system_stage.currentText().strip()
@@ -10961,7 +10976,15 @@ class MainWindow(QMainWindow):
                 self.fill_choice_table() 
 
         except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Не удалось добавить этап: {str(e)}")    
+            QMessageBox.critical(self, "Ошибка", f"Не удалось добавить этап: {str(e)}") 
+# =================================
+    def get_competition_tables(self):
+        title = Title.get_by_id(self.current_title_id)
+        return title.table_on_comp if title.table_on_comp else 4
+
+    def get_competition_match_time(self):
+        title = Title.get_by_id(self.current_title_id)
+        return title.time_on_match if title.time_on_match else 15   
 # ==================================
     def update_stages_info(self):
         """Обновление информационного окна со списком этапов (формат 2 строки с выравниванием)"""
@@ -10985,8 +11008,10 @@ class MainWindow(QMainWindow):
                 return
             
             # Получаем параметры системы
-            tables = getattr(self, 'system_tables', 4)
-            match_time = getattr(self, 'match_time', 15)
+            tables = self.get_competition_tables()
+            match_time = self.get_competition_match_time()
+            # tables = getattr(self, 'system_tables', 8)
+            # match_time = getattr(self, 'match_time', 15)
             
             info_text = f"🏆 СОРЕВНОВАНИЕ: {title_name.upper()}. СИСТЕМА ПРОВЕДЕНИЯ. | 🏓 Столов: {tables} | ⏱️ Время на матч: {match_time} мин.\n"
             info_text += "=" * 110 + "\n\n"
@@ -12603,6 +12628,7 @@ class MainWindow(QMainWindow):
         result = dialog.exec_()
         
         if result == QDialog.Accepted:
+
             return tables_spin.value(), time_spin.value()
         else:
             return None, None
@@ -12610,8 +12636,10 @@ class MainWindow(QMainWindow):
     def change_system_parameters(self):
         """Изменение параметров системы (столы, время)"""
         # Сохраняем текущие значения для восстановления при отмене
-        old_tables = getattr(self, 'system_tables', 4)
-        old_time = getattr(self, 'match_time', 15)
+        old_tables = self.get_competition_tables()
+        old_time = self.get_competition_match_time()
+        # old_tables = getattr(self, 'system_tables', 4)
+        # old_time = getattr(self, 'match_time', 15)
         
         dialog = QDialog(self)
         dialog.setWindowTitle("Параметры системы")
@@ -12670,14 +12698,19 @@ class MainWindow(QMainWindow):
         layout.addLayout(btn_layout)
         
         if dialog.exec_() == QDialog.Accepted:
-            self.system_tables = tables_spin.value()
-            self.match_time = time_spin.value()
+            tables = tables_spin.value()
+            match_time = time_spin.value()
+             # Сохраняем в Title
+            title = Title.get_by_id(self.current_title_id)
+            title.table_on_comp = tables
+            title.time_on_match = match_time
+            title.save()
             # Обновляем информацию в окне
             self.update_stages_info()
             QMessageBox.information(self, "Успех", 
                                 f"Параметры обновлены:\n"
-                                f"🏓 Столов: {self.system_tables}\n"
-                                f"⏱️ Время на матч: {self.match_time} мин.")
+                                f"🏓 Столов: {tables}\n"
+                                f"⏱️ Время на матч: {match_time} мин.")
         
     def calculate_tables_per_tour(self, group_sizes):
         """Расчет количества столов, необходимых для одного тура"""
@@ -15458,7 +15491,7 @@ class MainWindow(QMainWindow):
         for i in range(1, 8, 2):
             fn = ('TEXTCOLOR', (i, 0), (i, 68), colors.black)  # цвет шрифта игроков
             style.append(fn)
-            fn = ('TEXTCOLOR', (i + 1, 0), (i + 1, 68), colors.green)  # цвет шрифта номеров встреч
+            fn = ('TEXTCOLOR', (i + 1, 0), (i + 1, 68), colors.brown)  # цвет шрифта номеров встреч
             style.append(fn)
             # выравнивание фамилий игроков по левому краю
             fn = ('ALIGN', (i, 0), (i, 68), 'LEFT') 
@@ -20783,14 +20816,18 @@ class MainWindow(QMainWindow):
         begunki_data = []
         
         # Базовый запрос результатов
-        results = Result.select().where(Result.title_id == self.current_title_id)
-        
+        results = Result.select().where((Result.title_id == self.current_title_id) )
+  
         # Фильтр по этапу
         if stage not in group_list:
-            results = results.where(Result.number_group == stage)
+            results = results.where((Result.number_group == stage) & (Result.winner == ""))
         else:
-            results = results.where(Result.system_stage == stage)
-        
+            results = results.where((Result.system_stage == stage) & (Result.winner == ""))
+
+        if len(results) == 0:   
+            QMessageBox.warning(self, "Ошибка", "Нет данных для печати бегунков")
+            return None
+
         # Фильтр по группе/финалу
         if subgroup and subgroup not in ["Все группы", "Все финалы", ""]:
             if stage == "Одна таблица":
@@ -20897,9 +20934,6 @@ class MainWindow(QMainWindow):
         if len(fio_parts) >= 2:
             # Фамилия и инициалы
             surname = fio_parts[0]
-            # name_initial = fio_parts[1][0] if fio_parts[1] else ""
-            # patronymic_initial = fio_parts[2][0] if len(fio_parts) > 2 else ""
-            # formatted_name = f"{surname}\n{name_initial}.{patronymic_initial}." if patronymic_initial else f"{surname}\n{name_initial}."
             formatted_name = f"{surname}\n{fio_parts[1]} {fio_parts[2]}" if fio_parts[2] else f"{surname}\n{fio_parts[1]}"
         else:
             formatted_name = fio_part

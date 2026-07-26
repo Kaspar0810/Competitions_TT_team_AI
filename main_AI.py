@@ -258,7 +258,7 @@ class MainWindow(QMainWindow):
             return
         
         try:
-            query = Team.select().where(Team.title_id == self.current_title_id)
+            query = Team.select().where((Team.title_id == self.current_title_id) & (Team.sex == self.current_sex))
             teams_data = []
             for team in query:
                 teams_data.append({
@@ -311,7 +311,7 @@ class MainWindow(QMainWindow):
             return
         
         try:
-            query = Result.select().where(Result.title_id == self.current_title_id)
+            query = Result.select().where((Result.title_id == self.current_title_id) & (Result.sex == self.current_sex))
             results_data = []
             for result in query:
                 results_data.append({
@@ -483,7 +483,7 @@ class MainWindow(QMainWindow):
         
         # Тип таблицы
         table_type_layout = QHBoxLayout()
-        table_type_layout.addWidget(QLabel("Тип таблицы:"))
+        table_type_layout.addWidget(QLabel("Таблица:"))
         self.table_type = QComboBox()
         self.table_type.addItems([
             "Круговая",
@@ -2710,7 +2710,7 @@ class MainWindow(QMainWindow):
 
         system = System.get_or_none(
             (System.title_id == self.current_title_id) &
-            (System.sex == selllllf.current_sex) &
+            (System.sex == self.current_sex) &
             (System.stage == stage_name)
         )
         if not system:
@@ -2842,18 +2842,21 @@ class MainWindow(QMainWindow):
                 # Получаем все матчи для выбранного этапа
                 self.current_matches = list(Result.select().where(
                     (Result.title_id == self.current_title_id) &
+                    (Result.sex == self.current_sex) &
                     (Result.system_stage == stage_name)
                 ).order_by(Result.number_group, Result.round))
             elif stage_name == "Одна таблица":
                 # Получаем все матчи для выбранного этапа
                 self.current_matches = list(Result.select().where(
                     (Result.title_id == self.current_title_id) &
+                    (Result.sex == self.current_sex) &
                     (Result.system_stage == stage_name)
                 ).order_by(Result.round))
             else:
                 # Получаем все матчи для выбранного этапа
                 self.current_matches = list(Result.select().where(
                     (Result.title_id == self.current_title_id) &
+                    (Result.sex == self.current_sex) &
                     (Result.number_group == stage_name)
                 ).order_by(Result.number_group, Result.round))
             
@@ -3794,11 +3797,13 @@ class MainWindow(QMainWindow):
             if self.current_stage in ["Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]:
                 total_matches = Result.select().where(
                     (Result.title_id == self.current_title_id) &
+                    (Result.sex == self.current_sex) &
                     (Result.system_stage == self.current_stage)
                 ).count()
                 played_matches = Result.select().where(
                     (Result.title_id == self.current_title_id) &
                     (Result.system_stage == self.current_stage) &
+                    (Result.sex == self.current_sex) &
                     (Result.winner.is_null(False))
                 ).count()
                 if total_matches > 0 and played_matches == total_matches:
@@ -3807,10 +3812,12 @@ class MainWindow(QMainWindow):
             else:
                 total_matches = Result.select().where(
                     (Result.title_id == self.current_title_id) &
+                    (Result.sex == self.current_sex) &
                     (Result.number_group == self.current_stage)
                 ).count()
                 played_matches = Result.select().where(
                     (Result.title_id == self.current_title_id) &
+                    (Result.sex == self.current_sex) &
                     (Result.number_group == self.current_stage) &
                     (Result.winner.is_null(False))
                 ).count() 
@@ -4444,16 +4451,19 @@ class MainWindow(QMainWindow):
             if stage_name in group_list:
                 query = Result.select().where(
                     (Result.title_id == self.current_title_id) &
+                    (Result.sex == self.current_sex) &
                     (Result.system_stage == stage_name)
                 )
             elif stage_name == "Одна таблица":
                 query = Result.select().where(
                     (Result.title_id == self.current_title_id) &
+                    (Result.sex == self.current_sex) &
                     (Result.system_stage == stage_name)
                 )
             else:
                 query = Result.select().where(
                     (Result.title_id == self.current_title_id) &
+                    (Result.sex == self.current_sex) &
                     (Result.number_group == stage_name)
                 ) 
             
@@ -4568,11 +4578,13 @@ class MainWindow(QMainWindow):
             if self.current_stage in group_list:
                 query = Result.select().where(
                     (Result.title_id == self.current_title_id) &
+                    (Result.sex == self.current_sex) &
                     (Result.system_stage == self.current_stage)
                 )
             else:
                 query = Result.select().where(
                     (Result.title_id == self.current_title_id) &
+                    (Result.sex == self.current_sex) &
                     (Result.number_group == self.current_stage)
                 )
             
@@ -4601,11 +4613,13 @@ class MainWindow(QMainWindow):
             if stage_name in group_list:
                 query = Result.select().where(
                     (Result.title_id == self.current_title_id) &
+                    (Result.sex == self.current_sex) &
                     (Result.system_stage == stage_name)
                 )
             else:
                 query = Result.select().where(
                     (Result.title_id == self.current_title_id) &
+                    (Result.sex == self.current_sex) &
                     (Result.number_group == stage_name)
                 )
             
@@ -4843,6 +4857,7 @@ class MainWindow(QMainWindow):
                 # Перенос победителя
                 res_id_win = Result.select().where(
                     (Result.title_id == self.current_title_id) & 
+                    (Result.sex == self.current_sex) &
                     (Result.tours == snoska[0])
                 ).get_or_none()
                 
@@ -4857,6 +4872,7 @@ class MainWindow(QMainWindow):
                 if snoska[1] != 0:
                     res_id_lose = Result.select().where(
                         (Result.title_id == self.current_title_id) & 
+                        (Result.sex == self.current_sex) &
                         (Result.tours == snoska[1])
                     ).get_or_none()
                     
@@ -10751,7 +10767,6 @@ class MainWindow(QMainWindow):
                 games_info.append(f"Гр{i}: {games} игр")
             
             kol_game_string = str (f"{total_games_in_stage} игр.")
-            # label_string = f"Квалификация: {total_groups} гр по {players_per_group} чел."
             label_string = ""
             choice_flag = 0
             source_stage = ""
@@ -11066,21 +11081,7 @@ class MainWindow(QMainWindow):
             remaining_players = self.update_seeding_info()
 
             all_posev_player = total_in_this_final + remaining_players
-            if total_players <= all_posev_player:
-                self.fill_choice_table()
-
-            # ======================
-                self.get_or_create_x_player()
-            # =================
-
-                reply = QMessageBox.question(self, "Завершение посева", 
-                                            f"✅ Все {total_players} игроков распределены по финалам!\n\n"
-                                            f"Провести жеребьевку квалификации сейчас?",
-                                            QMessageBox.Yes | QMessageBox.No)
-                if reply == QMessageBox.Yes:
-                    self.perform_drawing()
-                  
-
+            # =======
             # Сохраняем информацию о финале
             self.current_finals_info = {
                 'number': final_number,
@@ -11090,12 +11091,48 @@ class MainWindow(QMainWindow):
             } 
             # если финал 
             total_groups = 1 
-# ==========================================                
+
+            
+            # ==========
+            # if total_players <= all_posev_player:
+            #     self.fill_choice_table()
+
+            #     self.get_or_create_x_player()
+
+            #     reply = QMessageBox.question(self, "Завершение посева", 
+            #                                 f"✅ Все {total_players} игроков распределены по финалам!\n\n"
+            #                                 f"Провести жеребьевку квалификации сейчас?",
+            #                                 QMessageBox.Yes | QMessageBox.No)
+            #     if reply == QMessageBox.Yes:
+            #         self.perform_drawing()
+                  
+
+            # # Сохраняем информацию о финале
+            # self.current_finals_info = {
+            #     'number': final_number,
+            #     'players': total_in_this_final,
+            #     'source': source_stage,
+            #     'places': f"{start_place}-{start_place + total_in_this_final - 1}"
+            # } 
+            # # если финал 
+            # total_groups = 1 
+              
     # Продолжаем сохранение в БД...
         else:
             QMessageBox.warning(self, "Ошибка", f"Неизвестный тип этапа: {stage_name}")
             return
-            
+        # # ==========
+        # if total_players <= all_posev_player:
+        #     self.fill_choice_table()
+
+        #     self.get_or_create_x_player()
+
+        #     reply = QMessageBox.question(self, "Завершение посева", 
+        #                                 f"✅ Все {total_players} игроков распределены по финалам!\n\n"
+        #                                 f"Провести жеребьевку квалификации сейчас?",
+        #                                 QMessageBox.Yes | QMessageBox.No)
+        #     if reply == QMessageBox.Yes:
+        #         self.perform_drawing()    
         # Сохраняем в базу данных
         try:
             
@@ -11147,6 +11184,19 @@ class MainWindow(QMainWindow):
 
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось добавить этап: {str(e)}") 
+
+        # ==========
+        if total_players <= all_posev_player:
+            self.fill_choice_table()
+
+            self.get_or_create_x_player()
+
+            reply = QMessageBox.question(self, "Завершение посева", 
+                                        f"✅ Все {total_players} игроков распределены по финалам!\n\n"
+                                        f"Провести жеребьевку квалификации сейчас?",
+                                        QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                self.perform_drawing()
 # =================================
     def get_competition_tables(self):
         title = Title.get_by_id(self.current_title_id)
@@ -12620,7 +12670,7 @@ class MainWindow(QMainWindow):
                 players = Player.select().where((Player.title_id == self.current_title_id) & (Player.sex == sex))
                 
                 # Получаем систему для определения групп
-                systems = System.select().where(System.title_id == self.current_title_id) & (System.sex == sex).order_by(System.id)
+                systems = System.select().where((System.title_id == self.current_title_id) & (System.sex == sex)).order_by(System.id)
                 
                 # Находим квалификацию
                 qualification = None
@@ -12672,7 +12722,6 @@ class MainWindow(QMainWindow):
                         )
                         player_index += 1
 
-                # elif qualification:
                 elif system.stage == "Квалификация":
                     # Распределяем игроков по группам
                     total_players = players.count()
@@ -13013,6 +13062,7 @@ class MainWindow(QMainWindow):
         # Получаем все финалы для текущего соревнования
         finals = System.select().where(
             (System.title_id == self.current_title_id) &
+            (System.sex == self.current_sex) &
             (System.stage.contains("финал")) &
             (~System.stage.contains("полуфинал"))
         ).order_by(System.id)
@@ -13160,9 +13210,10 @@ class MainWindow(QMainWindow):
 
         system = System.get_or_none(
             (System.title_id == self.current_title_id) &
-            (System.sex == self.current_sex) &
-             (System.stage == stage))
-
+            (System.stage == stage) &
+            (System.sex == self.current_sex)           
+            )
+        
         # Создаем диалог для ручной жеребьевки
         dialog = QDialog(self)
         dialog.setWindowTitle(f"Ручная жеребьевка - {stage}")
@@ -14005,12 +14056,13 @@ class MainWindow(QMainWindow):
             page_size = landscape(A4)
             if max_pl <= 8:
                 family_col = 5.0
-                wcells = 5.5 / max_pl if max_pl > 0 else 1
+                # wcells = 20.0 / max_pl if max_pl > 0 else 1
+                # wcells = 5.5 / max_pl if max_pl > 0 else 1
             else:
                 family_col = 4.6
-                wcells = 20.0 / max_pl if max_pl > 0 else 1
+                # wcells = 20.0 / max_pl if max_pl > 0 else 1
             center_stage = 210
-            # wcells = 20.0 / max_pl if max_pl > 0 else 1
+            wcells = 20.0 / max_pl if max_pl > 0 else 1
         else:
             page_size = A4
             family_col = 5.0
@@ -14205,6 +14257,7 @@ class MainWindow(QMainWindow):
             # Получаем system_id для этапа
             system = System.get_or_none(
                 (System.title_id == self.current_title_id) &
+                (System.sex == self.currnt_sex) &
                 (System.stage == stage)
             )
             
@@ -14215,6 +14268,7 @@ class MainWindow(QMainWindow):
             # ===== ЭТАП 1: СОЗДАЕМ ПУСТЫЕ ТАБЛИЦЫ ИЗ GAME_LIST С ФИКСИРОВАННЫМ ЧИСЛОМ СТРОК =====
             game_players = Game_list.select().where(
                 (Game_list.title_id == self.current_title_id) &
+                (Game_list.sex == self.current_sex) &
                 (Game_list.system_id == system.id)
             ).order_by(Game_list.number_group, Game_list.rank_num_player)
 
@@ -14310,11 +14364,13 @@ class MainWindow(QMainWindow):
             if stage in group_list or stage == "Одна таблица":
                 results = Result.select().where(
                     (Result.title_id == self.current_title_id) &
+                    (Result.sex == self.current_sex) &
                     (Result.system_stage == stage)
                 )
             else:
                 results = Result.select().where(
                     (Result.title_id == self.current_title_id) &
+                    (Result.sex == self.current_sex) &
                     (Result.number_group == stage)
                 )
             
@@ -17872,6 +17928,7 @@ class MainWindow(QMainWindow):
             # Получаем все результаты для текущего соревнования
             results = Result.select().where(
                 (Result.title_id == self.current_title_id) &
+                (Result.sex == self.current_sex) &
                 (Result.winner.is_null(True))  # Только несыгранные матчи
             ).order_by(Result.system_stage, Result.number_group, Result.round)
             
@@ -17983,7 +18040,7 @@ class MainWindow(QMainWindow):
             return
         
         try:
-            results = Result.select().where(Result.title_id == self.current_title_id).order_by(
+            results = Result.select().where((Result.title_id == self.current_title_id) & (Result.sex == self.current_sex)).order_by(
                 Result.system_stage, Result.number_group, Result.tours
             )
             
@@ -18039,10 +18096,12 @@ class MainWindow(QMainWindow):
                 # Считаем количество сыгранных матчей
                 total_matches = Result.select().where(
                     (Result.title_id == self.current_title_id) &
+                    (Result.sex == self.current_sex) &
                     (Result.system_stage == stage.stage)
                 ).count()
                 played_matches = Result.select().where(
                     (Result.title_id == self.current_title_id) &
+                    (Result.sex == self.current_sex) &
                     (Result.system_stage == stage.stage) &
                     (Result.winner.is_null(False))
                 ).count()
@@ -18051,10 +18110,12 @@ class MainWindow(QMainWindow):
                 if stage.stage == "Одна таблица":
                     total_matches = Result.select().where(
                         (Result.title_id == self.current_title_id) &
+                        (Result.sex == self.current_sex) &
                         (Result.system_stage == stage.stage)
                     ).count()
                     played_matches = Result.select().where(
                         (Result.title_id == self.current_title_id) &
+                        (Result.sex == self.current_sex) &
                         (Result.system_stage == stage.stage) &
                         (Result.winner.is_null(False))
                     ).count()
@@ -21922,7 +21983,7 @@ class MainWindow(QMainWindow):
                 (Player.fio == "X") &
                 (Player.fio_city == "X") &
                 (Player.title_id == self.current_title_id) &
-                (Player.sex == self.current_sex) &
+                (Player.sex == self.current_sex)
             )
             
             if not x_player:
@@ -21995,6 +22056,7 @@ class MainWindow(QMainWindow):
         """
         system = System.get_or_none(
             (System.title_id == self.current_title_id) &
+            (System.sex == self.current_sex) &
             (System.stage == final_stage)
         )
         if not system:
@@ -22035,7 +22097,11 @@ class MainWindow(QMainWindow):
     def transfer_results_to_final(self, final_stage, source_stage, assigned_players):
         """Переносит результаты сыгранных матчей из source_stage в final_stage."""
         # определяем system_id
-        system = System.get_or_none((System.title_id == self.current_title_id) & (System.stage == final_stage))
+        system = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == final_stage) &
+            (System.sex == self.current_sex)
+            )
         # количество попадающих в финал для нумерации райнод
         players_count = system.max_player
         # Создаём карту игроков: player_id -> позиция в финале
@@ -22047,6 +22113,7 @@ class MainWindow(QMainWindow):
         
         source_results = Result.select().where(
             (Result.title_id == self.current_title_id) &
+            (Result.sex == self.current_sex) &
             (Result.system_stage == source_stage)
         )
         for res in source_results:
@@ -22086,6 +22153,7 @@ class MainWindow(QMainWindow):
                     (Result.title_id == self.current_title_id) &
                     (Result.system_stage == 'Финальный') &
                     (Result.number_group == final_stage) &
+                    (Result.sex == self.current_sex) &
                     (Result.tours == tours_str)
                 )
                 if existing:
@@ -22213,10 +22281,6 @@ class MainWindow(QMainWindow):
             (Game_list.system_id == system.id)
         ).execute()
         
-        # Result.delete().where(
-        #     (Result.title_id == self.current_title_id) &
-        #     (Result.system_stage == stage_name)
-        # ).execute()
         
         # Записываем игроков в Game_list и Choice
         group_name = f"1 группа"
@@ -22786,7 +22850,7 @@ class MainWindow(QMainWindow):
             # Очищаем таблицы Choice и Result для этого этапа
             Result.delete().where(
                 (Result.title_id == self.current_title_id) &
-                (result.sex == self.current_sex) &
+                (Result.sex == self.current_sex) &
                 (Result.system_stage == "Одна таблица")
             ).execute()
             Game_list.delete().where(
@@ -22879,9 +22943,10 @@ class MainWindow(QMainWindow):
         """Сохранение ручной жеребьевки для одной таблицы"""
         try:
             # Очищаем старые данные
-            Choice.delete().where(Choice.title_id == self.current_title_id).execute()
+            Choice.delete().where((Choice.title_id == self.current_title_id) & (Choice.sex == self.curent_sex)).execute()
             Result.delete().where(
                 (Result.title_id == self.current_title_id) &
+                (Result.sex == self.current_sex) &
                 (Result.system_stage == "Одна таблица")
             ).execute()
             Game_list.delete().where(
@@ -23146,6 +23211,7 @@ class MainWindow(QMainWindow):
         # Получаем всех игроков в группах полуфинала
         game_players = Game_list.select().where(
             (Game_list.title_id == self.current_title_id) &
+            (Game_list.sex == self.current_sex) &
             (Game_list.system_id == system.id)
         ).order_by(Game_list.number_group, Game_list.rank_num_player)
         

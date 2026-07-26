@@ -301,6 +301,7 @@ class Team(BaseModel):
     id_pl5 = ForeignKeyField(Player, column_name='id_pl5', null=True)
     r_pl5 = IntegerField(default=0)
     team_full = CharField(null=True)
+    team_sex = CharField(10)
 
     class Meta:
         db_table = "teams"
@@ -328,6 +329,7 @@ class Choice_Team(BaseModel):
     mesto_final = IntegerField(null=True)
     title_id = ForeignKeyField(Title)
     team_full = CharField(null=True)
+    team_sex = CharField(10)
 
     class Meta:
         db_table = "choice_teams"
@@ -354,6 +356,7 @@ class Choice_double_player(BaseModel):
     mesto_final = IntegerField()
     vid_para = CharField(15)
     title_id = ForeignKeyField(Title)
+  
 
     class Meta:
         db_table = "choice_double_players"

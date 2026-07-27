@@ -332,9 +332,17 @@ def choice_group_auto(self, athletes, num_groups, stage, parent=None):
     try:
         # Проверяем наличие системы
         if num_groups == 1:
-            system = System.select().where((System.title_id == self.current_title_id) & (System.stage == "Одна таблица")).get()
+            system = System.select().where(
+                (System.title_id == self.current_title_id) &
+                (System.stage == "Одна таблица") &
+                (System.sex == self.current_sex)
+                 ).get()
         else:
-            system = System.select().where((System.title_id == self.current_title_id) & (System.stage == "Квалификация")).get()
+            system = System.select().where(
+                (System.title_id == self.current_title_id) &
+                (System.stage == "Квалификация") &
+                (System.sex == self.current_sex)
+                ).get()
         
         check_flag = system.choice_flag
         

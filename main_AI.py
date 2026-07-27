@@ -13166,7 +13166,11 @@ class MainWindow(QMainWindow):
     def auto_drawing_for_stage(self, stage):
         """Автоматическая жеребьевка для указанного этапа"""
         try:
-            systems = System.select().where((System.title_id == self.current_title_id) & (System.stage == stage)).get()
+            systems = System.select().where(
+                (System.title_id == self.current_title_id) &
+                (System.stage == stage) &
+                (System.sex == self.current_sex)
+                ).get()
             exit_count = systems.mesta_exit
             source_stage = systems.stage_exit
             type_table = systems.type_table
@@ -22055,7 +22059,10 @@ class MainWindow(QMainWindow):
         """
         Получает реальных игроков для этапа, исключая X.
         """
-        query = Player.select().where(Player.title_id == self.current_title_id).order_by(Player.rank.desc())
+        query = Player.select().where(
+            (Player.title_id == self.current_title_id) &
+            (Player.sex == self.current_sex)
+            ).order_by(Player.rank.desc())
         if exclude_x:
             query = query.where((Player.player != "X") & (Player.fio != "X") & (Player.fio_city != "X")).order_by(Player.rank.desc())
         
@@ -22084,7 +22091,8 @@ class MainWindow(QMainWindow):
         x_player = Player.get_or_none(
             (Player.player == "X") &
             (Player.fio == "X") &
-            (Player.fio_city == "X")
+            (Player.fio_city == "X") &
+            (Player.sex == self.current_sex)
         )
         
         if x_player:

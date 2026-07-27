@@ -7094,10 +7094,7 @@ class MainWindow(QMainWindow):
             print(f"Удалено записей Choice: {deleted_choices}")
             
             # Удаляем этапы
-            deleted_systems = System.delete().where(
-                (System.title_id == self.current_title_id) &
-                 (System.sex == self.current_sex)
-                 ).execute()
+            deleted_systems = System.delete().where((System.title_id == self.current_title_id) & (System.sex == self.current_sex)).execute()
             print(f"Удалено этапов: {deleted_systems}")
             
             # Сбрасываем текущий этап
@@ -10681,10 +10678,10 @@ class MainWindow(QMainWindow):
         if not stage_name:
             QMessageBox.warning(self, "Ошибка", "Введите название этапа")
             return
-        sex = self.current_sex
+        # sex = self.current_sex
         table_type = self.table_type.currentText()
         score_flag = self.score_flag.currentText()
-        total_players = Player.select().where((Player.title_id == self.current_title_id) & (Player.sex == sex)).count()
+        total_players = Player.select().where((Player.title_id == self.current_title_id) & (Player.sex == self.current_sex)).count()
         
         # Получаем предыдущий этап
         previous_stage = System.select().where(
@@ -10997,6 +10994,12 @@ class MainWindow(QMainWindow):
 
                 # # определяем число игроков в последнем финале               
                 total_in_this_final = total_groups * exit_val
+                # ==== вариант точного числа игроков в последнем финале ==
+                if total_groups * exit_val > players_not_out:
+                    total_in_this_final = players_not_out
+                else:
+                    total_in_this_final = total_groups * exit_val
+                #=====================================
 
                 if exit_val > remaining_players:
                     # Показываем предупреждение, не изменяя значение
@@ -11024,7 +11027,7 @@ class MainWindow(QMainWindow):
                 games_in_this_final = self.calculate_total_games(
                     self.table_type.currentText(), 
                     total_in_this_final, 
-                    1, 
+                    total_groups, 
                     group_sizes, 
                     stage_name, 
                     previous_stage
@@ -11186,17 +11189,18 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Ошибка", f"Не удалось добавить этап: {str(e)}") 
 
         # ==========
-        if total_players <= all_posev_player:
-            self.fill_choice_table()
+        if self.is_final_stage(stage_name):
+            if total_players <= all_posev_player:
+                self.fill_choice_table()
 
-            self.get_or_create_x_player()
+                self.get_or_create_x_player()
 
-            reply = QMessageBox.question(self, "Завершение посева", 
-                                        f"✅ Все {total_players} игроков распределены по финалам!\n\n"
-                                        f"Провести жеребьевку квалификации сейчас?",
-                                        QMessageBox.Yes | QMessageBox.No)
-            if reply == QMessageBox.Yes:
-                self.perform_drawing()
+                reply = QMessageBox.question(self, "Завершение посева", 
+                                            f"✅ Все {total_players} игроков распределены по финалам!\n\n"
+                                            f"Провести жеребьевку квалификации сейчас?",
+                                            QMessageBox.Yes | QMessageBox.No)
+                if reply == QMessageBox.Yes:
+                    self.perform_drawing()
 # =================================
     def get_competition_tables(self):
         title = Title.get_by_id(self.current_title_id)
@@ -11443,7 +11447,7 @@ class MainWindow(QMainWindow):
                 group_sizes.append(base)
         
         return group_sizes
-    # =============================
+
     def calculate_group_distribution(self, players, groups):
         """Расчет распределения участников по группам"""
         if groups <= 0:
@@ -11459,28 +11463,37 @@ class MainWindow(QMainWindow):
             return f"{groups} гр по {base} чел."
         else:
             return f"{groups} гр ({remainder} гр по {base + 1} чел., {groups - remainder} гр по {base} чел.)"
-#============
-    def calculate_total_games(self, table_type, total_players, groups_count, group_sizes, stage_name=None, previous_stage=None):
+
+    def calculate_total_games(self, table_type, total_in_this_final, groups_count, group_sizes, stage_name=None, previous_stage=None):
         """Расчет общего количества игр с учетом типа этапа и уже сыгранных встреч"""
-        if total_players == 0:
+  
+        if total_in_this_final == 0:
             return 0
         
+        total_games_playing = 0
         total_games = 0
-        
+
         if "Круговая" in table_type:
             # Для финала (точно не полуфинал)
+            already_played = []
+
             if self.is_final_stage(stage_name) and previous_stage:
+                total_player = Player.select().where((Player.title_id == self.current_title_id) & (Player.sex == self.current_sex)).count()
+                group_sizes = self.calculate_group_sizes(total_player, groups_count)
                 # В финале играют участники из разных групп предыдущего этапа
-                total_possible = (total_players * (total_players - 1)) // 2
-                
-                # Вычитаем игры, сыгранные внутри каждой группы предыдущего этапа
-                already_played = 0
                 # Количество участников из одной группы в финале
                 players_per_previous_group = previous_stage.mesta_exit
-                if players_per_previous_group > 1:
-                    already_played = (players_per_previous_group * (players_per_previous_group - 1)) // 2 * previous_stage.total_group
+
+                for p in group_sizes:
+                    already_played.append(p - players_per_previous_group)
+
+                for group_size in already_played:
+                    if group_size > 1:
+                        total_games_playing += (group_size * (group_size - 1)) // 2
+
+                total_possible = (sum(already_played) * (sum(already_played) - 1)) // 2
                 
-                total_games = total_possible - already_played
+                total_games = total_possible - total_games_playing
             else:
                 # Для остальных этапов (квалификация, полуфиналы)
                 for group_size in group_sizes:
@@ -11501,7 +11514,7 @@ class MainWindow(QMainWindow):
                     total_games += group_size - 1
         
         return total_games
-  # ========================  
+  
     def create_system_settings(self):
         """Создание новой системы проведения (вызывается из меню)"""
         # Переключаемся на вкладку Система

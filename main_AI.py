@@ -5383,6 +5383,9 @@ class MainWindow(QMainWindow):
                 # Вызываем специальный метод для левой панели
                 self.update_left_panel_for_extra_tab()
 
+                # обновляем этапы для бегунков
+                self.update_runner_stages()
+
                 # Загружаем даты для фильтра
                 self.load_competition_dates_for_filter()
                 # Обновляем список этапов для расписания
@@ -11095,48 +11098,11 @@ class MainWindow(QMainWindow):
             # если финал 
             total_groups = 1 
 
-            
-            # ==========
-            # if total_players <= all_posev_player:
-            #     self.fill_choice_table()
-
-            #     self.get_or_create_x_player()
-
-            #     reply = QMessageBox.question(self, "Завершение посева", 
-            #                                 f"✅ Все {total_players} игроков распределены по финалам!\n\n"
-            #                                 f"Провести жеребьевку квалификации сейчас?",
-            #                                 QMessageBox.Yes | QMessageBox.No)
-            #     if reply == QMessageBox.Yes:
-            #         self.perform_drawing()
-                  
-
-            # # Сохраняем информацию о финале
-            # self.current_finals_info = {
-            #     'number': final_number,
-            #     'players': total_in_this_final,
-            #     'source': source_stage,
-            #     'places': f"{start_place}-{start_place + total_in_this_final - 1}"
-            # } 
-            # # если финал 
-            # total_groups = 1 
-              
     # Продолжаем сохранение в БД...
         else:
             QMessageBox.warning(self, "Ошибка", f"Неизвестный тип этапа: {stage_name}")
             return
-        # # ==========
-        # if total_players <= all_posev_player:
-        #     self.fill_choice_table()
 
-        #     self.get_or_create_x_player()
-
-        #     reply = QMessageBox.question(self, "Завершение посева", 
-        #                                 f"✅ Все {total_players} игроков распределены по финалам!\n\n"
-        #                                 f"Провести жеребьевку квалификации сейчас?",
-        #                                 QMessageBox.Yes | QMessageBox.No)
-        #     if reply == QMessageBox.Yes:
-        #         self.perform_drawing()    
-        # Сохраняем в базу данных
         try:
             
             system_data = {
@@ -11909,6 +11875,7 @@ class MainWindow(QMainWindow):
         for stage in stages:
             if "Квалификация" in stage.stage and "полуфинал" not in stage.stage:
                 qualification = stage
+                stage = stage.stage
                 break
         
         if not qualification:
@@ -14274,7 +14241,7 @@ class MainWindow(QMainWindow):
             # Получаем system_id для этапа
             system = System.get_or_none(
                 (System.title_id == self.current_title_id) &
-                (System.sex == self.currnt_sex) &
+                (System.sex == self.current_sex) &
                 (System.stage == stage)
             )
             
@@ -17307,7 +17274,10 @@ class MainWindow(QMainWindow):
         
         try:
             # Получаем все записи Choice для этого соревнования
-            choices = Choice.select().where(Choice.title_id == self.current_title_id).order_by(Choice.group)
+            choices = Choice.select().where(
+                (Choice.title_id == self.current_title_id) &
+                (Choice.sex == self.current_sex)
+                ).order_by(Choice.group)
             
             if choices.count() == 0:
                 QMessageBox.warning(self, "Ошибка", "Нет данных жеребьевки для заполнения результатов")
@@ -22883,27 +22853,7 @@ class MainWindow(QMainWindow):
             # Заполняем Choice
             group_name = "1 группа"
             for idx, player in enumerate(players, 1):
-                # Получаем тренера
-                coach_name = ""
-                if player.coach_id:
-                    coach = Coach.get_or_none(Coach.id == player.coach_id)
-                    if coach:
-                        coach_name = coach.coach
-                
-                Choice.create(
-                    player_choice=player.id,
-                    family=player.fio or player.player,
-                    region=player.region or "",
-                    coach=coach_name,
-                    rank=player.rank or 0,
-                    basic="",
-                    group=group_name,
-                    posev_group=idx,
-                    mesto_group=0,
-                    title_id=self.current_title_id,
-                    sex=player.sex
-                )
-                
+    
                 # Заполняем Game_list
                 Game_list.create(
                     number_group=group_name,

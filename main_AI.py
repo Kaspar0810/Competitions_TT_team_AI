@@ -14036,15 +14036,18 @@ class MainWindow(QMainWindow):
         # Определяем ориентацию страницы
         if pv == "альбомная":
             page_size = landscape(A4)
-            if max_pl <= 8:
+            if max_pl <= 3:
                 family_col = 5.0
-                # wcells = 20.0 / max_pl if max_pl > 0 else 1
+                wcells = 5.5 / max_pl if max_pl > 0 else 1
+            elif max_pl > 3 or max_pl <= 8:
+                family_col = 5.0
+                wcells = 20.0 / max_pl if max_pl > 0 else 1
                 # wcells = 5.5 / max_pl if max_pl > 0 else 1
             else:
                 family_col = 4.6
-                # wcells = 20.0 / max_pl if max_pl > 0 else 1
+                wcells = 20.0 / max_pl if max_pl > 0 else 1
             center_stage = 210
-            wcells = 20.0 / max_pl if max_pl > 0 else 1
+            # wcells = 20.0 / max_pl if max_pl > 0 else 1
         else:
             page_size = A4
             family_col = 5.0
@@ -18898,21 +18901,43 @@ class MainWindow(QMainWindow):
             self.group_filter_combo.blockSignals(True)
             self.tour_filter_combo.blockSignals(True)
             
-            # Получаем уникальные группы``
+            # # Получаем уникальные группы``
+            # groups = Result.select(Result.number_group).where(
+            #     (Result.title_id == self.current_title_id) &
+            #     (Result.system_stage == stage_name) &
+            #     (Result.sex == self.current_sex)
+            # ).distinct().order_by(Result.number_group)
+
+             # Получаем уникальные группы``
             groups = Result.select(Result.number_group).where(
                 (Result.title_id == self.current_title_id) &
-                (Result.system_stage == stage_name)
-            ).distinct().order_by(Result.number_group)
+                (Result.system_stage == stage_name) &
+                (Result.sex == self.current_sex)
+            )
             
             # Сохраняем текущее значение
             current_group = self.group_filter_combo.currentText()
-            
-            # Обновляем ComboBox групп
+            # упорядочить номера групп =====
+            # Нужно извлечь номер группы из number_group (если формат "Группа 1" или "1 группа")
+            results_list = list(groups)
+            results_list.sort(key=lambda r: (
+                self._extract_group_number(r.number_group)))
+
+            group_num = []
+             # Обновляем ComboBox групп
             self.group_filter_combo.clear()
             self.group_filter_combo.addItem("Все группы")
-            for group in groups:
-                if group.number_group:
+            for group in results_list:
+                if group.number_group not in group_num:
+                    group_num.append(group.number_group)
                     self.group_filter_combo.addItem(group.number_group)
+            #==============
+            # # Обновляем ComboBox групп
+            # self.group_filter_combo.clear()
+            # self.group_filter_combo.addItem("Все группы")
+            # for group in groups:
+            #     if group.number_group:
+            #         self.group_filter_combo.addItem(group.number_group)
             
             # Восстанавливаем значение, если оно было
             if current_group != "Все группы":

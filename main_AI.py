@@ -21117,10 +21117,13 @@ class MainWindow(QMainWindow):
         begunki_data = []
         
         # Базовый запрос результатов
-        results = Result.select().where((Result.title_id == self.current_title_id) )
+        results = Result.select().where((Result.title_id == self.current_title_id) & (Result.sex == self.current_sex))
   
         # Фильтр по этапу
-        if stage not in group_list:
+        
+        if stage == "Одна таблица":
+            results = results.where((Result.system_stage == stage) & (Result.winner.is_null()))
+        elif stage not in group_list:
             results = results.where((Result.number_group == stage) & (Result.winner.is_null()))
         else:
             results = results.where((Result.system_stage == stage) & (Result.winner.is_null()))
@@ -21154,7 +21157,7 @@ class MainWindow(QMainWindow):
                 pass
         
         # Получаем все системные этапы для определения типа таблицы
-        systems = {s.id: s for s in System.select().where(System.title_id == self.current_title_id) & (System.sex == self.current_sex)}
+        systems = {s.id: s for s in System.select().where((System.title_id == self.current_title_id) & (System.sex == self.current_sex))}
         
         for res in results:
             # Получаем тип таблицы

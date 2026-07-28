@@ -18638,15 +18638,23 @@ class MainWindow(QMainWindow):
                     self.group_filter_combo.setCurrentIndex(0)
             
             # Получаем уникальные туры
-            if stage_name in group_list:
+            if stage_name == "Одна таблица":
                 rounds = Result.select(Result.round).where(
                     (Result.title_id == self.current_title_id) &
-                    (Result.system_stage == stage_name)
+                    (Result.system_stage == stage_name) &
+                    (Result.sex == self.current_sex)
+                ).distinct().order_by(Result.round)
+            elif stage_name in group_list:
+                rounds = Result.select(Result.round).where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.system_stage == stage_name) &
+                    (Result.sex == self.current_sex)
                 ).distinct().order_by(Result.round)
             else:# финалы
                 rounds = Result.select(Result.round).where(
                     (Result.title_id == self.current_title_id) &
-                    (Result.number_group == stage_name)
+                    (Result.number_group == stage_name) &
+                    (Result.sex == self.current_sex)
                 ).distinct().order_by(Result.round)
             
             # Сохраняем текущее значение
@@ -18656,7 +18664,6 @@ class MainWindow(QMainWindow):
             self.tour_filter_combo.clear()
             self.tour_filter_combo.addItem("Все туры")
             for tour in rounds:
-                # if tour.tours and str(tour.tours).isdigit():
                 self.tour_filter_combo.addItem(tour.round)
             
             # Восстанавливаем значение, если оно было

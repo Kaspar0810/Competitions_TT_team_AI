@@ -20857,11 +20857,13 @@ class MainWindow(QMainWindow):
         if stage in group_list or stage == "Одна таблица":
             results = Result.select().where(
                 (Result.title_id == self.current_title_id) &
+                (Result.sex == self.current_sex) &
                 (Result.system_stage == stage)
             )
         else:
             results = Result.select().where(
                 (Result.title_id == self.current_title_id) &
+                (Result.sex == self.current_sex) &
                 (Result.number_group == stage)
             )
 
@@ -20895,8 +20897,9 @@ class MainWindow(QMainWindow):
             # Данные о соревновании
             title = Title.get_by_id(self.current_title_id)
             vozrast = title.vozrast
-            gamer_txt = title.sredi if title.sredi else "Участники"
-            gm = gamer_txt[:1] if gamer_txt else "У"
+            gm = "М" if self.current_sex == "man" else "Д"
+            # gamer_txt = title.sredi if title.sredi else "Участники"
+            # gm = gamer_txt[:1] if gamer_txt else "У"
             gr = ""
             n_f = ""
             # Сокращения этапов
@@ -20969,7 +20972,7 @@ class MainWindow(QMainWindow):
 
                 # Шаблон бегунка (10 строк, 4 колонки)
                 d_tmp = [
-                    [f"до {vozr}",'',gr, 'тур', 'вст', 'стол'],
+                    [f"{gm} до {vozr}",'',gr, 'тур', 'вст', 'стол'],
                     [sys_stage, '', n_gr, round_num, tours_str, ''],
                     [pl1_text, '', '', pl2_text, '', ''],
                     ['', '', '', '', '', ''],

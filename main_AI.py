@@ -10429,7 +10429,7 @@ class MainWindow(QMainWindow):
         
         return tab_widget
 # ======================================
-    def edit_system_settings(self):
+    def _edit_system_settings(self):
         """Редактирование существующей системы проведения"""
         if not self.current_title_id:
             QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
@@ -11634,17 +11634,17 @@ class MainWindow(QMainWindow):
                     if total_count > 0:
                         # Удаляем результаты
                         if results_count > 0:
-                            deleted = Result.delete().where(Result.system_id == system_id).execute()
+                            deleted = Result.delete().where((Result.system_id == system_id) & (Result.sex == self.current_sex)).execute()
                             print(f"Удалено {deleted} записей результатов")
                         
                         # Удаляем игры
                         if games_count > 0:
-                            deleted = Game_list.delete().where(Game_list.system_id == system_id).execute()
+                            deleted = Game_list.delete().where((Game_list.system_id == system_id) & (Game_list.sex == self.current_sex)).execute()
                             print(f"Удалено {deleted} записей игр")
                         
                         # Удаляем выборы
                         if choices_count > 0:
-                            deleted = Choice.delete().where(Choice.title_id == self.current_title_id).execute()
+                            deleted = Choice.delete().where((Choice.title_id == self.current_title_id) & (Choice.sex == self.current_sex)).execute()
                             print(f"Удалено {deleted} записей выборов")
                     
                     # Обновляем параметры этапа

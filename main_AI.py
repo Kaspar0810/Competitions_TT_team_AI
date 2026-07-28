@@ -419,12 +419,12 @@ class MainWindow(QMainWindow):
         self.gender_buttons_layout.setSpacing(10)
         left_layout.addLayout(self.gender_buttons_layout)
         
-        # Разделитель
-        line = QFrame()
-        line.setFrameShape(QFrame.HLine)
-        line.setFrameShadow(QFrame.Sunken)
-        line.setStyleSheet("background-color: #ccc; max-height: 2px; margin: 10px 0;")
-        left_layout.addWidget(line)
+        # # Разделитель
+        # line = QFrame()
+        # line.setFrameShape(QFrame.HLine)
+        # line.setFrameShadow(QFrame.Sunken)
+        # line.setStyleSheet("background-color: #ccc; max-height: 2px; margin: 10px 0;")
+        # left_layout.addWidget(line)
         
         # === СЕКЦИЯ ДЛЯ СОЗДАНИЯ ЭТАПА ===
         self.stage_section = QGroupBox("🏆 Создание этапа")
@@ -6331,7 +6331,6 @@ class MainWindow(QMainWindow):
         # Заменяем 'область' на 'обл.' (с учётом пробелов и регистра)
         region_name = region_name.replace(' область', ' обл.').replace('область', 'обл.')
         # Дополнительные сокращения (опционально)
-        # region_name = region_name.replace(' автономный округ', ' АО').replace('автономный округ', 'АО')
         region_name = region_name.replace(' край', ' кр.').replace('край', 'кр.')
         region_name = region_name.replace('г.', '').replace('г.', '')
         return region_name
@@ -6813,7 +6812,6 @@ class MainWindow(QMainWindow):
 
         semifinal_1_action = QAction("1-й полуфинал", self)
         semifinal_1_action.triggered.connect(lambda: self.run_drawing_for_stage("Квалификация. 1-й полуфинал"))
-        # semifinal_1_action.triggered.connect(lambda: self.choice_semifinal_automat("Квалификация. 1-й полуфинал"))
         semifinals_menu.addAction(semifinal_1_action)
 
         semifinal_2_action = QAction("2-й полуфинал", self)
@@ -6966,7 +6964,8 @@ class MainWindow(QMainWindow):
         # Рейтинг
         rating_menu = menubar.addMenu("Рейтинг")
         rating_action = QAction("Показать рейтинг", self)
-        rating_action.triggered.connect(lambda: QMessageBox.information(self, "Рейтинг", "Рейтинг"))
+        # rating_action.triggered.connect(lambda: QMessageBox.information(self, "Рейтинг", "Рейтинг"))
+        rating_action.triggered.connect(lambda:self.tab_widget.setCurrentIndex(6))
         rating_menu.addAction(rating_action)
         
         # База данных
@@ -7038,7 +7037,6 @@ class MainWindow(QMainWindow):
             return
         
         days = 3
-        # now = datetime.datetime.now()
         now = datetime.now()
         old_files = []
         for filename in os.listdir(backup_dir):
@@ -7453,7 +7451,7 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'btn_filter_deleted') and self.btn_filter_deleted is not None:
             if self.btn_filter_deleted.isChecked():
                 self.btn_filter_deleted.setChecked(False)
-                self.btn_filter_deleted.setText("📋 Показать удаленных")
+                self.btn_filter_deleted.setText("📋 Показать\n удаленных")
         
         # Сбрасываем фильтр предварительных заявок
         if hasattr(self, 'btn_filter_preliminary') and self.btn_filter_preliminary is not None:
@@ -7958,7 +7956,7 @@ class MainWindow(QMainWindow):
                 return
         title_data = {
         # ... другие поля ...
-        'tab_enabled': "Титул Участники",  # Начальное значение - только вкладка Титул активна
+        'tab_enabled': "Титул Участники Рейтинг Дополнительно",  # Начальное значение - только вкладка Титул активна
         # ... остальные поля ...
         }
         # Формируем полное имя
@@ -8015,7 +8013,7 @@ class MainWindow(QMainWindow):
                     secretary=secretary_name,
                     kat_sec=self.new_comp_secretary_cat.currentText(),
                     vid_turnira=self.selected_tournament_type if hasattr(self, 'selected_tournament_type') else "Личные",
-                    tab_enabled="Титул Участники",  # Сразу активируем вкладку Участники
+                    tab_enabled="Титул Участники Рейтинг Дополнительно",  # Сразу активируем вкладку Участники
                     multiregion=0,
                     perenos=0,
                     otchestvo=0,
@@ -8037,7 +8035,7 @@ class MainWindow(QMainWindow):
                 title.kat_ref = self.new_comp_referee_cat.currentText()
                 title.secretary = secretary_name
                 title.kat_sec = self.new_comp_secretary_cat.currentText()
-                title.tab_enabled = "Титул Участники"  # Активируем вкладку Участники
+                title.tab_enabled = "Титул Участники Рейтинг Дополнительно"  # Активируем вкладку Участники
                 title.save()
 
                 # Создаем начальную систему
@@ -9767,7 +9765,7 @@ class MainWindow(QMainWindow):
         archive_layout.setSpacing(10)
         
         # Кнопка фильтрации удаленных игроков
-        self.btn_filter_deleted = QPushButton("📋 Показать удаленных")
+        self.btn_filter_deleted = QPushButton("📋 Показать\n удаленных")
         self.btn_filter_deleted.setCheckable(True)
         self.btn_filter_deleted.setStyleSheet("""
             QPushButton {
@@ -9786,7 +9784,7 @@ class MainWindow(QMainWindow):
         archive_layout.addWidget(self.btn_filter_deleted)
         
         # Кнопка восстановления выбранного игрока
-        btn_restore = QPushButton("🔄 Восстановить выбранного")
+        btn_restore = QPushButton("🔄 Восстановить\n выбранного")
         btn_restore.setStyleSheet("""
             QPushButton {
                 background-color: #4CAF50;
@@ -9966,7 +9964,7 @@ class MainWindow(QMainWindow):
         else:
             # Показываем активных игроков
             self.load_participants_for_title()
-            self.btn_filter_deleted.setText("📋 Показать удаленных")
+            self.btn_filter_deleted.setText("📋 Показать\n удаленных")
             # Восстанавливаем цвет заголовка
             self.table_header.setStyleSheet("""
                 background-color: #2196F3;
@@ -9982,7 +9980,7 @@ class MainWindow(QMainWindow):
         # Сбрасываем фильтр удаленных
         if self.btn_filter_deleted.isChecked():
             self.btn_filter_deleted.setChecked(False)
-            self.btn_filter_deleted.setText("📋 Показать удаленных")
+            self.btn_filter_deleted.setText("📋 Показ удаленных")
         
         # Сбрасываем остальные фильтры
         self.reset_filters()

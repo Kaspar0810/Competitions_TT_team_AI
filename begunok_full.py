@@ -99,14 +99,14 @@ class BegunokPDF:
         
         # Строка 5: =[1]Список!A2
         row5 = [""] * cols
-        row5[0] = "Надежды России"
+        row5[0] = f"{data.get('comp_name', '_____')}"
         row5[23] = "Стол"
         row5[28] = f"{data.get('table', '___')}"
         table_data.append(row5)
         
         # Строка 6: =[1]Список!A3
         row6 = [""] * cols
-        row6[0] = ""
+        row6[0] = f"{data.get('sredi', '_____')}"
         row6[23] = "Стадия"
         row6[28] = f"{data.get('stage', '_____')}"
         table_data.append(row6)

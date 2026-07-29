@@ -21959,7 +21959,10 @@ class MainWindow(QMainWindow):
         if len(results) == 0:   
             QMessageBox.warning(self, "Ошибка", "Нет данных для печати бегунков")
             return None
-
+        # Название соревнования
+        title = Title.get_or_none(Title.id == self.current_title_id)
+        comp_name = title.name
+        sredi = f"{title.sredi} {title.vozrast}"
         # Фильтр по группе/финалу
         if subgroup and subgroup not in ["Все группы", "Все финалы", ""]:
             if stage == "Одна таблица":
@@ -22025,6 +22028,8 @@ class MainWindow(QMainWindow):
             player2 = self.parse_player_for_runner(player2_full)
             
             data = {
+                'comp_name':comp_name,
+                'sredi':sredi,
                 'date': date_str,
                 'time': time_str,
                 'table': table,

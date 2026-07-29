@@ -12081,338 +12081,338 @@ class MainWindow(QMainWindow):
                                     f"👥 Количество участников финала: {auto_players} чел.\n"
                                     f"(Из {last_stage.total_group} групп выходит по {last_stage.mesta_exit} чел.)")
  # ==================================                             
-    # def perform_drawing(self):
-    #     """Проведение жеребьевки квалификации с выбором типа"""
-    #     # Проверяем, есть ли этапы для жеребьевки
-    #     stages = System.select().where((System.title_id == self.current_title_id) & (System.sex == self.current_sex))
-    #     qualification = None
-        
-    #     for stage in stages:
-    #         if "Квалификация" in stage.stage and "полуфинал" not in stage.stage:
-    #             qualification = stage
-    #             stage = stage.stage
-    #             break
-        
-    #     if not qualification:
-    #         QMessageBox.warning(self, "Ошибка", "Нет этапа квалификации для жеребьевки")
-    #         return
-
-    #     # Выбор типа жеребьевки
-    #     self.drawing_for_stage(stage)
-
-# ===вариант с игроками сразу в финале ===
     def perform_drawing(self):
         """Проведение жеребьевки квалификации с выбором типа"""
-        stages = System.select().where(System.title_id == self.current_title_id)
+        # Проверяем, есть ли этапы для жеребьевки
+        stages = System.select().where((System.title_id == self.current_title_id) & (System.sex == self.current_sex))
         qualification = None
         
         for stage in stages:
             if "Квалификация" in stage.stage and "полуфинал" not in stage.stage:
                 qualification = stage
+                stage = stage.stage
                 break
         
         if not qualification:
             QMessageBox.warning(self, "Ошибка", "Нет этапа квалификации для жеребьевки")
             return
 
-        # ---- НОВЫЙ ДИАЛОГ ----
-        bypass_players = self._get_bypass_players_for_final()
-        if bypass_players is None:
-            return  # пользователь отменил
+        # Выбор типа жеребьевки
+        self.drawing_for_stage(stage)
 
-        # Сохраняем количество игроков, которые идут сразу в финал
-        self.bypass_count = bypass_players
+# ===вариант с игроками сразу в финале ===
+    # def perform_drawing(self):
+    #     """Проведение жеребьевки квалификации с выбором типа"""
+    #     stages = System.select().where(System.title_id == self.current_title_id)
+    #     qualification = None
+        
+    #     for stage in stages:
+    #         if "Квалификация" in stage.stage and "полуфинал" not in stage.stage:
+    #             qualification = stage
+    #             break
+        
+    #     if not qualification:
+    #         QMessageBox.warning(self, "Ошибка", "Нет этапа квалификации для жеребьевки")
+    #         return
 
-        # Передаём это значение в жеребьёвку
-        self.drawing_for_stage(qualification.stage, bypass_players)
+    #     # ---- НОВЫЙ ДИАЛОГ ----
+    #     bypass_players = self._get_bypass_players_for_final()
+    #     if bypass_players is None:
+    #         return  # пользователь отменил
 
-    def _get_bypass_players_for_final(self):
-        """
-        Запрашивает, будут ли игроки сразу в финале без квалификации.
-        Возвращает количество таких игроков или None, если отменено.
-        """
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Игроки сразу в финале")
-        dialog.setModal(True)
-        dialog.setMinimumWidth(400)
+    #     # Сохраняем количество игроков, которые идут сразу в финал
+    #     self.bypass_count = bypass_players
 
-        layout = QVBoxLayout(dialog)
+    #     # Передаём это значение в жеребьёвку
+    #     self.drawing_for_stage(qualification.stage, bypass_players)
 
-        label = QLabel("Будут ли игроки сразу участвовать в 1-м финале без игр в квалификации?")
-        label.setWordWrap(True)
-        layout.addWidget(label)
+    # def _get_bypass_players_for_final(self):
+    #     """
+    #     Запрашивает, будут ли игроки сразу в финале без квалификации.
+    #     Возвращает количество таких игроков или None, если отменено.
+    #     """
+    #     dialog = QDialog(self)
+    #     dialog.setWindowTitle("Игроки сразу в финале")
+    #     dialog.setModal(True)
+    #     dialog.setMinimumWidth(400)
 
-        # Кнопки
-        btn_layout = QHBoxLayout()
-        yes_btn = QPushButton("✅ Да")
-        no_btn = QPushButton("❌ Нет")
-        cancel_btn = QPushButton("Отмена")
+    #     layout = QVBoxLayout(dialog)
 
-        result = [None]  # используем список для изменения внутри замыкания
+    #     label = QLabel("Будут ли игроки сразу участвовать в 1-м финале без игр в квалификации?")
+    #     label.setWordWrap(True)
+    #     layout.addWidget(label)
 
-        def set_yes():
-            # Спрашиваем количество
-            count, ok = QInputDialog.getInt(
-                self,
-                "Количество игроков в финале",
-                "Сколько игроков сразу попадают в 1-й финал?",
-                16, 1, 64
-            )
-            if ok:
-                result[0] = count
-                dialog.accept()
-            else:
-                result[0] = None
+    #     # Кнопки
+    #     btn_layout = QHBoxLayout()
+    #     yes_btn = QPushButton("✅ Да")
+    #     no_btn = QPushButton("❌ Нет")
+    #     cancel_btn = QPushButton("Отмена")
 
-        def set_no():
-            result[0] = 0
-            dialog.accept()
+    #     result = [None]  # используем список для изменения внутри замыкания
 
-        yes_btn.clicked.connect(set_yes)
-        no_btn.clicked.connect(set_no)
-        cancel_btn.clicked.connect(dialog.reject)
+    #     def set_yes():
+    #         # Спрашиваем количество
+    #         count, ok = QInputDialog.getInt(
+    #             self,
+    #             "Количество игроков в финале",
+    #             "Сколько игроков сразу попадают в 1-й финал?",
+    #             16, 1, 64
+    #         )
+    #         if ok:
+    #             result[0] = count
+    #             dialog.accept()
+    #         else:
+    #             result[0] = None
 
-        btn_layout.addWidget(yes_btn)
-        btn_layout.addWidget(no_btn)
-        btn_layout.addWidget(cancel_btn)
-        layout.addLayout(btn_layout)
+    #     def set_no():
+    #         result[0] = 0
+    #         dialog.accept()
 
-        dialog.exec_()
-        return result[0]
+    #     yes_btn.clicked.connect(set_yes)
+    #     no_btn.clicked.connect(set_no)
+    #     cancel_btn.clicked.connect(dialog.reject)
 
-    def auto_drawing_for_stage(self, stage, bypass_count=0):
-        """Автоматическая жеребьевка для указанного этапа с учётом игроков, сразу попавших в финал"""
-        try:
-            systems = System.select().where((System.title_id == self.current_title_id) & (System.stage == stage)).get()
-            exit_count = systems.mesta_exit
-            source_stage = systems.stage_exit
-            type_table = systems.type_table
-            num_groups = systems.total_group
+    #     btn_layout.addWidget(yes_btn)
+    #     btn_layout.addWidget(no_btn)
+    #     btn_layout.addWidget(cancel_btn)
+    #     layout.addLayout(btn_layout)
 
-            # Получаем список игроков
-            athletes = []
-            players = self.get_real_players_for_stage(exclude_x=True)
-            players_list = list(players)
+    #     dialog.exec_()
+    #     return result[0]
 
-            # ---- УЧЁТ BYPASS ----
-            if bypass_count > 0:
-                # Сортируем по рейтингу (по убыванию)
-                players_list.sort(key=lambda p: p.rank or 0, reverse=True)
-                # Первые bypass_count игроков идут сразу в финал
-                bypass_players = players_list[:bypass_count]
-                # Остальные участвуют в квалификации
-                players_for_qualification = players_list[bypass_count:]
-                # Сохраняем освобождённых для последующего использования в финале
-                self.bypass_players_list = bypass_players
-            else:
-                players_for_qualification = players_list
-                self.bypass_players_list = []
+    # def auto_drawing_for_stage(self, stage, bypass_count=0):
+    #     """Автоматическая жеребьевка для указанного этапа с учётом игроков, сразу попавших в финал"""
+    #     try:
+    #         systems = System.select().where((System.title_id == self.current_title_id) & (System.stage == stage)).get()
+    #         exit_count = systems.mesta_exit
+    #         source_stage = systems.stage_exit
+    #         type_table = systems.type_table
+    #         num_groups = systems.total_group
 
-            # Формируем список для жеребьёвки
-            for pl in players_for_qualification:
-                id = pl.id
-                player = pl.fio
-                rank = pl.rank
-                region = pl.region
-                coaches = Coach.get(Coach.id == pl.coach_id)
-                coach = coaches.coach
-                gamer = [id, player, rank, region, coach]
-                athletes.append(gamer)
+    #         # Получаем список игроков
+    #         athletes = []
+    #         players = self.get_real_players_for_stage(exclude_x=True)
+    #         players_list = list(players)
 
-            if stage == "Квалификация":
-                # Корректируем количество групп, если нужно
-                # Если bypass_count > 0, то количество групп может остаться тем же,
-                # но участников в группах станет меньше
-                auto_choice_group.choice_group_auto(self, athletes, num_groups, stage, parent=self)
-                self.fill_results_after_drawing()
-                QMessageBox.information(self, "Автоматическая жеребьевка", 
-                                        f"✅ Жеребьевка для этапа '{stage}' успешно проведена!\n\n"
-                                        f"📊 Параметры жеребьевки:\n"
-                                        f"   • Количество групп: {num_groups}\n"
-                                        f"   • Участников в группе: {systems.max_player}\n\n"
-                                        f"Таблицы Choice и Result обновлены.")
+    #         # ---- УЧЁТ BYPASS ----
+    #         if bypass_count > 0:
+    #             # Сортируем по рейтингу (по убыванию)
+    #             players_list.sort(key=lambda p: p.rank or 0, reverse=True)
+    #             # Первые bypass_count игроков идут сразу в финал
+    #             bypass_players = players_list[:bypass_count]
+    #             # Остальные участвуют в квалификации
+    #             players_for_qualification = players_list[bypass_count:]
+    #             # Сохраняем освобождённых для последующего использования в финале
+    #             self.bypass_players_list = bypass_players
+    #         else:
+    #             players_for_qualification = players_list
+    #             self.bypass_players_list = []
+
+    #         # Формируем список для жеребьёвки
+    #         for pl in players_for_qualification:
+    #             id = pl.id
+    #             player = pl.fio
+    #             rank = pl.rank
+    #             region = pl.region
+    #             coaches = Coach.get(Coach.id == pl.coach_id)
+    #             coach = coaches.coach
+    #             gamer = [id, player, rank, region, coach]
+    #             athletes.append(gamer)
+
+    #         if stage == "Квалификация":
+    #             # Корректируем количество групп, если нужно
+    #             # Если bypass_count > 0, то количество групп может остаться тем же,
+    #             # но участников в группах станет меньше
+    #             auto_choice_group.choice_group_auto(self, athletes, num_groups, stage, parent=self)
+    #             self.fill_results_after_drawing()
+    #             QMessageBox.information(self, "Автоматическая жеребьевка", 
+    #                                     f"✅ Жеребьевка для этапа '{stage}' успешно проведена!\n\n"
+    #                                     f"📊 Параметры жеребьевки:\n"
+    #                                     f"   • Количество групп: {num_groups}\n"
+    #                                     f"   • Участников в группе: {systems.max_player}\n\n"
+    #                                     f"Таблицы Choice и Result обновлены.")
                     
-                # Обновляем отображение информации
-                self.update_stages_info()
-            elif stage == "Квалификация. 1-й полуфинал":
-                #авто жеребьвка групп квалификации 1-ого полуфинала
-                self.choice_semifinal_automat("Квалификация. 1-й полуфинал")
-            else:
-                if type_table == "Круговая":
-                    # жеребьевка финала по кругу
-                    self.create_round_robin_final_automatically(stage, source_stage, exit_count)
-                else:
-                    # жеребьвка финальной сетки
-                    self.create_olimpic_final_automatically(stage, source_stage, exit_count)
+    #             # Обновляем отображение информации
+    #             self.update_stages_info()
+    #         elif stage == "Квалификация. 1-й полуфинал":
+    #             #авто жеребьвка групп квалификации 1-ого полуфинала
+    #             self.choice_semifinal_automat("Квалификация. 1-й полуфинал")
+    #         else:
+    #             if type_table == "Круговая":
+    #                 # жеребьевка финала по кругу
+    #                 self.create_round_robin_final_automatically(stage, source_stage, exit_count)
+    #             else:
+    #                 # жеребьвка финальной сетки
+    #                 self.create_olimpic_final_automatically(stage, source_stage, exit_count)
 
-        except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Ошибка при автоматической жеребьевке: {str(e)}")
+    #     except Exception as e:
+    #         QMessageBox.critical(self, "Ошибка", f"Ошибка при автоматической жеребьевке: {str(e)}")
 
-    def create_olimpic_final_automatically(self, stage, source_stage, exit_count):
-        """автоматическая жеребьевка по олимпийской системе с учётом освобождённых игроков"""
-        system = System.get_or_none((System.title_id == self.current_title_id) & (System.stage == stage))
+#     def create_olimpic_final_automatically(self, stage, source_stage, exit_count):
+#         """автоматическая жеребьевка по олимпийской системе с учётом освобождённых игроков"""
+#         system = System.get_or_none((System.title_id == self.current_title_id) & (System.stage == stage))
         
-        # Получаем игроков из источника (квалификация/полуфинал)
-        if source_stage == "Квалификация" or source_stage is None:
-            players_by_group = self.get_players_from_qualification_for_final(stage, exit_count)
-        else:
-            players_by_group = self.get_players_for_final(stage, exit_count)
+#         # Получаем игроков из источника (квалификация/полуфинал)
+#         if source_stage == "Квалификация" or source_stage is None:
+#             players_by_group = self.get_players_from_qualification_for_final(stage, exit_count)
+#         else:
+#             players_by_group = self.get_players_for_final(stage, exit_count)
 
-        # ---- ДОБАВЛЯЕМ ОСВОБОЖДЁННЫХ ИГРОКОВ ----
-        if hasattr(self, 'bypass_players_list') and self.bypass_players_list:
-            # Создаём специальную группу для освобождённых игроков
-            bypass_group = []
-            for player in self.bypass_players_list:
-                bypass_group.append({
-                    'choice_id': None,  # или соответствующий choice_id
-                    'player_id': player.id,
-                    'name': player.fio,
-                    'city': player.city,
-                    'region': player.region,
-                    'rank': player.rank,
-                    'place': 0,  # место в группе (условно 0)
-                    'group': "Освобождённые"
-                })
-            # Добавляем освобождённых в начало или конец списка
-            # В зависимости от логики посева (обычно они должны быть вверху)
-            players_by_group["Освобождённые"] = bypass_group
+#         # ---- ДОБАВЛЯЕМ ОСВОБОЖДЁННЫХ ИГРОКОВ ----
+#         if hasattr(self, 'bypass_players_list') and self.bypass_players_list:
+#             # Создаём специальную группу для освобождённых игроков
+#             bypass_group = []
+#             for player in self.bypass_players_list:
+#                 bypass_group.append({
+#                     'choice_id': None,  # или соответствующий choice_id
+#                     'player_id': player.id,
+#                     'name': player.fio,
+#                     'city': player.city,
+#                     'region': player.region,
+#                     'rank': player.rank,
+#                     'place': 0,  # место в группе (условно 0)
+#                     'group': "Освобождённые"
+#                 })
+#             # Добавляем освобождённых в начало или конец списка
+#             # В зависимости от логики посева (обычно они должны быть вверху)
+#             players_by_group["Освобождённые"] = bypass_group
 
-        # ... остальной код жеребьёвки
-                # 1. Определяем источник игроков
-        if source_stage is not None:
-            if stage == "Одна таблица":
-                source_stage = "Одна таблица"
-            elif stage == "1-й финал":
-                # Сначала проверяем наличие 1-го полуфинала
-                semifinal1 = System.get_or_none(
-                    (System.title_id == self.current_title_id) &
-                    (System.sex == self.current_sex) &
-                    (System.stage == "Квалификация. 1-й полуфинал")
-                )
-                if semifinal1:
-                    source_stage = "Квалификация. 1-й полуфинал"
-                else:
-                    source_stage = "Квалификация"
-            else:
-                semifinal2 = System.get_or_none(
-                    (System.title_id == self.current_title_id) &
-                    (System.sex == self.current_sex) &
-                    (System.stage == "Квалификация. 2-й полуфинал")
-                )
-                if semifinal2:
-                    source_stage = "Квалификация. 2-й полуфинал"
-                else:
-                    source_stage = "Квалификация"
+#         # ... остальной код жеребьёвки
+#                 # 1. Определяем источник игроков
+#         if source_stage is not None:
+#             if stage == "Одна таблица":
+#                 source_stage = "Одна таблица"
+#             elif stage == "1-й финал":
+#                 # Сначала проверяем наличие 1-го полуфинала
+#                 semifinal1 = System.get_or_none(
+#                     (System.title_id == self.current_title_id) &
+#                     (System.sex == self.current_sex) &
+#                     (System.stage == "Квалификация. 1-й полуфинал")
+#                 )
+#                 if semifinal1:
+#                     source_stage = "Квалификация. 1-й полуфинал"
+#                 else:
+#                     source_stage = "Квалификация"
+#             else:
+#                 semifinal2 = System.get_or_none(
+#                     (System.title_id == self.current_title_id) &
+#                     (System.sex == self.current_sex) &
+#                     (System.stage == "Квалификация. 2-й полуфинал")
+#                 )
+#                 if semifinal2:
+#                     source_stage = "Квалификация. 2-й полуфинал"
+#                 else:
+#                     source_stage = "Квалификация"
         
-        # 2. Получаем игроков из источника
-        if "полуфинал" in source_stage.lower():
-            players_by_group, actual_exit_count = self.get_players_for_final(stage, exit_count=None)
-        elif stage == "Одна таблица":
-            players_by_group = self.get_players_from_one_table(stage, exit_count=None)
-        else:
-            players_by_group = self.get_players_from_qualification_for_final(stage, exit_count)
+#         # 2. Получаем игроков из источника
+#         if "полуфинал" in source_stage.lower():
+#             players_by_group, actual_exit_count = self.get_players_for_final(stage, exit_count=None)
+#         elif stage == "Одна таблица":
+#             players_by_group = self.get_players_from_one_table(stage, exit_count=None)
+#         else:
+#             players_by_group = self.get_players_from_qualification_for_final(stage, exit_count)
         
-        if not players_by_group:
-            QMessageBox.warning(self, "Ошибка", f"Нет игроков для финала {stage}")
-            return None
+#         if not players_by_group:
+#             QMessageBox.warning(self, "Ошибка", f"Нет игроков для финала {stage}")
+#             return None
         
-        # 3. Сортируем группы по номеру
-        # sorted_groups = sorted(players_by_group.keys(), key=self._extract_number_from_group) 
+#         # 3. Сортируем группы по номеру
+#         # sorted_groups = sorted(players_by_group.keys(), key=self._extract_number_from_group) 
 
-        # 4. Жеребьевка сетки автоматом
-        num_id_player = self.choice_net_automat(stage, players_by_group)
+#         # 4. Жеребьевка сетки автоматом
+#         num_id_player = self.choice_net_automat(stage, players_by_group)
 
-        posev_data = {} # окончательные посев номер в сетке - игрок/ город
+#         posev_data = {} # окончательные посев номер в сетке - игрок/ город
 
-        for i in num_id_player.keys():
-            tmp_list = list(num_id_player[i])
-            if tmp_list[0] == "X":
-                # Получаем ID игрока X
-                x_player_id = self.get_x_player_id()
-                posev_data[i] = {
-                'player_id':x_player_id,
-                 'name_city':'X',
-                 'name':'X'
-                }
-            else:
-                id = tmp_list[0]
-                pl_id = Player.get(Player.id == id)
-                family_city = pl_id.fio_city
-                family_shot = pl_id.fio
-                posev_data[i] = {
-                'player_id':id,
-                 'name_city':family_city,
-                 'name':family_shot
-                }
+#         for i in num_id_player.keys():
+#             tmp_list = list(num_id_player[i])
+#             if tmp_list[0] == "X":
+#                 # Получаем ID игрока X
+#                 x_player_id = self.get_x_player_id()
+#                 posev_data[i] = {
+#                 'player_id':x_player_id,
+#                  'name_city':'X',
+#                  'name':'X'
+#                 }
+#             else:
+#                 id = tmp_list[0]
+#                 pl_id = Player.get(Player.id == id)
+#                 family_city = pl_id.fio_city
+#                 family_shot = pl_id.fio
+#                 posev_data[i] = {
+#                 'player_id':id,
+#                  'name_city':family_city,
+#                  'name':family_shot
+#                 }
 
-        # 5. определение сетки и заполнение списком игроков после жеребьевки
-        self.determine_net_type(stage, posev_data)
+#         # 5. определение сетки и заполнение списком игроков после жеребьевки
+#         self.determine_net_type(stage, posev_data)
 
-        # 6. Заполняем Game_list и Choice
-        for pl in posev_data:
-            player = posev_data[pl]
-            choice_id = player['player_id']
-            # Обновляем Choice
-            Choice.update(
-                final=stage,
-                posev_final=pl,
-                mesto_final=0,
-            ).where(Choice.player_choice_id == choice_id).execute()
+#         # 6. Заполняем Game_list и Choice
+#         for pl in posev_data:
+#             player = posev_data[pl]
+#             choice_id = player['player_id']
+#             # Обновляем Choice
+#             Choice.update(
+#                 final=stage,
+#                 posev_final=pl,
+#                 mesto_final=0,
+#             ).where(Choice.player_choice_id == choice_id).execute()
 
-            # Создаём запись в Game_list
-            Game_list.create(
-                number_group=stage,
-                rank_num_player=pl,
-                player_group_id=player['player_id'],
-                system_id=system.id,
-                title_id=self.current_title_id,
-                sex=self.current_sex if self.current_sex else "man") 
+#             # Создаём запись в Game_list
+#             Game_list.create(
+#                 number_group=stage,
+#                 rank_num_player=pl,
+#                 player_group_id=player['player_id'],
+#                 system_id=system.id,
+#                 title_id=self.current_title_id,
+#                 sex=self.current_sex if self.current_sex else "man") 
             
-        # # 7. Создаём туры и матчи заполняем Results
-        max_pl = system.max_player
-        # число игр в сетке
-        total_game = self.number_game_of_net(stage)
-# =========== проба записи стадии ====
-        # наивысшее место 
-        highest_place = self.get_final_start_place(stage)
-        # определяет количество игр в сетке
-        game = self.number_game_of_net(stage)
+#         # # 7. Создаём туры и матчи заполняем Results
+#         max_pl = system.max_player
+#         # число игр в сетке
+#         total_game = self.number_game_of_net(stage)
+# # =========== проба записи стадии ====
+#         # наивысшее место 
+#         highest_place = self.get_final_start_place(stage)
+#         # определяет количество игр в сетке
+#         game = self.number_game_of_net(stage)
 
-        self.get_match_title(i, game, highest_place, max_pl)
-# =======================
-        # присваивает встречи 1-ого тура и записывает в тбл Results
-        for i in range(1, max_pl // 2 + 1):   
-            pl1 = posev_data[i * 2 - 1]['name_city']
-            pl2 = posev_data[i * 2]['name_city']
-            if pl1 is not None and pl2 is not None:
-                with db:
-                    results = Result(number_group=stage, system_stage='финальный', player1=pl1, player2=pl2,
-                                    tours=i, title_id=self.current_title_id, system_id=system.id).save()
-        # дополняет номера будущих встреч            
-        for i in range(max_pl // 2 + 1, total_game + 1): 
-            with db:
-                results = Result(number_group=stage, system_stage="Финальный", player1="", player2="",
-                                tours=i, title_id=self.current_title_id, system_id=system.id).save()
-# ===================================
-        # # # После цикла создания матчей и перед установкой флага
-        # self.update_schedule_stages()
-        # записывает стадии сетки в Result
-        stadia = self.whrite_stadia_on_net(game, highest_place, max_pl)
+#         self.get_match_title(i, game, highest_place, max_pl)
+# # =======================
+#         # присваивает встречи 1-ого тура и записывает в тбл Results
+#         for i in range(1, max_pl // 2 + 1):   
+#             pl1 = posev_data[i * 2 - 1]['name_city']
+#             pl2 = posev_data[i * 2]['name_city']
+#             if pl1 is not None and pl2 is not None:
+#                 with db:
+#                     results = Result(number_group=stage, system_stage='финальный', player1=pl1, player2=pl2,
+#                                     tours=i, title_id=self.current_title_id, system_id=system.id).save()
+#         # дополняет номера будущих встреч            
+#         for i in range(max_pl // 2 + 1, total_game + 1): 
+#             with db:
+#                 results = Result(number_group=stage, system_stage="Финальный", player1="", player2="",
+#                                 tours=i, title_id=self.current_title_id, system_id=system.id).save()
+# # ===================================
+#         # # # После цикла создания матчей и перед установкой флага
+#         # self.update_schedule_stages()
+#         # записывает стадии сетки в Result
+#         stadia = self.whrite_stadia_on_net(game, highest_place, max_pl)
 
-        results_stadia = Result.select().where((Result.title_id == self.current_title_id) & (Result.system_id == system.id))
+#         results_stadia = Result.select().where((Result.title_id == self.current_title_id) & (Result.system_id == system.id))
 
-        for k in results_stadia:
-            num_game = int(k.tours)
-            stadia_str = stadia[num_game]
-            Result.update(stage_net=stadia_str).where(Result.id == k).execute()
+#         for k in results_stadia:
+#             num_game = int(k.tours)
+#             stadia_str = stadia[num_game]
+#             Result.update(stage_net=stadia_str).where(Result.id == k).execute()
 
-        # 9. Устанавливаем флаг choice_flag для записей Choice, участвующих в финале
-        self.set_choice_flag_for_stage(stage, flag=1)
+#         # 9. Устанавливаем флаг choice_flag для записей Choice, участвующих в финале
+#         self.set_choice_flag_for_stage(stage, flag=1)
         
-        QMessageBox.information(self, "Успех",
-            f"Автоматическая жеребьёвка {stage} завершена.")
+#         QMessageBox.information(self, "Успех",
+#             f"Автоматическая жеребьёвка {stage} завершена.")
         
-        self.check_olympic_pairs_conflicts(stage)
+#         self.check_olympic_pairs_conflicts(stage)
 # ========
 
     def calculate_semifinal_games(self, groups_count, players_per_group, exit_count):
@@ -13660,62 +13660,62 @@ class MainWindow(QMainWindow):
         else:
             self.manual_drawing_for_stage(stage)
 # ========== вариант без игроков в финале ==
-    # def auto_drawing_for_stage(self, stage):
-    #     """Автоматическая жеребьевка для указанного этапа"""
-    #     try:
-    #         systems = System.select().where(
-    #             (System.title_id == self.current_title_id) &
-    #             (System.stage == stage) &
-    #             (System.sex == self.current_sex)
-    #             ).get()
-    #         exit_count = systems.mesta_exit
-    #         source_stage = systems.stage_exit
-    #         type_table = systems.type_table
-    #         num_groups = systems.total_group
+    def auto_drawing_for_stage(self, stage):
+        """Автоматическая жеребьевка для указанного этапа"""
+        try:
+            systems = System.select().where(
+                (System.title_id == self.current_title_id) &
+                (System.stage == stage) &
+                (System.sex == self.current_sex)
+                ).get()
+            exit_count = systems.mesta_exit
+            source_stage = systems.stage_exit
+            type_table = systems.type_table
+            num_groups = systems.total_group
 
-    #         # Получаем список игроков
-    #         athletes = []
-    #         players = self.get_real_players_for_stage(exclude_x=True)
-    #         players_list = list(players)
-    #         for pl in players_list:
-    #             id = pl.id
-    #             player = pl.fio
-    #             rank = pl.rank
-    #             region = pl.region
-    #             coaches = Coach.get(Coach.id == pl.coach_id)
-    #             coach = coaches.coach
-    #             gamer = [id, player, rank, region, coach]
-    #             athletes.append(gamer)
+            # Получаем список игроков
+            athletes = []
+            players = self.get_real_players_for_stage(exclude_x=True)
+            players_list = list(players)
+            for pl in players_list:
+                id = pl.id
+                player = pl.fio
+                rank = pl.rank
+                region = pl.region
+                coaches = Coach.get(Coach.id == pl.coach_id)
+                coach = coaches.coach
+                gamer = [id, player, rank, region, coach]
+                athletes.append(gamer)
 
-    #         if stage == "Квалификация":
-    #             #авто жеребьвка групп
-    #             auto_choice_group.choice_group_auto(self, athletes, num_groups, stage, parent=self)
+            if stage == "Квалификация":
+                #авто жеребьвка групп
+                auto_choice_group.choice_group_auto(self, athletes, num_groups, stage, parent=self)
 
-    #             # Заполняем таблицу Result после жеребьевки
-    #             self.fill_results_after_drawing()
+                # Заполняем таблицу Result после жеребьевки
+                self.fill_results_after_drawing()
             
-    #             QMessageBox.information(self, "Автоматическая жеребьевка", 
-    #                                 f"✅ Жеребьевка для этапа '{stage}' успешно проведена!\n\n"
-    #                                 f"📊 Параметры жеребьевки:\n"
-    #                                 f"   • Количество групп: {num_groups}\n"
-    #                                 f"   • Участников в группе: {systems.max_player}\n\n"
-    #                                 f"Таблицы Choice и Result обновлены.")
+                QMessageBox.information(self, "Автоматическая жеребьевка", 
+                                    f"✅ Жеребьевка для этапа '{stage}' успешно проведена!\n\n"
+                                    f"📊 Параметры жеребьевки:\n"
+                                    f"   • Количество групп: {num_groups}\n"
+                                    f"   • Участников в группе: {systems.max_player}\n\n"
+                                    f"Таблицы Choice и Result обновлены.")
                 
-    #             # Обновляем отображение информации
-    #             self.update_stages_info()
-    #         elif stage == "Квалификация. 1-й полуфинал":
-    #             #авто жеребьвка групп квалификации 1-ого полуфинала
-    #             self.choice_semifinal_automat("Квалификация. 1-й полуфинал")
-    #         else:
-    #             if type_table == "Круговая":
-    #                 # жеребьевка финала по кругу
-    #                 self.create_round_robin_final_automatically(stage, source_stage, exit_count)
-    #             else:
-    #                 # жеребьвка финальной сетки
-    #                 self.create_olimpic_final_automatically(stage, source_stage, exit_count)
+                # Обновляем отображение информации
+                self.update_stages_info()
+            elif stage == "Квалификация. 1-й полуфинал":
+                #авто жеребьвка групп квалификации 1-ого полуфинала
+                self.choice_semifinal_automat("Квалификация. 1-й полуфинал")
+            else:
+                if type_table == "Круговая":
+                    # жеребьевка финала по кругу
+                    self.create_round_robin_final_automatically(stage, source_stage, exit_count)
+                else:
+                    # жеребьвка финальной сетки
+                    self.create_olimpic_final_automatically(stage, source_stage, exit_count)
 
-    #     except Exception as e:
-    #         QMessageBox.critical(self, "Ошибка", f"Ошибка при автоматической жеребьевке: {str(e)}")
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Ошибка при автоматической жеребьевке: {str(e)}")
 # ================================
     def manual_drawing_for_stage(self, stage):
         """Ручная жеребьевка для указанного этапа"""
@@ -14568,15 +14568,16 @@ class MainWindow(QMainWindow):
         # Определяем ориентацию страницы
         if pv == "альбомная":
             page_size = landscape(A4)
-            if max_pl <= 8:
+            if max_pl <= 3:
                 family_col = 5.0
-                # wcells = 20.0 / max_pl if max_pl > 0 else 1
-                # wcells = 5.5 / max_pl if max_pl > 0 else 1
+                wcells = 5.5 / max_pl if max_pl > 0 else 1
+            elif max_pl > 3 and max_pl <= 8:
+                family_col = 5.0
+                wcells = 20.0 / max_pl if max_pl > 0 else 1
             else:
                 family_col = 4.6
-                # wcells = 20.0 / max_pl if max_pl > 0 else 1
+                wcells = 20.0 / max_pl if max_pl > 0 else 1
             center_stage = 210
-            wcells = 20.0 / max_pl if max_pl > 0 else 1
         else:
             page_size = A4
             family_col = 5.0

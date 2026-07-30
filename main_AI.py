@@ -19754,8 +19754,6 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Сначала выберите этап для просмотра")
             return
 
-
-
         # Определяем тип этапа и ориентацию страницы
         stage = self.current_stage
 
@@ -19787,20 +19785,18 @@ class MainWindow(QMainWindow):
 
         # Создаем PDF файл
         try:
-            # if pdf_path and os.path.exists(pdf_path):
-            # file_name = os.path.join(pdf_dir, pdf_path)
-            if pdf_path and os.path.join(pdf_dir, pdf_path):
+            filename = os.path.join(pdf_dir, pdf_path)
+            if filename:
                 # Открываем PDF файл
                 if sys.platform == 'win32':
-                    os.startfile(file_name)
+                    os.startfile(filename)
                 else:
-                    os.system(f'open "{pdf_path}"')
+                    os.system(f'open "{filename}"')
             else:
                 QMessageBox.warning(self, "Ошибка", "Не удалось создать PDF файл")
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка при создании PDF: {str(e)}")
-
-       
+     
     def create_results_pdf(self, stage, pv="книжная"):
         """Создание PDF файла с результатами для указанного этапа"""
         from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer

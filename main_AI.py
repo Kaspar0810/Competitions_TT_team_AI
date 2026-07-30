@@ -14754,7 +14754,9 @@ class MainWindow(QMainWindow):
             name_table = f"{clean_name}_{sex}_{number_fin}-final.pdf"
         
         # Создаем PDF
-        doc = SimpleDocTemplate(name_table, pagesize=page_size)
+        filename = os.path.join(pdf_dir, name_table)
+
+        doc = SimpleDocTemplate(filename, pagesize=page_size)
         doc.topMargin = 1.8 * cm
         doc.leftMargin = 1 * cm
         
@@ -19785,10 +19787,12 @@ class MainWindow(QMainWindow):
 
         # Создаем PDF файл
         try:
-            if pdf_path and os.path.exists(pdf_path):
+            # if pdf_path and os.path.exists(pdf_path):
+            # file_name = os.path.join(pdf_dir, pdf_path)
+            if pdf_path and os.path.join(pdf_dir, pdf_path):
                 # Открываем PDF файл
                 if sys.platform == 'win32':
-                    os.startfile(pdf_path)
+                    os.startfile(file_name)
                 else:
                     os.system(f'open "{pdf_path}"')
             else:

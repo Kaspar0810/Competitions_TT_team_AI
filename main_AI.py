@@ -14532,6 +14532,11 @@ class MainWindow(QMainWindow):
         if not self.current_title_id:
             return
         
+        # Папка для сохранения
+        pdf_dir = "table_pdf"
+        if not os.path.exists(pdf_dir):
+            os.makedirs(pdf_dir)
+
         stage_list_sf = ["Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]
         
         # Получаем system_id для этапа
@@ -14542,7 +14547,7 @@ class MainWindow(QMainWindow):
         )
         # определяем пол для титула на PDF
         title = Title.get_by_id(self.current_title_id)
-        sex = title.sredi if title.sredi else "Участники"
+        # sex = title.sredi if title.sredi else "Участники"
 
         title_sex = self.sex_for_title(stage)
       
@@ -14727,16 +14732,18 @@ class MainWindow(QMainWindow):
         clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
         clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
         
+        sex = "M" if self.current_sex == "man" else "w"
+
         if stage == "Одна таблица":
             title_text = f"Финальные соревнования. Одиночный разряд. {title_sex}."
-            name_table = f"{clean_name}_one_table.pdf"
+            name_table = f"{clean_name}_{sex}_one_table.pdf"
         elif stage == "Квалификация":
             title_text = f"Квалификационные соревнования. {title_sex}."
-            name_table = f"{clean_name}_table_group.pdf"
+            name_table = f"{clean_name}_{sex}_table_group.pdf"
         elif stage in ["Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]:
             number_fin = stage[:stage.rfind("-")]
             title_text = f"{stage}. {title_sex}."
-            name_table = f"{clean_name}_{number_fin}-semifinal.pdf"
+            name_table = f"{clean_name}_{number_fin}_{sex}_semifinal.pdf"
         else:
             # Финал
             number_fin = stage[:stage.rfind("-")] if "-" in stage else stage
@@ -14744,7 +14751,7 @@ class MainWindow(QMainWindow):
             first_mesto = self.get_final_start_place(stage)
             last_mesto = first_mesto + max_pl - 1 if max_pl > 0 else first_mesto
             title_text = f'Финальные соревнования.({first_mesto}-{last_mesto} место). Одиночный разряд. {title_sex}.'
-            name_table = f"{clean_name}_{number_fin}-final.pdf"
+            name_table = f"{clean_name}_{sex}_{number_fin}-final.pdf"
         
         # Создаем PDF
         doc = SimpleDocTemplate(name_table, pagesize=page_size)
@@ -19744,7 +19751,9 @@ class MainWindow(QMainWindow):
         if not hasattr(self, 'current_stage') or not self.current_stage:
             QMessageBox.warning(self, "Ошибка", "Сначала выберите этап для просмотра")
             return
-                
+
+
+
         # Определяем тип этапа и ориентацию страницы
         stage = self.current_stage
 
@@ -19754,6 +19763,11 @@ class MainWindow(QMainWindow):
                 (System.stage == stage)
             )
         type_table = system.type_table
+
+        # Создаем папку для результатов
+        pdf_dir = "table_pdf"
+        if not os.path.exists(pdf_dir):
+            os.makedirs(pdf_dir)
 
         pv = "книжная"  # по умолчанию книжная
         
@@ -19782,6 +19796,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка при создании PDF: {str(e)}")
 
+       
     def create_results_pdf(self, stage, pv="книжная"):
         """Создание PDF файла с результатами для указанного этапа"""
         from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
@@ -21869,7 +21884,7 @@ class MainWindow(QMainWindow):
             # Получаем данные для бегунков (только несыгранные матчи)
             stiker_data = self.tbl_begunki(stage, subgroup, runner_type, tours="несыгранные")
 
-            # filename = f"{clean_name}_runners.pdf"
+
             filename = os.path.join(pdf_dir, f"{clean_name}_runners.pdf")
 
             if not stiker_data:

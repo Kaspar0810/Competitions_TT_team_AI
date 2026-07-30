@@ -2927,7 +2927,7 @@ class MainWindow(QMainWindow):
                 table = 1  # циклически
         # Сохраняем в БД для этих строк (вызываем обновление)
         self.save_table_values(selected_rows) 
-#
+
     def save_table_values(self, rows):
         """Сохраняет значения столов из таблицы в БД для указанных строк"""
         stage_name = self.schedule_stage_combo.currentText()
@@ -2959,7 +2959,7 @@ class MainWindow(QMainWindow):
                     result.save()
                 except:
                     pass  
-#
+
     def on_schedule_table_item_changed(self, item):
         # if item.column() != 5:  # только столбец "Стол"
         if item.column() != 6:  # только столбец "Стол"
@@ -4490,7 +4490,7 @@ class MainWindow(QMainWindow):
 
             # Сортируем список по числовому номеру группы, затем по туру
             results.sort(key=lambda r: (extract_group_number(r), int(r.round) if r.round else 0))
-# ========================
+
             # Формируем данные для модели
             data = []
             for result in results:
@@ -4923,98 +4923,6 @@ class MainWindow(QMainWindow):
                     
         except Exception as e:
             print(f"Ошибка при обработке Enter: {e}")
-
-#============================================================  
-    # def save_title_info(self):
-    #     """Сохранение информации о соревновании"""
-    #     if not self.comp_name_edit.text().strip():
-    #         QMessageBox.warning(self, "Ошибка", "Введите название соревнования")
-    #         return
-        
-    #     title_data = {
-    #         'name': self.comp_name_edit.text().strip(),
-    #         'sredi': self.comp_sredi_combo.currentText(),
-    #         'vozrast': self.comp_vozrast_combo.currentText(),
-    #         'data_start': self.comp_start_date.date().toPyDate(),
-    #         'data_end': self.comp_end_date.date().toPyDate(),
-    #         'mesto': self.comp_mesto_edit.text().strip(),
-    #         'city': self.comp_city_edit.text().strip(),
-    #         'referee': self.main_referee_edit.currentText(),
-    #         'kat_ref': self.referee_category_combo.currentText(),
-    #         'secretary': self.main_secretary_edit.text().strip(),
-    #         'kat_sec': self.secretary_category_combo.currentText(),
-    #         'vid_turnira': "Личное",
-    #         'full_name_comp': self.comp_name_edit.text().strip(),
-    #         'short_name_comp': self.comp_name_edit.text().strip()[:50],
-    #         'tab_enabled': "1",
-    #         'multiregion': 0,
-    #         'perenos': 0,
-    #         'otchestvo': 0,
-    #         'r_date': ""
-    #     }
-        
-    #     try:
-    #         if self.current_title_id:
-    #             query = Title.update(**title_data).where(Title.id == self.current_title_id)
-    #             query.execute()
-    #             QMessageBox.information(self, "Успех", "Информация о соревновании обновлена")
-    #         else:
-    #             title = Title.create(**title_data)
-    #             self.current_title_id = title.id
-    #             QMessageBox.information(self, "Успех", f"Соревнование '{title_data['name']}' создано")
-            
-    #         self.load_titles_list()
-    #         self.load_title_data()
-            
-    #     except Exception as e:
-    #         QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить данные: {str(e)}")
-    
-    
-    #     """Загрузка данных соревнования для редактирования"""
-    #     try:
-    #         title = Title.get_or_none(Title.id == self.current_title_id)
-    #         if title:
-    #             self.comp_name_edit.setText(title.name or "")
-                
-    #             index = self.comp_sredi_combo.findText(title.sredi or "")
-    #             if index >= 0:
-    #                 self.comp_sredi_combo.setCurrentIndex(index)
-                
-    #             index = self.comp_vozrast_combo.findText(title.vozrast or "")
-    #             if index >= 0:
-    #                 self.comp_vozrast_combo.setCurrentIndex(index)
-                
-    #             if title.data_start:
-    #                 self.comp_start_date.setDate(QDate(title.data_start.year, title.data_start.month, title.data_start.day))
-    #             if title.data_end:
-    #                 self.comp_end_date.setDate(QDate(title.data_end.year, title.data_end.month, title.data_end.day))
-    #             # === исправил загрузку города и места ====
-    #             mesto_txt = title.mesto
-    #             mark = mesto_txt.find("/")
-                
-    #             if mark == -1:
-    #                 self.comp_city_edit.setText(mesto_txt or "")
-    #             else: 
-    #                 mesto = mesto_txt[mark + 1:]
-    #                 city = mesto_txt[:mark] 
-    #                 self.comp_city_edit.setText(city or "")                 
-    #                 self.comp_mesto_edit.setText(mesto or "")
-    #             # ======= загрузка ГСК =======
-    #             main_referee = title.referee
-    #             main_secretary = title.secretary
-    #             self.main_referee_combo.setCurrentText(main_referee)
-    #             self.referee_category_combo.setCurrentText(main_secretary)
-    #             # =============
-                
-    #             index = self.referee_category_combo.findText(title.kat_ref or "")
-    #             if index >= 0:
-    #                 self.referee_category_combo.setCurrentIndex(index)
-                
-    #             index = self.secretary_category_combo.findText(title.kat_sec or "")
-    #             if index >= 0:
-    #                 self.secretary_category_combo.setCurrentIndex(index)
-    #     except Exception as e:
-    #         print(f"Ошибка загрузки данных: {e}")
     
     def clear_title_form(self):
         """Очистка формы титула"""
@@ -5114,7 +5022,7 @@ class MainWindow(QMainWindow):
 
                 # Обновляем список этапов для расписания      
                 self.update_schedule_stages()
-# ==================================================
+
     def update_finals_menu_after_selection(self):
         """Обновление меню финалов после выбора соревнования"""
         # Находим меню "Соревнования" -> "Жеребьевка" -> "Финалы"
@@ -5131,7 +5039,7 @@ class MainWindow(QMainWindow):
                                 break
                         break
                 break
-# ==================================================================
+
     def on_tab_changed(self, index):
         """Смена вкладки"""
         self.current_tab_index = index
@@ -5600,7 +5508,7 @@ class MainWindow(QMainWindow):
             import traceback
             traceback.print_exc()
             QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")
-# =======================================================
+
     def change_label_ListWidget(self, index):
         """Смена заголовка и QListWidget в зависимости от вкладки"""
         if index == 1 or index == 6:
@@ -6957,7 +6865,6 @@ class MainWindow(QMainWindow):
         # Рейтинг
         rating_menu = menubar.addMenu("Рейтинг")
         rating_action = QAction("Показать рейтинг", self)
-        # rating_action.triggered.connect(lambda: QMessageBox.information(self, "Рейтинг", "Рейтинг"))
         rating_action.triggered.connect(lambda:self.tab_widget.setCurrentIndex(6))
         rating_menu.addAction(rating_action)
         
@@ -7173,7 +7080,7 @@ class MainWindow(QMainWindow):
             print(f"Ошибка при сохранении БД: {e}")
             close_db()
             event.accept()
-    #==============================================
+
     def filter_by_alphabet(self):
         """Сортировка по алфавиту"""
         if not self.current_title_id:
@@ -13556,7 +13463,7 @@ class MainWindow(QMainWindow):
         """Установка типа жеребьевки и закрытие диалога"""
         self.drawing_type = drawing_type
         dialog.accept()
-
+#=================================
     def update_finals_menu(self, finals_menu):
         """Обновление меню финалов (динамически)"""
         # Очищаем меню
@@ -13586,7 +13493,35 @@ class MainWindow(QMainWindow):
                 final_action = QAction(final.stage, self)
                 final_action.triggered.connect(lambda checked, f=final: self.run_drawing_for_final(f))
                 finals_menu.addAction(final_action)
-
+# =======3007
+    # def update_finals_menu(self, finals_menu):
+    #     """Обновление меню финалов (динамически) с учётом пола"""
+    #     finals_menu.clear()
+        
+    #     if not self.current_title_id:
+    #         no_finals_action = QAction("Нет доступных финалов", self)
+    #         no_finals_action.setEnabled(False)
+    #         finals_menu.addAction(no_finals_action)
+    #         return
+        
+    #     sex_filter = self.current_sex if self.current_sex else "man"
+    #     finals = System.select().where(
+    #         (System.title_id == self.current_title_id) &
+    #         (System.stage.contains("финал")) &
+    #         (~System.stage.contains("полуфинал")) &
+    #         (System.sex == sex_filter)
+    #     ).order_by(System.id)
+        
+    #     if finals.count() == 0:
+    #         no_finals_action = QAction("Нет доступных финалов", self)
+    #         no_finals_action.setEnabled(False)
+    #         finals_menu.addAction(no_finals_action)
+    #     else:
+    #         for final in finals:
+    #             final_action = QAction(final.stage, self)
+    #             final_action.triggered.connect(lambda checked, f=final: self.run_drawing_for_final(f))
+    #             finals_menu.addAction(final_action)
+#======================
     def run_drawing_for_stage(self, stage_name):
         """Запуск жеребьевки для указанного этапа"""
         if not self.current_title_id:
@@ -16377,7 +16312,7 @@ class MainWindow(QMainWindow):
 
         finals = System.select().where(
             (System.title_id == self.current_title_id) &
-            (System.stage == fin)
+            (System.stage == fin) &
             (System.sex == self.current_sex)
             ).get()
         max_pl = finals.max_player # максимальное число игроков в сетке
@@ -19647,7 +19582,7 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             print(f"Ошибка фильтрации по игроку: {e}")
-
+# ========================================
     def update_results_menu(self):
         """Обновление меню результатов - активирует только те пункты, которые есть в системе"""
         if not self.current_title_id:
@@ -19685,13 +19620,53 @@ class MainWindow(QMainWindow):
                     
         except Exception as e:
             print(f"Ошибка обновления меню результатов: {e}")
+# ========== 3007
+    # def update_results_menu(self):
+    #     """Обновление меню результатов - активирует только те пункты, которые есть в системе для текущего пола"""
+    #     if not self.current_title_id:
+    #         for action in self.results_menu_actions.values():
+    #             action.setEnabled(False)
+    #         return
+        
+    #     try:
+    #         # Получаем все этапы из системы для текущего пола
+    #         sex_filter = self.current_sex if self.current_sex else "man"
+    #         stages = System.select().where(
+    #             (System.title_id == self.current_title_id) &
+    #             (System.sex == sex_filter)
+    #         )
+    #         stage_names = [s.stage for s in stages]
+            
+    #         # Активируем/деактивируем пункты меню в зависимости от наличия в системе
+    #         for stage_name, action in self.results_menu_actions.items():
+    #             action.setEnabled(stage_name in stage_names)
+            
+    #         # Обновляем подменю финалов
+    #         self.update_finals_results_menu(stage_names)
+            
+    #         # Также обновляем меню финалов для жеребьевки
+    #         for action in self.menuBar().actions():
+    #             if action.text() == "Соревнования":
+    #                 competitions_menu = action.menu()
+    #                 for sub_action in competitions_menu.actions():
+    #                     if sub_action.text() == "🎲 Жеребьевка":
+    #                         drawing_menu = sub_action.menu()
+    #                         for final_sub_action in drawing_menu.actions():
+    #                             if final_sub_action.text() == "Финалы":
+    #                                 finals_menu = final_sub_action.menu()
+    #                                 self.update_finals_menu(finals_menu)
+    #                                 break
+    #                         break
+    #                 break
+                    
+    #     except Exception as e:
+    #         print(f"Ошибка обновления меню результатов: {e}")
 
     def update_finals_results_menu(self, stage_names):
         """Обновление подменю финалов в меню результатов"""
-        # Очищаем существующее подменю
         self.finals_results_menu.clear()
         
-        # Находим все финалы в системе
+        # Находим все финалы в системе для текущего пола
         finals = [s for s in stage_names if "финал" in s.lower() and "полуфинал" not in s.lower()]
         
         if finals:
@@ -19703,7 +19678,26 @@ class MainWindow(QMainWindow):
             no_finals_action = QAction("Нет доступных финалов", self)
             no_finals_action.setEnabled(False)
             self.finals_results_menu.addAction(no_finals_action)
-
+            
+#==========================================
+    # def update_finals_results_menu(self, stage_names):
+    #     """Обновление подменю финалов в меню результатов"""
+    #     # Очищаем существующее подменю
+    #     self.finals_results_menu.clear()
+        
+    #     # Находим все финалы в системе
+    #     finals = [s for s in stage_names if "финал" in s.lower() and "полуфинал" not in s.lower()]
+        
+    #     if finals:
+    #         for final in sorted(finals):
+    #             final_action = QAction(final, self)
+    #             final_action.triggered.connect(lambda checked, f=final: self.show_results_for_stage(f))
+    #             self.finals_results_menu.addAction(final_action)
+    #     else:
+    #         no_finals_action = QAction("Нет доступных финалов", self)
+    #         no_finals_action.setEnabled(False)
+    #         self.finals_results_menu.addAction(no_finals_action)
+#==================================================
     def show_results_for_stage(self, stage_name):
         """Показать результаты для выбранного этапа"""
         if not self.current_title_id:
@@ -19764,6 +19758,14 @@ class MainWindow(QMainWindow):
             )
         type_table = system.type_table
 
+        choice_flag = 0
+
+        # Проверяем сделана ли жеребьевка для этапа
+        choice_flag = system.choice_flag
+        if choice_flag == 0:
+            QMessageBox.warning(self, "Ошибка", "Еще не сделана жеребьевка\nэтапа для просмотра")
+            return
+        
         # Создаем папку для результатов
         pdf_dir = "table_pdf"
         if not os.path.exists(pdf_dir):
@@ -25716,7 +25718,7 @@ class RatingFileDialog(QDialog):
             (Title.data_end == end_date)
         )
         return list(similar)
-
+#===============================
     def switch_gender_category(self, sex):
         """Переключение между мальчиками и девочками"""
         if self.current_sex == sex:
@@ -25738,6 +25740,38 @@ class RatingFileDialog(QDialog):
                 count = self.players_model.rowCount()
                 age_text = f" ({title.vozrast})" if title.vozrast else ""
                 self.table_header.setText(f"👥 {title.name}{age_text} - {sex_text} ({count} чел.)")
+# ============3007
+    # def switch_gender_category(self, sex):
+    #     """Переключение между man и woman"""
+    #     if self.current_sex == sex:
+    #         return
+        
+    #     self.current_sex = sex
+        
+    #     # Перезагружаем участников с фильтром по полу
+    #     self.load_participants_for_title()
+        
+    #     # Обновляем кнопки
+    #     self.create_category_buttons()
+        
+    #     # Обновляем заголовок таблицы
+    #     if self.current_title_id:
+    #         title = Title.get_or_none(Title.id == self.current_title_id)
+    #         if title:
+    #             sex_text = "Женщины" if sex == "woman" else "Мужчины"
+    #             count = self.players_model.rowCount()
+    #             age_text = f" ({title.vozrast})" if title.vozrast else ""
+    #             self.table_header.setText(f"👥 {title.name}{age_text} - {sex_text} ({count} чел.)")
+        
+    #     # Очищаем результаты поиска при смене пола
+    #     self.search_results_list.clear()
+        
+    #     # Сбрасываем заголовок поиска
+    #     self.reset_search_label()
+        
+    #     # ---- ОБНОВЛЯЕМ МЕНЮ РЕЗУЛЬТАТОВ ----
+    #     self.update_results_menu()
+#=========================
 
 def main():  
     # Сначала проверяем БД

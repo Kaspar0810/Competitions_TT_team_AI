@@ -21716,8 +21716,6 @@ class MainWindow(QMainWindow):
             title = Title.get_by_id(self.current_title_id)
             vozrast = title.vozrast
             gm = "М" if self.current_sex == "man" else "Д"
-            # gamer_txt = title.sredi if title.sredi else "Участники"
-            # gm = gamer_txt[:1] if gamer_txt else "У"
             gr = ""
             n_f = ""
             # Сокращения этапов
@@ -21962,7 +21960,7 @@ class MainWindow(QMainWindow):
         # Название соревнования
         title = Title.get_or_none(Title.id == self.current_title_id)
         comp_name = title.name
-        sredi = f"{title.sredi} {title.vozrast}"
+        sredi = f"среди {title.sredi} {title.vozrast}"
         # Фильтр по группе/финалу
         if subgroup and subgroup not in ["Все группы", "Все финалы", ""]:
             if stage == "Одна таблица":

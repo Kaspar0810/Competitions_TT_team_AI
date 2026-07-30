@@ -21855,7 +21855,7 @@ class MainWindow(QMainWindow):
             return None
 
         # Папка для сохранения
-        pdf_dir = "table_pdf"
+        pdf_dir = "runners"
         if not os.path.exists(pdf_dir):
             os.makedirs(pdf_dir)
 
@@ -21869,7 +21869,8 @@ class MainWindow(QMainWindow):
             # Получаем данные для бегунков (только несыгранные матчи)
             stiker_data = self.tbl_begunki(stage, subgroup, runner_type, tours="несыгранные")
 
-            filename = f"{clean_name}_runners.pdf"
+            # filename = f"{clean_name}_runners.pdf"
+            filename = os.path.join(pdf_dir, f"{clean_name}_runners.pdf")
 
             if not stiker_data:
                 return None
@@ -22117,7 +22118,7 @@ class MainWindow(QMainWindow):
         clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
         
         # Формируем имя файла
-        filename = f"{clean_name}_full_runners.pdf"
+        filename = os.path.join(pdf_dir, f"{clean_name}_full_runners.pdf")
         
         # Создаем PDF
         pdf = BegunokPDF(filename)

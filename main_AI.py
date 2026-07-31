@@ -10600,8 +10600,6 @@ class MainWindow(QMainWindow):
             choice_flag = 1
             source_stage = None
 
-           
-
         # === КВАЛИФИКАЦИЯ ===
         elif "Квалификация" in stage_name and "полуфинал" not in stage_name:
             total_groups_text = self.total_groups.text().strip()
@@ -10682,7 +10680,7 @@ class MainWindow(QMainWindow):
                 info_label.setText(f"Всего в полуфинале: {total_in_semifinal} чел.\n"
                                 f"Количество групп: {total_groups}\n"
                                 f"Участников в группе: {players_per_group} чел.\n"
-                                f"Всего игр: {self.calculate_semifinal_games_count(total_groups, players_per_group, previous_stage)}")
+                                f"Всего игр: {self.calculate_semifinal_games_count(total_groups, players_per_group, previous_stage, exit_val)}")
             
             exit_spin.valueChanged.connect(update_semifinal_info)
             update_semifinal_info()
@@ -10708,7 +10706,8 @@ class MainWindow(QMainWindow):
             group_sizes = [players_per_group] * total_groups
             total_games_in_stage = 0
             games_info = []
-            exit_count = previous_stage.mesta_exit
+            # exit_count = previous_stage.mesta_exit
+            exit_count = stage_exit
             for i, gsize in enumerate(group_sizes, 1):
                 total_possible = (gsize * (gsize - 1)) // 2
                 already_played = (exit_count * (exit_count - 1)) // 2 * 2
@@ -11097,7 +11096,9 @@ class MainWindow(QMainWindow):
                     if "полуфинал" in system.stage.lower() and previous_stage and "Квалификация" in previous_stage.stage:
                         players_in_semifinal = previous_stage.total_group * previous_stage.mesta_exit
                         players_per_group = previous_stage.mesta_exit * 2
-                        games = self.calculate_semifinal_games_count(groups_count, players_per_group, previous_stage)
+                        # players_in_semifinal = previous_stage.total_group * system.mesta_exit
+                        # players_per_group = system.mesta_exit * 2
+                        games = self.calculate_semifinal_games_count(groups_count, players_per_group, previous_stage, exit_val)
                     elif self.is_final_stage(system.stage):
                         if system.kol_game_string:
                             import re
@@ -11137,11 +11138,13 @@ class MainWindow(QMainWindow):
                     
                     # Для полуфинала
                     if "полуфинал" in system.stage.lower() and previous_stage and "Квалификация" in previous_stage.stage:
-                        players_in_semifinal = previous_stage.total_group * previous_stage.mesta_exit
-                        players_per_group = previous_stage.mesta_exit * 2
+                        players_in_semifinal = system.total_group * system.mesta_exit
+                        players_per_group = system.mesta_exit * 2
+                        # players_in_semifinal = previous_stage.total_group * previous_stage.mesta_exit
+                        # players_per_group = previous_stage.mesta_exit * 2
                         group_sizes = [players_per_group] * groups_count
                         distribution_text = self.calculate_group_distribution(players_in_semifinal, groups_count)
-                        total_games = self.calculate_semifinal_games_count(groups_count, players_per_group, previous_stage)
+                        total_games = self.calculate_semifinal_games_count(groups_count, players_per_group, previous_stage, exit_val)
                         stage_display = system.stage
                         places_display = ""
                         
@@ -12392,7 +12395,7 @@ class MainWindow(QMainWindow):
         
         return ", ".join(distribution)
         
-    def calculate_semifinal_games_count(self, groups_count, players_per_group, previous_stage):
+    def calculate_semifinal_games_count(self, groups_count, players_per_group, previous_stage, exit_val):
         """Расчет количества игр в полуфинале с учетом уже сыгранных"""
         # Всего возможных игр в группе (если все встречаются впервые)
         total_possible = (players_per_group * (players_per_group - 1)) // 2

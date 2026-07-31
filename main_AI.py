@@ -2,6 +2,7 @@
 import sys
 import os
 import platform
+from pathlib import Path 
 
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QDialogButtonBox,
@@ -32,6 +33,7 @@ from reportlab.lib.styles import ParagraphStyle as PS
 from typing import List, Tuple, Dict, Optional, Set
 
 import tempfile
+import pymysql
 
 from models import connect_db, close_db
 from models import *
@@ -10025,6 +10027,7 @@ class MainWindow(QMainWindow):
 # =======================================
     def import_database(self):
         """Импорт базы данных из файла бэкапа"""
+# ====== вариант новый из старый программы
         try:
             # Создаем диалог выбора файла, по умолчанию открываем папку backup_db
             backup_dir = "backup_db"
@@ -10042,7 +10045,7 @@ class MainWindow(QMainWindow):
             
             if not file_path:
                 return
-            
+
             # Запрашиваем подтверждение
             reply = QMessageBox.question(
                 self, 
@@ -10056,61 +10059,33 @@ class MainWindow(QMainWindow):
             
             if reply != QMessageBox.Yes:
                 return
+
+            # # Показываем прогресс-бар
+            # progress = QProgressDialog("Импорт базы данных...", "Отмена", 0, 100, self)
+            # progress.setWindowModality(Qt.WindowModal)
+            # progress.show()
+
+            # Connect to the MySQL database
+            cnx = pymysql.connect(user='root', password='db_pass', host='localhost')
+            username='root'
+            database='mysql_db'
+            password='db_pass'
+            host='localhost'
+
+            cursor = cnx.cursor()
+
+            restore_command = f"mysql --host={host} --user={username} --password={password} {database} < {file_path}"
+            subprocess.run(restore_command, shell=True)
+            cnx.commit()
             
-            # Показываем прогресс-бар
-            progress = QProgressDialog("Импорт базы данных...", "Отмена", 0, 100, self)
-            progress.setWindowModality(Qt.WindowModal)
-            progress.show()
-            
-            # Читаем SQL файл
-            with open(file_path, 'r', encoding='utf-8') as f:
-                sql_content = f.read()
-            
-            progress.setValue(30)
-            
-            # Подключаемся к БД и выполняем импорт
-            from models import db
-            
-            # Закрываем текущее соединение
-            if not db.is_closed():
-                db.close()
-            
-            progress.setValue(50)
-            
-            # Открываем новое соединение
-            db.connect()
-            
-            progress.setValue(70)
-            
-            # Разбиваем SQL на отдельные запросы
-            import re
-            # Убираем комментарии
-            sql_content = re.sub(r'--.*$', '', sql_content, flags=re.MULTILINE)
-            # Разбиваем по точкам с запятой
-            statements = [s.strip() for s in sql_content.split(';') if s.strip()]
-            
-            total = len(statements)
-            for i, statement in enumerate(statements):
-                if statement:
-                    try:
-                        db.execute_sql(statement)
-                    except Exception as e:
-                        print(f"Ошибка выполнения запроса: {e}")
-                        print(f"Запрос: {statement[:100]}...")
-                
-                # Обновляем прогресс
-                progress.setValue(70 + int((i + 1) / total * 30))
-                
-                if progress.wasCanceled():
-                    break
-            
-            progress.setValue(100)
-            
+            cursor.close()
+            cnx.close()
+
             QMessageBox.information(self, "Успех", 
-                                f"База данных успешно импортирована из файла:\n{file_path}\n\n"
-                                f"Рекомендуется перезапустить приложение для полного применения изменений.")
-            
-            progress.close()
+                                            f"База данных успешно импортирована из файла:\n{file_path}\n\n"
+                                            f"Рекомендуется перезапустить приложение для полного применения изменений.")
+                        
+            # progress.close()
             
             # Предлагаем перезапустить приложение
             restart_reply = QMessageBox.question(
@@ -10125,9 +10100,9 @@ class MainWindow(QMainWindow):
                 # Перезапускаем приложение
                 python = sys.executable
                 os.execl(python, python, *sys.argv)
-            
+
         except Exception as e:
-            progress.close()
+            # progress.close()
             QMessageBox.critical(self, "Ошибка", f"Не удалось импортировать базу данных: {str(e)}")
 
     def open_competition(self):
@@ -18147,24 +18122,29 @@ class MainWindow(QMainWindow):
             traceback.print_exc()
             QMessageBox.critical(self, "Ошибка", f"Не удалось заполнить результаты: {str(e)}")
 
+    def ReturnCode():
+        pass
+
     def save_current_competition(self):
         """Сохранение текущего соревнования"""
 
-        # Player.update(patronymic_id=112).where(Player.patronymic_id.is_null()).execute()
-        # Game_list.update(player_double_id=16, team_id=1).where(Game_list.team_id.is_null()).execute()
-
+# ====================== это вариант из первой программы 
+        """нажата кнопка -выход- и резервное копирование db"""
         if not self.current_title_id:
-            return
-        
+                    return
         try:
             title = Title.get_by_id(self.current_title_id)
-            
-            reply = QMessageBox.question(self, "Сохранение соревнования", 
-                                        f"Сохранить резервную копию соревнования '{title.name}'?",
-                                        QMessageBox.Yes | QMessageBox.No)
-            
-            if reply == QMessageBox.Yes:
-                # Создаем папку backup_db, если её нет
+            remark_flag = 0
+            flag = 0
+            if flag == 0:
+                result = QMessageBox.question(self, "Backup DB", "Вы действительно хотите сохранить текущие соревнования?",
+                                            QMessageBox.Ok, QMessageBox.No)
+            else:
+                result = QMessageBox.Ok
+                remark_flag = 1
+
+            if result == QMessageBox.Ok:
+            # Создаем папку backup_db, если её нет
                 backup_dir = "backup_db"
                 if not os.path.exists(backup_dir):
                     os.makedirs(backup_dir)
@@ -18177,15 +18157,69 @@ class MainWindow(QMainWindow):
                 
                 from datetime import datetime
                 timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-                backup_file = os.path.join(backup_dir, f"{clean_name}_{timestamp}.sql")
-                
-                # Экспортируем базу данных
-                self.export_database_internal(backup_file, None)
-                
-                QMessageBox.information(self, "Успех", f"Соревнование сохранено в:\n{backup_file}")
-                
+
+                user = "root"
+                password = "db_pass"
+                database = "mysql_db"
+                current_date = str(datetime.now().strftime('%d_%m_%Y'))
+
+                if remark_flag == 1:
+                    comment, ok = QInputDialog.getText(self, "Коментарий", "Введите коментарий для копии DB.")
+                    comment = comment.replace(" ", "_")
+                    backup_file = os.path.join(backup_dir, f"{clean_name}_{timestamp}_{comment}.sql")
+                else:
+                    backup_file = os.path.join(backup_dir, f"{clean_name}_{timestamp}.sql")   
+                try: 
+                    p = subprocess.Popen('mysqldump -u' + user + ' -p' + password + ' --databases ' + database + ' > ' + backup_file, shell=True)
+                    p.communicate()
+                    # Check for errors
+                    if p.returncode != 0:
+                        raise self.ReturnCode
+                    QMessageBox.information(self, "Успех", f"Соревнование сохранено в:\n{backup_file}")           
+                    return backup_file
+                except:
+                    print('Backup failed for ', db)
+            else:
+                return
+            
         except Exception as e:
             print(f"Ошибка сохранения соревнования: {e}")
+
+#======================= этот вариант был ранее
+
+        # if not self.current_title_id:
+        #     return
+        
+        # try:
+        #     title = Title.get_by_id(self.current_title_id)
+            
+        #     reply = QMessageBox.question(self, "Сохранение соревнования", 
+        #                                 f"Сохранить резервную копию соревнования '{title.name}'?",
+        #                                 QMessageBox.Yes | QMessageBox.No)
+            
+        #     if reply == QMessageBox.Yes:
+        #         # Создаем папку backup_db, если её нет
+        #         backup_dir = "backup_db"
+        #         if not os.path.exists(backup_dir):
+        #             os.makedirs(backup_dir)
+                
+        #         # Формируем имя файла
+        #         short_name = title.short_name_comp if title.short_name_comp else title.name
+        #         import re
+        #         clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
+        #         clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
+                
+        #         from datetime import datetime
+        #         timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+        #         backup_file = os.path.join(backup_dir, f"{clean_name}_{timestamp}.sql")
+                
+        #         # Экспортируем базу данных
+        #         self.export_database_internal(backup_file, None)
+                
+        #         QMessageBox.information(self, "Успех", f"Соревнование сохранено в:\n{backup_file}")
+                
+        # except Exception as e:
+        #     print(f"Ошибка сохранения соревнования: {e}")
 
     def export_database_internal(self, file_path, progress=None):
         """Встроенный экспорт базы данных (без mysqldump)"""

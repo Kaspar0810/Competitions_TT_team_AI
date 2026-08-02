@@ -1065,7 +1065,7 @@ class MainWindow(QMainWindow):
             1: 180,  # Участники
             2: 350,  # Команды
             3: 350,  # Пары
-            4: 350,  # Система
+            4: 580,  # Система
             5: 200,  # Результаты - маленькая верхняя часть для формы ввода
             6: 150,  # Рейтинг
             7: 720   # Дополнительно
@@ -10641,50 +10641,85 @@ class MainWindow(QMainWindow):
             label_string = ""
             choice_flag = 0
             source_stage = ""
-            
+# ========================= n
         # === ПОЛУФИНАЛЫ ===
         elif "полуфинал" in stage_name.lower():
-            if not previous_stage or "Квалификация" not in previous_stage.stage:
-                QMessageBox.warning(self, "Ошибка", "Полуфинал может следовать только после квалификации")
+            # Находим квалификацию
+            qualification = System.get_or_none(
+                (System.title_id == self.current_title_id) &
+                (System.sex == self.current_sex) &
+                (System.stage == "Квалификация")
+            )
+            if not qualification:
+                QMessageBox.warning(self, "Ошибка", "Этап 'Квалификация' не найден для создания полуфинала")
                 return
-            
+
             # Количество групп полуфинала = количество групп квалификации / 2
-            total_groups = max(1, previous_stage.total_group // 2)
-            
+            total_groups = max(1, qualification.total_group // 2)
+
+            # Определяем, сколько игроков выходит из каждой группы квалификации в полуфинал
+            # По умолчанию 2, но можно взять из qualification.mesta_exit
+            exit_count = 2
+
+            # Для 1-го полуфинала берутся места 1..exit_count, для 2-го - exit_count+1 .. 2*exit_count
+            # Но это не влияет на количество групп, только на отбор игроков.
+
+            # Общее количество игроков, участвующих в полуфинале
+            total_players_in_semifinal = qualification.total_group * exit_count
+            # Количество игроков в каждой группе полуфинала
+            players_per_group = exit_count * 2
+
+            # Если во 2-м полуфинале игроков меньше 4, корректируем
+            # Но это зависит от того, какой полуфинал создаётся.
+            # Определим, какой полуфинал (1-й или 2-й) по названию
+            if "1-й" in stage_name:
+                # 1-й полуфинал
+                pass
+            elif "2-й" in stage_name:
+                # 2-й полуфинал: число игроков может быть меньше, если в некоторых группах квалификации меньше exit_count игроков
+                # Но мы не можем здесь точно определить, поэтому оставим как есть, но учтём в диалоге.
+                pass
+
+            # Показываем диалог с настройкой выхода
             dialog = QDialog(self)
             dialog.setWindowTitle("Настройка полуфинала")
             dialog.setModal(True)
             dialog.setMinimumWidth(400)
-            
+
             layout = QVBoxLayout(dialog)
-            layout.addWidget(QLabel(f"Из этапа '{previous_stage.stage}' в полуфинал переходят:"))
-            
+            layout.addWidget(QLabel(f"Из этапа 'Квалификация' в полуфинал переходят:"))
+
             exit_layout = QHBoxLayout()
             exit_layout.addWidget(QLabel("Количество участников из каждой группы:"))
             exit_spin = QSpinBox()
             exit_spin.setMinimum(1)
-            exit_spin.setMaximum(previous_stage.max_player)
-            exit_spin.setValue(previous_stage.mesta_exit if previous_stage.mesta_exit > 0 else 2)
+            exit_spin.setMaximum(qualification.max_player)
+            exit_spin.setValue(exit_count)
             exit_layout.addWidget(exit_spin)
             layout.addLayout(exit_layout)
-            
+
             info_label = QLabel()
             info_label.setStyleSheet("color: blue;")
             info_label.setWordWrap(True)
             layout.addWidget(info_label)
-            
+
             def update_semifinal_info():
                 exit_val = exit_spin.value()
                 players_per_group = exit_val * 2
-                total_in_semifinal = previous_stage.total_group * exit_val
-                info_label.setText(f"Всего в полуфинале: {total_in_semifinal} чел.\n"
-                                f"Количество групп: {total_groups}\n"
-                                f"Участников в группе: {players_per_group} чел.\n"
-                                f"Всего игр: {self.calculate_semifinal_games_count(total_groups, players_per_group, previous_stage, exit_val)}")
-            
+                total_in_semifinal = qualification.total_group * exit_val
+                # Проверяем, что во 2-м полуфинале достаточно игроков
+                if "2-й" in stage_name and total_in_semifinal < 4:
+                    info_label.setText(f"⚠️ Внимание! Во 2-м полуфинале будет {total_in_semifinal} игроков.\n"
+                                    f"Рекомендуется объединить все группы в одну.")
+                else:
+                    info_label.setText(f"Всего в полуфинале: {total_in_semifinal} чел.\n"
+                                    f"Количество групп: {total_groups}\n"
+                                    f"Участников в группе: {players_per_group} чел.\n"
+                                    f"Всего игр: {self.calculate_semifinal_games(total_groups, players_per_group, exit_val)}")
+
             exit_spin.valueChanged.connect(update_semifinal_info)
             update_semifinal_info()
-            
+
             btn_layout = QHBoxLayout()
             ok_btn = QPushButton("OK")
             ok_btn.clicked.connect(dialog.accept)
@@ -10693,33 +10728,43 @@ class MainWindow(QMainWindow):
             btn_layout.addWidget(ok_btn)
             btn_layout.addWidget(cancel_btn)
             layout.addLayout(btn_layout)
-            
+
             if dialog.exec_() != QDialog.Accepted:
                 return
-            
+
             stage_exit = exit_spin.value()
             max_players = stage_exit * 2
+
+            # Корректируем total_groups, если игроков меньше 4
+            # Если во 2-м полуфинале и total_in_semifinal < 4, то создаём одну группу
+            total_in_semifinal = qualification.total_group * stage_exit
+            if "2-й" in stage_name and total_in_semifinal < 4:
+                total_groups = 1
+                max_players = total_in_semifinal
+
             choice_flag = 0
-            
+
             # Расчет количества игр в полуфинале
             players_per_group = stage_exit * 2
             group_sizes = [players_per_group] * total_groups
+            # Если групп стало 1, то group_sizes = [max_players]
+            if total_groups == 1:
+                group_sizes = [max_players]
             total_games_in_stage = 0
             games_info = []
-            # exit_count = previous_stage.mesta_exit
-            exit_count = stage_exit
+            # exit_count_qual = qualification.mesta_exit if qualification.mesta_exit else 2
             for i, gsize in enumerate(group_sizes, 1):
                 total_possible = (gsize * (gsize - 1)) // 2
-                already_played = (exit_count * (exit_count - 1)) // 2 * 2
+                already_played = (stage_exit * (stage_exit - 1)) // 2 * 2
                 games = total_possible - already_played
                 total_games_in_stage += games
                 games_info.append(f"Гр{i}: {games} игр")
-            
+
             kol_game_string = f"{total_games_in_stage} игр."
             label_string = ""
 
             source_stage = "Квалификация"
-
+#====================
         # === ФИНАЛ ===
         elif self.is_final_stage(stage_name):
             if not previous_stage:
@@ -11063,7 +11108,7 @@ class MainWindow(QMainWindow):
             sex = self.current_sex
             
             systems = System.select().where((System.title_id == self.current_title_id) & (System.sex == sex)).order_by(System.id)
-            
+                        
             self.stages_info.clear()
             
             if systems.count() == 0:
@@ -11080,7 +11125,7 @@ class MainWindow(QMainWindow):
             previous_stage = None
             current_place = 1
             total_all_games = 0
-            total_time_minutes = 0  # <--- Инициализируем общее время
+            total_time_minutes = 0
             
             # Определяем максимальную ширину для выравнивания
             max_games_width = 0
@@ -11093,12 +11138,21 @@ class MainWindow(QMainWindow):
                     temp_games_list.append(0)
                 else:
                     groups_count = system.total_group if system.total_group else 1
-                    if "полуфинал" in system.stage.lower() and previous_stage and "Квалификация" in previous_stage.stage:
-                        players_in_semifinal = previous_stage.total_group * previous_stage.mesta_exit
-                        players_per_group = previous_stage.mesta_exit * 2
-                        # players_in_semifinal = previous_stage.total_group * system.mesta_exit
-                        # players_per_group = system.mesta_exit * 2
-                        games = self.calculate_semifinal_games_count(groups_count, players_per_group, previous_stage, exit_val)
+                    if "полуфинал" in system.stage.lower():
+                        # Для полуфинала используем квалификацию как источник
+                        qualification = System.get_or_none(
+                            (System.title_id == self.current_title_id) &
+                            (System.stage == "Квалификация") &
+                            (System.sex == sex)
+                        )
+                        if qualification:
+                            exit_count = system.mesta_exit
+                            # Количество групп полуфинала = groups_count (уже рассчитано)
+                            players_per_group = exit_count * 2
+                            # Рассчитываем игры через функцию, которая учитывает уже сыгранные
+                            games = self.calculate_semifinal_games(groups_count, players_per_group, exit_count)
+                        else:
+                            games = 0
                     elif self.is_final_stage(system.stage):
                         if system.kol_game_string:
                             import re
@@ -11110,6 +11164,7 @@ class MainWindow(QMainWindow):
                             else:
                                 games = self.calculate_olympic_games(system.max_player)
                     else:
+                        # Квалификация или Одна таблица
                         group_sizes = self.calculate_group_sizes(total_players, groups_count)
                         games = self.calculate_total_games(
                             system.type_table, total_players, groups_count, group_sizes,
@@ -11125,7 +11180,7 @@ class MainWindow(QMainWindow):
             # Второй проход: выводим с выравниванием и считаем общее время
             previous_stage = None
             for idx, system in enumerate(systems, 1):
-                total_players = Player.select().where((Player.title_id == self.current_title_id) & (Player.sex == self.current_sex)).count()
+                total_players = Player.select().where((Player.title_id == self.current_title_id) & (Player.sex == sex)).count()
                 
                 if total_players == 0:
                     distribution_text = "нет участников"
@@ -11137,30 +11192,43 @@ class MainWindow(QMainWindow):
                     groups_count = system.total_group if system.total_group else 1
                     
                     # Для полуфинала
-                    if "полуфинал" in system.stage.lower() and previous_stage and "Квалификация" in previous_stage.stage:
-                        players_in_semifinal = system.total_group * system.mesta_exit
-                        players_per_group = system.mesta_exit * 2
-                        # players_in_semifinal = previous_stage.total_group * previous_stage.mesta_exit
-                        # players_per_group = previous_stage.mesta_exit * 2
-                        group_sizes = [players_per_group] * groups_count
-                        distribution_text = self.calculate_group_distribution(players_in_semifinal, groups_count)
-                        total_games = self.calculate_semifinal_games_count(groups_count, players_per_group, previous_stage, exit_val)
-                        stage_display = system.stage
-                        places_display = ""
-                        
-                        # Расчет времени для полуфинала
-                        max_tours = self.calculate_max_tours_in_stage(group_sizes)
-                        tables_per_tour = self.calculate_tables_per_tour(group_sizes)
-                        
-                        if max_tours > 0 and tables > 0:
-                            if tables_per_tour > tables:
-                                actual_tours = max_tours * math.ceil(tables_per_tour / tables)
+                    if "полуфинал" in system.stage.lower():
+                        qualification = System.get_or_none(
+                            (System.title_id == self.current_title_id) &
+                            (System.stage == "Квалификация") &
+                            (System.sex == sex)
+                        )
+                        if qualification:
+                            exit_count = system.mesta_exit
+                            groups_count = system.total_group
+                            players_per_group = exit_count * 2
+                            players_in_semifinal = groups_count * players_per_group
+                            # players_per_group = exit_count * 2
+                            group_sizes = [players_per_group] * groups_count
+                            distribution_text = self.calculate_group_distribution(players_in_semifinal, groups_count)
+                            total_games = self.calculate_semifinal_games(groups_count, players_per_group, exit_count)
+                            stage_display = system.stage
+                            places_display = ""
+                            
+                            # Расчет времени для полуфинала
+                            max_tours = self.calculate_max_tours_in_stage(group_sizes)
+                            tables_per_tour = self.calculate_tables_per_tour(group_sizes)
+                            
+                            if max_tours > 0 and tables > 0:
+                                if tables_per_tour > tables:
+                                    actual_tours = max_tours * math.ceil(tables_per_tour / tables)
+                                else:
+                                    actual_tours = max_tours
+                                stage_minutes = actual_tours * match_time
                             else:
-                                actual_tours = max_tours
-                            stage_minutes = actual_tours * match_time
+                                stage_minutes = 0
                         else:
+                            distribution_text = "нет квалификации"
+                            total_games = 0
+                            stage_display = system.stage
+                            places_display = ""
                             stage_minutes = 0
-                        
+                            
                     # Для финала
                     elif self.is_final_stage(system.stage):
                         players_in_final = system.max_player
@@ -11202,7 +11270,7 @@ class MainWindow(QMainWindow):
                                 stage_minutes = 0
                         
                     else:
-                        # Для квалификации
+                        # Для квалификации или Одна таблица
                         group_sizes = self.calculate_group_sizes(total_players, groups_count)
                         distribution_text = self.calculate_group_distribution(total_players, groups_count)
                         total_games = self.calculate_total_games(
@@ -11233,8 +11301,7 @@ class MainWindow(QMainWindow):
                     else:
                         stage_time = f"{minutes} мин"
                     
-                    # Добавляем ко общему времени
-                    total_time_minutes += stage_minutes  # <--- Суммируем
+                    total_time_minutes += stage_minutes
                 
                 # Подсчитываем общее количество игр
                 total_all_games += total_games
@@ -11258,7 +11325,6 @@ class MainWindow(QMainWindow):
             else:
                 total_time_str = f"{total_minutes} мин"
             
-            # Подчеркивание и сумма игр всех этапов
             info_text += "─" * 70 + "\n"
             info_text += f"🏆 ВСЕГО НА СОРЕВНОВАНИИ: {total_all_games} ИГР | ⏱️ ОБЩЕЕ ВРЕМЯ: {total_time_str}\n"
             
@@ -11269,6 +11335,7 @@ class MainWindow(QMainWindow):
             import traceback
             traceback.print_exc()
             self.stages_info.setText(f"Ошибка: {str(e)}")
+
     # ===================================
     def calculate_group_sizes(self, players, groups):
         """Расчет количества участников в каждой группе"""
@@ -12300,35 +12367,31 @@ class MainWindow(QMainWindow):
 #         self.check_olympic_pairs_conflicts(stage)
 # ========
 
-    def calculate_semifinal_games(self, groups_count, players_per_group, exit_count):
+    def calculate_semifinal_games(self, groups_count, players_per_group, exit_val):
         """
         Расчет количества игр в полуфинале с учетом уже сыгранных встреч
-        """
-        if groups_count <= 0 or players_per_group <= 0 or exit_count <= 0:
-            return 0, 0, 0
+        # """
+    
+        if groups_count <= 0 or players_per_group <= 0 or exit_val <= 0:
+            return 0
         
-        # В полуфинале группы формируются путем слияния двух групп квалификации
-        semifinal_groups = groups_count // 2
-        
-        # В каждой группе полуфинала будет 2 * exit_count игроков
-        players_in_semifinal_group = exit_count * 2
         
         # Общее количество возможных игр в группе (если бы все встречались впервые)
-        total_possible_games = (players_in_semifinal_group * (players_in_semifinal_group - 1)) // 2
+        total_possible_games = (players_per_group * (players_per_group - 1)) // 2
         
         # Количество уже сыгранных игр:
         # В каждой группе квалификации сыграно (exit_count * (exit_count - 1)) // 2 игр между вышедшими
         # Таких групп в одной группе полуфинала - 2 (из двух групп квалификации)
-        already_played = ((exit_count * (exit_count - 1)) // 2) * 2
+        already_played = ((exit_val * (exit_val - 1)) // 2) * 2
         
         # Также нужно учесть, что игроки из одной группы квалификации уже играли между собой
         # Поэтому уникальных игр будет меньше
         unique_games = total_possible_games - already_played
         
         # Общее количество игр в полуфинале
-        total_games = unique_games * semifinal_groups
+        total_games = unique_games * groups_count
         
-        return total_games, unique_games, semifinal_groups
+        return total_games
     
     def on_stage_type_changed(self, stage_name):
         """Обработка изменения типа этапа - показываем/скрываем поле количество групп"""
@@ -12394,20 +12457,21 @@ class MainWindow(QMainWindow):
             remaining -= players
         
         return ", ".join(distribution)
+ # =========== old       
+    # def calculate_semifinal_games_count(self, groups_count, players_per_group, previous_stage):
+    #     """Расчет количества игр в полуфинале с учетом уже сыгранных"""
+    #     # Всего возможных игр в группе (если все встречаются впервые)
+    #     total_possible = (players_per_group * (players_per_group - 1)) // 2
         
-    def calculate_semifinal_games_count(self, groups_count, players_per_group, previous_stage, exit_val):
-        """Расчет количества игр в полуфинале с учетом уже сыгранных"""
-        # Всего возможных игр в группе (если все встречаются впервые)
-        total_possible = (players_per_group * (players_per_group - 1)) // 2
+    #     # Уже сыграно в квалификации между вышедшими участниками
+    #     exit_count = previous_stage.mesta_exit
+    #     already_played = (exit_count * (exit_count - 1)) // 2 * 2  # По 2 группы в одном полуфинале
+
+     
+    #     unique_games_per_group = total_possible - already_played
+    #     total_games = unique_games_per_group * groups_count
         
-        # Уже сыграно в квалификации между вышедшими участниками
-        exit_count = previous_stage.mesta_exit
-        already_played = (exit_count * (exit_count - 1)) // 2 * 2  # По 2 группы в одном полуфинале
-        
-        unique_games_per_group = total_possible - already_played
-        total_games = unique_games_per_group * groups_count
-        
-        return total_games
+    #     return total_games
 
     def delete_system_stage(self, system_id):
         """Удаление этапа с очисткой связанных данных"""
@@ -12542,7 +12606,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Ошибка получения номера финала: {e}")
             return 1
-        
+#============ old        
     def get_players_distribution_info(self):
         """Получение информации о распределении игроков по этапам"""
         from models import System
@@ -12572,6 +12636,7 @@ class MainWindow(QMainWindow):
             
             # 1-й полуфинал
             elif "1-й полуфинал" in system.stage or ("полуфинал" in system.stage and previous_stage and "Квалификация" in previous_stage.stage):
+            # elif "1-й полуфинал" in system.stage:
                 distribution['semifinal_1']['total_groups'] = system.total_group
                 distribution['semifinal_1']['players_per_group'] = system.max_player
                 distribution['semifinal_1']['exited_per_group'] = system.mesta_exit
@@ -12596,7 +12661,92 @@ class MainWindow(QMainWindow):
             previous_stage = system
         
         return distribution
-    
+# ============= new
+    # def get_players_distribution_info(self):
+    #     """Получение информации о распределении игроков по этапам"""
+    #     from models import System
+        
+    #     systems = System.select().where(
+    #         (System.title_id == self.current_title_id) &
+    #         (System.sex == self.current_sex)
+    #     ).order_by(System.id)
+        
+    #     if systems.count() == 0:
+    #         return {}
+        
+    #     distribution = {
+    #         'qualification': {'total_groups': 0, 'players_per_group': 0, 'exited_per_group': 0, 'exited_total': 0, 'remaining_total': 0},
+    #         'semifinal_1': {'total_groups': 0, 'players_per_group': 0, 'exited_per_group': 0, 'exited_total': 0, 'remaining_total': 0},
+    #         'semifinal_2': {'total_groups': 0, 'players_per_group': 0, 'exited_per_group': 0, 'exited_total': 0, 'remaining_total': 0},
+    #         'finals': []
+    #     }
+        
+    #     # Находим квалификацию и полуфиналы
+    #     qualification = None
+    #     semifinal_1 = None
+    #     semifinal_2 = None
+        
+    #     for system in systems:
+    #         if "Квалификация" in system.stage and "полуфинал" not in system.stage:
+    #             qualification = system
+    #         elif "1-й полуфинал" in system.stage:
+    #             semifinal_1 = system
+    #         elif "2-й полуфинал" in system.stage:
+    #             semifinal_2 = system
+        
+    #     # Заполняем квалификацию
+    #     if qualification:
+    #         distribution['qualification']['total_groups'] = qualification.total_group
+    #         distribution['qualification']['players_per_group'] = qualification.max_player
+    #         distribution['qualification']['exited_per_group'] = qualification.mesta_exit
+    #         distribution['qualification']['exited_total'] = qualification.total_group * qualification.mesta_exit
+    #         distribution['qualification']['remaining_total'] = qualification.max_player - qualification.mesta_exit
+        
+    #     # Заполняем полуфиналы
+    #     if semifinal_1:
+    #         distribution['semifinal_1']['total_groups'] = semifinal_1.total_group
+    #         distribution['semifinal_1']['players_per_group'] = semifinal_1.max_player
+    #         distribution['semifinal_1']['exited_per_group'] = semifinal_1.mesta_exit
+    #         distribution['semifinal_1']['exited_total'] = semifinal_1.total_group * semifinal_1.mesta_exit
+    #         distribution['semifinal_1']['remaining_total'] = semifinal_1.max_player - semifinal_1.mesta_exit
+        
+    #     if semifinal_2:
+    #         distribution['semifinal_2']['total_groups'] = semifinal_2.total_group
+    #         distribution['semifinal_2']['players_per_group'] = semifinal_2.max_player
+    #         distribution['semifinal_2']['exited_per_group'] = semifinal_2.mesta_exit
+    #         distribution['semifinal_2']['exited_total'] = semifinal_2.total_group * semifinal_2.mesta_exit
+    #         distribution['semifinal_2']['remaining_total'] = semifinal_2.max_player - semifinal_2.mesta_exit
+        
+    #     # Заполняем финалы
+    #     for system in systems:
+    #         if self.is_final_stage(system.stage):
+    #             # Определяем источник игроков для финала
+    #             source_stage = system.stage_exit  # берем из поля stage_exit
+                
+    #             # Если source_stage не указан, пытаемся определить автоматически
+    #             if not source_stage:
+    #                 # Если есть полуфиналы, определяем по номеру финала
+    #                 final_number = self.get_final_number(system.stage)
+    #                 if final_number == 1 and semifinal_1:
+    #                     source_stage = "Квалификация. 1-й полуфинал"
+    #                 elif final_number == 2 and semifinal_2:
+    #                     source_stage = "Квалификация. 2-й полуфинал"
+    #                 elif final_number == 3 and semifinal_1 and semifinal_2:
+    #                     # 3-й финал обычно из 2-го полуфинала (если ещё остались игроки)
+    #                     source_stage = "Квалификация. 2-й полуфинал"
+    #                 else:
+    #                     source_stage = "Квалификация"
+                
+    #             distribution['finals'].append({
+    #                 'number': self.get_final_number(system.stage),
+    #                 'players': system.max_player,
+    #                 'stage_name': system.stage,
+    #                 'source_stage': source_stage,
+    #                 'stage_exit': system.stage_exit
+    #             })
+        
+    #     return distribution 
+# ====================    
     def check_players_status(self):
         """Проверка статуса всех игроков перед созданием системы"""
         if not self.current_title_id:

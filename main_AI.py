@@ -10798,7 +10798,8 @@ class MainWindow(QMainWindow):
                 groups_list.append(mesta_exit)
             players_in_final = sum(groups_list)
 
-            if distribution['semifinal_1']['players_per_group'] > players_in_final:
+            # if distribution['semifinal_1']['players_per_group'] > players_in_final:
+            if distribution['semifinal_1']['remaining_total'] > 0:
                 source_stage = "Квалификация. 1-й полуфинал"
                 # число участников в группе
                 players_per_group = distribution['semifinal_1']['players_per_group']
@@ -10811,15 +10812,17 @@ class MainWindow(QMainWindow):
                 total_groups = distribution['semifinal_1']['total_groups']
             
             # Затем проверяем 2-й полуфинал
-            if not source_stage and distribution['semifinal_2']['total_groups'] > 0:
-                if already_in_finals < distribution['semifinal_2']['exited_total']:
-                    source_stage = "Квалификация. 2-й полуфинал"
-                    remaining_players = distribution['semifinal_2']['exited_total'] - already_in_finals
-                    players_per_group = distribution['semifinal_2']['exited_per_group']
-                    total_groups = distribution['semifinal_2']['total_groups']
+            # if not source_stage and distribution['semifinal_2']['total_groups'] > 0:
+            if not source_stage and distribution['semifinal_2']['remaining_total'] > 0:
+                # if already_in_finals < distribution['semifinal_2']['exited_total']:
+                source_stage = "Квалификация. 2-й полуфинал"
+                remaining_players = distribution['semifinal_2']['exited_total'] - already_in_finals
+                players_per_group = distribution['semifinal_2']['exited_per_group']
+                total_groups = distribution['semifinal_2']['total_groups']
             
             # Затем проверяем квалификацию (оставшиеся игроки, не ушедшие в полуфиналы)
-            if not source_stage and distribution['qualification']['total_groups'] > 0:
+            # if not source_stage and distribution['qualification']['total_groups'] > 0:
+            if not source_stage and distribution['qualification']['remaining_total'] > 0:
                 # Вычитаем уже ушедших в полуфиналы
                 gone_to_semifinals = 0
                 if distribution['semifinal_1']['exited_total'] > 0:
@@ -12622,8 +12625,23 @@ class MainWindow(QMainWindow):
             'semifinal_2': {'total_groups': 0, 'players_per_group': 0, 'exited_per_group': 0, 'exited_total': 0, 'remaining_total': 0},
             'finals': []
         }
-        
+        distribution_remaining = {
+            'Квалификация':{'remaining_total': 0},
+            'Квалификация. 1-й полуфинал': {'remaining_total': 0},
+            'Квалификация. 2-й полуфинал': {'remaining_total': 0} 
+            }
+        stage_out_list = ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]
+
         previous_stage = None
+
+        sys = System.select().where((System.title_id == self.current_title_id) & (System.sex == self.current_sex))
+
+        for stage_out in stage_out_list:
+            for system in sys:
+                stage = system.stage_exit
+                mesta_exit = system.mesta_exit
+                if system.stage_exit == stage_out:
+                    distribution_remaining[stage]['remaining_total'] += mesta_exit
         
         for system in systems:
             # Квалификация
@@ -12632,23 +12650,24 @@ class MainWindow(QMainWindow):
                 distribution['qualification']['players_per_group'] = system.max_player
                 distribution['qualification']['exited_per_group'] = system.mesta_exit
                 # Фикс: оставшиеся в квалификации
-                distribution['qualification']['remaining_total'] = (system.max_player) - distribution['qualification']['exited_per_group']
+                # distribution['qualification']['remaining_total'] = (system.max_player) - distribution['qualification']['exited_per_group']
+                distribution['qualification']['remaining_total'] = (system.max_player) - distribution_remaining['Квалификация']['remaining_total']
             
             # 1-й полуфинал
-            elif "1-й полуфинал" in system.stage or ("полуфинал" in system.stage and previous_stage and "Квалификация" in previous_stage.stage):
-            # elif "1-й полуфинал" in system.stage:
+            # elif "1-й полуфинал" in system.stage or ("полуфинал" in system.stage and previous_stage and "Квалификация" in previous_stage.stage):
+            elif "1-й полуфинал" in system.stage:
                 distribution['semifinal_1']['total_groups'] = system.total_group
                 distribution['semifinal_1']['players_per_group'] = system.max_player
                 distribution['semifinal_1']['exited_per_group'] = system.mesta_exit
                 # Оставшиеся в полуфинале игроки (не вышедшие в финал)
-                distribution['semifinal_1']['remaining_total'] = (system.max_player) - distribution['semifinal_1']['exited_per_group']
+                distribution['semifinal_1']['remaining_total'] = (system.max_player) - distribution_remaining['Квалификация. 1-й полуфинал']['remaining_total']
             
             # 2-й полуфинал
             elif "2-й полуфинал" in system.stage:
                 distribution['semifinal_2']['total_groups'] = system.total_group
                 distribution['semifinal_2']['players_per_group'] = system.max_player
                 distribution['semifinal_2']['exited_per_group'] = system.mesta_exit
-                distribution['semifinal_2']['remaining_total'] = (system.max_player) - distribution['semifinal_2']['exited_per_group']
+                distribution['semifinal_2']['remaining_total'] = (system.max_player) - distribution_remaining['Квалификация. 2-й полуфинал']['remaining_total']
             
             # Финал
             elif self.is_final_stage(system.stage):

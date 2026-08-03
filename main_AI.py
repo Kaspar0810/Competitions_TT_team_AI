@@ -11173,7 +11173,7 @@ class MainWindow(QMainWindow):
             
             # Определяем максимальную ширину для выравнивания
             max_games_width = max([len(str(g)) for g in temp_games_list]) if temp_games_list else 0
-            max_games_width = max(max_games_width, 30)
+            max_games_width = max(max_games_width, 40)
             
             # Второй проход: выводим с выравниванием и считаем общее время
             previous_stage = None
@@ -11201,7 +11201,6 @@ class MainWindow(QMainWindow):
                             groups_count = system.total_group
                             players_per_group = exit_count * 2
                             players_in_semifinal = groups_count * players_per_group
-                            # players_per_group = exit_count * 2
                             group_sizes = [players_per_group] * groups_count
                             distribution_text = self.calculate_group_distribution(players_in_semifinal, groups_count)
                             total_games = self.calculate_semifinal_games(groups_count, players_per_group, exit_count)
@@ -11307,7 +11306,15 @@ class MainWindow(QMainWindow):
                 # Выравниваем количество игр по правому краю
                 games_str = str(total_games)
                 games_padded = games_str.rjust(max_games_width)
-                
+
+                # определяем количество знаков этап и систему
+                length = len(f"{system.type_table} | {distribution_text}")
+                if idx == 1:
+                    full_dlina = length + len(games_padded)
+                else:
+                    max_games_width = full_dlina - length
+                    games_padded = games_str.rjust(max_games_width)
+
                 # 1-я строка: номер этапа, название, места
                 info_text += f"┌─ 📌 ЭТАП {idx}: {stage_display}{places_display}\n"
                 # 2-я строка: тип таблицы, распределение, количество игр, время

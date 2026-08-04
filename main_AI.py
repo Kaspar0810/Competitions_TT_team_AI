@@ -31,6 +31,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.colors import *
 from reportlab.lib.styles import ParagraphStyle as PS
 from typing import List, Tuple, Dict, Optional, Set
+from reportlab.pdfgen.canvas import Canvas
 
 import tempfile
 import pymysql
@@ -16925,6 +16926,189 @@ class MainWindow(QMainWindow):
 
         return name_table_final
     # титульный лист в формате PDF
+# =======================================
+#     def create_title_page_pdf(self):
+#         """Создание титульного листа в PDF формате A4 книжная ориентация"""
+#         if not self.current_title_id:
+#             QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+#             return
+
+#         try:
+           
+#             # Получаем данные о соревновании
+#             title = Title.get_by_id(self.current_title_id)
+
+#             # Создаём папку, если её нет
+#             pdf_dir = "table_pdf"
+#             if not os.path.exists(pdf_dir):
+#                 os.makedirs(pdf_dir)
+
+#             # Имя файла
+#             short_name = title.short_name_comp if title.short_name_comp else title.name
+#             import re
+#             clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
+#             clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
+#             filename = os.path.join(pdf_dir, f"{clean_name}_title_page.pdf")
+
+#             # Спрашиваем про изображение
+#             reply = QMessageBox.question(
+#                 self,
+#                 "Изображение на титульный лист",
+#                 "Добавить изображение (логотип) на титульный лист?",
+#                 QMessageBox.Yes | QMessageBox.No
+#             )
+
+#             image_path = None
+#             if reply == QMessageBox.Yes:
+#                 image_path, _ = QFileDialog.getOpenFileName(
+#                     self,
+#                     "Выберите изображение для титульного листа",
+#                     "",
+#                     "Images (*.png *.jpg *.jpeg *.gif *.bmp)"
+#                 )
+#                 if not image_path:
+#                     return
+
+#             name = title.name if title.name else "Соревнование"
+#             sredi = title.sredi if title.sredi else ""
+#             vozrast = title.vozrast if title.vozrast else ""
+#             mesto = title.mesto if title.mesto else ""
+#             start = title.data_start.strftime("%d.%m.%Y") if title.data_start else ""
+#             end = title.data_end.strftime("%d.%m.%Y") if title.data_end else ""
+
+#             canvas = Canvas(f"{filename}", pagesize=A4)
+
+#             if image_path == None:
+#                 canvas.setFont("DejaVuSerif-Italic", 14)
+#                 canvas.drawString(5 * cm, 28 * cm, "Федерация настольного тенниса России")
+#                 canvas.drawString(3 * cm, 27 * cm, "Федерация настольного тенниса Нижегородской области")
+#                 canvas.setFont("DejaVuSerif-Italic", 20)
+#                 canvas.drawString(2 * cm, 23 * cm, name)
+#                 canvas.setFont("DejaVuSerif-Italic", 16)
+#                 canvas.drawString(2.5 * cm, 22 * cm, f"среди {sredi} {vozrast}")
+#                 canvas.setFont("DejaVuSerif-Italic", 14)
+#                 canvas.drawString(5.5 * cm, 5 * cm, f"г. {mesto}")
+#                 canvas.drawString(7.5 * cm, 4 * cm, f"{start} - {end}")
+#             else:
+#                 canvas.drawImage(image_path, 7 * cm, 12 * cm, 6.9 * cm, 4.9 * cm,
+#                                 mask=[0, 2, 0, 2, 0, 2])  # делает фон прозрачным
+#                 canvas.setFont("DejaVuSerif-Italic", 14)
+#                 canvas.drawString(5 * cm, 28 * cm, "Федерация настольного тенниса России")
+#                 canvas.drawString(3 * cm, 27 * cm, "Федерация настольного тенниса Нижегородской области")
+#                 canvas.setFont("DejaVuSerif-Italic", 20)
+#                 canvas.drawString(2 * cm, 23 * cm, name) # попробовать выравнить титул
+#                 canvas.setFont("DejaVuSerif-Italic", 16)
+#                 canvas.drawString(2.5 * cm, 22 * cm, f"среди {sredi} {vozrast}")
+#                 canvas.setFont("DejaVuSerif-Italic", 14)
+#                 canvas.drawString(5.5 * cm, 5 * cm, f"г. {mesto}")
+#                 canvas.drawString(7.5 * cm, 4 * cm, f"{start} - {end}")
+#             # catalog = 1 # файл сохраяняется в каталоге /table_pdf
+#             # change_dir(catalog)
+#             canvas.save()
+#             # os.chdir("..")
+
+
+# # ==============================================================
+#             # # Создаём документ с уменьшенным нижним отступом
+#             # doc = SimpleDocTemplate(filename, pagesize=A4,
+#             #                         topMargin=2*cm, bottomMargin=1.5*cm,
+#             #                         leftMargin=2*cm, rightMargin=2*cm)
+
+#             # styles = getSampleStyleSheet()
+#             # title_style = PS("TitleStyle", fontSize=18, fontName="DejaVuSerif-Bold",
+#             #                 alignment=1, spaceAfter=20, textColor=colors.darkblue)
+#             # subtitle_style = PS("SubtitleStyle", fontSize=14, fontName="DejaVuSerif",
+#             #                     alignment=1, spaceAfter=10, textColor=colors.black)
+#             # info_style = PS("InfoStyle", fontSize=12, fontName="DejaVuSerif",
+#             #                 alignment=1, spaceAfter=8, textColor=colors.black)
+
+#             # # Основные элементы (верхняя и средняя часть)
+#             # elements = []
+
+#             # # Верхняя часть
+#             # elements.append(Spacer(1, 1*cm))
+#             # elements.append(Paragraph("Федерация настольного тенниса России", title_style))
+#             # elements.append(Paragraph("Федерация настольного тенниса Нижегородской области", subtitle_style))
+#             # elements.append(Spacer(1, 1.5*cm))
+
+#             # # Изображение
+#             # if image_path and os.path.exists(image_path):
+#             #     try:
+#             #         img = Image(image_path, width=5*cm, height=5*cm)
+#             #         img.hAlign = 'CENTER'
+#             #         elements.append(img)
+#             #         elements.append(Spacer(1, 1*cm))
+#             #     except Exception as e:
+#             #         print(f"Ошибка загрузки изображения: {e}")
+
+#             # # Название соревнования
+#             # name = title.name if title.name else "Соревнование"
+#             # elements.append(Paragraph(name, title_style))
+#             # elements.append(Spacer(1, 0.5*cm))
+
+#             # # Категория
+#             # sredi = title.sredi if title.sredi else ""
+#             # vozrast = title.vozrast if title.vozrast else ""
+#             # if sredi or vozrast:
+#             #     elements.append(Paragraph(f"среди {sredi} {vozrast}", subtitle_style))
+#             #     elements.append(Spacer(1, 0.5*cm))
+
+#             # # ---- НИЖНЯЯ ЧАСТЬ (дата и место) ----
+#             # # Формируем текст
+#             # mesto = title.mesto if title.mesto else ""
+#             # start = title.data_start.strftime("%d.%m.%Y") if title.data_start else ""
+#             # end = title.data_end.strftime("%d.%m.%Y") if title.data_end else ""
+
+#             # bottom_parts = []
+#             # if mesto:
+#             #     bottom_parts.append(f"г. {mesto}")
+#             # if start and end:
+#             #     bottom_parts.append(f"{start} - {end}")
+#             # elif start:
+#             #     bottom_parts.append(start)
+
+#             # # Создаём таблицу с одной ячейкой, которая будет растягиваться на всю ширину
+#             # # и прижиматься к нижнему краю
+#             # bottom_table = None
+#             # if bottom_parts:
+#             #     bottom_text = " | ".join(bottom_parts)
+#             #     bottom_paragraph = Paragraph(bottom_text, info_style)
+#             #     # Используем таблицу, чтобы зафиксировать позицию снизу
+#             #     bottom_table = Table([[bottom_paragraph]])
+#             #     bottom_table._argW = [doc.width]    
+#             #     bottom_table.setStyle(TableStyle([
+#             #         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+#             #         ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
+#             #         ('TOPPADDING', (0, 0), (-1, -1), 0),
+#             #         ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+#             #     ]))
+#             # else:
+#             #     # Если данных нет, просто добавляем пустую строку
+#             #     bottom_table = Paragraph(" ", info_style)
+
+#             # # Добавляем нижнюю часть в конец списка элементов
+#             # elements.append(bottom_table)
+
+#             # # Строим документ
+#             # doc.build(elements)
+
+#             QMessageBox.information(self, "Успех", f"Титульный лист сохранён в:\n{filename}")
+
+#             # Предлагаем открыть файл
+#             reply = QMessageBox.question(self, "Открыть файл",
+#                                         "Открыть созданный PDF файл?",
+#                                         QMessageBox.Yes | QMessageBox.No)
+#             if reply == QMessageBox.Yes:
+#                 if sys.platform == 'win32':
+#                     os.startfile(filename)
+#                 else:
+#                     os.system(f'open "{filename}"')
+
+#         except Exception as e:
+#             import traceback
+#             traceback.print_exc()
+#             QMessageBox.critical(self, "Ошибка", f"Не удалось создать титульный лист: {str(e)}")
+# =======================================================
     def create_title_page_pdf(self):
         """Создание титульного листа в PDF формате A4 книжная ориентация"""
         if not self.current_title_id:
@@ -16932,14 +17116,6 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
-            from reportlab.lib.pagesizes import A4
-            from reportlab.lib import colors
-            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle as PS
-            from reportlab.lib.units import cm, inch
-            import os
-            from PyQt5.QtWidgets import QFileDialog
-
             # Получаем данные о соревновании
             title = Title.get_by_id(self.current_title_id)
 
@@ -16998,7 +17174,7 @@ class MainWindow(QMainWindow):
             # ---- Изображение (если есть) ----
             if image_path and os.path.exists(image_path):
                 try:
-                    img = Image(image_path, width=5*cm, height=5*cm)
+                    img = Image(image_path, width=10*cm, height=10*cm)
                     img.hAlign = 'CENTER'
                     elements.append(img)
                     elements.append(Spacer(1, 1*cm))

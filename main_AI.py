@@ -10946,9 +10946,10 @@ class MainWindow(QMainWindow):
                     self.table_type.currentText(), 
                     total_in_this_final, 
                     total_groups, 
-                    group_sizes, 
+                    group_sizes,                     
                     stage_name, 
-                    previous_stage
+                    previous_stage,
+                    exit_val=1
                 )
                 
                 return total_in_this_final, games_in_this_final
@@ -11165,15 +11166,20 @@ class MainWindow(QMainWindow):
                         # Квалификация или Одна таблица
                         group_sizes = self.calculate_group_sizes(total_players, groups_count)
                         games = self.calculate_total_games(
-                            system.type_table, total_players, groups_count, group_sizes,
-                            system.stage, previous_stage
+                            system.type_table,
+                            total_players,
+                            groups_count,
+                            group_sizes,                          
+                            system.stage,
+                            previous_stage,
+                            exit_val=1
                         )
                     temp_games_list.append(games)
                 previous_stage = system
             
             # Определяем максимальную ширину для выравнивания
             max_games_width = max([len(str(g)) for g in temp_games_list]) if temp_games_list else 0
-            max_games_width = max(max_games_width, 40)
+            max_games_width = max(max_games_width, 35)
             
             # Второй проход: выводим с выравниванием и считаем общее время
             previous_stage = None
@@ -11271,8 +11277,13 @@ class MainWindow(QMainWindow):
                         group_sizes = self.calculate_group_sizes(total_players, groups_count)
                         distribution_text = self.calculate_group_distribution(total_players, groups_count)
                         total_games = self.calculate_total_games(
-                            system.type_table, total_players, groups_count, group_sizes,
-                            system.stage, previous_stage
+                            system.type_table,
+                            total_players,
+                            groups_count,
+                            group_sizes,                       
+                            system.stage,
+                            previous_stage,
+                            exit_val=1
                         )
                         stage_display = system.stage
                         places_display = ""
@@ -11378,7 +11389,7 @@ class MainWindow(QMainWindow):
         else:
             return f"{groups} гр ({remainder} гр по {base + 1} чел., {groups - remainder} гр по {base} чел.)"
 
-    def calculate_total_games(self, table_type, total_in_this_final, groups_count, group_sizes, stage_name=None, previous_stage=None):
+    def calculate_total_games(self, table_type, total_in_this_final, groups_count, group_sizes, stage_name=None, previous_stage=None, exit_val=1):
         """Расчет общего количества игр с учетом типа этапа и уже сыгранных встреч"""
   
         if total_in_this_final == 0:
@@ -11392,20 +11403,23 @@ class MainWindow(QMainWindow):
             already_played = []
 
             if self.is_final_stage(stage_name) and previous_stage:
-                total_player = Player.select().where((Player.title_id == self.current_title_id) & (Player.sex == self.current_sex)).count()
-                group_sizes = self.calculate_group_sizes(total_player, groups_count)
-                # В финале играют участники из разных групп предыдущего этапа
-                # Количество участников из одной группы в финале
-                players_per_previous_group = previous_stage.mesta_exit
+                total_player = total_in_this_final * exit_val
+                if exit_val == 1:
+                    total_possible = (total_player * (total_player - 1)) // 2
+                else:
+                    group_sizes = self.calculate_group_sizes(total_player, groups_count)
+                    # В финале играют участники из разных групп предыдущего этапа
+                    # Количество участников из одной группы в финале
+                    players_per_previous_group = previous_stage.mesta_exit
 
-                for p in group_sizes:
-                    already_played.append(p - players_per_previous_group)
+                    for p in group_sizes:
+                        already_played.append(p - players_per_previous_group)
 
-                for group_size in already_played:
-                    if group_size > 1:
-                        total_games_playing += (group_size * (group_size - 1)) // 2
+                    for group_size in already_played:
+                        if group_size > 1:
+                            total_games_playing += (group_size * (group_size - 1)) // 2
 
-                total_possible = (sum(already_played) * (sum(already_played) - 1)) // 2
+                    total_possible = (sum(already_played) * (sum(already_played) - 1)) // 2
                 
                 total_games = total_possible - total_games_playing
             else:
@@ -11778,9 +11792,10 @@ class MainWindow(QMainWindow):
                         new_table_type, 
                         total_players, 
                         new_total_group, 
-                        group_sizes, 
+                        group_sizes,
                         new_stage_name, 
-                        previous_stage
+                        previous_stage,
+                        exit_val=1
                     )
                     
                     # Формируем kol_game_string
@@ -12611,7 +12626,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Ошибка получения номера финала: {e}")
             return 1
-#============ old        
+       
     def get_players_distribution_info(self):
         """Получение информации о распределении игроков по этапам"""
         from models import System
@@ -18098,15 +18113,19 @@ class MainWindow(QMainWindow):
         
         try:
             # Получаем все записи Choice для этого соревнования
-            choices = Choice.select().where(
+            choices = list(Choice.select().where(
                 (Choice.title_id == self.current_title_id) &
                 (Choice.sex == self.current_sex)
-                ).order_by(Choice.group)
+                ).order_by(Choice.group))
             
             if choices.count() == 0:
                 QMessageBox.warning(self, "Ошибка", "Нет данных жеребьевки для заполнения результатов")
                 return
-            
+
+            # Сортируем группы по номеру
+            choices.sort(key=lambda c: self._extract_number_from_group(c.group))
+            # sorted_groups = sorted(choices.keys(), key=self._extract_number_from_group)
+
             # Группируем по группам
             groups = {}
             for choice in choices:
@@ -22475,7 +22494,6 @@ class MainWindow(QMainWindow):
         # 2. Получаем игроков из источника
         if "полуфинал" in source_stage.lower():
             players_by_group, actual_exit_count = self.get_players_for_final(source_stage, exit_count)
-            # players_by_group = self.get_players_for_final(stage_name, exit_count=None)
         else:
             players_by_group = self.get_players_from_qualification_for_final(exit_count)
         
@@ -22644,7 +22662,7 @@ class MainWindow(QMainWindow):
         
         # 3. Сортируем группы по номеру
         sorted_groups = sorted(players_by_group.keys(), key=self._extract_number_from_group)
-        # sorted_groups = sorted(players_by_group[0].keys(), key=self._extract_number_from_group)
+  
         
         # 4. Распределение игроков по позициям в круговой таблице
         total_players = sum(len(players_by_group[g]) for g in sorted_groups)

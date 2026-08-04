@@ -18118,13 +18118,12 @@ class MainWindow(QMainWindow):
                 (Choice.sex == self.current_sex)
                 ).order_by(Choice.group))
             
-            if choices.count() == 0:
+            if len(choices) == 0:
                 QMessageBox.warning(self, "Ошибка", "Нет данных жеребьевки для заполнения результатов")
                 return
 
             # Сортируем группы по номеру
             choices.sort(key=lambda c: self._extract_number_from_group(c.group))
-            # sorted_groups = sorted(choices.keys(), key=self._extract_number_from_group)
 
             # Группируем по группам
             groups = {}
@@ -19516,16 +19515,21 @@ class MainWindow(QMainWindow):
             self.tour_filter_combo.blockSignals(True)
             
             # Получаем уникальные группы``
-            groups = Result.select(Result.number_group).where(
+            groups = list(Result.select(Result.number_group).where(
                 (Result.title_id == self.current_title_id) &
-                (Result.system_stage == stage_name)
-            ).distinct().order_by(Result.number_group)
+                (Result.system_stage == stage_name) &
+                (Result.sex == self.current_sex)
+            ).distinct())
             
             # Сохраняем текущее значение
             current_group = self.group_filter_combo.currentText()
             
             # Обновляем ComboBox групп
             self.group_filter_combo.clear()
+
+            # сортируем группы по номеру
+            groups.sort(key=lambda r: self._extract_number_from_group(r.number_group))
+
             self.group_filter_combo.addItem("Все группы")
             for group in groups:
                 if group.number_group:

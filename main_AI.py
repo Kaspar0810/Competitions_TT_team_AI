@@ -5972,6 +5972,11 @@ class MainWindow(QMainWindow):
                     if tab_index == 0:  # Титул
                         if btn_text == "📋 Создать новое":
                             btn.clicked.connect(self.new_competition)
+                            title_btn = QPushButton("📄 Создать титульный лист")
+                            title_btn.setMinimumHeight(35)
+                            title_btn.setStyleSheet(self.get_button_style())
+                            title_btn.clicked.connect(self.create_title_page_pdf)
+                            self.dynamic_filters_layout.addWidget(title_btn)
                     elif tab_index == 2:  # Команды
                         if btn_text == "➕ Добавить":
                             btn.clicked.connect(self.add_team)
@@ -6032,6 +6037,8 @@ class MainWindow(QMainWindow):
                 item.widget().deleteLater()
             elif item.layout():
                 self.clear_layout(item.layout())
+
+
 
     def add_player_from_form(self):
         """Добавление участника из формы на вкладке Участники"""
@@ -6782,7 +6789,14 @@ class MainWindow(QMainWindow):
         duplicate_surnames_action = QAction("Двойные фамилии", self)
         duplicate_surnames_action.triggered.connect(self.export_duplicate_surnames_to_pdf)
         print_menu.addAction(duplicate_surnames_action)
-        
+
+        # Титульный лист
+        title_page_action = QAction("📄 Титульный лист", self)
+        title_page_action.triggered.connect(self.view_title_page)  # <-- новый метод
+        view_menu.addAction(title_page_action)
+
+        view_menu.addSeparator()  # разделитель
+
         # Список участников
         participants_list_action = QAction("📋 Список участников (PDF)", self)
         participants_list_action.triggered.connect(self.export_participants_to_pdf)
@@ -14744,7 +14758,7 @@ class MainWindow(QMainWindow):
         clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
         clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
         
-        sex = "M" if self.current_sex == "man" else "w"
+        sex = "M" if self.current_sex == "man" else "W"
 
         if stage == "Одна таблица":
             title_text = f"Финальные соревнования. Одиночный разряд. {title_sex}."
@@ -16910,8 +16924,133 @@ class MainWindow(QMainWindow):
         doc.build(elements, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
 
         return name_table_final
+    # титульный лист в формате PDF
+    def create_title_page_pdf(self):
+        """Создание титульного листа в PDF формате A4 книжная ориентация"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
 
+        try:
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
+            from reportlab.lib.pagesizes import A4
+            from reportlab.lib import colors
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle as PS
+            from reportlab.lib.units import cm, inch
+            import os
+            from PyQt5.QtWidgets import QFileDialog
 
+            # Получаем данные о соревновании
+            title = Title.get_by_id(self.current_title_id)
+
+            # Создаём папку, если её нет
+            pdf_dir = "table_pdf"
+            if not os.path.exists(pdf_dir):
+                os.makedirs(pdf_dir)
+
+            # Имя файла
+            short_name = title.short_name_comp if title.short_name_comp else title.name
+            import re
+            clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
+            clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
+            filename = os.path.join(pdf_dir, f"{clean_name}_title_page.pdf")
+
+            # Спрашиваем про изображение
+            reply = QMessageBox.question(
+                self,
+                "Изображение на титульный лист",
+                "Добавить изображение (логотип) на титульный лист?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+
+            image_path = None
+            if reply == QMessageBox.Yes:
+                image_path, _ = QFileDialog.getOpenFileName(
+                    self,
+                    "Выберите изображение для титульного листа",
+                    "",
+                    "Images (*.png *.jpg *.jpeg *.gif *.bmp)"
+                )
+                if not image_path:
+                    return  # пользователь отменил выбор
+
+            # Создаём PDF-документ
+            doc = SimpleDocTemplate(filename, pagesize=A4,
+                                    topMargin=2*cm, bottomMargin=2*cm,
+                                    leftMargin=2*cm, rightMargin=2*cm)
+
+            styles = getSampleStyleSheet()
+            title_style = PS("TitleStyle", fontSize=18, fontName="DejaVuSerif-Bold",
+                            alignment=1, spaceAfter=20, textColor=colors.darkblue)
+            subtitle_style = PS("SubtitleStyle", fontSize=14, fontName="DejaVuSerif",
+                                alignment=1, spaceAfter=10, textColor=colors.black)
+            info_style = PS("InfoStyle", fontSize=12, fontName="DejaVuSerif",
+                            alignment=1, spaceAfter=8, textColor=colors.black)
+
+            elements = []
+
+            # ---- Верхняя часть ----
+            elements.append(Spacer(1, 1*cm))
+            elements.append(Paragraph("Федерация настольного тенниса России", title_style))
+            elements.append(Paragraph("Федерация настольного тенниса Нижегородской области", subtitle_style))
+            elements.append(Spacer(1, 1.5*cm))
+
+            # ---- Изображение (если есть) ----
+            if image_path and os.path.exists(image_path):
+                try:
+                    img = Image(image_path, width=5*cm, height=5*cm)
+                    img.hAlign = 'CENTER'
+                    elements.append(img)
+                    elements.append(Spacer(1, 1*cm))
+                except Exception as e:
+                    print(f"Ошибка загрузки изображения: {e}")
+
+            # ---- Основная информация ----
+            # Название соревнования
+            name = title.name if title.name else "Соревнование"
+            elements.append(Paragraph(name, title_style))
+            elements.append(Spacer(1, 0.5*cm))
+
+            # Категория участников
+            sredi = title.sredi if title.sredi else ""
+            vozrast = title.vozrast if title.vozrast else ""
+            if sredi or vozrast:
+                elements.append(Paragraph(f"среди {sredi} {vozrast}", subtitle_style))
+                elements.append(Spacer(1, 0.5*cm))
+
+            # ---- Нижняя часть ----
+            # Место проведения
+            mesto = title.mesto if title.mesto else ""
+            if mesto:
+                elements.append(Paragraph(f"г. {mesto}", info_style))
+
+            # Даты
+            start = title.data_start.strftime("%d.%m.%Y") if title.data_start else ""
+            end = title.data_end.strftime("%d.%m.%Y") if title.data_end else ""
+            if start and end:
+                elements.append(Paragraph(f"{start} - {end}", info_style))
+            elif start:
+                elements.append(Paragraph(start, info_style))
+
+            # Создаём PDF
+            doc.build(elements)
+
+            QMessageBox.information(self, "Успех", f"Титульный лист сохранён в:\n{filename}")
+
+            # Предлагаем открыть файл
+            reply = QMessageBox.question(self, "Открыть файл",
+                                        "Открыть созданный PDF файл?",
+                                        QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                if sys.platform == 'win32':
+                    os.startfile(filename)
+                else:
+                    os.system(f'open "{filename}"')
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "Ошибка", f"Не удалось создать титульный лист: {str(e)}")
 # ======  написание стадий сетки ===============
     def get_match_title(self, i, game, highest_place, mp):
         """
@@ -18584,7 +18723,7 @@ class MainWindow(QMainWindow):
             detail_text.clear()
             
             try:
-                all_choices = Choice.select().where(Choice.title_id == self.current_title_id)
+                all_choices = Choice.select().where((Choice.title_id == self.current_title_id) & (Choice.sex == self.current_sex))
                 results = []
                 for choice in all_choices:
                     player = Player.get_or_none(Player.id == choice.player_choice.id)
@@ -24919,6 +25058,49 @@ class MainWindow(QMainWindow):
         """Редактирование состава ГСК (то же самое, что и create)"""
         self.create_gsk_list()
 
+# ========== Просмотр файлов в PDF =============
+# Титульный лист
+    def view_title_page(self):
+        """Просмотр титульного листа: если файл существует - открыть, иначе предложить создать"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+
+        try:
+            # Получаем данные о соревновании
+            title = Title.get_by_id(self.current_title_id)
+            short_name = title.short_name_comp if title.short_name_comp else title.name
+            import re
+            clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
+            clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
+
+            # Путь к файлу
+            pdf_dir = "table_pdf"
+            filename = os.path.join(pdf_dir, f"{clean_name}_title_page.pdf")
+
+            if os.path.exists(filename):
+                # Файл существует – открываем
+                if sys.platform == 'win32':
+                    os.startfile(filename)
+                else:
+                    os.system(f'open "{filename}"')
+            else:
+                # Файла нет – спрашиваем о создании
+                reply = QMessageBox.question(
+                    self,
+                    "Титульный лист не найден",
+                    f"PDF-файл титульного листа не найден.\n"
+                    f"Создать его сейчас?",
+                    QMessageBox.Yes | QMessageBox.No
+                )
+                if reply == QMessageBox.Yes:
+                    # Создаём титульный лист (метод уже есть)
+                    self.create_title_page_pdf()
+                # Если пользователь отказался – ничего не делаем
+
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось открыть титульный лист: {str(e)}")
+
     def view_gsk_list(self):
         """Просмотр списка ГСК (генерирует PDF)"""
         if not self.current_title_id:
@@ -25884,36 +26066,7 @@ class RatingFileDialog(QDialog):
                 age_text = f" ({title.vozrast})" if title.vozrast else ""
                 self.table_header.setText(f"👥 {title.name}{age_text} - {sex_text} ({count} чел.)")
 # ============3007
-    # def switch_gender_category(self, sex):
-    #     """Переключение между man и woman"""
-    #     if self.current_sex == sex:
-    #         return
-        
-    #     self.current_sex = sex
-        
-    #     # Перезагружаем участников с фильтром по полу
-    #     self.load_participants_for_title()
-        
-    #     # Обновляем кнопки
-    #     self.create_category_buttons()
-        
-    #     # Обновляем заголовок таблицы
-    #     if self.current_title_id:
-    #         title = Title.get_or_none(Title.id == self.current_title_id)
-    #         if title:
-    #             sex_text = "Женщины" if sex == "woman" else "Мужчины"
-    #             count = self.players_model.rowCount()
-    #             age_text = f" ({title.vozrast})" if title.vozrast else ""
-    #             self.table_header.setText(f"👥 {title.name}{age_text} - {sex_text} ({count} чел.)")
-        
-    #     # Очищаем результаты поиска при смене пола
-    #     self.search_results_list.clear()
-        
-    #     # Сбрасываем заголовок поиска
-    #     self.reset_search_label()
-        
-    #     # ---- ОБНОВЛЯЕМ МЕНЮ РЕЗУЛЬТАТОВ ----
-    #     self.update_results_menu()
+
 #=========================
 
 def main():  

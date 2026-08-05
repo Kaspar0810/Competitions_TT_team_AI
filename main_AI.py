@@ -22318,13 +22318,13 @@ class MainWindow(QMainWindow):
 
     def begunki_made(self, stage, subgroup, runner_type):
         """создание бегунков для выбранного этапа"""
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-        from reportlab.lib.pagesizes import A4
-        from reportlab.lib import colors
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle as PS
-        from reportlab.lib.units import cm
-        import os
-        import re
+        # from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        # from reportlab.lib.pagesizes import A4
+        # from reportlab.lib import colors
+        # from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle as PS
+        # from reportlab.lib.units import cm
+        # import os
+        # import re
 
         if not self.current_title_id:
             QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
@@ -22404,6 +22404,167 @@ class MainWindow(QMainWindow):
             filename = self.create_full_runners_pdf(stage, subgroup, date=None, time=None)
             return filename
 # ================== полный бегунок ====
+    def print_runners(self):
+        """Печать бегунков для выбранного этапа"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+        
+        stage_name = self.stage_for_runner_combo.currentText()
+        if stage_name in ["Нет активного соревнования", "Нет добавленных этапов"]:
+            QMessageBox.warning(self, "Ошибка", "Нет доступных этапов")
+            return
+        
+        subgroup = self.subgroup_for_runner_combo.currentText()
+        runner_type = self.runner_type_combo.currentText()
+
+        if runner_type == "Полный":
+            # Для полных бегунков используем фильтры расписания
+            self.print_full_runners_with_filters(stage_name, subgroup)
+        else:
+            # Урезанные бегунки (без фильтров)
+            filename = self.begunki_made(stage_name, subgroup, runner_type)
+            if filename:
+                QMessageBox.information(self, "Успех", f"Бегунки сохранены в файл:\n{filename}")
+                reply = QMessageBox.question(self, "Открыть файл", 
+                                            "Открыть созданный PDF файл?",
+                                            QMessageBox.Yes | QMessageBox.No)
+                if reply == QMessageBox.Yes:
+                    if sys.platform == 'win32':
+                        os.startfile(filename)
+                    else:
+                        os.system(f'open "{filename}"')
+            else:
+                QMessageBox.warning(self, "Ошибка", "Не удалось создать бегунки")
+
+    def print_full_runners_with_filters(self, stage_name, subgroup):
+        """Печать полных бегунков с учётом текущих фильтров расписания"""
+        try:
+            # Вспомогательная функция для безопасного получения текста ячейки
+            def get_item_text(row, col):
+                item = self.schedule_table.item(row, col)
+                return item.text() if item else ""
+            
+            matches_data = []
+            for row in range(self.schedule_table.rowCount()):
+                # Пропускаем скрытые строки (фильтры)
+                if self.schedule_table.isRowHidden(row):
+                    continue
+                
+                # Извлекаем данные с проверкой на None
+                tour = get_item_text(row, 0)
+                group = get_item_text(row, 1)
+                player1 = get_item_text(row, 2)
+                player2 = get_item_text(row, 3)
+                date = get_item_text(row, 4)
+                time = get_item_text(row, 5)
+                table = get_item_text(row, 6)
+                match = get_item_text(row, 7)
+                stage = get_item_text(row, 8)
+
+                if not player1 and not player2:
+                    continue  # пропускаем пустые строки
+
+                matches_data.append({
+                    'group': group or stage_name,
+                    'tour': tour,
+                    'match': match,
+                    'date': date,
+                    'time': time,
+                    'table': table,
+                    'player1': player1,
+                    'player2': player2,
+                    'stage': stage
+                })
+
+            if not matches_data:
+                QMessageBox.warning(self, "Ошибка", "Нет данных для печати бегунков (возможно, все строки скрыты фильтрами)")
+                return
+            
+            # Создаём PDF с полными бегунками
+            from begunok_full import BegunokPDF
+            import os
+            import re
+
+            # Папка для сохранения
+            pdf_dir = "runners"
+            if not os.path.exists(pdf_dir):
+                os.makedirs(pdf_dir)
+
+            title = Title.get_by_id(self.current_title_id)
+            short_name = title.short_name_comp if title.short_name_comp else title.name
+            clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
+            clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
+
+            filename = os.path.join(pdf_dir, f"{clean_name}_full_runners_filtered.pdf")
+
+            # Преобразуем данные в формат для BegunokPDF
+            begunki_data = []
+            for m in matches_data:
+                begunki_data.append({
+                    'date': m['date'],
+                    'time': m['time'],
+                    'table': m['table'],
+                    'match_num': m['tour'],
+                    'stage': m['stage'],
+                    'player1': self._parse_player_for_runner_full(m['player1'])['name'],
+                    'city1': self._parse_player_for_runner_full(m['player1'])['city'],
+                    'rank1': self._parse_player_for_runner_full(m['player1'])['rank'],
+                    'player2': self._parse_player_for_runner_full(m['player2'])['name'],
+                    'city2': self._parse_player_for_runner_full(m['player2'])['city'],
+                    'rank2': self._parse_player_for_runner_full(m['player2'])['rank'],
+                })
+
+            # Создаём PDF
+            pdf = BegunokPDF(filename)
+            pdf.add_begunki(begunki_data)
+            pdf.save()
+
+            QMessageBox.information(self, "Успех", f"Полные бегунки сохранены в:\n{filename}")
+
+            # Предлагаем открыть файл
+            reply = QMessageBox.question(self, "Открыть файл",
+                                        "Открыть созданный PDF файл?",
+                                        QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                if sys.platform == 'win32':
+                    os.startfile(filename)
+                else:
+                    os.system(f'open "{filename}"')
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "Ошибка", f"Не удалось создать бегунки: {str(e)}")
+
+    # def parse_player_for_runner_full(self, player_str):
+    #     """
+    #     Парсит строку игрока для полных бегунков.
+    #     Возвращает словарь с полями 'name', 'rank', 'city'.
+    #     """
+    #     result = {'name': player_str, 'rank': '', 'city': ''}
+    #     if not player_str:
+    #         return result
+        
+    #     # Если есть "/" разделитель города
+    #     if '/' in player_str:
+    #         parts = player_str.split('/', 1)
+    #         result['name'] = parts[0].strip()
+    #         result['city'] = parts[1].strip()
+    #     else:
+    #         result['name'] = player_str.strip()
+        
+    #     # Попытка найти рейтинг игрока (если есть в базе)
+    #     try:
+    #         player = Player.get_or_none(Player.fio == result['name'])
+    #         if player:
+    #             result['rank'] = str(player.rank) if player.rank else ""
+    #     except:
+    #         pass
+        
+    #     return result
+
+# =================================
     def full_runners_data(self, stage, subgroup, date=None, time=None):
         """
         Получение данных для полного бегунка
@@ -22521,7 +22682,7 @@ class MainWindow(QMainWindow):
         
         return begunki_data
 
-    def parse_player_for_runner(self, player_full):
+    def _parse_player_for_runner_full(self, player_full):
         """
         Парсинг строки игрока для бегунка
         Формат: "Фамилия Имя Отчество/Город"
@@ -22603,147 +22764,147 @@ class MainWindow(QMainWindow):
         
         return filename
 
-    def _print_full_runners_dialog(self):
-        """Диалог для печати полных бегунков с фильтрами"""
-        if not self.current_title_id:
-            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
-            return
+    # def _print_full_runners_dialog(self):
+    #     """Диалог для печати полных бегунков с фильтрами"""
+    #     if not self.current_title_id:
+    #         QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+    #         return
         
-        # Создаем диалог
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Печать полных бегунков")
-        dialog.setModal(True)
-        dialog.setMinimumWidth(400)
+    #     # Создаем диалог
+    #     dialog = QDialog(self)
+    #     dialog.setWindowTitle("Печать полных бегунков")
+    #     dialog.setModal(True)
+    #     dialog.setMinimumWidth(400)
         
-        layout = QVBoxLayout(dialog)
+    #     layout = QVBoxLayout(dialog)
         
-        # Заголовок
-        title_label = QLabel("Печать полных бегунков")
-        title_label.setStyleSheet("font-weight: bold; font-size: 13px; margin-bottom: 10px;")
-        layout.addWidget(title_label)
+    #     # Заголовок
+    #     title_label = QLabel("Печать полных бегунков")
+    #     title_label.setStyleSheet("font-weight: bold; font-size: 13px; margin-bottom: 10px;")
+    #     layout.addWidget(title_label)
         
-        # Выбор этапа
-        stage_layout = QHBoxLayout()
-        stage_layout.addWidget(QLabel("Этап:"))
-        stage_combo = QComboBox()
-        stage_combo.addItem("Все этапы")
-        stages = System.select().where((System.title_id == self.current_title_id) & (System.sex == self.current_sex)).order_by(System.id)
-        for s in stages:
-            stage_combo.addItem(s.stage)
-        stage_layout.addWidget(stage_combo, 1)
-        layout.addLayout(stage_layout)
+    #     # Выбор этапа
+    #     stage_layout = QHBoxLayout()
+    #     stage_layout.addWidget(QLabel("Этап:"))
+    #     stage_combo = QComboBox()
+    #     stage_combo.addItem("Все этапы")
+    #     stages = System.select().where((System.title_id == self.current_title_id) & (System.sex == self.current_sex)).order_by(System.id)
+    #     for s in stages:
+    #         stage_combo.addItem(s.stage)
+    #     stage_layout.addWidget(stage_combo, 1)
+    #     layout.addLayout(stage_layout)
         
-        # Выбор группы
-        group_layout = QHBoxLayout()
-        group_layout.addWidget(QLabel("Группа/Финал:"))
-        group_combo = QComboBox()
-        group_combo.addItem("Все группы")
-        group_layout.addWidget(group_combo, 1)
-        layout.addLayout(group_layout)
+    #     # Выбор группы
+    #     group_layout = QHBoxLayout()
+    #     group_layout.addWidget(QLabel("Группа/Финал:"))
+    #     group_combo = QComboBox()
+    #     group_combo.addItem("Все группы")
+    #     group_layout.addWidget(group_combo, 1)
+    #     layout.addLayout(group_layout)
         
-        # Выбор даты
-        date_layout = QHBoxLayout()
-        date_layout.addWidget(QLabel("Дата:"))
-        date_combo = QComboBox()
-        date_combo.addItem("все даты")
-        # Загружаем уникальные даты из результатов
-        dates = Result.select(Result.schedule_date).where(
-            Result.title_id == self.current_title_id
-        ).distinct()
-        for d in dates:
-            if d.schedule_date:
-                date_combo.addItem(d.schedule_date.strftime("%d.%m.%Y"))
-        date_layout.addWidget(date_combo, 1)
-        layout.addLayout(date_layout)
+    #     # Выбор даты
+    #     date_layout = QHBoxLayout()
+    #     date_layout.addWidget(QLabel("Дата:"))
+    #     date_combo = QComboBox()
+    #     date_combo.addItem("все даты")
+    #     # Загружаем уникальные даты из результатов
+    #     dates = Result.select(Result.schedule_date).where(
+    #         Result.title_id == self.current_title_id
+    #     ).distinct()
+    #     for d in dates:
+    #         if d.schedule_date:
+    #             date_combo.addItem(d.schedule_date.strftime("%d.%m.%Y"))
+    #     date_layout.addWidget(date_combo, 1)
+    #     layout.addLayout(date_layout)
         
-        # Выбор времени
-        time_layout = QHBoxLayout()
-        time_layout.addWidget(QLabel("Время:"))
-        time_combo = QComboBox()
-        time_combo.addItem("все время")
-        times = Result.select(Result.schedule_time).where(
-            Result.title_id == self.current_title_id
-        ).distinct()
-        for t in times:
-            if t.schedule_time:
-                time_combo.addItem(t.schedule_time.strftime("%H:%M"))
-        time_layout.addWidget(time_combo, 1)
-        layout.addLayout(time_layout)
+    #     # Выбор времени
+    #     time_layout = QHBoxLayout()
+    #     time_layout.addWidget(QLabel("Время:"))
+    #     time_combo = QComboBox()
+    #     time_combo.addItem("все время")
+    #     times = Result.select(Result.schedule_time).where(
+    #         Result.title_id == self.current_title_id
+    #     ).distinct()
+    #     for t in times:
+    #         if t.schedule_time:
+    #             time_combo.addItem(t.schedule_time.strftime("%H:%M"))
+    #     time_layout.addWidget(time_combo, 1)
+    #     layout.addLayout(time_layout)
         
-        # Функция обновления групп при выборе этапа
-        def update_groups():
-            group_combo.clear()
-            group_combo.addItem("Все группы")
+    #     # Функция обновления групп при выборе этапа
+    #     def update_groups():
+    #         group_combo.clear()
+    #         group_combo.addItem("Все группы")
             
-            selected_stage = stage_combo.currentText()
-            if selected_stage != "Все этапы":
-                system = System.get_or_none(
-                    (System.title_id == self.current_title_id) &
-                    (System.stage == selected_stage)
-                )
-                if system:
-                    # Получаем уникальные группы для этого этапа
-                    groups = Result.select(Result.number_group).where(
-                        (Result.title_id == self.current_title_id) &
-                        (Result.system_stage == selected_stage)
-                    ).distinct()
-                    for g in groups:
-                        if g.number_group:
-                            group_combo.addItem(g.number_group)
+    #         selected_stage = stage_combo.currentText()
+    #         if selected_stage != "Все этапы":
+    #             system = System.get_or_none(
+    #                 (System.title_id == self.current_title_id) &
+    #                 (System.stage == selected_stage)
+    #             )
+    #             if system:
+    #                 # Получаем уникальные группы для этого этапа
+    #                 groups = Result.select(Result.number_group).where(
+    #                     (Result.title_id == self.current_title_id) &
+    #                     (Result.system_stage == selected_stage)
+    #                 ).distinct()
+    #                 for g in groups:
+    #                     if g.number_group:
+    #                         group_combo.addItem(g.number_group)
         
-        stage_combo.currentTextChanged.connect(update_groups)
-        update_groups()
+    #     stage_combo.currentTextChanged.connect(update_groups)
+    #     update_groups()
         
-        # Кнопки
-        btn_layout = QHBoxLayout()
-        print_btn = QPushButton("🖨️ Печать")
-        print_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 8px;")
-        print_btn.clicked.connect(lambda: self._print_full_runners(
-            dialog, stage_combo, group_combo, date_combo, time_combo
-        ))
-        cancel_btn = QPushButton("Отмена")
-        cancel_btn.clicked.connect(dialog.reject)
-        btn_layout.addWidget(print_btn)
-        btn_layout.addWidget(cancel_btn)
-        layout.addLayout(btn_layout)
+    #     # Кнопки
+    #     btn_layout = QHBoxLayout()
+    #     print_btn = QPushButton("🖨️ Печать")
+    #     print_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 8px;")
+    #     print_btn.clicked.connect(lambda: self._print_full_runners(
+    #         dialog, stage_combo, group_combo, date_combo, time_combo
+    #     ))
+    #     cancel_btn = QPushButton("Отмена")
+    #     cancel_btn.clicked.connect(dialog.reject)
+    #     btn_layout.addWidget(print_btn)
+    #     btn_layout.addWidget(cancel_btn)
+    #     layout.addLayout(btn_layout)
         
-        dialog.exec_()
+    #     dialog.exec_()
 
-    def _print_full_runners(self, stage_combo, group_combo, date_combo, time_combo):
-        """Внутренний метод печати бегунков при выборе из расписания на сетке"""
-        stage = stage_combo.currentText()
-        if stage == "Все этапы":
-            stage = None
+    # def _print_full_runners(self, stage_combo, group_combo, date_combo, time_combo):
+    #     """Внутренний метод печати бегунков при выборе из расписания на сетке"""
+    #     stage = stage_combo.currentText()
+    #     if stage == "Все этапы":
+    #         stage = None
         
-        subgroup = group_combo.currentText()
-        if subgroup == "Все группы":
-            subgroup = None
+    #     subgroup = group_combo.currentText()
+    #     if subgroup == "Все группы":
+    #         subgroup = None
         
-        date = date_combo.currentText()
-        if date == "все даты":
-            date = None
+    #     date = date_combo.currentText()
+    #     if date == "все даты":
+    #         date = None
         
-        time = time_combo.currentText()
-        if time == "все время":
-            time = None
+    #     time = time_combo.currentText()
+    #     if time == "все время":
+    #         time = None
         
-        # Создаем PDF
-        filename = self.create_full_runners_pdf(stage, subgroup, date, time)
+    #     # Создаем PDF
+    #     filename = self.create_full_runners_pdf(stage, subgroup, date, time)
         
-        if filename:
-            # dialog.accept()
-            QMessageBox.information(self, "Успех", f"Бегунки сохранены в файл:\n{filename}")
+    #     if filename:
+    #         # dialog.accept()
+    #         QMessageBox.information(self, "Успех", f"Бегунки сохранены в файл:\n{filename}")
             
-            # Предлагаем открыть файл
-            reply = QMessageBox.question(self, "Открыть файл", 
-                                        "Открыть созданный PDF файл?",
-                                        QMessageBox.Yes | QMessageBox.No)
-            if reply == QMessageBox.Yes:
-                import sys
-                if sys.platform == 'win32':
-                    os.startfile(filename)
-                else:
-                    os.system(f'open "{filename}"')
+    #         # Предлагаем открыть файл
+    #         reply = QMessageBox.question(self, "Открыть файл", 
+    #                                     "Открыть созданный PDF файл?",
+    #                                     QMessageBox.Yes | QMessageBox.No)
+    #         if reply == QMessageBox.Yes:
+    #             import sys
+    #             if sys.platform == 'win32':
+    #                 os.startfile(filename)
+    #             else:
+    #                 os.system(f'open "{filename}"')
 # ======= полные соревнования
     def export_competition_full_pdf(self):
         """Экспорт полного файла соревнования в PDF (сохраняется в competition_pdf)"""

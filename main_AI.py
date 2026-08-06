@@ -1325,7 +1325,9 @@ class MainWindow(QMainWindow):
             
             # Обновляем заголовок таблицы
             self.update_table_header()
-            
+
+            self.update_stages_info()
+
         except Exception as e:
             print(f"Ошибка создания кнопок категорий: {e}")
 
@@ -2787,25 +2789,51 @@ class MainWindow(QMainWindow):
         match = re.search(r'\d+', group_str)
         return int(match.group()) if match else 0
 
+    # def update_schedule_stages(self):
+    #     """Обновление списка этапов для расписания (все этапы)"""
+    #     self.schedule_stage_combo.blockSignals(True)
+    #     self.schedule_stage_combo.clear()
+    #     if not self.current_title_id:
+    #         self.schedule_stage_combo.blockSignals(False)
+    #         return
+
+    #     stages = System.select().where(
+    #         (System.title_id == self.current_title_id) &
+    #         (System.sex == self.current_sex)).order_by(System.id)
+    #     for stage in stages:
+    #         self.schedule_stage_combo.addItem(stage.stage)
+
+    #     self.schedule_stage_combo.blockSignals(False)
+    #     # Принудительно загружаем первый этап, если есть
+    #     if self.schedule_stage_combo.count() > 0:
+    #         self.schedule_stage_combo.setCurrentIndex(0)
+    #         # Вызываем вручную, так как сигнал может не сработать, если индекс не изменился
+    #         self.on_schedule_stage_changed()
+
     def update_schedule_stages(self):
-        """Обновление списка этапов для расписания (все этапы)"""
+        """Обновление списка этапов для расписания с учётом текущего пола"""
         self.schedule_stage_combo.blockSignals(True)
         self.schedule_stage_combo.clear()
+        
         if not self.current_title_id:
             self.schedule_stage_combo.blockSignals(False)
             return
 
+        # Получаем только те этапы, которые соответствуют текущему полу
+        sex = self.current_sex if self.current_sex else "man"
         stages = System.select().where(
             (System.title_id == self.current_title_id) &
-            (System.sex == self.current_sex)).order_by(System.id)
+            (System.sex == sex)
+        ).order_by(System.id)
+
         for stage in stages:
             self.schedule_stage_combo.addItem(stage.stage)
 
         self.schedule_stage_combo.blockSignals(False)
+        
         # Принудительно загружаем первый этап, если есть
         if self.schedule_stage_combo.count() > 0:
             self.schedule_stage_combo.setCurrentIndex(0)
-            # Вызываем вручную, так как сигнал может не сработать, если индекс не изменился
             self.on_schedule_stage_changed()
 #
     def load_competition_dates(self):
@@ -5278,6 +5306,7 @@ class MainWindow(QMainWindow):
                     font-size: 13px;
                     border-radius: 3px;
                 """)
+
                 # скрывает отдельные окна
                 self.filters_widget.setVisible(False)
                 self.stage_section.setVisible(False)
@@ -8422,6 +8451,12 @@ class MainWindow(QMainWindow):
                 age_text = f" ({title.vozrast})" if title.vozrast else ""
                 self.table_header.setText(f"👥 {title.name}{age_text} - {sex_text} ({count} чел.)")
         
+        # Обновляем список этапов для расписания (учитываем новый пол)
+        self.update_schedule_stages()
+
+        # Также обновляем этапы для бегунков
+        self.update_runner_stages()
+
         # Очищаем результаты поиска при смене пола
         self.search_results_list.clear()
         

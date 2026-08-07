@@ -7116,9 +7116,10 @@ class MainWindow(QMainWindow):
                 backup_file = os.path.join(backup_dir, f"backup_{timestamp}.sql")
                 
                 # Экспортируем базу данных
-                self.export_database_internal(backup_file, None)
-                
-                QMessageBox.information(self, "Успех", f"База данных сохранена в:\n{backup_file}")
+                # self.export_database_internal(backup_file, None)
+                self.run_backup_db()
+
+                # QMessageBox.information(self, "Успех", f"База данных сохранена в:\n{backup_file}")
             
             # Закрываем соединение с БД
             close_db()
@@ -18678,125 +18679,125 @@ class MainWindow(QMainWindow):
         # except Exception as e:
         #     print(f"Ошибка сохранения соревнования: {e}")
 
-    def export_database_internal(self, file_path, progress=None):
-        """Встроенный экспорт базы данных (без mysqldump)"""
+    # def export_database_internal(self, file_path, progress=None):
+    #     """Встроенный экспорт базы данных (без mysqldump)"""
         
-        try:
-            from models import (
-                Title, Coach, Region, City, Patronymic, Player, Players_full,
-                R_list_m, R_list_d, R1_list_m, R1_list_d, Referee, Team,
-                Players_double, Choice, Result, System, Choice_Team, Game_list,
-                Choice_double_player, Delete_player, db
-            )
-            from datetime import datetime, date
+    #     try:
+    #         from models import (
+    #             Title, Coach, Region, City, Patronymic, Player, Players_full,
+    #             R_list_m, R_list_d, R1_list_m, R1_list_d, Referee, Team,
+    #             Players_double, Choice, Result, System, Choice_Team, Game_list,
+    #             Choice_double_player, Delete_player, db
+    #         )
+    #         from datetime import datetime, date
             
-            models = [
-                Title, Coach, Region, City, Patronymic, Player, Players_full,
-                R_list_m, R_list_d, R1_list_m, R1_list_d, Referee, Team,
-                Players_double, Choice, Result, System, Choice_Team, Game_list,
-                Choice_double_player, Delete_player
-            ]
+    #         models = [
+    #             Title, Coach, Region, City, Patronymic, Player, Players_full,
+    #             R_list_m, R_list_d, R1_list_m, R1_list_d, Referee, Team,
+    #             Players_double, Choice, Result, System, Choice_Team, Game_list,
+    #             Choice_double_player, Delete_player
+    #         ]
             
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(f"-- Backup created at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-                f.write(f"-- Database: {db.database}\n\n")
+    #         with open(file_path, 'w', encoding='utf-8') as f:
+    #             f.write(f"-- Backup created at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+    #             f.write(f"-- Database: {db.database}\n\n")
                 
-                for i, model in enumerate(models):
-                    if progress and progress.wasCanceled():
-                        break
+    #             for i, model in enumerate(models):
+    #                 if progress and progress.wasCanceled():
+    #                     break
                     
-                    if progress:
-                        progress.setValue(i)
-                        progress.setLabelText(f"Экспорт таблицы: {model._meta.table_name}")
+    #                 if progress:
+    #                     progress.setValue(i)
+    #                     progress.setLabelText(f"Экспорт таблицы: {model._meta.table_name}")
                     
-                    table_name = model._meta.table_name
-                    f.write(f"-- Table structure for table {table_name}\n")
-                    f.write(f"DROP TABLE IF EXISTS `{table_name}`;\n")
+    #                 table_name = model._meta.table_name
+    #                 f.write(f"-- Table structure for table {table_name}\n")
+    #                 f.write(f"DROP TABLE IF EXISTS `{table_name}`;\n")
                     
-                    # Получаем колонки таблицы
-                    columns = []
-                    for field_name, field in model._meta.fields.items():
-                        # Получаем имя колонки (db_column или column или name)
-                        if hasattr(field, 'db_column') and field.db_column:
-                            col_name = field.db_column
-                        elif hasattr(field, 'column'):
-                            col_name = field.column
-                        else:
-                            col_name = field_name
+    #                 # Получаем колонки таблицы
+    #                 columns = []
+    #                 for field_name, field in model._meta.fields.items():
+    #                     # Получаем имя колонки (db_column или column или name)
+    #                     if hasattr(field, 'db_column') and field.db_column:
+    #                         col_name = field.db_column
+    #                     elif hasattr(field, 'column'):
+    #                         col_name = field.column
+    #                     else:
+    #                         col_name = field_name
                         
-                        # Получаем тип поля
-                        if hasattr(field, 'field_type'):
-                            col_type = field.field_type
-                        else:
-                            col_type = str(type(field).__name__).upper()
+    #                     # Получаем тип поля
+    #                     if hasattr(field, 'field_type'):
+    #                         col_type = field.field_type
+    #                     else:
+    #                         col_type = str(type(field).__name__).upper()
                         
-                        col_def = f"`{col_name}` {col_type}"
+    #                     col_def = f"`{col_name}` {col_type}"
                         
-                        # Primary Key
-                        if field.primary_key:
-                            col_def += " PRIMARY KEY AUTO_INCREMENT"
+    #                     # Primary Key
+    #                     if field.primary_key:
+    #                         col_def += " PRIMARY KEY AUTO_INCREMENT"
                         
-                        # NOT NULL
-                        if not field.null and not field.primary_key:
-                            col_def += " NOT NULL"
+    #                     # NOT NULL
+    #                     if not field.null and not field.primary_key:
+    #                         col_def += " NOT NULL"
                         
-                        # DEFAULT
-                        if field.default is not None and not callable(field.default):
-                            if isinstance(field.default, str):
-                                col_def += f" DEFAULT '{field.default}'"
-                            else:
-                                col_def += f" DEFAULT {field.default}"
+    #                     # DEFAULT
+    #                     if field.default is not None and not callable(field.default):
+    #                         if isinstance(field.default, str):
+    #                             col_def += f" DEFAULT '{field.default}'"
+    #                         else:
+    #                             col_def += f" DEFAULT {field.default}"
                         
-                        columns.append(col_def)
+    #                     columns.append(col_def)
                     
-                    create_sql = f"CREATE TABLE `{table_name}` (\n  " + ",\n  ".join(columns) + "\n);"
-                    f.write(f"{create_sql}\n\n")
+    #                 create_sql = f"CREATE TABLE `{table_name}` (\n  " + ",\n  ".join(columns) + "\n);"
+    #                 f.write(f"{create_sql}\n\n")
                     
-                    # Получаем данные
-                    try:
-                        query = model.select()
-                        rows = list(query)
+    #                 # Получаем данные
+    #                 try:
+    #                     query = model.select()
+    #                     rows = list(query)
                         
-                        if rows:
-                            for row in rows:
-                                values = []
-                                for field_name, field in model._meta.fields.items():
-                                    val = getattr(row, field_name)
-                                    if val is None:
-                                        values.append('NULL')
-                                    elif isinstance(val, str):
-                                        val = val.replace("'", "''")
-                                        values.append(f"'{val}'")
-                                    elif isinstance(val, (datetime, date)):
-                                        values.append(f"'{val}'")
-                                    elif isinstance(val, bool):
-                                        values.append('1' if val else '0')
-                                    else:
-                                        values.append(str(val))
+    #                     if rows:
+    #                         for row in rows:
+    #                             values = []
+    #                             for field_name, field in model._meta.fields.items():
+    #                                 val = getattr(row, field_name)
+    #                                 if val is None:
+    #                                     values.append('NULL')
+    #                                 elif isinstance(val, str):
+    #                                     val = val.replace("'", "''")
+    #                                     values.append(f"'{val}'")
+    #                                 elif isinstance(val, (datetime, date)):
+    #                                     values.append(f"'{val}'")
+    #                                 elif isinstance(val, bool):
+    #                                     values.append('1' if val else '0')
+    #                                 else:
+    #                                     values.append(str(val))
                                 
-                                # Получаем имена колонок
-                                col_names = []
-                                for field_name, field in model._meta.fields.items():
-                                    if hasattr(field, 'db_column') and field.db_column:
-                                        col_names.append(f"`{field.db_column}`")
-                                    elif hasattr(field, 'column'):
-                                        col_names.append(f"`{field.column}`")
-                                    else:
-                                        col_names.append(f"`{field_name}`")
+    #                             # Получаем имена колонок
+    #                             col_names = []
+    #                             for field_name, field in model._meta.fields.items():
+    #                                 if hasattr(field, 'db_column') and field.db_column:
+    #                                     col_names.append(f"`{field.db_column}`")
+    #                                 elif hasattr(field, 'column'):
+    #                                     col_names.append(f"`{field.column}`")
+    #                                 else:
+    #                                     col_names.append(f"`{field_name}`")
                                 
-                                f.write(f"INSERT INTO `{table_name}` ({','.join(col_names)}) VALUES ({','.join(values)});\n")
-                            f.write("\n")
-                    except Exception as e:
-                        print(f"Ошибка экспорта данных из {table_name}: {e}")
-                        f.write(f"-- Ошибка экспорта данных: {e}\n\n")
+    #                             f.write(f"INSERT INTO `{table_name}` ({','.join(col_names)}) VALUES ({','.join(values)});\n")
+    #                         f.write("\n")
+    #                 except Exception as e:
+    #                     print(f"Ошибка экспорта данных из {table_name}: {e}")
+    #                     f.write(f"-- Ошибка экспорта данных: {e}\n\n")
             
-            if progress:
-                progress.setValue(len(models))
+    #         if progress:
+    #             progress.setValue(len(models))
                 
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            raise e
+    #     except Exception as e:
+    #         import traceback
+    #         traceback.print_exc()
+    #         raise e
 # ===============================        
     def search_in_choice_table(self):
         """Поиск информации в таблице Choice с выводом полной информации"""

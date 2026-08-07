@@ -20585,7 +20585,7 @@ class MainWindow(QMainWindow):
         # определяем 1-е место в финале
         system = System.get_or_none(
                 (System.title_id == self.current_title_id) &
-                (system.sex == self.current_sex) &
+                (System.sex == self.current_sex) &
                 (System.stage == final_stage)
             )
         if final_stage not in group_list:

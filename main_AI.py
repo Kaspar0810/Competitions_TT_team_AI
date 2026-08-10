@@ -5680,27 +5680,10 @@ class MainWindow(QMainWindow):
 
     def save_edited_player(self):
         """Сохранение отредактированного участника"""
-        # if not hasattr(self, 'editing_player_id') or not self.editing_player_id:
-        #     QMessageBox.warning(self, "Ошибка", "Нет выбранного участника для редактирования")
-        #     return
-        
-        # fio_input = self.fio_edit.text().strip()
-        # if not fio_input:
-        #     QMessageBox.warning(self, "Ошибка", "Введите ФИО участника")
-        #     return
-        
-        # city = self.city_edit.text().strip()
-        # if not city:
-        #     QMessageBox.warning(self, "Ошибка", "Введите город участника")
-        #     return
-        
-        # # Форматируем ФИО
-        # player_name, full_name = self.format_player_name(fio_input)
-        # fio_city = self.format_fio_city(fio_input, city)
         if not hasattr(self, 'editing_player_id') or not self.editing_player_id:
             QMessageBox.warning(self, "Ошибка", "Нет выбранного участника для редактирования")
             return
-    
+        
         fio_input = self.fio_edit.text().strip()
         if not fio_input:
             QMessageBox.warning(self, "Ошибка", "Введите ФИО участника")
@@ -5722,28 +5705,24 @@ class MainWindow(QMainWindow):
         # Отображаем в поле ввода правильный формат
         self.fio_edit.setText(full_name)
         
-        # Проверка региона
-        region = self.region_combo.currentText()
+        # Если регион не выбран, пытаемся найти по городу
+        city_obj = City.get_or_none(City.city == city)
+
+        if city_obj and city_obj.region_id:
+            region_obj = Region.get_or_none(Region.id == city_obj.region_id)
+            if region_obj:
+                region = region_obj.region
+                self.region_combo.setCurrentText(region)
+        
         if not region:
-            # Если регион не выбран, пытаемся найти по городу
-            city_obj = City.get_or_none(City.city == city)
-            if city_obj and city_obj.region_id:
-                region_obj = Region.get_or_none(Region.id == city_obj.region_id)
-                if region_obj:
-                    region = region_obj.region
-                    self.region_combo.setCurrentText(region)
-            # Отображаем в поле ввода правильный формат
-            self.fio_edit.setText(full_name)
+            QMessageBox.warning(self, "Ошибка", "Введите регион участника")
+            return
         
         patronymic_text = self.patronymic_edit.text().strip()
         region = self.region_combo.currentText()
         coach_text = self.coach_edit.text().strip()
         rank_text = self.rank_edit.text().strip()
         
-        if not region:
-            QMessageBox.warning(self, "Ошибка", "Введите регион участника")
-            return
-#        
         if not rank_text:
             QMessageBox.warning(self, "Ошибка", "Введите рейтинг участника")
             return
@@ -5782,7 +5761,6 @@ class MainWindow(QMainWindow):
         else:
             application_status = "предварительная"
         
-        # try:
         sex = "woman" if self.sex_combo.currentText() == "Женский" else "man"
         razryad = self.razryad_combo.currentText()
             
@@ -5800,8 +5778,7 @@ class MainWindow(QMainWindow):
         if coach_text and coach_text != "-":
             coach, created = Coach.get_or_create(coach=coach_text)
             coach_id = coach.id
-
-# ==========================
+# =======================
         try:
             with db.atomic():  # Транзакция для целостности
                 # Обновляем Player
@@ -5845,19 +5822,19 @@ class MainWindow(QMainWindow):
             self.is_editing_mode = False
             self._update_edit_button_text(False)
             self._set_form_editable(False)
-            
-            # Очищаем форму и сбрасываем ID редактирования
-            self.clear_participant_form()
-            delattr(self, 'editing_player_id')
-            
-            # Перезагружаем таблицу
-            self.load_participants_for_title()
-            
+                    
             QMessageBox.information(self, "Успех", 
                 "Данные участника успешно обновлены\n"
                 f"ФИО: {full_name}\n"
                 f"Город: {city}\n"
                 f"Регион: {region}")
+            
+            # Очищаем форму и сбрасываем ID редактирования
+            self.clear_participant_form()
+            delattr(self, 'editing_player_id')
+
+            # Перезагружаем таблицу
+            self.load_participants_for_title()
             
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить изменения: {str(e)}")
@@ -5964,7 +5941,7 @@ class MainWindow(QMainWindow):
                 delattr(self, 'editing_player_id')
             self.load_participants_for_title()
             QMessageBox.information(self, "Отмена", "Редактирование отменено")
-# ======================
+
     def export_players(self):
         """Экспорт списка участников в файл"""
         if not self.current_title_id:
@@ -6129,12 +6106,9 @@ class MainWindow(QMainWindow):
                         if tab_index == 1:  # Участники
                             if btn_text == "➕ Добавить":
                                 btn.clicked.connect(self.add_player_from_form)
-                            # elif btn_text == "✏️ Редактировать":
-                            #     btn.clicked.connect(self.edit_player)
-
                             elif btn_text == "✏️ Редактировать":
                                 self._edit_btn = btn
-                                btn.clicked.connect(self.edit_player)    
+                                btn.clicked.connect(self.edit_player)
                             elif btn_text == "🗑️ Удалить":
                                 btn.clicked.connect(self.delete_player_from_table)
                             elif btn_text == "🔍 Поиск":

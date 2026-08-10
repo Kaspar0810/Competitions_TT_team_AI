@@ -172,6 +172,8 @@ class MainWindow(QMainWindow):
         # Для фильтра по игроку
         self.player_filter_text = ""
         self.player_filter_list = []  # Список всех игроков для автодополнения
+
+        self.is_editing_mode = False  # Флаг режима редактирования
 # =========================
     def check_old_backups_on_startup(self):
         """Проверка старых бэкапов при запуске"""
@@ -5599,7 +5601,12 @@ class MainWindow(QMainWindow):
         return 0
  
     def edit_player(self):
-        """Редактирование выбранного участника"""
+        """Редактирование выбранного участника или сохранение изменений"""
+        # Если режим редактирования уже активен, сохраняем изменения
+        if self.is_editing_mode:
+            self.save_edited_player()
+            return
+        
         selection = self.table_view.selectedIndexes()
         if not selection:
             QMessageBox.warning(self, "Ошибка", "Выберите участника для редактирования")
@@ -5652,17 +5659,48 @@ class MainWindow(QMainWindow):
             self.sex_combo.setCurrentIndex(sex_index)
             
             self.editing_player_id = player_id
-            QMessageBox.information(self, "Редактирование", f"Редактирование: {player.fio}")
+            
+            # --- Переключаем режим редактирования ---
+            self.is_editing_mode = True
+            self._update_edit_button_text(True)
+            
+            # Делаем поля доступными для редактирования
+            self._set_form_editable(True)
+            
+            # Устанавливаем фокус на поле ФИО
+            self.fio_edit.setFocus()
+            self.fio_edit.selectAll()
+            
+            QMessageBox.information(self, "Редактирование", 
+                f"Редактирование: {player.fio}\n"
+                f"Внесите изменения и нажмите кнопку 'Сохранить' на левой панели")
             
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка: {str(e)}")
 
     def save_edited_player(self):
         """Сохранение отредактированного участника"""
+        # if not hasattr(self, 'editing_player_id') or not self.editing_player_id:
+        #     QMessageBox.warning(self, "Ошибка", "Нет выбранного участника для редактирования")
+        #     return
+        
+        # fio_input = self.fio_edit.text().strip()
+        # if not fio_input:
+        #     QMessageBox.warning(self, "Ошибка", "Введите ФИО участника")
+        #     return
+        
+        # city = self.city_edit.text().strip()
+        # if not city:
+        #     QMessageBox.warning(self, "Ошибка", "Введите город участника")
+        #     return
+        
+        # # Форматируем ФИО
+        # player_name, full_name = self.format_player_name(fio_input)
+        # fio_city = self.format_fio_city(fio_input, city)
         if not hasattr(self, 'editing_player_id') or not self.editing_player_id:
             QMessageBox.warning(self, "Ошибка", "Нет выбранного участника для редактирования")
             return
-        
+    
         fio_input = self.fio_edit.text().strip()
         if not fio_input:
             QMessageBox.warning(self, "Ошибка", "Введите ФИО участника")
@@ -5673,12 +5711,29 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Введите город участника")
             return
         
+        # Получаем старые данные для обновления связанных таблиц
+        old_player = Player.get_by_id(self.editing_player_id)
+        old_fio_city = old_player.fio_city if old_player.fio_city else self.format_fio_city(old_player.fio, old_player.city)
+        
         # Форматируем ФИО
         player_name, full_name = self.format_player_name(fio_input)
         fio_city = self.format_fio_city(fio_input, city)
         
         # Отображаем в поле ввода правильный формат
         self.fio_edit.setText(full_name)
+        
+        # Проверка региона
+        region = self.region_combo.currentText()
+        if not region:
+            # Если регион не выбран, пытаемся найти по городу
+            city_obj = City.get_or_none(City.city == city)
+            if city_obj and city_obj.region_id:
+                region_obj = Region.get_or_none(Region.id == city_obj.region_id)
+                if region_obj:
+                    region = region_obj.region
+                    self.region_combo.setCurrentText(region)
+            # Отображаем в поле ввода правильный формат
+            self.fio_edit.setText(full_name)
         
         patronymic_text = self.patronymic_edit.text().strip()
         region = self.region_combo.currentText()
@@ -5688,7 +5743,7 @@ class MainWindow(QMainWindow):
         if not region:
             QMessageBox.warning(self, "Ошибка", "Введите регион участника")
             return
-        
+#        
         if not rank_text:
             QMessageBox.warning(self, "Ошибка", "Введите рейтинг участника")
             return
@@ -5727,57 +5782,69 @@ class MainWindow(QMainWindow):
         else:
             application_status = "предварительная"
         
+        # try:
+        sex = "woman" if self.sex_combo.currentText() == "Женский" else "man"
+        razryad = self.razryad_combo.currentText()
+            
+        # Преобразуем отчество в ID
+        patronymic_id = None
+        if patronymic_text and patronymic_text != "-":
+            patronymic, created = Patronymic.get_or_create(
+                patronymic=patronymic_text,
+                defaults={'sex': "w" if sex == "woman" else "m"}
+            )
+            patronymic_id = patronymic.id
+        
+        # Преобразуем тренера в ID
+        coach_id = None
+        if coach_text and coach_text != "-":
+            coach, created = Coach.get_or_create(coach=coach_text)
+            coach_id = coach.id
+
+# ==========================
         try:
-            sex = "woman" if self.sex_combo.currentText() == "Женский" else "man"
-            razryad = self.razryad_combo.currentText()
+            with db.atomic():  # Транзакция для целостности
+                # Обновляем Player
+                update_data = {
+                    'player': player_name,
+                    'fio': full_name,
+                    'fio_city': fio_city,
+                    'bday': birth_date,
+                    'rank': rank,
+                    'city': city,
+                    'region': region,
+                    'razryad': razryad,
+                    'sex': sex,
+                    'application': application_status,
+                    'patronymic_id': patronymic_id,
+                    'coach_id': coach_id,
+                    'mesto': old_player.mesto
+                }
+                
+                query = Player.update(**update_data).where(Player.id == self.editing_player_id)
+                query.execute()
+                
+                # Если изменился город или ФИО, обновляем связанные таблицы
+                if old_fio_city != fio_city:
+                    self._update_player_related_data(old_fio_city, fio_city, self.editing_player_id)
+                
+                # Синхронизация с Players_full
+                players_full_data = {
+                    'player': player_name,
+                    'bday': birth_date,
+                    'city': city,
+                    'region': region,
+                    'razryad': razryad,
+                    'coach_id': coach_id,
+                    'patronymic_id': patronymic_id,
+                    'sex': sex
+                }
+                self.sync_with_players_full(players_full_data)
             
-            # Преобразуем отчество в ID
-            patronymic_id = None
-            if patronymic_text and patronymic_text != "-":
-                patronymic, created = Patronymic.get_or_create(
-                    patronymic=patronymic_text,
-                    defaults={'sex': "w" if sex == "woman" else "m"}
-                )
-                patronymic_id = patronymic.id
-            
-            # Преобразуем тренера в ID
-            coach_id = None
-            if coach_text and coach_text != "-":
-                coach, created = Coach.get_or_create(coach=coach_text)
-                coach_id = coach.id
-            
-            # Обновляем данные участника в таблице Player
-            update_data = {
-                'player': player_name,
-                'fio': full_name,
-                'fio_city': fio_city,
-                'bday': birth_date,
-                'rank': rank,
-                'city': city,
-                'region': region,
-                'razryad': razryad,
-                'sex': sex,
-                'application': application_status,
-                'patronymic_id': patronymic_id,
-                'coach_id': coach_id,
-                'mesto': 0
-            }
-            
-            query = Player.update(**update_data).where(Player.id == self.editing_player_id)
-            query.execute()
-            
-            # СИНХРОНИЗАЦИЯ С TABLICA Players_full
-            players_full_data = {
-                'player': player_name,
-                'bday': birth_date,
-                'city': city,
-                'region': region,
-                'razryad': razryad,
-                'coach_id': coach_id,
-                'patronymic_id': patronymic_id,
-                'sex': sex
-            }
-            self.sync_with_players_full(players_full_data)
+            # --- Выходим из режима редактирования ---
+            self.is_editing_mode = False
+            self._update_edit_button_text(False)
+            self._set_form_editable(False)
             
             # Очищаем форму и сбрасываем ID редактирования
             self.clear_participant_form()
@@ -5786,11 +5853,118 @@ class MainWindow(QMainWindow):
             # Перезагружаем таблицу
             self.load_participants_for_title()
             
-            QMessageBox.information(self, "Успех", "Данные участника успешно обновлены")
+            QMessageBox.information(self, "Успех", 
+                "Данные участника успешно обновлены\n"
+                f"ФИО: {full_name}\n"
+                f"Город: {city}\n"
+                f"Регион: {region}")
             
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить изменения: {str(e)}")
+            import traceback
+            traceback.print_exc()
 
+    def _update_player_related_data(self, old_fio_city, new_fio_city, player_id):
+        """
+        Обновляет данные игрока во всех связанных таблицах при изменении ФИО/города.
+        """
+        try:
+            with db.atomic():  # транзакция для целостности
+                # 1. Обновляем Result (player1, player2, winner, loser)
+                # Обновляем поля, где игрок указан как player1
+                Result.update(player1=new_fio_city).where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.player1 == old_fio_city)
+                ).execute()
+                
+                # Обновляем поля, где игрок указан как player2
+                Result.update(player2=new_fio_city).where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.player2 == old_fio_city)
+                ).execute()
+                
+                # Обновляем поля, где игрок указан как winner
+                Result.update(winner=new_fio_city).where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.winner == old_fio_city)
+                ).execute()
+                
+                # Обновляем поля, где игрок указан как loser
+                Result.update(loser=new_fio_city).where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.loser == old_fio_city)
+                ).execute()
+                
+                # 2. Обновляем Choice (family)
+                Choice.update(family=new_fio_city.split('/')[0]).where(
+                    (Choice.title_id == self.current_title_id) &
+                    (Choice.player_choice_id == player_id)
+                ).execute()
+                
+                # 3. Обновляем Game_list (если там хранится имя игрока, но у вас там ID, поэтому не требуется)
+                # Если в Game_list есть текстовое поле, его тоже нужно обновить, но обычно там player_group_id
+                
+                # 4. Обновляем Players_full (если она используется)
+                Players_full.update(
+                    player=new_fio_city.split('/')[0],
+                    city=new_fio_city.split('/')[1] if '/' in new_fio_city else ''
+                ).where(
+                    (Players_full.player == old_fio_city.split('/')[0]) &
+                    (Players_full.city == old_fio_city.split('/')[1] if '/' in old_fio_city else '')
+                ).execute()
+                
+                print(f"Обновлены связанные данные для игрока {player_id}: {old_fio_city} -> {new_fio_city}")
+                
+        except Exception as e:
+            print(f"Ошибка обновления связанных данных: {e}")
+            raise
+
+    def _update_edit_button_text(self, editing_mode):
+        """Обновляет текст кнопки редактирования на левой панели"""
+        if not hasattr(self, '_edit_btn') or self._edit_btn is None:
+            return
+        if editing_mode:
+            self._edit_btn.setText("💾 Сохранить изменения")
+            self._edit_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #FF9800;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 8px;
+                    font-size: 11px;
+                    font-weight: bold;
+                }
+                QPushButton:hover { background-color: #F57C00; }
+            """)
+        else:
+            self._edit_btn.setText("✏️ Редактировать")
+            self._edit_btn.setStyleSheet(self.get_button_style())
+
+    def _set_form_editable(self, editable):
+        """Включает/отключает редактирование полей формы"""
+        self.fio_edit.setReadOnly(not editable)
+        self.patronymic_edit.setReadOnly(not editable)
+        self.birth_date_edit.setReadOnly(not editable)
+        self.city_edit.setReadOnly(not editable)
+        self.region_combo.setEnabled(editable)
+        self.razryad_combo.setEnabled(editable)
+        self.coach_edit.setReadOnly(not editable)
+        self.rank_edit.setReadOnly(not editable)
+        self.sex_combo.setEnabled(editable)
+
+    def cancel_editing(self):
+        """Отмена редактирования"""
+        if self.is_editing_mode:
+            self.is_editing_mode = False
+            self._update_edit_button_text(False)
+            self._set_form_editable(False)
+            self.clear_participant_form()
+            if hasattr(self, 'editing_player_id'):
+                delattr(self, 'editing_player_id')
+            self.load_participants_for_title()
+            QMessageBox.information(self, "Отмена", "Редактирование отменено")
+# ======================
     def export_players(self):
         """Экспорт списка участников в файл"""
         if not self.current_title_id:
@@ -5955,8 +6129,12 @@ class MainWindow(QMainWindow):
                         if tab_index == 1:  # Участники
                             if btn_text == "➕ Добавить":
                                 btn.clicked.connect(self.add_player_from_form)
+                            # elif btn_text == "✏️ Редактировать":
+                            #     btn.clicked.connect(self.edit_player)
+
                             elif btn_text == "✏️ Редактировать":
-                                btn.clicked.connect(self.edit_player)
+                                self._edit_btn = btn
+                                btn.clicked.connect(self.edit_player)    
                             elif btn_text == "🗑️ Удалить":
                                 btn.clicked.connect(self.delete_player_from_table)
                             elif btn_text == "🔍 Поиск":

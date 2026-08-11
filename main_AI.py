@@ -2719,7 +2719,8 @@ class MainWindow(QMainWindow):
 
         results = Result.select().where(
             (Result.title_id == self.current_title_id) &
-            (Result.system_id == system.id)
+            (Result.system_id == system.id) &
+            (Result.sex == self.current_sex)
         )
 
         if results.count() == 0:
@@ -2790,27 +2791,6 @@ class MainWindow(QMainWindow):
         import re
         match = re.search(r'\d+', group_str)
         return int(match.group()) if match else 0
-
-    # def update_schedule_stages(self):
-    #     """Обновление списка этапов для расписания (все этапы)"""
-    #     self.schedule_stage_combo.blockSignals(True)
-    #     self.schedule_stage_combo.clear()
-    #     if not self.current_title_id:
-    #         self.schedule_stage_combo.blockSignals(False)
-    #         return
-
-    #     stages = System.select().where(
-    #         (System.title_id == self.current_title_id) &
-    #         (System.sex == self.current_sex)).order_by(System.id)
-    #     for stage in stages:
-    #         self.schedule_stage_combo.addItem(stage.stage)
-
-    #     self.schedule_stage_combo.blockSignals(False)
-    #     # Принудительно загружаем первый этап, если есть
-    #     if self.schedule_stage_combo.count() > 0:
-    #         self.schedule_stage_combo.setCurrentIndex(0)
-    #         # Вызываем вручную, так как сигнал может не сработать, если индекс не изменился
-    #         self.on_schedule_stage_changed()
 
     def update_schedule_stages(self):
         """Обновление списка этапов для расписания с учётом текущего пола"""
@@ -3037,18 +3017,6 @@ class MainWindow(QMainWindow):
         if result:
             result.schedule_table = table_num
             result.save()
-#=================
-    # def apply_schedule_to_selected(self):
-    #     """Применить расписание к выбранным строкам"""
-    #     selected_rows = set()
-    #     for item in self.schedule_table.selectedItems():
-    #         selected_rows.add(item.row())
-    #     if not selected_rows:
-    #         QMessageBox.warning(self, "Ошибка", "Не выбраны встречи для назначения")
-    #         return
-    #     self.apply_schedule_to_rows(list(selected_rows))
-
-    #     self.update_schedule_filter_combos()
 
     def apply_schedule_to_selected(self):
         """Применить дату и время к выбранным строкам, затем предложить назначить столы"""
@@ -3107,20 +3075,19 @@ class MainWindow(QMainWindow):
         # Сохраняем дату и время для выбранных строк
         for row in selected_rows:
             tour = self.schedule_table.item(row, 0).text()
+            group = self.schedule_table.item(row, 1).text()
             if not tour:
                 continue
             result = Result.get_or_none(
                 (Result.title_id == self.current_title_id) &
                 (Result.system_id == system.id) &
+                (Result.number_group == group) &
                 (Result.tours == tour)
             )
             if result:
                 result.schedule_date = date_obj
                 result.schedule_time = time_obj
                 result.save()
-
-        # # Обновляем таблицу
-        # self.load_schedule_matches(stage_name)
 
         # ---- НОВАЯ ЛОГИКА: после сохранения даты/времени предлагаем назначить столы ----
         # Проверяем, остались ли строки выделенными (если не были сброшены)
@@ -3145,7 +3112,8 @@ class MainWindow(QMainWindow):
             # Если выделение сбросилось, предлагаем выбрать строки заново
             QMessageBox.information(self, "Информация", 
                 "Дата и время назначены. Для назначения столов выделите строки и нажмите 'Назначить столы'.")
-
+            
+        self.update_schedule_filter_combos()
                 
 #=============================
 
@@ -3212,16 +3180,16 @@ class MainWindow(QMainWindow):
             self.schedule_date_filter_combo.addItem(current.strftime("%d.%m.%Y"))
             current += timedelta(days=1)
 
-    def populate_time_filter_combo(self):
-        """Заполняет комбобокс фильтра времени (09:00-21:00 с шагом 5 мин)"""
-        self.schedule_time_filter_combo.clear()
-        self.schedule_time_filter_combo.addItem("Все время")
-        start = QTime(9, 0)
-        end = QTime(21, 0)
-        current = start
-        while current <= end:
-            self.schedule_time_filter_combo.addItem(current.toString("HH:mm"))
-            current = current.addSecs(5 * 60)
+    # def populate_time_filter_combo(self):
+    #     """Заполняет комбобокс фильтра времени (09:00-21:00 с шагом 5 мин)"""
+    #     self.schedule_time_filter_combo.clear()
+    #     self.schedule_time_filter_combo.addItem("Все время")
+    #     start = QTime(9, 0)
+    #     end = QTime(21, 0)
+    #     current = start
+    #     while current <= end:
+    #         self.schedule_time_filter_combo.addItem(current.toString("HH:mm"))
+    #         current = current.addSecs(5 * 60)
 
     def apply_schedule_filters(self):
         """Применяет фильтры по дате, времени и стадии к таблице расписания"""
@@ -3293,30 +3261,6 @@ class MainWindow(QMainWindow):
             self.load_schedule_matches(stage_name)
             QMessageBox.information(self, "Успех", f"Расписание очищено для {len(selected_rows)} встреч")
 #============================
-    # def populate_time_combo(self):
-    #     """Заполняет комбобокс временем с 09:00 до 21:00 с шагом 5 минут"""
-    #     self.schedule_time_combo.clear()
-    #     start = QTime(9, 0)
-    #     end = QTime(21, 0)
-    #     current = start
-    #     while current <= end:
-    #         self.schedule_time_combo.addItem(current.toString("HH:mm"), current)
-    #         current = current.addSecs(5 * 60)  # +5 минут
-    #     # Устанавливаем текущее время, округлённое до ближайших 5 минут вперёд
-    #     now = QTime.currentTime()
-    #     # Округляем до ближайших 5 минут вверх
-    #     minute = now.minute()
-    #     remainder = minute % 5
-    #     if remainder != 0:
-    #         now = now.addSecs((5 - remainder) * 60)
-    #     # Если время позже 21:00, ставим 21:00
-    #     if now > end:
-    #         now = end
-    #     index = self.schedule_time_combo.findText(now.toString("HH:mm"))
-    #     if index >= 0:
-    #         self.schedule_time_combo.setCurrentIndex(index)
-    #     else:
-    #         self.schedule_time_combo.setCurrentIndex(0)
     def populate_time_combo(self):
         """Заполняет комбобокс временем с 09:00 до 21:00 с шагом 5 минут"""
         self.schedule_time_combo.clear()
@@ -3344,7 +3288,6 @@ class MainWindow(QMainWindow):
                 self.schedule_time_combo.setCurrentIndex(index)
             else:
                 self.schedule_time_combo.setCurrentIndex(0)  # "-нет времени-"
-
 #=========================
     def update_left_panel_for_extra_tab(self):
         """Обновление левой панели для вкладки Дополнительно (фильтры расписания + кнопки действий)"""
@@ -3381,7 +3324,7 @@ class MainWindow(QMainWindow):
         time_layout.addWidget(QLabel("Время:"))
         self.schedule_time_filter_combo = QComboBox()
         self.schedule_time_filter_combo.addItem("Все время")
-        self.populate_time_filter_combo()
+        self.populate_time_combo()
         self.schedule_time_filter_combo.currentIndexChanged.connect(self.apply_schedule_filters)
         time_layout.addWidget(self.schedule_time_filter_combo, 1)
         self.dynamic_filters_layout.addLayout(time_layout)
@@ -4485,10 +4428,7 @@ class MainWindow(QMainWindow):
         selected_rows = set()
         for item in self.schedule_table.selectedItems():
             selected_rows.add(item.row())
-        # if not selected_rows:
-        #     QMessageBox.warning(self, "Ошибка", "Сначала выберите строки для назначения столов")
-        #     return
-
+    
         # Создаём диалог
         dialog = QDialog(self)
         dialog.setWindowTitle("Назначение номеров столов")
@@ -4591,10 +4531,6 @@ class MainWindow(QMainWindow):
         # Обновляем таблицу
         self.load_schedule_matches(stage_name)
 
-        # # Очищаем выделение, если нужно
-        # if clear_current.isChecked():
-        #     self.schedule_table.clearSelection()
-
         # Прокручиваем к первому выбранному (если нужно)
         if scroll_to_selection.isChecked() and sorted_rows:
             self.schedule_table.scrollToItem(self.schedule_table.item(sorted_rows[0], 0))
@@ -4606,134 +4542,7 @@ class MainWindow(QMainWindow):
         else:
             # Если строки были переданы, сохраняем выделение
             for row in sorted(selected_rows):
-                self.schedule_table.selectRow(row)
-
-    # def assign_tables_dialog(self):
-    #     """Диалог для ввода номеров столов и назначения их выбранным строкам"""
-    #     # Проверяем, что есть выбранные строки
-    #     selected_rows = set()
-    #     for item in self.schedule_table.selectedItems():
-    #         selected_rows.add(item.row())
-    #     if not selected_rows:
-    #         QMessageBox.warning(self, "Ошибка", "Сначала выберите строки для назначения столов")
-    #         return
-
-    #     # Создаём диалог
-    #     dialog = QDialog(self)
-    #     dialog.setWindowTitle("Назначение номеров столов")
-    #     dialog.setModal(True)
-    #     dialog.setMinimumWidth(400)
-
-    #     layout = QVBoxLayout(dialog)
-
-    #     label = QLabel("Введите номера столов для выбранных встреч:")
-    #     layout.addWidget(label)
-
-    #     line_edit = QLineEdit()
-    #     line_edit.setPlaceholderText("Пример: 1,3,5 или 1-5 или 1,3,5-7")
-    #     layout.addWidget(line_edit)
-
-    #     # Информация о количестве выбранных строк
-    #     info_label = QLabel(f"Выбрано строк: {len(selected_rows)}")
-    #     info_label.setStyleSheet("color: gray;")
-    #     layout.addWidget(info_label)
-
-    #     # Опции
-    #     options_group = QGroupBox("Опции")
-    #     options_layout = QVBoxLayout()
-        
-    #     clear_current = QCheckBox("Очистить текущее выделение")
-    #     clear_current.setChecked(True)
-    #     options_layout.addWidget(clear_current)
-        
-    #     scroll_to_selection = QCheckBox("Прокрутить к выделению")
-    #     scroll_to_selection.setChecked(True)
-    #     options_layout.addWidget(scroll_to_selection)
-        
-    #     options_group.setLayout(options_layout)
-    #     layout.addWidget(options_group)
-
-    #     # Кнопки
-    #     buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-    #     buttons.accepted.connect(dialog.accept)
-    #     buttons.rejected.connect(dialog.reject)
-    #     layout.addWidget(buttons)
-
-    #     if dialog.exec_() != QDialog.Accepted:
-    #         return
-
-    #     text = line_edit.text().strip()
-    #     if not text:
-    #         QMessageBox.warning(self, "Ошибка", "Введите номера столов")
-    #         return
-
-    #     # Парсим ввод
-    #     table_numbers = []
-    #     try:
-    #         parts = text.replace(' ', '').split(',')
-    #         for part in parts:
-    #             if '-' in part:
-    #                 start, end = map(int, part.split('-'))
-    #                 if start < end:
-    #                     table_numbers.extend(range(start, end + 1))
-    #                 else:
-    #                     table_numbers.extend(range(start, end - 1, -1))
-    #             else:
-    #                 table_numbers.append(int(part))
-    #     except ValueError:
-    #         QMessageBox.critical(self, "Ошибка", "Некорректный формат ввода.\nИспользуйте числа, запятые и дефисы.")
-    #         return
-
-    #     if not table_numbers:
-    #         return
-
-    #     # Применяем номера столов к выбранным строкам (по порядку, циклически)
-    #     sorted_rows = sorted(selected_rows)
-    #     if len(table_numbers) < len(sorted_rows):
-    #         # Если номеров меньше, чем строк, повторяем циклически
-    #         table_numbers = table_numbers * (len(sorted_rows) // len(table_numbers) + 1)
-    #     table_numbers = table_numbers[:len(sorted_rows)]
-
-    #     stage_name = self.schedule_stage_combo.currentText()
-    #     system = System.get_or_none(
-    #         (System.title_id == self.current_title_id) &
-    #         (System.stage == stage_name)
-    #     )
-    #     if not system:
-    #         QMessageBox.warning(self, "Ошибка", "Система не найдена")
-    #         return
-
-    #     # Обновляем каждую строку
-    #     for row_idx, table_num in zip(sorted_rows, table_numbers):
-    #         tour = self.schedule_table.item(row_idx, 0).text()
-    #         if not tour:
-    #             continue
-    #         result = Result.get_or_none(
-    #             (Result.title_id == self.current_title_id) &
-    #             (Result.system_id == system.id) &
-    #             (Result.tours == tour)
-    #         )
-    #         if result:
-    #             result.schedule_table = table_num
-    #             result.save()
-
-    #     # Обновляем таблицу
-    #     self.load_schedule_matches(stage_name)
-
-    #     # ---- ИСПРАВЛЕННАЯ ЛОГИКА ВЫДЕЛЕНИЯ ----
-    #     # Очищаем выделение, только если пользователь явно указал это
-    #     if clear_current.isChecked():
-    #         self.schedule_table.clearSelection()
-    #     else:
-    #         # Если не нужно очищать, восстанавливаем выделение на тех же строках
-    #         for row in sorted_rows:
-    #             self.schedule_table.selectRow(row)
-
-    #     # Прокручиваем к первому выбранному (если нужно)
-    #     if scroll_to_selection.isChecked() and sorted_rows:
-    #         self.schedule_table.scrollToItem(self.schedule_table.item(sorted_rows[0], 0))
-
-    #     QMessageBox.information(self, "Успех", f"Назначено {len(sorted_rows)} столов")            
+                self.schedule_table.selectRow(row)     
 # ============================ новая обновление статусной строки ==
     def load_results_table_for_stage(self, stage_name):
         """Загрузка таблицы результатов для выбранного этапа с фильтрацией"""

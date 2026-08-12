@@ -3219,6 +3219,10 @@ class MainWindow(QMainWindow):
 
             self.schedule_table.setRowHidden(row, not show)
 
+        times = self.get_schedule_times(date_filter)
+        for time_obj in times:
+            self.schedule_time_filter_combo.addItem(time_obj.strftime("%H:%M"))
+
     def clear_schedule_for_selected(self):
             """Очистить дату, время и стол для выбранных строк"""
             selected_rows = set()
@@ -3241,6 +3245,7 @@ class MainWindow(QMainWindow):
             stage_name = self.schedule_stage_combo.currentText()
             system = System.get_or_none(
                 (System.title_id == self.current_title_id) &
+                (System.sex == self.current_sex) &
                 (System.stage == stage_name)
             )
             if not system:

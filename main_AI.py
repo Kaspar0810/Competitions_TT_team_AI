@@ -2765,7 +2765,7 @@ class MainWindow(QMainWindow):
             self.schedule_table.setItem(row, 5, QTableWidgetItem(time_str))
             # Стол
             table = result.schedule_table if result.schedule_table else ""
-            self.schedule_table.setItem(row, 6, QTableWidgetItem(str(table)))
+            self.schedule_table.setItem(row, 6, QTableWidgetItem(table))
             # Встреча (для круговой – номер встречи, например "1-2", для олимпийской – пусто)
             if is_round_robin:
                 # Для круговой встречи tours уже содержит номер встречи (например "1-2")
@@ -2905,7 +2905,6 @@ class MainWindow(QMainWindow):
             return
 
         # Проверку на олимпийскую систему убираем – загружаем все этапы
-        # self.max_tables = getattr(self, 'system_tables', 4)
         self.max_tables = self.get_competition_tables()
 
         self.load_schedule_matches(stage_name)
@@ -2975,11 +2974,11 @@ class MainWindow(QMainWindow):
                     pass  
 
     def on_schedule_table_item_changed(self, item):
-        # if item.column() != 5:  # только столбец "Стол"
         if item.column() != 6:  # только столбец "Стол"
             return
         row = item.row()
         tour = self.schedule_table.item(row, 0).text()
+        number_group = self.schedule_table.item(row, 6).text()
         if not tour:
             return
 
@@ -3013,10 +3012,11 @@ class MainWindow(QMainWindow):
         result = Result.get_or_none(
             (Result.title_id == self.current_title_id) &
             (Result.system_id == system.id) &
+            (Result.number_group == number_group) &
             (Result.tours == tour)
         )
         if result:
-            result.schedule_table = table_num
+            result.schedule_table = str(table_num)
             result.save()
 
     def apply_schedule_to_selected(self):
@@ -13908,35 +13908,7 @@ class MainWindow(QMainWindow):
                 final_action = QAction(final.stage, self)
                 final_action.triggered.connect(lambda checked, f=final: self.run_drawing_for_final(f))
                 finals_menu.addAction(final_action)
-# =======3007
-    # def update_finals_menu(self, finals_menu):
-    #     """Обновление меню финалов (динамически) с учётом пола"""
-    #     finals_menu.clear()
-        
-    #     if not self.current_title_id:
-    #         no_finals_action = QAction("Нет доступных финалов", self)
-    #         no_finals_action.setEnabled(False)
-    #         finals_menu.addAction(no_finals_action)
-    #         return
-        
-    #     sex_filter = self.current_sex if self.current_sex else "man"
-    #     finals = System.select().where(
-    #         (System.title_id == self.current_title_id) &
-    #         (System.stage.contains("финал")) &
-    #         (~System.stage.contains("полуфинал")) &
-    #         (System.sex == sex_filter)
-    #     ).order_by(System.id)
-        
-    #     if finals.count() == 0:
-    #         no_finals_action = QAction("Нет доступных финалов", self)
-    #         no_finals_action.setEnabled(False)
-    #         finals_menu.addAction(no_finals_action)
-    #     else:
-    #         for final in finals:
-    #             final_action = QAction(final.stage, self)
-    #             final_action.triggered.connect(lambda checked, f=final: self.run_drawing_for_final(f))
-    #             finals_menu.addAction(final_action)
-#======================
+
     def run_drawing_for_stage(self, stage_name):
         """Запуск жеребьевки для указанного этапа"""
         if not self.current_title_id:

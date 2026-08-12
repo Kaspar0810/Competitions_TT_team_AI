@@ -2764,7 +2764,8 @@ class MainWindow(QMainWindow):
             time_str = result.schedule_time.strftime("%H:%M") if result.schedule_time else ""
             self.schedule_table.setItem(row, 5, QTableWidgetItem(time_str))
             # Стол
-            self.schedule_table.setItem(row, 6, QTableWidgetItem(str(result.schedule_table) if result.schedule_table else ""))
+            table = result.schedule_table if result.schedule_table else ""
+            self.schedule_table.setItem(row, 6, QTableWidgetItem(str(table)))
             # Встреча (для круговой – номер встречи, например "1-2", для олимпийской – пусто)
             if is_round_robin:
                 # Для круговой встречи tours уже содержит номер встречи (например "1-2")
@@ -3106,8 +3107,8 @@ class MainWindow(QMainWindow):
             if assign_tables_reply == QMessageBox.Yes:
                 # Вызываем диалог назначения столов для выделенных строк
                 self.assign_tables_dialog(remaining_selected)
-                # Обновляем таблицу
-                self.load_schedule_matches(stage_name)
+                # # Обновляем таблицу
+                # self.load_schedule_matches(stage_name)
         else:
             # Если выделение сбросилось, предлагаем выбрать строки заново
             QMessageBox.information(self, "Информация", 
@@ -4415,7 +4416,7 @@ class MainWindow(QMainWindow):
     def assign_tables_dialog(self, selected_rows=None):
         """Диалог для ввода номеров столов и назначения их выбранным строкам"""
         # Если строки не переданы, получаем их из таблицы
-        if selected_rows is None:
+        if selected_rows is None or selected_rows is False:
             selected_rows = set()
             for item in self.schedule_table.selectedItems():
                 selected_rows.add(item.row())
@@ -4525,10 +4526,10 @@ class MainWindow(QMainWindow):
                 (Result.tours == tour)
             )
             if result:
-                result.schedule_table = table_num
-                result.save()
+                query = Result.update(schedule_table=table_num).where(Result.id == result.id)
+                query.execute()
 
-        # Обновляем таблицу
+        # # Обновляем таблицу
         self.load_schedule_matches(stage_name)
 
         # Прокручиваем к первому выбранному (если нужно)
@@ -26336,29 +26337,6 @@ class RatingFileDialog(QDialog):
             (Title.data_end == end_date)
         )
         return list(similar)
-# #===============================
-#     def switch_gender_category(self, sex):
-#         """Переключение между мальчиками и девочками"""
-#         if self.current_sex == sex:
-#             return
-        
-#         self.current_sex = sex
-        
-#         # Перезагружаем участников с фильтром по полу
-#         self.load_participants_for_title()
-        
-#         # Обновляем кнопки
-#         self.create_category_buttons()
-        
-#         # Обновляем заголовок таблицы
-#         if self.current_title_id:
-#             title = Title.get_or_none(Title.id == self.current_title_id)
-#             if title:
-#                 sex_text = "Девочки" if sex == "woman" else "Мальчики"
-#                 count = self.players_model.rowCount()
-#                 age_text = f" ({title.vozrast})" if title.vozrast else ""
-#                 self.table_header.setText(f"👥 {title.name}{age_text} - {sex_text} ({count} чел.)")
-# ============3007
 
 #=========================
 

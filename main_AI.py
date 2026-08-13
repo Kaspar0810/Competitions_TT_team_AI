@@ -2704,7 +2704,7 @@ class MainWindow(QMainWindow):
         self.update_schedule_stages()
 
         return tab_widget
-
+# ======================
     def load_schedule_matches(self, stage_name):
         self.schedule_table.setRowCount(0)
 
@@ -2793,6 +2793,12 @@ class MainWindow(QMainWindow):
                 self.apply_schedule_filters()
             except:
                 pass
+        # # что мы находимся на вкладке "Дополнительно"
+        # if hasattr(self, 'schedule_stage_filter_combo') and self.schedule_stage_filter_combo is not None:
+        #     try:
+        #         self.update_stage_filter_combo()
+        #     except RuntimeError:
+        #         self.schedule_stage_filter_combo = None
 
     def _extract_group_number(self, group_str):
         """Извлекает числовой номер из строки группы (например, 'Группа 1' -> 1, '1 группа' -> 1)"""
@@ -3185,7 +3191,7 @@ class MainWindow(QMainWindow):
         while current <= end:
             self.schedule_date_filter_combo.addItem(current.strftime("%d.%m.%Y"))
             current += timedelta(days=1)
-
+# ==========================================
     def apply_schedule_filters(self):
         """Применяет фильтры по дате, времени и стадии к таблице расписания"""
         if not hasattr(self, 'schedule_table') or self.schedule_table is None:
@@ -3535,30 +3541,64 @@ class MainWindow(QMainWindow):
                 pass
         times = query.distinct().order_by(Result.schedule_time)
         return [t.schedule_time for t in times if t.schedule_time]
+# ================================= 1308
+    # def update_stage_filter_combo(self):
+    #     """Обновляет список стадий в фильтре на основе текущей таблицы"""
+    #     if not hasattr(self, 'schedule_stage_filter_combo'):
+    #         return
+    #     self.schedule_stage_filter_combo.blockSignals(True)
+    #     current_text = self.schedule_stage_filter_combo.currentText()
+    #     self.schedule_stage_filter_combo.clear()
+    #     self.schedule_stage_filter_combo.addItem("Все стадии")
+    #     stages = set()
+
+    #     for row in range(self.schedule_table.rowCount()):
+    #         item = self.schedule_table.item(row, 7)  # стадия
+    #         if item and item.text():
+    #             stages.add(item.text())
+
+    #     for stage in sorted(stages):
+    #         self.schedule_stage_filter_combo.addItem(stage)
+    #     # Восстанавливаем предыдущее значение, если оно есть
+    #     index = self.schedule_stage_filter_combo.findText(current_text)
+    #     if index >= 0:
+    #         self.schedule_stage_filter_combo.setCurrentIndex(index)
+    #     self.schedule_stage_filter_combo.blockSignals(False)
 
     def update_stage_filter_combo(self):
         """Обновляет список стадий в фильтре на основе текущей таблицы"""
-        if not hasattr(self, 'schedule_stage_filter_combo'):
+        # Проверяем, существует ли объект
+        if not hasattr(self, 'schedule_stage_filter_combo') or self.schedule_stage_filter_combo is None:
             return
-        self.schedule_stage_filter_combo.blockSignals(True)
-        current_text = self.schedule_stage_filter_combo.currentText()
-        self.schedule_stage_filter_combo.clear()
-        self.schedule_stage_filter_combo.addItem("Все стадии")
-        stages = set()
-
-        for row in range(self.schedule_table.rowCount()):
-            item = self.schedule_table.item(row, 7)  # стадия
-            if item and item.text():
-                stages.add(item.text())
-
-        for stage in sorted(stages):
-            self.schedule_stage_filter_combo.addItem(stage)
-        # Восстанавливаем предыдущее значение, если оно есть
-        index = self.schedule_stage_filter_combo.findText(current_text)
-        if index >= 0:
-            self.schedule_stage_filter_combo.setCurrentIndex(index)
-        self.schedule_stage_filter_combo.blockSignals(False)
-
+        
+        try:
+            # Проверяем, жив ли объект
+            self.schedule_stage_filter_combo.blockSignals(True)
+        except RuntimeError:
+            # Объект удалён, сбрасываем ссылку
+            self.schedule_stage_filter_combo = None
+            return
+        
+        try:
+            current_text = self.schedule_stage_filter_combo.currentText()
+            self.schedule_stage_filter_combo.clear()
+            self.schedule_stage_filter_combo.addItem("Все стадии")
+            stages = set()
+            for row in range(self.schedule_table.rowCount()):
+                item = self.schedule_table.item(row, 8)  # стадия
+                if item and item.text():
+                    stages.add(item.text())
+            for stage in sorted(stages):
+                self.schedule_stage_filter_combo.addItem(stage)
+            # Восстанавливаем предыдущее значение, если оно есть
+            index = self.schedule_stage_filter_combo.findText(current_text)
+            if index >= 0:
+                self.schedule_stage_filter_combo.setCurrentIndex(index)
+            self.schedule_stage_filter_combo.blockSignals(False)
+        except RuntimeError:
+            # Если объект был удалён во время работы
+            self.schedule_stage_filter_combo = None
+# ==============================
     def apply_schedule_to_rows(self, rows):
         """Применить текущие дату, время и стол к списку строк (индексы) и проверить конфликты после сохранения"""
         if not rows:
@@ -7245,16 +7285,30 @@ class MainWindow(QMainWindow):
         
         # Инициализируем обновление меню результатов
         self.update_results_menu()
+#=======================
+    # def open_edit_stages_dialog(self):
+    #     """Открытие диалога редактирования этапов"""
+    #     if not self.current_title_id:
+    #         QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+    #         return
+        
+    #     dialog = edit_stage.EditStagesDialog(self, self.current_title_id)
+    #     dialog.exec_()
 
     def open_edit_stages_dialog(self):
         """Открытие диалога редактирования этапов"""
         if not self.current_title_id:
             QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
             return
-        
-        dialog = edit_stage.EditStagesDialog(self, self.current_title_id)
-        dialog.exec_()
 
+        # Передаём текущий пол
+        dialog = edit_stage.EditStagesDialog(
+            self,
+            self.current_title_id,
+            sex=self.current_sex  # <-- передаём пол
+        )
+        dialog.exec_()
+#=========================
     def open_backup_management(self):
         """Открыть диалог управления бэкапами"""
         dialog = BackupManagementDialog.BackupManagementDialog(self, backup_dir="backup_db")

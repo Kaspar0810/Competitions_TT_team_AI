@@ -23,12 +23,13 @@ class EditStagesDialog(QDialog):
     4. Перемещение игроков в финалах
     """
     
-    def __init__(self, parent=None, title_id=None):
+    def __init__(self, parent=None, title_id=None, sex=None):
         super().__init__(parent)
         self.parent = parent
         self.title_id = title_id
         self.current_title = None
         self.current_stage = None
+        self.current_sex = sex
         self.current_system = None
         self.drag_data = None
         
@@ -364,7 +365,7 @@ class EditStagesDialog(QDialog):
                 self.title_info_label.setText(f"Соревнование: {self.current_title.name}")
             except:
                 self.title_info_label.setText("Соревнование: не найдено")
-    
+# ==========================    
     def load_stages(self):
         """Загрузка списка этапов"""
         self.stage_combo.clear()
@@ -373,7 +374,7 @@ class EditStagesDialog(QDialog):
             return
         
         try:
-            stages = System.select().where(System.title_id == self.title_id).order_by(System.id)
+            stages = System.select().where((System.title_id == self.title_id) & (System.sex == self.current_sex)).order_by(System.id)
             for stage in stages:
                 self.stage_combo.addItem(stage.stage, stage.id)
             
@@ -382,7 +383,7 @@ class EditStagesDialog(QDialog):
                 
         except Exception as e:
             print(f"Ошибка загрузки этапов: {e}")
- # =======================   
+
     def on_stage_changed(self, stage_name):
         self.current_stage = stage_name
         if not stage_name:

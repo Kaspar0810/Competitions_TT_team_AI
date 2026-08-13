@@ -3006,7 +3006,6 @@ class MainWindow(QMainWindow):
         
         if table_num < 1 or table_num > self.max_tables:
             QMessageBox.warning(self, "Ошибка", f"Номер стола должен быть от 1 до {self.max_tables}")
-            # self.load_schedule_matches(self.schedule_stage_combo.currentText())
             return
 
         # Обновляем в БД
@@ -3116,16 +3115,13 @@ class MainWindow(QMainWindow):
             if assign_tables_reply == QMessageBox.Yes:
                 # Вызываем диалог назначения столов для выделенных строк
                 self.assign_tables_dialog(remaining_selected)
-                # # Обновляем таблицу
-                # self.load_schedule_matches(stage_name)
+
         else:
             # Если выделение сбросилось, предлагаем выбрать строки заново
             QMessageBox.information(self, "Информация", 
                 "Дата и время назначены. Для назначения столов выделите строки и нажмите 'Назначить столы'.")
             
-        self.update_schedule_filter_combos()
-                
-#=============================
+        self.update_schedule_filter_combos()            
 
     def apply_schedule_to_range(self):
         """Назначить расписание для диапазона встреч (без выделения)"""
@@ -3190,33 +3186,6 @@ class MainWindow(QMainWindow):
             self.schedule_date_filter_combo.addItem(current.strftime("%d.%m.%Y"))
             current += timedelta(days=1)
 
-    # def apply_schedule_filters(self):
-    #     """Применяет фильтры по дате, времени и стадии к таблице расписания"""
-    #     if not hasattr(self, 'schedule_table'):
-    #         return
-
-    #     date_filter = self.schedule_date_filter_combo.currentText()
-    #     time_filter = self.schedule_time_filter_combo.currentText()
-    #     stage_filter = self.schedule_stage_filter_combo.currentText() if hasattr(self, 'schedule_stage_filter_combo') else "Все стадии"
-
-    #     for row in range(self.schedule_table.rowCount()):
-    #         date_item = self.schedule_table.item(row, 4)   # Дата (индекс 4)
-    #         time_item = self.schedule_table.item(row, 5)
-    #         stage_item = self.schedule_table.item(row, 7)  # Стадия (индекс 8)
-    #         show = True
-
-    #         if date_filter != "Все даты" and date_item:
-    #             if date_item.text() != date_filter:
-    #                 show = False
-    #         if show and time_filter != "Все время" and time_item:
-    #             if time_item.text() != time_filter:
-    #                 show = False
-    #         if show and stage_filter != "Все стадии" and stage_item:
-    #             if stage_item.text() != stage_filter:
-    #                 show = False
-
-    #         self.schedule_table.setRowHidden(row, not show)
-# =====================
     def apply_schedule_filters(self):
         """Применяет фильтры по дате, времени и стадии к таблице расписания"""
         if not hasattr(self, 'schedule_table') or self.schedule_table is None:
@@ -3251,7 +3220,7 @@ class MainWindow(QMainWindow):
         for row in range(self.schedule_table.rowCount()):
             date_item = self.schedule_table.item(row, 4)
             time_item = self.schedule_table.item(row, 5)
-            stage_item = self.schedule_table.item(row, 8)
+            stage_item = self.schedule_table.item(row, 7)
             show = True
 
             if date_filter != "Все даты" and date_item:
@@ -3313,7 +3282,6 @@ class MainWindow(QMainWindow):
             # Разблокируем сигналы
             self.schedule_time_filter_combo.blockSignals(False)
      
-
     def clear_schedule_for_selected(self):
             """Очистить дату, время и стол для выбранных строк"""
             selected_rows = set()
@@ -3357,7 +3325,7 @@ class MainWindow(QMainWindow):
             
             self.load_schedule_matches(stage_name)
             QMessageBox.information(self, "Успех", f"Расписание очищено для {len(selected_rows)} встреч")
-#============================
+
     def populate_time_combo(self):
         """Заполняет комбобокс временем с 09:00 до 21:00 с шагом 5 минут"""
         self.schedule_time_combo.clear()
@@ -3385,7 +3353,7 @@ class MainWindow(QMainWindow):
                 self.schedule_time_combo.setCurrentIndex(index)
             else:
                 self.schedule_time_combo.setCurrentIndex(0)  # "-нет времени-"
-#=========================
+
     def update_left_panel_for_extra_tab(self):
         """Обновление левой панели для вкладки Дополнительно (фильтры расписания + кнопки действий)"""
         # Очистка панели

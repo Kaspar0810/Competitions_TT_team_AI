@@ -2785,6 +2785,15 @@ class MainWindow(QMainWindow):
         self.status_label.setText(f"✅ Загружено {len(results_list)} матчей для этапа '{stage_name}'")
         self.update_stage_filter_combo()
 
+        # В конце метода, после заполнения таблицы
+        if hasattr(self, 'schedule_date_filter_combo') and self.schedule_date_filter_combo is not None:
+            try:
+                # Сбрасываем фильтры, чтобы обновился список времени
+                self.schedule_date_filter_combo.setCurrentText("Все даты")
+                self.apply_schedule_filters()
+            except:
+                pass
+
     def _extract_group_number(self, group_str):
         """Извлекает числовой номер из строки группы (например, 'Группа 1' -> 1, '1 группа' -> 1)"""
         if not group_str:
@@ -3181,30 +3190,68 @@ class MainWindow(QMainWindow):
             self.schedule_date_filter_combo.addItem(current.strftime("%d.%m.%Y"))
             current += timedelta(days=1)
 
-    # def populate_time_filter_combo(self):
-    #     """Заполняет комбобокс фильтра времени (09:00-21:00 с шагом 5 мин)"""
-    #     self.schedule_time_filter_combo.clear()
-    #     self.schedule_time_filter_combo.addItem("Все время")
-    #     start = QTime(9, 0)
-    #     end = QTime(21, 0)
-    #     current = start
-    #     while current <= end:
-    #         self.schedule_time_filter_combo.addItem(current.toString("HH:mm"))
-    #         current = current.addSecs(5 * 60)
+    # def apply_schedule_filters(self):
+    #     """Применяет фильтры по дате, времени и стадии к таблице расписания"""
+    #     if not hasattr(self, 'schedule_table'):
+    #         return
 
+    #     date_filter = self.schedule_date_filter_combo.currentText()
+    #     time_filter = self.schedule_time_filter_combo.currentText()
+    #     stage_filter = self.schedule_stage_filter_combo.currentText() if hasattr(self, 'schedule_stage_filter_combo') else "Все стадии"
+
+    #     for row in range(self.schedule_table.rowCount()):
+    #         date_item = self.schedule_table.item(row, 4)   # Дата (индекс 4)
+    #         time_item = self.schedule_table.item(row, 5)
+    #         stage_item = self.schedule_table.item(row, 7)  # Стадия (индекс 8)
+    #         show = True
+
+    #         if date_filter != "Все даты" and date_item:
+    #             if date_item.text() != date_filter:
+    #                 show = False
+    #         if show and time_filter != "Все время" and time_item:
+    #             if time_item.text() != time_filter:
+    #                 show = False
+    #         if show and stage_filter != "Все стадии" and stage_item:
+    #             if stage_item.text() != stage_filter:
+    #                 show = False
+
+    #         self.schedule_table.setRowHidden(row, not show)
+# =====================
     def apply_schedule_filters(self):
         """Применяет фильтры по дате, времени и стадии к таблице расписания"""
-        if not hasattr(self, 'schedule_table'):
+        if not hasattr(self, 'schedule_table') or self.schedule_table is None:
             return
+        
+        # Проверяем наличие фильтров
+        date_filter = "Все даты"
+        time_filter = "Все время"
+        stage_filter = "Все стадии"
+        
+        if hasattr(self, 'schedule_date_filter_combo') and self.schedule_date_filter_combo is not None:
+            try:
+                date_filter = self.schedule_date_filter_combo.currentText()
+            except RuntimeError:
+                self.schedule_date_filter_combo = None
+        
+        if hasattr(self, 'schedule_time_filter_combo') and self.schedule_time_filter_combo is not None:
+            try:
+                time_filter = self.schedule_time_filter_combo.currentText()
+            except RuntimeError:
+                self.schedule_time_filter_combo = None
+        
+        if hasattr(self, 'schedule_stage_filter_combo') and self.schedule_stage_filter_combo is not None:
+            try:
+                stage_filter = self.schedule_stage_filter_combo.currentText()
+            except RuntimeError:
+                self.schedule_stage_filter_combo = None
 
-        date_filter = self.schedule_date_filter_combo.currentText()
-        time_filter = self.schedule_time_filter_combo.currentText()
-        stage_filter = self.schedule_stage_filter_combo.currentText() if hasattr(self, 'schedule_stage_filter_combo') else "Все стадии"
+        # ---- ОБНОВЛЯЕМ СПИСОК ДОСТУПНОГО ВРЕМЕНИ ----
+        self._update_available_times_for_date(date_filter)
 
         for row in range(self.schedule_table.rowCount()):
-            date_item = self.schedule_table.item(row, 4)   # Дата (индекс 4)
+            date_item = self.schedule_table.item(row, 4)
             time_item = self.schedule_table.item(row, 5)
-            stage_item = self.schedule_table.item(row, 7)  # Стадия (индекс 8)
+            stage_item = self.schedule_table.item(row, 8)
             show = True
 
             if date_filter != "Все даты" and date_item:
@@ -3219,9 +3266,53 @@ class MainWindow(QMainWindow):
 
             self.schedule_table.setRowHidden(row, not show)
 
-        times = self.get_schedule_times(date_filter)
-        for time_obj in times:
-            self.schedule_time_filter_combo.addItem(time_obj.strftime("%H:%M"))
+    def _update_available_times_for_date(self, date_filter):
+        """Обновляет список доступного времени в фильтре на основе выбранной даты"""
+        if not hasattr(self, 'schedule_time_filter_combo') or self.schedule_time_filter_combo is None:
+            return
+        
+        try:
+            # Блокируем сигналы, чтобы избежать рекурсии
+            self.schedule_time_filter_combo.blockSignals(True)
+            
+            # Сохраняем текущее выбранное время
+            current_time = self.schedule_time_filter_combo.currentText()
+            
+            # Очищаем и добавляем "Все время"
+            self.schedule_time_filter_combo.clear()
+            self.schedule_time_filter_combo.addItem("Все время")
+            
+            # Собираем все времена из таблицы для выбранной даты
+            times = set()
+            for row in range(self.schedule_table.rowCount()):
+                date_item = self.schedule_table.item(row, 4)
+                time_item = self.schedule_table.item(row, 5)
+                
+                # Если дата не выбрана или совпадает с текущей, добавляем время
+                if date_filter == "Все даты" or (date_item and date_item.text() == date_filter):
+                    if time_item and time_item.text():
+                        times.add(time_item.text())
+            
+            # Добавляем времена в комбобокс (сортируем)
+            for time_val in sorted(times):
+                self.schedule_time_filter_combo.addItem(time_val)
+            
+            # Восстанавливаем выбранное время, если оно есть в списке
+            if current_time and current_time != "Все время":
+                idx = self.schedule_time_filter_combo.findText(current_time)
+                if idx >= 0:
+                    self.schedule_time_filter_combo.setCurrentIndex(idx)
+                else:
+                    self.schedule_time_filter_combo.setCurrentIndex(0)  # "Все время"
+            else:
+                self.schedule_time_filter_combo.setCurrentIndex(0)  # "Все время"
+                
+        except Exception as e:
+            print(f"Ошибка обновления времени: {e}")
+        finally:
+            # Разблокируем сигналы
+            self.schedule_time_filter_combo.blockSignals(False)
+     
 
     def clear_schedule_for_selected(self):
             """Очистить дату, время и стол для выбранных строк"""

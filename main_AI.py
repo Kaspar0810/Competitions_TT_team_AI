@@ -3541,29 +3541,6 @@ class MainWindow(QMainWindow):
                 pass
         times = query.distinct().order_by(Result.schedule_time)
         return [t.schedule_time for t in times if t.schedule_time]
-# ================================= 1308
-    # def update_stage_filter_combo(self):
-    #     """Обновляет список стадий в фильтре на основе текущей таблицы"""
-    #     if not hasattr(self, 'schedule_stage_filter_combo'):
-    #         return
-    #     self.schedule_stage_filter_combo.blockSignals(True)
-    #     current_text = self.schedule_stage_filter_combo.currentText()
-    #     self.schedule_stage_filter_combo.clear()
-    #     self.schedule_stage_filter_combo.addItem("Все стадии")
-    #     stages = set()
-
-    #     for row in range(self.schedule_table.rowCount()):
-    #         item = self.schedule_table.item(row, 7)  # стадия
-    #         if item and item.text():
-    #             stages.add(item.text())
-
-    #     for stage in sorted(stages):
-    #         self.schedule_stage_filter_combo.addItem(stage)
-    #     # Восстанавливаем предыдущее значение, если оно есть
-    #     index = self.schedule_stage_filter_combo.findText(current_text)
-    #     if index >= 0:
-    #         self.schedule_stage_filter_combo.setCurrentIndex(index)
-    #     self.schedule_stage_filter_combo.blockSignals(False)
 
     def update_stage_filter_combo(self):
         """Обновляет список стадий в фильтре на основе текущей таблицы"""
@@ -7150,6 +7127,33 @@ class MainWindow(QMainWindow):
         print_action.triggered.connect(lambda: QMessageBox.information(self, "Печать", "Печать"))
         print_menu.addAction(print_action)
         
+        # ---- Чистые таблицы ----
+        clean_tables_menu = print_menu.addMenu("📋 Чистые таблицы")
+
+        # Круговая таблица
+        round_robin_action = QAction("Круговая таблица", self)
+        round_robin_action.triggered.connect(self.print_clean_round_robin)
+        clean_tables_menu.addAction(round_robin_action)
+
+        # Групповые таблицы
+        group_tables_action = QAction("Групповые таблицы", self)
+        group_tables_action.triggered.connect(self.print_clean_group_tables)
+        clean_tables_menu.addAction(group_tables_action)
+
+        # Олимпийская система - подменю
+        olympic_menu = clean_tables_menu.addMenu("Олимпийская система")
+
+        olympic_submenus = [
+            ("Прогрессивная", self.print_clean_olympic_progressive),
+            ("Выбывание после одного поражения", self.print_clean_olympic_single_elim),
+            ("Минус 2", self.print_clean_olympic_minus_2)
+        ]
+
+        for name, callback in olympic_submenus:
+            action = QAction(name, self)
+            action.triggered.connect(callback)
+            olympic_menu.addAction(action)
+
         # Просмотр
         view_menu = menubar.addMenu("Просмотр")
 
@@ -17338,189 +17342,314 @@ class MainWindow(QMainWindow):
         doc.build(elements, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
 
         return name_table_final
-    # титульный лист в формате PDF
-# =======================================
-#     def create_title_page_pdf(self):
-#         """Создание титульного листа в PDF формате A4 книжная ориентация"""
-#         if not self.current_title_id:
-#             QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
-#             return
+# =========================
+# ========== печать чистых таблиц ====
+    def print_clean_round_robin(self):
+        """Печать чистой круговой таблицы"""
+        try:
+            players, ok = QInputDialog.getInt(
+                self,
+                "Круговая таблица",
+                "Введите количество участников:",
+                8, 2, 32
+            )
+            if not ok:
+                return
 
-#         try:
-           
-#             # Получаем данные о соревновании
-#             title = Title.get_by_id(self.current_title_id)
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+            from reportlab.lib.pagesizes import A4, landscape
+            from reportlab.lib import colors
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle as PS
+            from reportlab.lib.units import cm
 
-#             # Создаём папку, если её нет
-#             pdf_dir = "table_pdf"
-#             if not os.path.exists(pdf_dir):
-#                 os.makedirs(pdf_dir)
+            pdf_dir = "table_pdf"
+            if not os.path.exists(pdf_dir):
+                os.makedirs(pdf_dir)
 
-#             # Имя файла
-#             short_name = title.short_name_comp if title.short_name_comp else title.name
-#             import re
-#             clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
-#             clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
-#             filename = os.path.join(pdf_dir, f"{clean_name}_title_page.pdf")
+            # Имя файла
+            from datetime import datetime
+            filename = os.path.join(pdf_dir, f"clean_round_robin_{players}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf")
 
-#             # Спрашиваем про изображение
-#             reply = QMessageBox.question(
-#                 self,
-#                 "Изображение на титульный лист",
-#                 "Добавить изображение (логотип) на титульный лист?",
-#                 QMessageBox.Yes | QMessageBox.No
-#             )
+            # Ориентация
+            if players > 10:
+                page_size = landscape(A4)
+            else:
+                page_size = A4
 
-#             image_path = None
-#             if reply == QMessageBox.Yes:
-#                 image_path, _ = QFileDialog.getOpenFileName(
-#                     self,
-#                     "Выберите изображение для титульного листа",
-#                     "",
-#                     "Images (*.png *.jpg *.jpeg *.gif *.bmp)"
-#                 )
-#                 if not image_path:
-#                     return
+            doc = SimpleDocTemplate(filename, pagesize=page_size,
+                                    topMargin=1.5*cm, bottomMargin=1.5*cm,
+                                    leftMargin=1.5*cm, rightMargin=1.5*cm)
 
-#             name = title.name if title.name else "Соревнование"
-#             sredi = title.sredi if title.sredi else ""
-#             vozrast = title.vozrast if title.vozrast else ""
-#             mesto = title.mesto if title.mesto else ""
-#             start = title.data_start.strftime("%d.%m.%Y") if title.data_start else ""
-#             end = title.data_end.strftime("%d.%m.%Y") if title.data_end else ""
+            styles = getSampleStyleSheet()
+            title_style = PS("TitleStyle", fontSize=14, fontName="DejaVuSerif-Bold",
+                            alignment=1, spaceAfter=20, textColor=colors.darkblue)
 
-#             canvas = Canvas(f"{filename}", pagesize=A4)
+            elements = []
+            elements.append(Paragraph(f"Круговая таблица на {players} участников", title_style))
 
-#             if image_path == None:
-#                 canvas.setFont("DejaVuSerif-Italic", 14)
-#                 canvas.drawString(5 * cm, 28 * cm, "Федерация настольного тенниса России")
-#                 canvas.drawString(3 * cm, 27 * cm, "Федерация настольного тенниса Нижегородской области")
-#                 canvas.setFont("DejaVuSerif-Italic", 20)
-#                 canvas.drawString(2 * cm, 23 * cm, name)
-#                 canvas.setFont("DejaVuSerif-Italic", 16)
-#                 canvas.drawString(2.5 * cm, 22 * cm, f"среди {sredi} {vozrast}")
-#                 canvas.setFont("DejaVuSerif-Italic", 14)
-#                 canvas.drawString(5.5 * cm, 5 * cm, f"г. {mesto}")
-#                 canvas.drawString(7.5 * cm, 4 * cm, f"{start} - {end}")
-#             else:
-#                 canvas.drawImage(image_path, 7 * cm, 12 * cm, 6.9 * cm, 4.9 * cm,
-#                                 mask=[0, 2, 0, 2, 0, 2])  # делает фон прозрачным
-#                 canvas.setFont("DejaVuSerif-Italic", 14)
-#                 canvas.drawString(5 * cm, 28 * cm, "Федерация настольного тенниса России")
-#                 canvas.drawString(3 * cm, 27 * cm, "Федерация настольного тенниса Нижегородской области")
-#                 canvas.setFont("DejaVuSerif-Italic", 20)
-#                 canvas.drawString(2 * cm, 23 * cm, name) # попробовать выравнить титул
-#                 canvas.setFont("DejaVuSerif-Italic", 16)
-#                 canvas.drawString(2.5 * cm, 22 * cm, f"среди {sredi} {vozrast}")
-#                 canvas.setFont("DejaVuSerif-Italic", 14)
-#                 canvas.drawString(5.5 * cm, 5 * cm, f"г. {mesto}")
-#                 canvas.drawString(7.5 * cm, 4 * cm, f"{start} - {end}")
-#             # catalog = 1 # файл сохраяняется в каталоге /table_pdf
-#             # change_dir(catalog)
-#             canvas.save()
-#             # os.chdir("..")
+            # Заголовки
+            headers = [""] + [str(i) for i in range(1, players + 1)] + ["Очки", "Соот.", "Место"]
+            table_data = [headers]
 
+            # Создаём пустые строки
+            for i in range(1, players + 1):
+                row = [str(i)] + [""] * players + ["", "", ""]
+                table_data.append(row)
 
-# # ==============================================================
-#             # # Создаём документ с уменьшенным нижним отступом
-#             # doc = SimpleDocTemplate(filename, pagesize=A4,
-#             #                         topMargin=2*cm, bottomMargin=1.5*cm,
-#             #                         leftMargin=2*cm, rightMargin=2*cm)
+            # Ширина колонок
+            if players <= 8:
+                col_widths = [0.8*cm] + [1.2*cm] * players + [1.2*cm, 1.2*cm, 1.2*cm]
+            elif players <= 16:
+                col_widths = [0.6*cm] + [0.8*cm] * players + [0.8*cm, 0.8*cm, 0.8*cm]
+            else:
+                col_widths = [0.5*cm] + [0.6*cm] * players + [0.6*cm, 0.6*cm, 0.6*cm]
 
-#             # styles = getSampleStyleSheet()
-#             # title_style = PS("TitleStyle", fontSize=18, fontName="DejaVuSerif-Bold",
-#             #                 alignment=1, spaceAfter=20, textColor=colors.darkblue)
-#             # subtitle_style = PS("SubtitleStyle", fontSize=14, fontName="DejaVuSerif",
-#             #                     alignment=1, spaceAfter=10, textColor=colors.black)
-#             # info_style = PS("InfoStyle", fontSize=12, fontName="DejaVuSerif",
-#             #                 alignment=1, spaceAfter=8, textColor=colors.black)
+            table = Table(table_data, colWidths=col_widths, repeatRows=1)
+            table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSerif'),
+                ('FONTSIZE', (0, 0), (-1, -1), 7),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                ('TOPPADDING', (0, 0), (-1, -1), 2),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+            ]))
 
-#             # # Основные элементы (верхняя и средняя часть)
-#             # elements = []
+            elements.append(table)
+            doc.build(elements, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
 
-#             # # Верхняя часть
-#             # elements.append(Spacer(1, 1*cm))
-#             # elements.append(Paragraph("Федерация настольного тенниса России", title_style))
-#             # elements.append(Paragraph("Федерация настольного тенниса Нижегородской области", subtitle_style))
-#             # elements.append(Spacer(1, 1.5*cm))
+            QMessageBox.information(self, "Успех", f"Таблица сохранена:\n{filename}")
 
-#             # # Изображение
-#             # if image_path and os.path.exists(image_path):
-#             #     try:
-#             #         img = Image(image_path, width=5*cm, height=5*cm)
-#             #         img.hAlign = 'CENTER'
-#             #         elements.append(img)
-#             #         elements.append(Spacer(1, 1*cm))
-#             #     except Exception as e:
-#             #         print(f"Ошибка загрузки изображения: {e}")
+            if sys.platform == 'win32':
+                os.startfile(filename)
+            else:
+                os.system(f'open "{filename}"')
 
-#             # # Название соревнования
-#             # name = title.name if title.name else "Соревнование"
-#             # elements.append(Paragraph(name, title_style))
-#             # elements.append(Spacer(1, 0.5*cm))
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось создать таблицу: {str(e)}")
 
-#             # # Категория
-#             # sredi = title.sredi if title.sredi else ""
-#             # vozrast = title.vozrast if title.vozrast else ""
-#             # if sredi or vozrast:
-#             #     elements.append(Paragraph(f"среди {sredi} {vozrast}", subtitle_style))
-#             #     elements.append(Spacer(1, 0.5*cm))
+    def print_clean_group_tables(self):
+        """Печать чистых групповых таблиц"""
+        try:
+            groups, ok = QInputDialog.getInt(
+                self,
+                "Групповые таблицы",
+                "Введите количество групп:",
+                4, 1, 16
+            )
+            if not ok:
+                return
 
-#             # # ---- НИЖНЯЯ ЧАСТЬ (дата и место) ----
-#             # # Формируем текст
-#             # mesto = title.mesto if title.mesto else ""
-#             # start = title.data_start.strftime("%d.%m.%Y") if title.data_start else ""
-#             # end = title.data_end.strftime("%d.%m.%Y") if title.data_end else ""
+            players_per_group, ok = QInputDialog.getInt(
+                self,
+                "Групповые таблицы",
+                f"Введите количество участников в группе (для {groups} групп):",
+                4, 2, 16
+            )
+            if not ok:
+                return
 
-#             # bottom_parts = []
-#             # if mesto:
-#             #     bottom_parts.append(f"г. {mesto}")
-#             # if start and end:
-#             #     bottom_parts.append(f"{start} - {end}")
-#             # elif start:
-#             #     bottom_parts.append(start)
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+            from reportlab.lib.pagesizes import A4, landscape
+            from reportlab.lib import colors
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle as PS
+            from reportlab.lib.units import cm
 
-#             # # Создаём таблицу с одной ячейкой, которая будет растягиваться на всю ширину
-#             # # и прижиматься к нижнему краю
-#             # bottom_table = None
-#             # if bottom_parts:
-#             #     bottom_text = " | ".join(bottom_parts)
-#             #     bottom_paragraph = Paragraph(bottom_text, info_style)
-#             #     # Используем таблицу, чтобы зафиксировать позицию снизу
-#             #     bottom_table = Table([[bottom_paragraph]])
-#             #     bottom_table._argW = [doc.width]    
-#             #     bottom_table.setStyle(TableStyle([
-#             #         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-#             #         ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
-#             #         ('TOPPADDING', (0, 0), (-1, -1), 0),
-#             #         ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
-#             #     ]))
-#             # else:
-#             #     # Если данных нет, просто добавляем пустую строку
-#             #     bottom_table = Paragraph(" ", info_style)
+            pdf_dir = "table_pdf"
+            if not os.path.exists(pdf_dir):
+                os.makedirs(pdf_dir)
 
-#             # # Добавляем нижнюю часть в конец списка элементов
-#             # elements.append(bottom_table)
+            from datetime import datetime
+            filename = os.path.join(pdf_dir, f"clean_group_tables_{groups}x{players_per_group}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf")
 
-#             # # Строим документ
-#             # doc.build(elements)
+            # Для большого количества групп или участников используем альбомную ориентацию
+            if groups > 2 or players_per_group > 8:
+                page_size = landscape(A4)
+            else:
+                page_size = A4
 
-#             QMessageBox.information(self, "Успех", f"Титульный лист сохранён в:\n{filename}")
+            doc = SimpleDocTemplate(filename, pagesize=page_size,
+                                    topMargin=1.5*cm, bottomMargin=1.5*cm,
+                                    leftMargin=1.5*cm, rightMargin=1.5*cm)
 
-#             # Предлагаем открыть файл
-#             reply = QMessageBox.question(self, "Открыть файл",
-#                                         "Открыть созданный PDF файл?",
-#                                         QMessageBox.Yes | QMessageBox.No)
-#             if reply == QMessageBox.Yes:
-#                 if sys.platform == 'win32':
-#                     os.startfile(filename)
-#                 else:
-#                     os.system(f'open "{filename}"')
+            styles = getSampleStyleSheet()
+            title_style = PS("TitleStyle", fontSize=14, fontName="DejaVuSerif-Bold",
+                            alignment=1, spaceAfter=20, textColor=colors.darkblue)
+            group_style = PS("GroupStyle", fontSize=12, fontName="DejaVuSerif-Bold",
+                            alignment=0, spaceAfter=12, textColor=colors.green)
 
-#         except Exception as e:
-#             import traceback
-#             traceback.print_exc()
-#             QMessageBox.critical(self, "Ошибка", f"Не удалось создать титульный лист: {str(e)}")
+            elements = []
+            elements.append(Paragraph(f"Групповые таблицы: {groups} групп по {players_per_group} участников", title_style))
+            elements.append(Spacer(1, 0.5*cm))
+
+            # Для каждой группы
+            for g in range(1, groups + 1):
+                elements.append(Paragraph(f"Группа {g}", group_style))
+
+                headers = [""] + [str(i) for i in range(1, players_per_group + 1)] + ["Очки", "Соот.", "Место"]
+                table_data = [headers]
+
+                for i in range(1, players_per_group + 1):
+                    row = [str(i)] + [""] * players_per_group + ["", "", ""]
+                    table_data.append(row)
+
+                col_widths = [0.6*cm] + [0.8*cm] * players_per_group + [0.8*cm, 0.8*cm, 0.8*cm]
+
+                table = Table(table_data, colWidths=col_widths, repeatRows=1)
+                table.setStyle(TableStyle([
+                    ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSerif'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 7),
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                    ('TOPPADDING', (0, 0), (-1, -1), 2),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+                ]))
+
+                elements.append(table)
+                elements.append(Spacer(1, 0.5*cm))
+
+            doc.build(elements, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
+
+            QMessageBox.information(self, "Успех", f"Таблицы сохранены:\n{filename}")
+
+            if sys.platform == 'win32':
+                os.startfile(filename)
+            else:
+                os.system(f'open "{filename}"')
+
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось создать таблицы: {str(e)}")
+
+    def _print_clean_olympic_table(self, net_type, players):
+        """Общая функция для печати олимпийской сетки"""
+        try:
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+            from reportlab.lib.pagesizes import A4, landscape
+            from reportlab.lib import colors
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle as PS
+            from reportlab.lib.units import cm
+
+            pdf_dir = "table_pdf"
+            if not os.path.exists(pdf_dir):
+                os.makedirs(pdf_dir)
+
+            from datetime import datetime
+            filename = os.path.join(pdf_dir, f"clean_olympic_{net_type}_{players}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf")
+
+            # Определяем размер сетки (ближайшая степень двойки)
+            grid_size = 1
+            while grid_size < players:
+                grid_size *= 2
+
+            # Для сетки > 8 используем альбомную ориентацию
+            if grid_size > 8:
+                page_size = landscape(A4)
+            else:
+                page_size = A4
+
+            doc = SimpleDocTemplate(filename, pagesize=page_size,
+                                    topMargin=1.5*cm, bottomMargin=1.5*cm,
+                                    leftMargin=1.5*cm, rightMargin=1.5*cm)
+
+            styles = getSampleStyleSheet()
+            title_style = PS("TitleStyle", fontSize=14, fontName="DejaVuSerif-Bold",
+                            alignment=1, spaceAfter=20, textColor=colors.darkblue)
+
+            elements = []
+            elements.append(Paragraph(f"Олимпийская сетка ({net_type}) на {players} участников", title_style))
+
+            # Создаём пустую сетку
+            # Количество строк = 2 * grid_size
+            # Количество столбцов = log2(grid_size) * 2 + 1
+            rounds = 1
+            temp = grid_size
+            while temp > 1:
+                temp //= 2
+                rounds += 1
+
+            cols = rounds * 2 - 1
+            rows = grid_size * 2
+
+            # Создаём пустую таблицу
+            table_data = []
+            for i in range(rows):
+                row = [""] * cols
+                # Нумерация строк (слева)
+                if i % 2 == 0:
+                    row[0] = str(i // 2 + 1)
+                table_data.append(row)
+
+            # Ширина колонок
+            if grid_size <= 8:
+                col_widths = [0.5*cm] + [1.5*cm] * (cols - 1)
+            elif grid_size <= 16:
+                col_widths = [0.4*cm] + [1.2*cm] * (cols - 1)
+            else:
+                col_widths = [0.3*cm] + [0.8*cm] * (cols - 1)
+
+            table = Table(table_data, colWidths=col_widths, rowHeights=[0.5*cm] * rows)
+            table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSerif'),
+                ('FONTSIZE', (0, 0), (-1, -1), 6),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                ('TOPPADDING', (0, 0), (-1, -1), 1),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+            ]))
+
+            elements.append(table)
+            doc.build(elements, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
+
+            QMessageBox.information(self, "Успех", f"Сетка сохранена:\n{filename}")
+
+            if sys.platform == 'win32':
+                os.startfile(filename)
+            else:
+                os.system(f'open "{filename}"')
+
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось создать сетку: {str(e)}")
+
+    def print_clean_olympic_progressive(self):
+        """Печать чистой прогрессивной олимпийской сетки"""
+        players, ok = QInputDialog.getInt(
+            self,
+            "Прогрессивная сетка",
+            "Введите количество участников (4, 8, 16, 32, 64):",
+            16, 4, 64
+        )
+        if ok:
+            self._print_clean_olympic_table("Прогрессивная", players)
+
+    def print_clean_olympic_single_elim(self):
+        """Печать чистой олимпийской сетки (выбывание после одного поражения)"""
+        players, ok = QInputDialog.getInt(
+            self,
+            "Сетка выбывания",
+            "Введите количество участников (4, 8, 16, 32, 64):",
+            16, 4, 64
+        )
+        if ok:
+            self._print_clean_olympic_table("Выбывание", players)
+
+    def print_clean_olympic_minus_2(self):
+        """Печать чистой олимпийской сетки (минус 2)"""
+        players, ok = QInputDialog.getInt(
+            self,
+            "Сетка 'Минус 2'",
+            "Введите количество участников (4, 8, 16, 32, 64):",
+            16, 4, 64
+        )
+        if ok:
+            self._print_clean_olympic_table("Минус 2", players)
+
+# титульный лист в формате PDF
 # =======================================================
     def create_title_page_pdf(self):
         """Создание титульного листа в PDF формате A4 книжная ориентация"""
@@ -25833,6 +25962,7 @@ class GskManagementDialog(QDialog):
 
         QMessageBox.information(self, "Успех", "Состав ГСК сохранён")
         self.accept()
+
 
 # =================================
 class RatingLoaderThread(QThread):

@@ -3585,7 +3585,7 @@ class MainWindow(QMainWindow):
             self.schedule_stage_filter_combo.addItem("Все стадии")
             stages = set()
             for row in range(self.schedule_table.rowCount()):
-                item = self.schedule_table.item(row, 8)  # стадия
+                item = self.schedule_table.item(row, 7)  # стадия
                 if item and item.text():
                     stages.add(item.text())
             for stage in sorted(stages):

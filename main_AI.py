@@ -7127,11 +7127,19 @@ class MainWindow(QMainWindow):
         print_action.triggered.connect(lambda: QMessageBox.information(self, "Печать", "Печать"))
         print_menu.addAction(print_action)
         
+        # Добавляем подменю "Двойные фамилии"
+        duplicate_surnames_action = QAction("Двойные фамилии", self)
+        duplicate_surnames_action.triggered.connect(self.export_duplicate_surnames_to_pdf)
+        print_menu.addAction(duplicate_surnames_action)
+
+        print_menu.addSeparator()    
+
         # ---- Чистые таблицы ----
         clean_tables_menu = print_menu.addMenu("📋 Чистые таблицы")
 
         # Круговая таблица
         round_robin_action = QAction("Круговая таблица", self)
+
         round_robin_action.triggered.connect(self.print_clean_round_robin)
         clean_tables_menu.addAction(round_robin_action)
 
@@ -7157,10 +7165,7 @@ class MainWindow(QMainWindow):
         # Просмотр
         view_menu = menubar.addMenu("Просмотр")
 
-        # Добавляем подменю "Двойные фамилии"
-        duplicate_surnames_action = QAction("Двойные фамилии", self)
-        duplicate_surnames_action.triggered.connect(self.export_duplicate_surnames_to_pdf)
-        print_menu.addAction(duplicate_surnames_action)
+        
 
         # Титульный лист
         title_page_action = QAction("📄 Титульный лист", self)
@@ -14975,7 +14980,7 @@ class MainWindow(QMainWindow):
         
         if not self.current_title_id:
             return
-        
+
         # Папка для сохранения
         pdf_dir = "table_pdf"
         if not os.path.exists(pdf_dir):
@@ -15000,7 +15005,12 @@ class MainWindow(QMainWindow):
             return
          
         # Определяем параметры таблиц
-        if stage in stage_list_sf:  # если этап полуфинал
+        if stage == "Чистые групповые таблицы":
+            kg = system.total_group  # кол-во групп
+            max_pl = system.max_player
+            if max_pl <= 3:
+                pv = "альбомная" 
+        elif stage in stage_list_sf:  # если этап полуфинал
             kg = system.total_group  # кол-во групп
             max_pl = system.max_player
         elif stage == "Квалификация":
@@ -15181,6 +15191,12 @@ class MainWindow(QMainWindow):
         if stage == "Одна таблица":
             title_text = f"Финальные соревнования. Одиночный разряд. {title_sex}."
             name_table = f"{clean_name}_{sex}_one_table.pdf"
+        elif stage == "Чистая таблица":
+            title_text = f"Финальные соревнования. Одиночный разряд. {title_sex}."
+            name_table = f"{clean_name}_{sex}_clear_table.pdf"
+        elif stage == "Чистые групповые таблицы":
+            title_text = f"Квалификационные соревнования. {title_sex}."
+            name_table = f"{clean_name}_{sex}_clear_group.pdf"
         elif stage == "Квалификация":
             title_text = f"Квалификационные соревнования. {title_sex}."
             name_table = f"{clean_name}_{sex}_table_group.pdf"
@@ -17345,182 +17361,135 @@ class MainWindow(QMainWindow):
 # =========================
 # ========== печать чистых таблиц ====
     def print_clean_round_robin(self):
-        """Печать чистой круговой таблицы"""
+        players, ok = QInputDialog.getInt(
+            self,
+            "Круговая таблица",
+            "Введите количество участников:",
+            8, 2, 32
+        )
+        if not ok:
+            return
+
         try:
-            players, ok = QInputDialog.getInt(
-                self,
-                "Круговая таблица",
-                "Введите количество участников:",
-                8, 2, 32
+            # Создаём временную систему
+            temp_system = System.create(
+                title_id=self.current_title_id,
+                stage="Чистая таблица",
+                total_group=1,
+                max_player=players,
+                type_table="Круговая",
+                sex=self.current_sex if self.current_sex else "man",
+                score_flag=5,
+                label_string=f"Чистая круговая таблица на {players} участников",
+                kol_game_string=f"{(players * (players - 1)) // 2} игр"
             )
-            if not ok:
-                return
 
-            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-            from reportlab.lib.pagesizes import A4, landscape
-            from reportlab.lib import colors
-            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle as PS
-            from reportlab.lib.units import cm
+            # Создаём фиктивных игроков X
+            x_player = Player.get_or_create(
+                player="X",
+                fio="X",
+                fio_city="X",
+                title_id=self.current_title_id,
+                sex=self.current_sex if self.current_sex else "man",
+                rank=0
+            )[0]
 
-            pdf_dir = "table_pdf"
-            if not os.path.exists(pdf_dir):
-                os.makedirs(pdf_dir)
-
-            # Имя файла
-            from datetime import datetime
-            filename = os.path.join(pdf_dir, f"clean_round_robin_{players}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf")
-
-            # Ориентация
-            if players > 10:
-                page_size = landscape(A4)
-            else:
-                page_size = A4
-
-            doc = SimpleDocTemplate(filename, pagesize=page_size,
-                                    topMargin=1.5*cm, bottomMargin=1.5*cm,
-                                    leftMargin=1.5*cm, rightMargin=1.5*cm)
-
-            styles = getSampleStyleSheet()
-            title_style = PS("TitleStyle", fontSize=14, fontName="DejaVuSerif-Bold",
-                            alignment=1, spaceAfter=20, textColor=colors.darkblue)
-
-            elements = []
-            elements.append(Paragraph(f"Круговая таблица на {players} участников", title_style))
-
-            # Заголовки
-            headers = [""] + [str(i) for i in range(1, players + 1)] + ["Очки", "Соот.", "Место"]
-            table_data = [headers]
-
-            # Создаём пустые строки
+            # Заполняем Game_list
             for i in range(1, players + 1):
-                row = [str(i)] + [""] * players + ["", "", ""]
-                table_data.append(row)
+                Game_list.create(
+                    number_group="1 группа",
+                    rank_num_player=i,                                                       
+                    player_group=x_player.id,
+                    system_id=temp_system.id,
+                    title_id=self.current_title_id,
+                    sex=self.current_sex if self.current_sex else "man"
+                )
 
-            # Ширина колонок
-            if players <= 8:
-                col_widths = [0.8*cm] + [1.2*cm] * players + [1.2*cm, 1.2*cm, 1.2*cm]
-            elif players <= 16:
-                col_widths = [0.6*cm] + [0.8*cm] * players + [0.8*cm, 0.8*cm, 0.8*cm]
-            else:
-                col_widths = [0.5*cm] + [0.6*cm] * players + [0.6*cm, 0.6*cm, 0.6*cm]
+            # Вызываем table_made
+            pv = "альбомная" if players > 8 else "книжная"
+            filename = self.table_made(pv, temp_system.stage)
 
-            table = Table(table_data, colWidths=col_widths, repeatRows=1)
-            table.setStyle(TableStyle([
-                ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSerif'),
-                ('FONTSIZE', (0, 0), (-1, -1), 7),
-                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-                ('TOPPADDING', (0, 0), (-1, -1), 2),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-            ]))
+            # Удаляем временные данные
+            Game_list.delete().where(Game_list.system_id == temp_system.id).execute()
+            temp_system.delete_instance()
 
-            elements.append(table)
-            doc.build(elements, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
-
-            QMessageBox.information(self, "Успех", f"Таблица сохранена:\n{filename}")
-
-            if sys.platform == 'win32':
-                os.startfile(filename)
-            else:
-                os.system(f'open "{filename}"')
+            if filename:
+                full_path = os.path.join("table_pdf", filename)
+                QMessageBox.information(self, "Успех", f"Таблица сохранена:\n{full_path}")
+                if sys.platform == 'win32':
+                    os.startfile(full_path)
+                else:
+                    os.system(f'open "{full_path}"')
 
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось создать таблицу: {str(e)}")
 
     def print_clean_group_tables(self):
-        """Печать чистых групповых таблиц"""
+        groups, ok = QInputDialog.getInt(
+            self,
+            "Групповые таблицы",
+            "Введите количество групп:",
+            4, 1, 16
+        )
+        if not ok:
+            return
+
+        players_per_group, ok = QInputDialog.getInt(
+            self,
+            "Групповые таблицы",
+            f"Введите количество участников в группе (для {groups} групп):",
+            4, 2, 16
+        )
+        if not ok:
+            return
+
         try:
-            groups, ok = QInputDialog.getInt(
-                self,
-                "Групповые таблицы",
-                "Введите количество групп:",
-                4, 1, 16
+            temp_system = System.create(
+                title_id=self.current_title_id,
+                stage="Чистые групповые таблицы",
+                total_group=groups,
+                max_player=players_per_group,
+                type_table="Круговая",
+                sex=self.current_sex if self.current_sex else "man",
+                score_flag=5,
+                label_string=f"Чистые групповые таблицы: {groups} групп по {players_per_group} участников",
+                kol_game_string=f"{groups * ((players_per_group * (players_per_group - 1)) // 2)} игр"
             )
-            if not ok:
-                return
 
-            players_per_group, ok = QInputDialog.getInt(
-                self,
-                "Групповые таблицы",
-                f"Введите количество участников в группе (для {groups} групп):",
-                4, 2, 16
-            )
-            if not ok:
-                return
+            x_player = Player.get_or_create(
+                player="X",
+                fio="X",
+                fio_city="X",
+                title_id=self.current_title_id,
+                sex=self.current_sex if self.current_sex else "man",
+                rank=0
+            )[0]
 
-            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-            from reportlab.lib.pagesizes import A4, landscape
-            from reportlab.lib import colors
-            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle as PS
-            from reportlab.lib.units import cm
-
-            pdf_dir = "table_pdf"
-            if not os.path.exists(pdf_dir):
-                os.makedirs(pdf_dir)
-
-            from datetime import datetime
-            filename = os.path.join(pdf_dir, f"clean_group_tables_{groups}x{players_per_group}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf")
-
-            # Для большого количества групп или участников используем альбомную ориентацию
-            if groups > 2 or players_per_group > 8:
-                page_size = landscape(A4)
-            else:
-                page_size = A4
-
-            doc = SimpleDocTemplate(filename, pagesize=page_size,
-                                    topMargin=1.5*cm, bottomMargin=1.5*cm,
-                                    leftMargin=1.5*cm, rightMargin=1.5*cm)
-
-            styles = getSampleStyleSheet()
-            title_style = PS("TitleStyle", fontSize=14, fontName="DejaVuSerif-Bold",
-                            alignment=1, spaceAfter=20, textColor=colors.darkblue)
-            group_style = PS("GroupStyle", fontSize=12, fontName="DejaVuSerif-Bold",
-                            alignment=0, spaceAfter=12, textColor=colors.green)
-
-            elements = []
-            elements.append(Paragraph(f"Групповые таблицы: {groups} групп по {players_per_group} участников", title_style))
-            elements.append(Spacer(1, 0.5*cm))
-
-            # Для каждой группы
             for g in range(1, groups + 1):
-                elements.append(Paragraph(f"Группа {g}", group_style))
+                group_name = f"{g} группа"
+                for pos in range(1, players_per_group + 1):
+                    Game_list.create(
+                        number_group=group_name,
+                        rank_num_player=pos,
+                        player_group=x_player.id,
+                        system_id=temp_system.id,
+                        title_id=self.current_title_id,
+                        sex=self.current_sex if self.current_sex else "man"
+                    )
 
-                headers = [""] + [str(i) for i in range(1, players_per_group + 1)] + ["Очки", "Соот.", "Место"]
-                table_data = [headers]
+            pv = "альбомная" if players_per_group < 3 else "книжная"
+            filename = self.table_made(pv, temp_system.stage)
 
-                for i in range(1, players_per_group + 1):
-                    row = [str(i)] + [""] * players_per_group + ["", "", ""]
-                    table_data.append(row)
+            Game_list.delete().where(Game_list.system_id == temp_system.id).execute()
+            temp_system.delete_instance()
 
-                col_widths = [0.6*cm] + [0.8*cm] * players_per_group + [0.8*cm, 0.8*cm, 0.8*cm]
-
-                table = Table(table_data, colWidths=col_widths, repeatRows=1)
-                table.setStyle(TableStyle([
-                    ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSerif'),
-                    ('FONTSIZE', (0, 0), (-1, -1), 7),
-                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                    ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-                    ('TOPPADDING', (0, 0), (-1, -1), 2),
-                    ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-                ]))
-
-                elements.append(table)
-                elements.append(Spacer(1, 0.5*cm))
-
-            doc.build(elements, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
-
-            QMessageBox.information(self, "Успех", f"Таблицы сохранены:\n{filename}")
-
-            if sys.platform == 'win32':
-                os.startfile(filename)
-            else:
-                os.system(f'open "{filename}"')
+            if filename:
+                full_path = os.path.join("table_pdf", filename)
+                QMessageBox.information(self, "Успех", f"Таблицы сохранены:\n{full_path}")
+                if sys.platform == 'win32':
+                    os.startfile(full_path)
+                else:
+                    os.system(f'open "{full_path}"')
 
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось создать таблицы: {str(e)}")

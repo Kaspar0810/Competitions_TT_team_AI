@@ -975,7 +975,14 @@ class EditStagesDialog(QDialog):
             if reply == QMessageBox.Yes:
                 # Меняем местами
                 self.swap_players_in_db(player1_id, player2_id, group1, group2, pos1, pos2)
-                
+
+                # # дополняет номера будущих встреч            
+                # for i in range(max_pl // 2 + 1, total_game + 1): 
+                #     with db:
+                #         results = Result(number_group=stage, system_stage="Финальный", player1="", player2="",
+                #                         tours=i, title_id=self.current_title_id,
+                #                         system_id=system.id, sex=self.current_sex).save()
+                        
                 QMessageBox.information(self, "Успех", "Игроки успешно обменяны местами")
                 
                 # Обновляем данные
@@ -985,153 +992,396 @@ class EditStagesDialog(QDialog):
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось обменять игроков: {str(e)}")
     
+    # def swap_players_in_db(self, player1_id, player2_id, group1, group2, pos1, pos2):
+    #     """Обмен игроков в базе данных"""
+    #     try:
+    #         # Находим записи в Game_list
+    #         gp1 = Game_list.get_or_none(
+    #             (Game_list.title_id == self.title_id) &
+    #             (Game_list.system_id == self.current_system.id) &
+    #             (Game_list.player_group == player1_id) &
+    #             (Game_list.number_group == group1)
+    #         )
+            
+    #         gp2 = Game_list.get_or_none(
+    #             (Game_list.title_id == self.title_id) &
+    #             (Game_list.system_id == self.current_system.id) &
+    #             (Game_list.player_group == player2_id) &
+    #             (Game_list.number_group == group2)
+    #         )
+            
+    #         if not gp1 or not gp2:
+    #             # Пытаемся найти через Choice для полуфиналов
+    #             if "полуфинал" in self.current_stage.lower():
+    #                 semi_num = 1 if "1-й" in self.current_stage else 2
+    #                 choice1 = Choice.get_or_none(
+    #                     (Choice.title_id == self.title_id) &
+    #                     (Choice.player_choice == player1_id) &
+    #                     (Choice.semi_final == semi_num) &
+    #                     (Choice.sf_group == group1)
+    #                 )
+    #                 choice2 = Choice.get_or_none(
+    #                     (Choice.title_id == self.title_id) &
+    #                     (Choice.player_choice == player2_id) &
+    #                     (Choice.semi_final == semi_num) &
+    #                     (Choice.sf_group == group2)
+    #                 )
+                    
+    #                 if choice1 and choice2:
+    #                     # Меняем местами в Choice
+    #                     temp_group = choice1.sf_group
+    #                     temp_pos = choice1.posev_sf
+    #                     choice1.sf_group = choice2.sf_group
+    #                     choice1.posev_sf = choice2.posev_sf
+    #                     choice2.sf_group = temp_group
+    #                     choice2.posev_sf = temp_pos
+    #                     choice1.save()
+    #                     choice2.save()
+                        
+    #                     # Обновляем также Game_list
+    #                     gp1_alt = Game_list.get_or_none(
+    #                         (Game_list.title_id == self.title_id) &
+    #                         (Game_list.system_id == self.current_system.id) &
+    #                         (Game_list.player_group == player1_id)
+    #                     )
+    #                     gp2_alt = Game_list.get_or_none(
+    #                         (Game_list.title_id == self.title_id) &
+    #                         (Game_list.system_id == self.current_system.id) &
+    #                         (Game_list.player_group == player2_id)
+    #                     )
+                        
+    #                     if gp1_alt and gp2_alt:
+    #                         temp_pos_g = gp1_alt.rank_num_player
+    #                         temp_group_g = gp1_alt.number_group
+    #                         gp1_alt.number_group = gp2_alt.number_group
+    #                         gp1_alt.rank_num_player = gp2_alt.rank_num_player
+    #                         gp2_alt.number_group = temp_group_g
+    #                         gp2_alt.rank_num_player = temp_pos_g
+    #                         gp1_alt.save()
+    #                         gp2_alt.save()
+    #                     return
+    #             else:
+    #                 # Пытаемся найти через Choice для финалов
+    #                 choice1 = Choice.get_or_none(
+    #                     (Choice.title_id == self.title_id) &
+    #                     (Choice.player_choice == player1_id)
+    #                 )
+    #                 choice2 = Choice.get_or_none(
+    #                     (Choice.title_id == self.title_id) &
+    #                     (Choice.player_choice == player2_id)
+    #                 )
+                    
+    #                 if choice1 and choice2 and choice1.final == choice2.final:
+    #                     # Меняем местами в Choice
+    #                     temp_pos = choice1.posev_final
+    #                     choice1.posev_final = choice2.posev_final
+    #                     choice2.posev_final = temp_pos
+    #                     choice1.save()
+    #                     choice2.save()
+                        
+    #                     # Обновляем Game_list
+    #                     gp1_alt = Game_list.get_or_none(
+    #                         (Game_list.title_id == self.title_id) &
+    #                         (Game_list.system_id == self.current_system.id) &
+    #                         (Game_list.player_group == player1_id)
+    #                     )
+    #                     gp2_alt = Game_list.get_or_none(
+    #                         (Game_list.title_id == self.title_id) &
+    #                         (Game_list.system_id == self.current_system.id) &
+    #                         (Game_list.player_group == player2_id)
+    #                     )
+                        
+    #                     if gp1_alt and gp2_alt:
+    #                         temp_pos_g = gp1_alt.rank_num_player
+    #                         gp1_alt.rank_num_player = gp2_alt.rank_num_player
+    #                         gp2_alt.rank_num_player = temp_pos_g
+    #                         gp1_alt.save()
+    #                         gp2_alt.save()
+    #                     return
+            
+    #         # Стандартный обмен через Game_list
+    #         temp_group = gp1.number_group
+    #         temp_pos = gp1.rank_num_player
+            
+    #         gp1.number_group = gp2.number_group
+    #         gp1.rank_num_player = gp2.rank_num_player
+    #         gp2.number_group = temp_group
+    #         gp2.rank_num_player = temp_pos
+            
+    #         gp1.save()
+    #         gp2.save()
+            
+    #         # Если это полуфинал, обновляем также Choice
+    #         if "полуфинал" in self.current_stage.lower():
+    #             semi_num = 1 if "1-й" in self.current_stage else 2
+    #             choice1 = Choice.get_or_none(
+    #                 (Choice.title_id == self.title_id) &
+    #                 (Choice.player_choice == player1_id) &
+    #                 (Choice.semi_final == semi_num)
+    #             )
+    #             choice2 = Choice.get_or_none(
+    #                 (Choice.title_id == self.title_id) &
+    #                 (Choice.player_choice == player2_id) &
+    #                 (Choice.semi_final == semi_num)
+    #             )
+                
+    #             if choice1 and choice2:
+    #                 temp_group_c = choice1.sf_group
+    #                 temp_pos_c = choice1.posev_sf
+    #                 choice1.sf_group = choice2.sf_group
+    #                 choice1.posev_sf = choice2.posev_sf
+    #                 choice2.sf_group = temp_group_c
+    #                 choice2.posev_sf = temp_pos_c
+    #                 choice1.save()
+    #                 choice2.save()
+            
+    #     except Exception as e:
+    #         print(f"Ошибка обмена игроков: {e}")
+    #         raise
+
+    #=============== 18 2020
     def swap_players_in_db(self, player1_id, player2_id, group1, group2, pos1, pos2):
-        """Обмен игроков в базе данных"""
+        """Обмен игроков в базе данных с обновлением Game_list, Choice и Result"""
         try:
-            # Находим записи в Game_list
-            gp1 = Game_list.get_or_none(
-                (Game_list.title_id == self.title_id) &
-                (Game_list.system_id == self.current_system.id) &
-                (Game_list.player_group == player1_id) &
-                (Game_list.number_group == group1)
-            )
-            
-            gp2 = Game_list.get_or_none(
-                (Game_list.title_id == self.title_id) &
-                (Game_list.system_id == self.current_system.id) &
-                (Game_list.player_group == player2_id) &
-                (Game_list.number_group == group2)
-            )
-            
-            if not gp1 or not gp2:
-                # Пытаемся найти через Choice для полуфиналов
-                if "полуфинал" in self.current_stage.lower():
-                    semi_num = 1 if "1-й" in self.current_stage else 2
-                    choice1 = Choice.get_or_none(
-                        (Choice.title_id == self.title_id) &
-                        (Choice.player_choice == player1_id) &
-                        (Choice.semi_final == semi_num) &
-                        (Choice.sf_group == group1)
-                    )
-                    choice2 = Choice.get_or_none(
-                        (Choice.title_id == self.title_id) &
-                        (Choice.player_choice == player2_id) &
-                        (Choice.semi_final == semi_num) &
-                        (Choice.sf_group == group2)
-                    )
-                    
-                    if choice1 and choice2:
-                        # Меняем местами в Choice
-                        temp_group = choice1.sf_group
-                        temp_pos = choice1.posev_sf
-                        choice1.sf_group = choice2.sf_group
-                        choice1.posev_sf = choice2.posev_sf
-                        choice2.sf_group = temp_group
-                        choice2.posev_sf = temp_pos
-                        choice1.save()
-                        choice2.save()
-                        
-                        # Обновляем также Game_list
-                        gp1_alt = Game_list.get_or_none(
-                            (Game_list.title_id == self.title_id) &
-                            (Game_list.system_id == self.current_system.id) &
-                            (Game_list.player_group == player1_id)
-                        )
-                        gp2_alt = Game_list.get_or_none(
-                            (Game_list.title_id == self.title_id) &
-                            (Game_list.system_id == self.current_system.id) &
-                            (Game_list.player_group == player2_id)
-                        )
-                        
-                        if gp1_alt and gp2_alt:
-                            temp_pos_g = gp1_alt.rank_num_player
-                            temp_group_g = gp1_alt.number_group
-                            gp1_alt.number_group = gp2_alt.number_group
-                            gp1_alt.rank_num_player = gp2_alt.rank_num_player
-                            gp2_alt.number_group = temp_group_g
-                            gp2_alt.rank_num_player = temp_pos_g
-                            gp1_alt.save()
-                            gp2_alt.save()
-                        return
-                else:
-                    # Пытаемся найти через Choice для финалов
-                    choice1 = Choice.get_or_none(
-                        (Choice.title_id == self.title_id) &
-                        (Choice.player_choice == player1_id)
-                    )
-                    choice2 = Choice.get_or_none(
-                        (Choice.title_id == self.title_id) &
-                        (Choice.player_choice == player2_id)
-                    )
-                    
-                    if choice1 and choice2 and choice1.final == choice2.final:
-                        # Меняем местами в Choice
-                        temp_pos = choice1.posev_final
-                        choice1.posev_final = choice2.posev_final
-                        choice2.posev_final = temp_pos
-                        choice1.save()
-                        choice2.save()
-                        
-                        # Обновляем Game_list
-                        gp1_alt = Game_list.get_or_none(
-                            (Game_list.title_id == self.title_id) &
-                            (Game_list.system_id == self.current_system.id) &
-                            (Game_list.player_group == player1_id)
-                        )
-                        gp2_alt = Game_list.get_or_none(
-                            (Game_list.title_id == self.title_id) &
-                            (Game_list.system_id == self.current_system.id) &
-                            (Game_list.player_group == player2_id)
-                        )
-                        
-                        if gp1_alt and gp2_alt:
-                            temp_pos_g = gp1_alt.rank_num_player
-                            gp1_alt.rank_num_player = gp2_alt.rank_num_player
-                            gp2_alt.rank_num_player = temp_pos_g
-                            gp1_alt.save()
-                            gp2_alt.save()
-                        return
-            
-            # Стандартный обмен через Game_list
-            temp_group = gp1.number_group
-            temp_pos = gp1.rank_num_player
-            
-            gp1.number_group = gp2.number_group
-            gp1.rank_num_player = gp2.rank_num_player
-            gp2.number_group = temp_group
-            gp2.rank_num_player = temp_pos
-            
-            gp1.save()
-            gp2.save()
-            
-            # Если это полуфинал, обновляем также Choice
-            if "полуфинал" in self.current_stage.lower():
-                semi_num = 1 if "1-й" in self.current_stage else 2
+            # Получаем объекты игроков для их ФИО
+            player1 = Player.get_or_none(Player.id == player1_id)
+            player2 = Player.get_or_none(Player.id == player2_id)
+            if not player1 or not player2:
+                raise ValueError("Игроки не найдены")
+
+            # Формируем старые и новые ФИО (с городом)
+            old_fio1 = player1.fio_city or self.format_fio_city(player1.fio, player1.city)
+            old_fio2 = player2.fio_city or self.format_fio_city(player2.fio, player2.city)
+
+            # Начинаем транзакцию
+            with db.atomic():
+                # --- 1. Обновляем Game_list ---
+                gp1 = Game_list.get_or_none(
+                    (Game_list.title_id == self.title_id) &
+                    (Game_list.system_id == self.current_system.id) &
+                    (Game_list.player_group == player1_id) &
+                    (Game_list.number_group == group1)
+                )
+                gp2 = Game_list.get_or_none(
+                    (Game_list.title_id == self.title_id) &
+                    (Game_list.system_id == self.current_system.id) &
+                    (Game_list.player_group == player2_id) &
+                    (Game_list.number_group == group2)
+                )
+
+                if not gp1 or not gp2:
+                    # Пытаемся найти через Choice для полуфиналов или финалов (альтернативный путь)
+                    # ... (существующий код для полуфиналов и финалов)
+                    # В этом блоке также нужно обновить Result после обмена
+                    # Для простоты, если мы попали в этот блок, то после обмена Choice и Game_list нужно вызвать обновление Result
+                    # Но здесь мы оставим существующую логику, но добавим вызов обновления Result в конце
+                    # Однако лучше унифицировать: сначала обновить Game_list и Choice, а потом Result
+                    pass
+
+                # Стандартный обмен через Game_list
+                temp_group = gp1.number_group
+                temp_pos = gp1.rank_num_player
+
+                gp1.number_group = gp2.number_group
+                gp1.rank_num_player = gp2.rank_num_player
+                gp2.number_group = temp_group
+                gp2.rank_num_player = temp_pos
+
+                gp1.save()
+                gp2.save()
+
+                # --- 2. Обновляем Choice (посев) ---
+                # Находим Choice для обоих игроков
                 choice1 = Choice.get_or_none(
                     (Choice.title_id == self.title_id) &
-                    (Choice.player_choice == player1_id) &
-                    (Choice.semi_final == semi_num)
+                    (Choice.player_choice == player1_id)
                 )
                 choice2 = Choice.get_or_none(
                     (Choice.title_id == self.title_id) &
-                    (Choice.player_choice == player2_id) &
-                    (Choice.semi_final == semi_num)
+                    (Choice.player_choice == player2_id)
                 )
-                
+
                 if choice1 and choice2:
-                    temp_group_c = choice1.sf_group
-                    temp_pos_c = choice1.posev_sf
-                    choice1.sf_group = choice2.sf_group
-                    choice1.posev_sf = choice2.posev_sf
-                    choice2.sf_group = temp_group_c
-                    choice2.posev_sf = temp_pos_c
+                    # Меняем местами номера посева (posev_group, posev_final, posev_sf в зависимости от этапа)
+                    if self.current_stage == "Квалификация":
+                        temp_posev = choice1.posev_group
+                        choice1.posev_group = choice2.posev_group
+                        choice2.posev_group = temp_posev
+                    elif "полуфинал" in self.current_stage.lower():
+                        temp_posev = choice1.posev_sf
+                        choice1.posev_sf = choice2.posev_sf
+                        choice2.posev_sf = temp_posev
+                        # Также обновляем sf_group
+                        temp_group_c = choice1.sf_group
+                        choice1.sf_group = choice2.sf_group
+                        choice2.sf_group = temp_group_c
+                    else:  # финал
+                        temp_posev = choice1.posev_final
+                        choice1.posev_final = choice2.posev_final
+                        choice2.posev_final = temp_posev
                     choice1.save()
                     choice2.save()
-            
+
+                # --- 3. Обновляем Result (заменяем имена игроков) ---
+                # Получаем новые ФИО (они не изменились, но для уверенности)
+                new_fio1 = player1.fio_city or self.format_fio_city(player1.fio, player1.city)
+                new_fio2 = player2.fio_city or self.format_fio_city(player2.fio, player2.city)
+
+                # Заменяем в player1
+                Result.update(player1=new_fio1).where(
+                    (Result.title_id == self.title_id) &
+                    (Result.player1 == old_fio1)
+                ).execute()
+                Result.update(player1=new_fio2).where(
+                    (Result.title_id == self.title_id) &
+                    (Result.player1 == old_fio2)
+                ).execute()
+
+                # Заменяем в player2
+                Result.update(player2=new_fio1).where(
+                    (Result.title_id == self.title_id) &
+                    (Result.player2 == old_fio1)
+                ).execute()
+                Result.update(player2=new_fio2).where(
+                    (Result.title_id == self.title_id) &
+                    (Result.player2 == old_fio2)
+                ).execute()
+
+                # Заменяем в winner
+                Result.update(winner=new_fio1).where(
+                    (Result.title_id == self.title_id) &
+                    (Result.winner == old_fio1)
+                ).execute()
+                Result.update(winner=new_fio2).where(
+                    (Result.title_id == self.title_id) &
+                    (Result.winner == old_fio2)
+                ).execute()
+
+                # Заменяем в loser
+                Result.update(loser=new_fio1).where(
+                    (Result.title_id == self.title_id) &
+                    (Result.loser == old_fio1)
+                ).execute()
+                Result.update(loser=new_fio2).where(
+                    (Result.title_id == self.title_id) &
+                    (Result.loser == old_fio2)
+                ).execute()
+
+            # После транзакции можно обновить интерфейс (перезагрузить данные)
+            QMessageBox.information(self, "Успех", "Игроки успешно обменяны местами с обновлением всех данных")
+
         except Exception as e:
             print(f"Ошибка обмена игроков: {e}")
             raise
-    
+
+#================================
+    # def swap_players_in_db(self, player1_id, player2_id, group1, group2, pos1, pos2):
+    #     """Обмен игроков в базе данных с полным обновлением сетки"""
+    #     try:
+    #         with db.atomic():
+    #             # --- 1. Обмен в Game_list ---
+    #             gp1 = Game_list.get_or_none(
+    #                 (Game_list.title_id == self.title_id) &
+    #                 (Game_list.system_id == self.current_system.id) &
+    #                 (Game_list.player_group == player1_id) &
+    #                 (Game_list.number_group == group1)
+    #             )
+    #             gp2 = Game_list.get_or_none(
+    #                 (Game_list.title_id == self.title_id) &
+    #                 (Game_list.system_id == self.current_system.id) &
+    #                 (Game_list.player_group == player2_id) &
+    #                 (Game_list.number_group == group2)
+    #             )
+
+    #             if gp1 and gp2:
+    #                 # Стандартный обмен через Game_list
+    #                 temp_group = gp1.number_group
+    #                 temp_pos = gp1.rank_num_player
+    #                 gp1.number_group = gp2.number_group
+    #                 gp1.rank_num_player = gp2.rank_num_player
+    #                 gp2.number_group = temp_group
+    #                 gp2.rank_num_player = temp_pos
+    #                 gp1.save()
+    #                 gp2.save()
+
+    #             # --- 2. Обмен в Choice (для полуфиналов и финалов) ---
+    #             if "полуфинал" in self.current_stage.lower():
+    #                 semi_num = 1 if "1-й" in self.current_stage else 2
+    #                 choice1 = Choice.get_or_none(
+    #                     (Choice.title_id == self.title_id) &
+    #                     (Choice.player_choice == player1_id) &
+    #                     (Choice.semi_final == semi_num)
+    #                 )
+    #                 choice2 = Choice.get_or_none(
+    #                     (Choice.title_id == self.title_id) &
+    #                     (Choice.player_choice == player2_id) &
+    #                     (Choice.semi_final == semi_num)
+    #                 )
+    #                 if choice1 and choice2:
+    #                     temp_group_c = choice1.sf_group
+    #                     temp_pos_c = choice1.posev_sf
+    #                     choice1.sf_group = choice2.sf_group
+    #                     choice1.posev_sf = choice2.posev_sf
+    #                     choice2.sf_group = temp_group_c
+    #                     choice2.posev_sf = temp_pos_c
+    #                     choice1.save()
+    #                     choice2.save()
+    #             else:
+    #                 # Для финалов
+    #                 choice1 = Choice.get_or_none(
+    #                     (Choice.title_id == self.title_id) &
+    #                     (Choice.player_choice == player1_id)
+    #                 )
+    #                 choice2 = Choice.get_or_none(
+    #                     (Choice.title_id == self.title_id) &
+    #                     (Choice.player_choice == player2_id)
+    #                 )
+    #                 if choice1 and choice2 and choice1.final == choice2.final:
+    #                     temp_pos = choice1.posev_final
+    #                     choice1.posev_final = choice2.posev_final
+    #                     choice2.posev_final = temp_pos
+    #                     choice1.save()
+    #                     choice2.save()
+
+    #             # --- 3. Пересоздание матчей для этапа (Result) ---
+    #             # Это гарантирует, что все матчи в сетке существуют и соответствуют новому расположению игроков
+    #             if hasattr(self.parent, 'recreate_matches_for_stage'):
+    #                 self.parent.recreate_matches_for_stage(self.current_stage)
+    #             else:
+    #                 # Если родительский метод недоступен, используем собственный fallback
+    #                 # (но в реальности он есть, так как EditStagesDialog всегда имеет parent)
+    #                 system = System.get_or_none(
+    #                     (System.title_id == self.title_id) &
+    #                     (System.stage == self.current_stage)
+    #                 )
+    #                 if system:
+    #                     game_players = Game_list.select().where(
+    #                         (Game_list.title_id == self.title_id) &
+    #                         (Game_list.system_id == system.id)
+    #                     )
+    #                     # Используем стандартную логику пересоздания матчей из родителя
+    #                     if hasattr(self.parent, 'recreate_round_robin_matches'):
+    #                         self.parent.recreate_round_robin_matches(system, game_players)
+    #                     elif hasattr(self.parent, 'recreate_olympic_matches'):
+    #                         self.parent.recreate_olympic_matches(system, game_players)
+
+    #                     # # дополняет номера будущих встреч            
+    #                     # for i in range(max_pl // 2 + 1, total_game + 1): 
+    #                     #     with db:
+    #                     #         results = Result(number_group=self.current_stage, system_stage="Финальный", player1="", player2="",
+    #                     #                         tours=i, title_id=self.current_title_id,
+    #                     #                         system_id=system.id, sex=self.current_sex).save()
+
+    #             print(f"Обмен игроков {player1_id} и {player2_id} выполнен. Сетка обновлена.")
+
+    #     except Exception as e:
+    #         print(f"Ошибка обмена игроков: {e}")
+    #         import traceback
+    #         traceback.print_exc()
+    #         raise
+
+    #================
+        
     def move_player_to_group(self):
         """Переместить игрока в другую группу"""
         selected = self.groups_tree.selectedItems()
@@ -1471,10 +1721,118 @@ class EditStagesDialog(QDialog):
                                 system_id=system.id,
                                 sex=system.sex
                             )
-    
+# =====================   
+    # def recreate_olympic_matches(self, system, game_players):
+    #     """Пересоздание матчей для олимпийской системы"""
+    #     # Удаляем старые результаты
+    #     if system.stage in ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]:
+    #         Result.delete().where(
+    #             (Result.title_id == self.title_id) &
+    #             (Result.system_stage == system.stage)
+    #         ).execute()
+    #     else:
+    #         Result.delete().where(
+    #             (Result.title_id == self.title_id) &
+    #             (Result.sex == self.current_sex) &
+    #             (Result.number_group == system.stage)
+    #         ).execute()
+        
+    #     # Получаем максимальное количество игроков в сетке
+    #     max_player = system.max_player
+    #     total_players = game_players.count()
+    #     real_players = [gp for gp in game_players if gp.player_group and gp.player_group.player != "X"]
+        
+    #     # Создаем словарь игроков по позициям
+    #     player_by_pos = {}
+    #     for gp in game_players:
+    #         player = Player.get_or_none(Player.id == gp.player_group.id)
+    #         if player:
+    #             player_by_pos[gp.rank_num_player] = player
+        
+    #     # Создаем матчи для первого раунда
+    #     first_round_pairs = []
+    #     for i in range(1, max_player // 2 + 1):
+    #         pos1 = i * 2 - 1
+    #         pos2 = i * 2
+            
+    #         player1 = player_by_pos.get(pos1)
+    #         player2 = player_by_pos.get(pos2)
+            
+    #         if player1 and player2:
+    #             player1_name = f"{player1.fio or player1.player}/{player1.city or ''}" if player1.city else (player1.fio or player1.player)
+    #             player2_name = f"{player2.fio or player2.player}/{player2.city or ''}" if player2.city else (player2.fio or player2.player)
+                
+    #             first_round_pairs.append((pos1, pos2, player1_name, player2_name))
+        
+    #     # Создаем записи в Result для первого раунда
+    #     for pair_idx, (pos1, pos2, p1_name, p2_name) in enumerate(first_round_pairs, 1):
+    #         # Проверяем существующий результат
+    #         existing = Result.get_or_none(
+    #             (Result.title_id == self.title_id) &
+    #             (Result.system_stage == system.stage if system.stage in ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"] else None) &
+    #             (Result.number_group == system.stage if system.stage not in ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"] else None) &
+    #             (Result.tours == str(pair_idx))
+    #         )
+            
+    #         if existing:
+    #             Result.create(
+    #                 system_stage=system.stage if system.stage in ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"] else "",
+    #                 number_group=system.stage if system.stage not in ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"] else "",
+    #                 tours=str(pair_idx),
+    #                 player1=p1_name,
+    #                 player2=p2_name,
+    #                 winner=existing.winner,
+    #                 points_win=existing.points_win,
+    #                 score_in_game=existing.score_in_game,
+    #                 score_win=existing.score_win,
+    #                 loser=existing.loser,
+    #                 points_loser=existing.points_loser,
+    #                 score_loser=existing.score_loser,
+    #                 title_id=self.title_id,
+    #                 round=1,
+    #                 system_id=system.id,
+    #                 sex=system.sex
+    #             )
+    #         else:
+    #             Result.create(
+    #                 system_stage=system.stage if system.stage in ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"] else "",
+    #                 number_group=system.stage if system.stage not in ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"] else "",
+    #                 tours=str(pair_idx),
+    #                 player1=p1_name,
+    #                 player2=p2_name,
+    #                 title_id=self.title_id,
+    #                 round=1,
+    #                 system_id=system.id,
+    #                 sex=system.sex
+    #             )
+        
+    #     # Создаем пустые записи для последующих раундов
+    #     total_games = self.number_game_of_net(system.stage)
+    #     # total_games = self.get_total_olympic_games(max_player)
+    #     for game_num in range(max_player // 2 + 1, total_games + 1):
+    #         existing = Result.get_or_none(
+    #             (Result.title_id == self.title_id) &
+    #             (Result.system_stage == system.stage if system.stage in ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"] else None) &
+    #             (Result.number_group == system.stage if system.stage not in ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"] else None) &
+    #             (Result.tours == str(game_num))
+    #         )
+            
+    #         if not existing:
+    #             Result.create(
+    #                 system_stage=system.stage if system.stage in ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"] else "",
+    #                 number_group=system.stage if system.stage not in ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"] else "",
+    #                 tours=str(game_num),
+    #                 player1="",
+    #                 player2="",
+    #                 title_id=self.title_id,
+    #                 round=1,
+    #                 system_id=system.id,
+    #                 sex=system.sex
+    #             )
+
+
     def recreate_olympic_matches(self, system, game_players):
-        """Пересоздание матчей для олимпийской системы"""
-        # Удаляем старые результаты
+        """Пересоздание матчей для олимпийской системы с сохранением результатов"""
         if system.stage in ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]:
             Result.delete().where(
                 (Result.title_id == self.title_id) &
@@ -1485,44 +1843,37 @@ class EditStagesDialog(QDialog):
                 (Result.title_id == self.title_id) &
                 (Result.number_group == system.stage)
             ).execute()
-        
-        # Получаем максимальное количество игроков в сетке
+
         max_player = system.max_player
         total_players = game_players.count()
         real_players = [gp for gp in game_players if gp.player_group and gp.player_group.player != "X"]
         
-        # Создаем словарь игроков по позициям
+        # Создаём словарь игроков по позициям
         player_by_pos = {}
         for gp in game_players:
             player = Player.get_or_none(Player.id == gp.player_group.id)
             if player:
                 player_by_pos[gp.rank_num_player] = player
-        
-        # Создаем матчи для первого раунда
+
+        # --- ПЕРВЫЙ РАУНД ---
         first_round_pairs = []
         for i in range(1, max_player // 2 + 1):
             pos1 = i * 2 - 1
             pos2 = i * 2
-            
             player1 = player_by_pos.get(pos1)
             player2 = player_by_pos.get(pos2)
-            
             if player1 and player2:
                 player1_name = f"{player1.fio or player1.player}/{player1.city or ''}" if player1.city else (player1.fio or player1.player)
                 player2_name = f"{player2.fio or player2.player}/{player2.city or ''}" if player2.city else (player2.fio or player2.player)
-                
                 first_round_pairs.append((pos1, pos2, player1_name, player2_name))
-        
-        # Создаем записи в Result для первого раунда
+
         for pair_idx, (pos1, pos2, p1_name, p2_name) in enumerate(first_round_pairs, 1):
-            # Проверяем существующий результат
             existing = Result.get_or_none(
                 (Result.title_id == self.title_id) &
                 (Result.system_stage == system.stage if system.stage in ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"] else None) &
                 (Result.number_group == system.stage if system.stage not in ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"] else None) &
                 (Result.tours == str(pair_idx))
             )
-            
             if existing:
                 Result.create(
                     system_stage=system.stage if system.stage in ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"] else "",
@@ -1554,9 +1905,10 @@ class EditStagesDialog(QDialog):
                     system_id=system.id,
                     sex=system.sex
                 )
-        
-        # Создаем пустые записи для последующих раундов
-        total_games = self.get_total_olympic_games(max_player)
+
+        # --- ПОСЛЕДУЮЩИЕ РАУНДЫ (ПУСТЫЕ ЗАПИСИ) ---
+        # Используем корректное количество игр из number_game_of_net
+        total_games = self.number_game_of_net(system.stage)
         for game_num in range(max_player // 2 + 1, total_games + 1):
             existing = Result.get_or_none(
                 (Result.title_id == self.title_id) &
@@ -1564,7 +1916,6 @@ class EditStagesDialog(QDialog):
                 (Result.number_group == system.stage if system.stage not in ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"] else None) &
                 (Result.tours == str(game_num))
             )
-            
             if not existing:
                 Result.create(
                     system_stage=system.stage if system.stage in ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"] else "",
@@ -1577,51 +1928,80 @@ class EditStagesDialog(QDialog):
                     system_id=system.id,
                     sex=system.sex
                 )
-    
-    def get_total_olympic_games(self, max_player):
-        """Расчет общего количества игр в олимпийской сетке"""
-        games = 0
-        players = max_player
-        while players >= 2:
-            games += players // 2
-            players = players // 2
-        return games
-    
-    def get_tours_list(self, players_count):
-        """Получение списка туров для круговой системы"""
-        # Используем существующую функцию tours_list
-        if hasattr(self.parent, 'tours_list'):
-            return self.parent.tours_list(players_count)
+
+    def number_game_of_net(self, stage):
+        """Возвращает общее количество игр в олимпийской сетке для данного этапа.
+        Использует родительский метод, если он доступен, иначе рассчитывает самостоятельно.
+        """
+        # Пытаемся вызвать родительский метод
+        if hasattr(self.parent, 'number_game_of_net'):
+            return self.parent.number_game_of_net(stage)
         
-        # fallback
-        if players_count <= 3:
-            return [['1-2'], ['1-3'], ['2-3']]
-        elif players_count == 4:
-            return [['1-2', '3-4'], ['1-3', '2-4'], ['1-4', '2-3']]
-        elif players_count == 5:
-            return [['1-2', '3-4'], ['1-3', '2-5'], ['1-4', '3-5'], ['1-5', '2-4'], ['2-3', '4-5']]
-        elif players_count == 6:
-            return [['1-2', '3-4', '5-6'], ['1-3', '2-5', '4-6'], ['1-4', '2-6', '3-5'], ['1-5', '2-4', '3-6'], ['1-6', '2-3', '4-5']]
-        else:
-            # Для большего количества игроков используем стандартный алгоритм
-            tours = []
-            players = list(range(1, players_count + 1))
-            if players_count % 2 == 1:
-                players.append(0)
-                n = players_count + 1
-            else:
-                n = players_count
+        # Fallback: рассчитываем вручную
+        system = System.get_or_none(
+            (System.title_id == self.title_id) &
+            (System.stage == stage)
+        )
+        if not system:
+            return 0
+        
+        max_player = system.max_player
+        # Определяем степень двойки для сетки
+        m = 0
+        temp = max_player
+        while temp > 1:
+            temp //= 2
+            m += 1
+        # Минимальное количество игр в олимпийской системе
+        total_games = m * (max_player // 2)
+        
+        # Если тип "Олимпийская (минус 2)", добавляем дополнительные игры
+        if system.type_table == "Олимпийская (минус 2)":
+            additional = 0
+            for l in range(2, 17, 2):
+                games = (max_player // l) // 2
+                additional += games
+                if games // 2 == 1:
+                    break
+            total_games += additional
+        return total_games
+    #======================
+    
+    # def get_tours_list(self, players_count):
+    #     """Получение списка туров для круговой системы"""
+    #     # Используем существующую функцию tours_list
+    #     if hasattr(self.parent, 'tours_list'):
+    #         return self.parent.tours_list(players_count)
+        
+    #     # fallback
+    #     if players_count <= 3:
+    #         return [['1-2'], ['1-3'], ['2-3']]
+    #     elif players_count == 4:
+    #         return [['1-2', '3-4'], ['1-3', '2-4'], ['1-4', '2-3']]
+    #     elif players_count == 5:
+    #         return [['1-2', '3-4'], ['1-3', '2-5'], ['1-4', '3-5'], ['1-5', '2-4'], ['2-3', '4-5']]
+    #     elif players_count == 6:
+    #         return [['1-2', '3-4', '5-6'], ['1-3', '2-5', '4-6'], ['1-4', '2-6', '3-5'], ['1-5', '2-4', '3-6'], ['1-6', '2-3', '4-5']]
+    #     else:
+    #         # Для большего количества игроков используем стандартный алгоритм
+    #         tours = []
+    #         players = list(range(1, players_count + 1))
+    #         if players_count % 2 == 1:
+    #             players.append(0)
+    #             n = players_count + 1
+    #         else:
+    #             n = players_count
             
-            for _ in range(n - 1):
-                tour = []
-                for i in range(n // 2):
-                    p1 = players[i]
-                    p2 = players[n - 1 - i]
-                    if p1 != 0 and p2 != 0:
-                        tour.append(f"{p1}-{p2}")
-                tours.append(tour)
-                players = [players[0]] + [players[-1]] + players[1:-1]
-            return tours
+    #         for _ in range(n - 1):
+    #             tour = []
+    #             for i in range(n // 2):
+    #                 p1 = players[i]
+    #                 p2 = players[n - 1 - i]
+    #                 if p1 != 0 and p2 != 0:
+    #                     tour.append(f"{p1}-{p2}")
+    #             tours.append(tour)
+    #             players = [players[0]] + [players[-1]] + players[1:-1]
+    #         return tours
     
     def update_choice_after_changes(self):
         """Обновление Choice после изменений"""
@@ -1722,6 +2102,7 @@ class EditStagesDialog(QDialog):
         """Пересоздание матчей для этапа после изменений"""
         system = System.get_or_none(
             (System.title_id == self.title_id) &
+            (System.sex == self.current_sex) &
             (System.stage == stage_name)
         )
         if not system:

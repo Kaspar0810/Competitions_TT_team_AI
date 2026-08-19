@@ -7295,15 +7295,6 @@ class MainWindow(QMainWindow):
         # Инициализируем обновление меню результатов
         self.update_results_menu()
 #=======================
-    # def open_edit_stages_dialog(self):
-    #     """Открытие диалога редактирования этапов"""
-    #     if not self.current_title_id:
-    #         QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
-    #         return
-        
-    #     dialog = edit_stage.EditStagesDialog(self, self.current_title_id)
-    #     dialog.exec_()
-
     def open_edit_stages_dialog(self):
         """Открытие диалога редактирования этапов"""
         if not self.current_title_id:
@@ -17426,7 +17417,6 @@ class MainWindow(QMainWindow):
         doc.build(elements, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
 
         return name_table_final
-# =========================
 # ========== печать чистых таблиц ====
     def print_clean_olympic_progressive(self):
         players = self._get_olympic_players_count("Прогрессивная сетка")
@@ -17683,9 +17673,7 @@ class MainWindow(QMainWindow):
         if ok and item:
             return int(item)
         return None
-
-# титульный лист в формате PDF
-# =======================================================
+# ============ титульный лист в формате PDF
     def create_title_page_pdf(self):
         """Создание титульного листа в PDF формате A4 книжная ориентация"""
         if not self.current_title_id:
@@ -17972,8 +17960,7 @@ class MainWindow(QMainWindow):
         match_titles = {}
         for i in range(1, game + 1):
             match_titles[i] = self.get_match_title(i, game, highest_place, mp)
-        return match_titles
-                
+        return match_titles               
 # ========= пробный вариант матчей в сетке =========
     def _setka_8_full_made(self, fin, posev_data):
             """сетка на 8 в pdf"""

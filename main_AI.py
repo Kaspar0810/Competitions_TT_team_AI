@@ -7184,6 +7184,11 @@ class MainWindow(QMainWindow):
         self.regions_action.triggered.connect(self.export_regions_to_pdf)
         view_menu.addAction(self.regions_action)
 
+        # view_menu.addSeparator()
+        podium_action = QAction("🏆 Список призеров", self)
+        podium_action.triggered.connect(self.print_podium_list)
+        view_menu.addAction(podium_action)
+
         # Итоговый протокол
         final_protocol_action = QAction("📋 Итоговый протокол", self)
         final_protocol_action.triggered.connect(self.export_final_protocol_pdf)
@@ -14962,6 +14967,160 @@ class MainWindow(QMainWindow):
             import traceback
             traceback.print_exc()
             QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")
+
+    def print_podium_list(self):
+        """Создание PDF со списком призеров (1-3 места)"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+
+        try:
+            # Получаем участников, отсортированных по месту (mesto)
+            players_list = Player.select().where(
+                (Player.title_id == self.current_title_id) &
+                (Player.player != "X") &
+                (Player.sex == self.current_sex) &
+                (Player.mesto <= 3)  # только те, у кого 1? 2 и 3
+            ).order_by(Player.mesto.asc())
+
+            if players_list.count() == 0:
+                QMessageBox.warning(self, "Ошибка", "Нет участников с присвоенными местами")
+                return
+
+            # Создаём папку, если её нет
+            pdf_dir = "table_pdf"
+            if not os.path.exists(pdf_dir):
+                os.makedirs(pdf_dir)
+
+            # Имя файла
+            title = Title.get_by_id(self.current_title_id)
+
+            gamer = title.gamer if title.gamer else "Участники"
+            otc = title.otchestvo if title.otchestvo else 0
+
+            short_name = title.short_name_comp if title.short_name_comp else title.name
+            import re
+            clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
+            clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
+
+            filename = os.path.join(pdf_dir, f"{clean_name}_podium_list.pdf")
+
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+
+            styles = getSampleStyleSheet()
+            title_style = PS("TitleStyle", fontSize=14, fontName="DejaVuSerif-Bold",
+                            alignment=1, spaceAfter=20, textColor=colors.darkblue)
+
+            # Подготовка данных для таблицы
+            elements = []
+            
+            for player in players_list:
+                place_text = f"{player.mesto} место"
+                # Формируем ФИО с отчеством или без
+                if otc == 1:
+                    patronymic_text = ""
+                    if player.patronymic_id:
+                        try:
+                            patronymic = Patronymic.get(Patronymic.id == player.patronymic_id)
+                            patronymic_text = patronymic.patronymic
+                        except:
+                            pass
+                    full_name = f"{player.player} {patronymic_text}".strip()
+                else:
+                    full_name = player.player
+                
+                # Форматируем дату рождения - ИСПРАВЛЕНО
+                birth_date = self.format_birth_date(player.bday)
+                
+                # Получаем тренера
+                coach_text = ""
+                if player.coach_id:
+                    try:
+                        coach = Coach.get(Coach.id == player.coach_id)
+                        coach_text = coach.coach
+                    except:
+                        pass
+                
+                # Подготовка стилей для переноса длинной строки
+                styles = getSampleStyleSheet()
+                custom_style = styles['Normal'].clone("CustomStyle")
+                custom_style.fontName = 'DejaVuSerif'
+                custom_style.fontSize = 6
+                custom_style.wordWrap = 'LTR'  # Перенос слов (LTR - Left-To-Right)
+                custom_style.leading = 6  # Межстрочный интервал
+                
+                data_row = [
+                    str(place_text),
+                    Paragraph(full_name, custom_style),
+                    birth_date,
+                    str(player.rank) if player.rank else "0",
+                    player.city or "",
+                    Paragraph(player.region or "", custom_style),
+                    player.razryad or "",
+                    Paragraph(coach_text, custom_style),
+                ]
+                elements.append(data_row)
+            
+            # Добавляем заголовок таблицы
+            headers = ["Место", "ФИО", "Дата рожд.", "R", "Город", "Субъект РФ", "Разряд", "Тренер(ы)"]
+            elements.insert(0, headers)
+                        
+            # Настраиваем ширину колонок
+            col_widths = [1.28*cm, 5.0*cm, 1.5*cm, 0.7*cm, 2.5*cm, 3.2*cm, 1.0*cm, 4.0*cm]
+            rH = 0.46*cm
+            # Создаем таблицу
+            table = Table(elements, colWidths=col_widths, rowHeights=[rH] * len(elements), repeatRows=1)
+
+            # Стиль таблицы
+            table_style = TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSerif'),
+                ('FONTSIZE', (0, 0), (-1, -1), 7),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+                ('TOPPADDING', (0, 0), (-1, -1), 2),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('BACKGROUND', (0, 0), (8, 0), colors.yellow),
+                ('TEXTCOLOR', (0, 0), (8, 0), colors.darkblue),
+                ('LINEABOVE', (0, 0), (-1, -1), 0.3, colors.grey),
+                ('INNERGRID', (0, 0), (-1, -1), 0.1, colors.grey),
+                ('BOX', (0, 0), (-1, -1), 0.5, colors.darkblue),
+            ])
+            
+            table.setStyle(table_style)
+            
+            # Создаем PDF документ
+            doc = SimpleDocTemplate(filename, pagesize=A4,
+                                    topMargin=30*mm, bottomMargin=10*mm,
+                                    leftMargin=5*mm, rightMargin=5*mm)
+            
+            # Стиль заголовка
+            story = []
+            h3 = PS("normal", fontSize=12, fontName="DejaVuSerif-Italic", leftIndent=180,
+                    firstLineIndent=10, textColor="green")
+            h3.spaceAfter = 10
+            story.append(Paragraph(f'Список призеров и победителей. {gamer}', h3))
+            story.append(table)
+                        
+            # Строим документ с использованием функции заголовка
+            doc.build(story, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
+
+            QMessageBox.information(self, "Успех", f"Список призеров и победителей сохранён в:\n{filename}")
+
+            # Предлагаем открыть файл
+            reply = QMessageBox.question(self, "Открыть файл",
+                                        "Открыть созданный PDF файл?",
+                                        QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                if sys.platform == 'win32':
+                    os.startfile(filename)
+                else:
+                    os.system(f'open "{filename}"')
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")
+
 
 # === круговые таблицы ====
     def table_made(self, pv, stage):

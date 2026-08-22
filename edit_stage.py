@@ -1929,6 +1929,20 @@ class EditStagesDialog(QDialog):
                     sex=system.sex
                 )
 
+        # записывает стадии сетки в Result
+        highest_place = self.parent.get_final_start_place(system.stage)
+
+        stadia = self.parent.whrite_stadia_on_net(total_games, highest_place, max_player)
+
+        results_stadia = Result.select().where(
+            (Result.title_id == self.title_id) &
+            (Result.system_id == system.id))
+
+        for k in results_stadia:
+            num_game = int(k.tours)
+            stadia_str = stadia[num_game]
+            Result.update(stage_net=stadia_str).where(Result.id == k).execute()
+
     def number_game_of_net(self, stage):
         """Возвращает общее количество игр в олимпийской сетке для данного этапа.
         Использует родительский метод, если он доступен, иначе рассчитывает самостоятельно.

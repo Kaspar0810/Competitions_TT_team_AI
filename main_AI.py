@@ -11645,7 +11645,7 @@ class MainWindow(QMainWindow):
             
             # Определяем максимальную ширину для выравнивания
             max_games_width = max([len(str(g)) for g in temp_games_list]) if temp_games_list else 0
-            max_games_width = max(max_games_width, 35)
+            max_games_width = max(max_games_width, 30)
             
             # Второй проход: выводим с выравниванием и считаем общее время
             previous_stage = None

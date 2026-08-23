@@ -65,6 +65,7 @@ from PyPDF2 import PdfMerger
 # В основной программе
 import auto_choice_group
 import manual_choice
+# ManualNetDrawDialog
 
 from db_setup import setup_database
 from import_initial_data import InitialDataImportDialog
@@ -14167,6 +14168,17 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка при автоматической жеребьевке: {str(e)}")
 # ================================
+    def open_manual_net_draw(self, stage):
+        """Открытие диалога ручной жеребьевки сетки"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+
+        # from manual_net_draw import manual_choice.ManualNetDrawDialog
+        stage_name = stage
+        dialog = manual_choice.ManualNetDrawDialog(self, self.current_title_id, stage_name, self.current_sex)
+        dialog.exec_()
+#==========================================
     def manual_drawing_for_stage(self, stage):
         """Ручная жеребьевка для указанного этапа"""
         from models import Player, Coach
@@ -14221,6 +14233,8 @@ class MainWindow(QMainWindow):
         elif stage == "Квалификация. 1-й полуфинал":
             # Вызываем функцию выбора жеребьевки полуфиналов
             result = manual_choice.choice_semifinal_manual(self)
+        else:
+            self.open_manual_net_draw(stage)
 
         if num_id_player is not None:  
             self.save_manual_drawing_for_stage(num_id_player, stage)

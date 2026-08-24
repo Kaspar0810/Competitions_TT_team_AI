@@ -14174,7 +14174,6 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
             return
 
-        # from manual_net_draw import manual_choice.ManualNetDrawDialog
         stage_name = stage
         dialog = manual_choice.ManualNetDrawDialog(self, self.current_title_id, stage_name, self.current_sex)
         dialog.exec_()

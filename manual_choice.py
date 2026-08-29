@@ -2395,8 +2395,9 @@ class ManualNetDrawDialog(QDialog):
         if existing > 0:
             self._handle_existing_drawing()
         else:
-            self.load_players()
             self.draw_net()
+            self.load_players()
+            # self.draw_net()
             self.save_btn.setEnabled(True)
             self.status_label.setText(f"Загружен этап: {self.stage_name}. Игроков: {len(self.players)}")
 
@@ -2717,7 +2718,7 @@ class ManualNetDrawDialog(QDialog):
             self.current_player = self.players.pop(0)
             self.update_player_info(current_pl)
             seed_positions = self.get_seed_positions(idx + 1)
-            self.highlight_posev(self, seed_positions)
+            self.highlight_posev(seed_positions)
         else:
             self.current_player = None
             self.update_player_info(None)
@@ -2935,19 +2936,6 @@ class ManualNetDrawDialog(QDialog):
             item = QTableWidgetItem(text)
             item.setTextAlignment(Qt.AlignLeft)
             self.net_table.setItem(row, 1, item)
-#============================
-        # current_item = self.players_list.item(0)
-        # if current_item:
-        #     current_player = current_item.player_data
-        #     current_index = 0  # индекс в списке players
-        #     # Находим индекс в списке self.players
-        #     for i, p in enumerate(self.players):
-        #         if p['player_id'] == current_player['player_id']:
-        #             current_index = i
-        #             break
-        #     seed_positions = self.get_seed_positions(current_index + 1)
-        # else:
-        #     seed_positions = []
 
     def closeEvent(self, event):
         if self.net_positions:
@@ -3072,13 +3060,6 @@ class ManualNetDrawDialog(QDialog):
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить жеребьёвку: {str(e)}")
 
-    # def update_players_list(self):
-    #     """Обновляет список оставшихся игроков"""
-    #     self.players_list.clear()
-    #     for p in self.players:
-    #         item = PlayerItem(p)
-    #         self.players_list.addItem(item)
-
     def get_seed_positions(self, player_index):
         """
         Возвращает список рекомендуемых позиций для игрока с номером player_index (начиная с 1).
@@ -3119,16 +3100,16 @@ class ManualNetDrawDialog(QDialog):
             print(f"Ошибка получения позиций посева: {e}")
             return []
 
-    def highlight_posev(self, ind):
+    def highlight_posev(self, seed_positions):
         """Подсвечивает номера посева"""
         # Сбрасываем подсветку
         for row in range(self.net_table.rowCount()):
             item = self.net_table.item(row, 1)
             if item:
                 item.setBackground(Qt.white) 
-        for pos in ind:
+        for pos in seed_positions:
             row = pos - 1
-            item = self.net_table.item(row, 0)
+            item = self.net_table.item(row, 1)
             if item:
                 item.setBackground(Qt.yellow)
 
@@ -3154,12 +3135,11 @@ class ManualNetDrawDialog(QDialog):
         # Подсвечиваем возможные позиции для этого игрока
         self.highlight_possible_positions(player_data)
 
-    def get_current_player(self, idx):
-        """Возвращает данные текущего игрока"""
-        # if self.current_player_index >= 0 and self.current_player_index < len(self.players):
-        if idx >= 0 and idx < len(self.players):
-            return self.players[idx - 1]
-        return None
+    # def get_current_player(self, idx):
+    #     """Возвращает данные текущего игрока"""
+    #     if idx >= 0 and idx < len(self.players):
+    #         return self.players[idx - 1]
+    #     return None
 
     # def get_current_player(self):
     #     """Возвращает данные текущего игрока"""

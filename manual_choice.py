@@ -146,7 +146,6 @@ class ChoiceGroupManual(QDialog):
         
         placed_count = sum(1 for group in self.groups for athlete in group if athlete)
         self.current_athlete_index = placed_count
-        # self.current_group_for_seed = self.find_next_group_for_seed()
         self.update_round_display()
         self.update_groups_display()
         self.highlight_current_group()
@@ -2221,6 +2220,718 @@ class PlayerItem(QListWidgetItem):
         self.setText(f"{player_data['name']} ({player_data['city']})")
 
 #===========Ручная жеребьевка сетки
+# class ManualNetDrawDialog(QDialog):
+#     def __init__(self, parent=None, title_id=None, stage_name=None, sex=None):
+#         super().__init__(parent)
+#         self.parent = parent
+#         self.title_id = title_id
+#         self.stage_name = stage_name
+#         self.sex = sex
+#         self.current_system = None
+#         self.current_player = None  # текущий игрок, который будет сеяться
+
+#         self.players = []
+#         self.net_positions = {}
+#         self.max_players = 0
+#         self.setWindowTitle(f"Ручная жеребьевка - {stage_name}")
+#         self.setMinimumSize(1000, 850)
+#         self.setModal(True)
+#         self.init_ui()
+#         self.load_stage_data()
+# #====================
+#     def init_ui(self):
+#         main_layout = QVBoxLayout(self)
+
+#         # Верхняя панель с информацией
+#         top_panel = QHBoxLayout()
+#         top_panel.addWidget(QLabel(f"Этап: {self.stage_name}"))
+#         top_panel.addStretch()
+
+#         # Статусная строка
+#         self.status_label = QLabel("Загрузка данных...")
+#         self.status_label.setStyleSheet("padding: 5px; background-color: #FFFFE0; border-top: 1px solid #ddd;font-size: 12px;")
+#         top_panel.addWidget(self.status_label)
+        
+
+#         self.save_btn = QPushButton("💾 Сохранить жеребьевку")
+#         self.save_btn.setEnabled(False)
+#         self.save_btn.clicked.connect(self.save_drawing)
+#         top_panel.addWidget(self.save_btn)
+#         main_layout.addLayout(top_panel)
+
+#         # Основной сплиттер (горизонтальный)
+#         splitter = QSplitter(Qt.Horizontal)
+
+#         # Левая панель
+#         left_widget = QWidget()
+#         left_layout = QVBoxLayout(left_widget)
+#         left_layout.setContentsMargins(0, 0, 0, 0)
+
+#         # Информация об игроке
+#         info_group = QGroupBox("Текущий игрок")
+#         info_group.setStyleSheet("""
+#             QGroupBox {
+#                 font-weight: bold;
+#                 font-size: 12px;
+#                 border: 2px solid #4CAF50;
+#                 border-radius: 8px;
+#                 margin-top: 10px;
+#             }
+#             QGroupBox::title {
+#                 color: #4CAF50;
+#                 subcontrol-origin: margin;
+#                 left: 10px;
+#                 padding: 0 8px 0 8px;
+#             }
+#         """)
+#         info_layout = QFormLayout(info_group)
+#         self.player_info = {
+#             'name': QLabel("-"),
+#             'city': QLabel("-"),
+#             'region': QLabel("-"),
+#             'coach': QLabel("-")
+#         }
+#         info_layout.addRow("ФИО:", self.player_info['name'])
+#         info_layout.addRow("Город:", self.player_info['city'])
+#         info_layout.addRow("Регион:", self.player_info['region'])
+#         info_layout.addRow("Тренер:", self.player_info['coach'])
+#         left_layout.addWidget(info_group)
+
+#         # Список оставшихся игроков (растягивается)
+#         list_group = QGroupBox("📝 Список игроков")
+#         list_group.setStyleSheet("""
+#             QGroupBox {
+#                 font-weight: bold;
+#                 font-size: 12px;
+#                 border: 2px solid #2196F3;
+#                 border-radius: 8px;
+#                 margin-top: 10px;
+#             }
+#             QGroupBox::title {
+#                 color: #2196F3;
+#                 subcontrol-origin: margin;
+#                 left: 10px;
+#                 padding: 0 8px 0 8px;
+#             }
+#         """)
+#         list_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+#         list_layout = QVBoxLayout(list_group)
+#         list_layout.setContentsMargins(10, 15, 10, 10)
+#         self.players_list = QListWidget()
+#         list_layout.addWidget(self.players_list)
+#         left_layout.addWidget(list_group)
+
+#         splitter.addWidget(left_widget)
+
+#         # Правая панель: сетка
+#         right_widget = QWidget()
+#         right_layout = QVBoxLayout(right_widget)
+#         right_layout.setContentsMargins(0, 0, 0, 0)
+
+#         self.net_table = QTableWidget()
+#         self.net_table.setEditTriggers(QTableWidget.NoEditTriggers)
+#         self.net_table.setSelectionBehavior(QTableWidget.SelectItems)
+#         self.net_table.setAcceptDrops(True)
+#         self.net_table.cellClicked.connect(self.on_net_cell_clicked)
+#         self.net_table.setDragDropMode(QTableWidget.DropOnly)
+#         self.net_table.setStyleSheet("""
+#             QTableWidget {
+#                 font-size: 11px;
+#                 gridline-color: #ddd;
+#             }
+#             QTableWidget::item {
+#                 padding: 4px;
+#             }
+#             QTableWidget::item:selected {
+#                 background-color: #4CAF50;
+#                 color: white;
+#             }
+#         """)
+#         # Растягиваем сетку
+#         self.net_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+#         right_layout.addWidget(self.net_table)
+
+#         splitter.addWidget(right_widget)
+
+#         # Устанавливаем пропорции (левая - 30%, правая - 70%)
+#         splitter.setSizes([500, 500])
+
+#         main_layout.addWidget(splitter)
+
+      
+
+#     def load_stage_data(self):
+#         if not self.stage_name:
+#             return
+#         self.current_system = System.get_or_none(
+#             (System.title_id == self.title_id) &
+#             (System.stage == self.stage_name) &
+#             (System.sex == self.sex)
+#         )
+#         if not self.current_system:
+#             QMessageBox.warning(self, "Ошибка", f"Этап {self.stage_name} не найден")
+#             self.close()
+#             return
+#         self.max_players = self.current_system.max_player
+#         # Проверяем, есть ли уже жеребьёвка
+#         existing = Game_list.select().where(
+#             (Game_list.title_id == self.title_id) &
+#             (Game_list.system_id == self.current_system.id)
+#         ).count()
+#         if existing > 0:
+#             self._handle_existing_drawing()
+#         else:
+#             self.draw_net()
+#             self.load_players()
+#             self.save_btn.setEnabled(True)
+#             self.status_label.setText(f"Загружен этап: {self.stage_name}. Игроков: {len(self.players) + 1}")
+
+#     def _handle_existing_drawing(self):
+#         reply = QMessageBox.question(
+#             self,
+#             "Жеребьёвка уже проведена",
+#             "Для этого этапа уже есть жеребьёвка.\n"
+#             "Загрузить существующую или сбросить и начать заново?",
+#             QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+#             QMessageBox.Cancel
+#         )
+#         if reply == QMessageBox.Cancel:
+#             self.close()
+#             return
+#         elif reply == QMessageBox.Yes:
+#             # Загружаем существующую
+#             self.load_players()
+#             self.draw_net()
+#             self.load_existing_net()
+#             self.save_btn.setEnabled(True)
+#             self.status_label.setText(f"Загружена существующая жеребьёвка для {self.stage_name}")
+#         else:
+#             # Сброс: удаляем старые записи
+#             Game_list.delete().where(
+#                 (Game_list.title_id == self.title_id) &
+#                 (Game_list.system_id == self.current_system.id)
+#             ).execute()
+#             Choice.update(posev_final=0).where(
+#                 (Choice.title_id == self.title_id) &
+#                 (Choice.final == self.stage_name)
+#             ).execute()
+#             self.load_players()
+#             self.draw_net()
+#             self.save_btn.setEnabled(True)
+#             self.status_label.setText(f"Старая жеребьёвка сброшена для {self.stage_name}")
+
+#     def draw_net(self):
+#         if not self.current_system:
+#             return
+#         max_pl = self.max_players
+#         self.net_table.setRowCount(max_pl)
+#         self.net_table.setColumnCount(2)
+#         self.net_table.setHorizontalHeaderLabels(["№", "Игрок / Город"])
+#         self.net_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+#         self.net_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+#         # Устанавливаем фиксированную высоту строк, чтобы поместилось 32 строки
+#         if max_pl > 20:
+#             self.net_table.verticalHeader().setDefaultSectionSize(18)
+#         else:
+#             self.net_table.verticalHeader().setDefaultSectionSize(24)
+
+#         for pos in range(1, max_pl + 1):
+#             # Номер посева
+#             item = QTableWidgetItem(str(pos))
+#             item.setTextAlignment(Qt.AlignCenter)
+#             item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+#             self.net_table.setItem(pos - 1, 0, item)
+#             # Ячейка для игрока
+#             self.net_table.setItem(pos - 1, 1, QTableWidgetItem(""))
+
+#         self.net_table.resizeColumnsToContents()
+#         self.net_table.resizeRowsToContents()
+
+#     def place_player(self, pos, player_data):
+#         self.net_positions[pos] = {
+#             'player_id': player_data['player_id'],
+#             'name': player_data['name'],
+#             'city': player_data['city'],
+#             'choice_id': player_data['choice_id']
+#         }
+
+#         # Убираем игрока из списка
+#         for i in range(self.players_list.count()):
+#             item = self.players_list.item(i)
+#             if item.player_data['player_id'] == player_data['player_id']:
+#                 self.players_list.takeItem(i)
+#                 break
+#         self.update_net_display()
+#         self.status_label.setText(f"Игрок {player_data['name']} размещён на позиции {pos}")
+#         # Проверяем, все ли заполнены
+#         if len(self.net_positions) == self.max_players:
+#             self.status_label.setText(f"✅ Все {self.max_players} позиций заполнены!")
+#             self.save_btn.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold;")
+
+#     def highlight_conflicts(self, selected_player=None):
+#         """Подсвечивает игроков из того же региона или тренера, что и выбранный"""
+#         # Сбрасываем подсветку
+#         for row in range(self.net_table.rowCount()):
+#             item = self.net_table.item(row, 1)
+#             if item:
+#                 item.setBackground(Qt.white)
+
+#         if not selected_player:
+#             return
+
+#         region = selected_player.get('region', '')
+#         coach = selected_player.get('coach', '')
+
+#         # Получаем список размещённых игроков с регионами и тренерами
+#         for pos, data in self.net_positions.items():
+#             # Получаем полные данные игрока
+#             player = Player.get_or_none(Player.id == data['player_id'])
+#             if not player:
+#                 continue
+#             p_region = player.region or ''
+#             p_coach = ''
+#             if player.coach_id:
+#                 coach_obj = Coach.get_or_none(Coach.id == player.coach_id)
+#                 if coach_obj:
+#                     p_coach = coach_obj.coach or ''
+
+#             if region and p_region == region:
+#                 row = pos - 1
+#                 item = self.net_table.item(row, 1)
+#                 if item:
+#                     item.setBackground(QColor(244, 164, 96))
+#             if coach and p_coach == coach:
+#                 row = pos - 1
+#                 item = self.net_table.item(row, 1)
+#                 if item:
+#                     item.setBackground(QColor(240, 128, 128))
+
+#     def save_drawing(self):
+#         """Сохранение жеребьёвки в БД"""
+#         if len(self.net_positions) != self.max_players:
+#             QMessageBox.warning(self, "Ошибка", f"Не все позиции заполнены. Осталось {self.max_players - len(self.net_positions)}")
+#             return
+
+#         reply = QMessageBox.question(
+#             self,
+#             "Подтверждение",
+#             f"Сохранить жеребьёвку для {self.current_stage}?",
+#             QMessageBox.Yes | QMessageBox.No
+#         )
+#         if reply != QMessageBox.Yes:
+#             return
+
+#         try:
+#             # Удаляем старые записи в Game_list для этого этапа
+#             Game_list.delete().where(
+#                 (Game_list.title_id == self.title_id) &
+#                 (Game_list.system_id == self.current_system.id)
+#             ).execute()
+
+#             # Сохраняем новые
+#             for pos, data in self.net_positions.items():
+#                 Game_list.create(
+#                     number_group=self.stage_name,
+#                     rank_num_player=pos,
+#                     player_group_id=data['player_id'],
+#                     system_id=self.current_system.id,
+#                     title_id=self.title_id,
+#                     sex=self.sex if self.sex else "man"
+#                 )
+
+#             # Обновляем Choice (posev_final)
+#             Choice.update(posev_final=0).where(
+#                 (Choice.title_id == self.title_id) &
+#                 (Choice.sex == self.current_sex) &
+#                 (Choice.final == self.stage_name)
+#             ).execute()
+
+#             for pos, data in self.net_positions.items():
+#                 Choice.update(posev_final=pos).where(
+#                     (Choice.title_id == self.title_id) &
+#                     (Choice.sex == self.current_sex) &
+#                     (Choice.player_choice == data['player_id'])
+#                 ).execute()
+
+#             # Устанавливаем флаг choice_flag для системы
+#             System.update(choice_flag=1).where(System.id == self.current_system.id).execute()
+
+#             QMessageBox.information(self, "Успех", f"Жеребьёвка для {self.current_stage} сохранена")
+#             self.accept()
+
+#         except Exception as e:
+#             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить жеребьёвку: {str(e)}")  
+
+#     def load_players(self):
+#         """Загрузка игроков для текущего финала с использованием real_place_for_final"""
+
+#         if not self.current_system:
+#             return
+
+#         self.players.clear()
+#         try:
+#             self.players_list.clear()
+#         except RuntimeError:
+#             self.players_list = QListWidget()
+
+#         # Получаем информацию о том, какие места выходят в этот финал
+#         choice = Choice.get_or_none(
+#             (Choice.title_id == self.title_id) &
+#             (Choice.sex == self.sex)
+#             )   
+#         stage_exit = self.current_system.stage_exit
+
+#         try:
+#             final_info = self.parent.real_place_for_final(self.stage_name)
+#             nums = final_info['place_stage']
+#         except AttributeError:
+#             QMessageBox.warning(self, "Ошибка", "Метод real_place_for_final не найден в родительском окне")
+#             return
+
+#         stage_sources = final_info['stage_exit']
+#         if not stage_sources:
+#             QMessageBox.warning(self, "Ошибка", f"Не указан источник для финала {self.stage_name}")
+#             return
+
+#         # Обрабатываем все источники (если их несколько)
+#         players_data = []
+
+#         # Определяем поля в зависимости от источника
+#         if "полуфинал" in stage_exit.lower():
+#             semi_num = 1 if "1-й" in stage_exit else 2
+#             choices = Choice.select().where(
+#                 (Choice.title_id == self.title_id) &
+#                 (Choice.semi_final == semi_num)
+#             )
+#             group_field = 'sf_group'
+#             pos_field = 'posev_sf'
+#             place_field = 'mesto_semi_final'
+#         else:
+#             choices = Choice.select().where(
+#                 (Choice.title_id == self.title_id) &
+#                 (Choice.group.contains("группа"))
+#             )
+#             group_field = 'group'
+#             pos_field = 'posev_group'
+#             place_field = 'mesto_group'
+
+#             # Фильтруем по полу
+#             if self.sex:
+#                 choices = choices.where(Choice.sex == self.sex)
+
+#             # Собираем данные
+#             for ch in choices:
+#                 place = getattr(ch, place_field) or 0
+#                 if place not in nums:
+#                     continue
+#                 player = Player.get_or_none(Player.id == ch.player_choice.id)
+#                 if not player:
+#                     continue
+#                 group_name = getattr(ch, group_field)
+#                 match = re.search(r'\d+', group_name)
+#                 group_num = int(match.group()) if match else 0
+#                 pos = getattr(ch, pos_field)
+
+#                 coach_name = ""
+#                 if player.coach_id:
+#                     coach = Coach.get_or_none(Coach.id == player.coach_id)
+#                     if coach:
+#                         coach_name = coach.coach
+
+#                 players_data.append({
+#                     'choice_id': ch.id,
+#                     'player_id': player.id,
+#                     'name': player.fio or player.player,
+#                     'city': player.city or "",
+#                     'region': player.region or "",
+#                     'rank': player.rank or 0,
+#                     'group': group_num,
+#                     'position': pos,
+#                     'place': place,
+#                     'coach': coach_name,
+#                     'sex': player.sex or ""
+#                 })
+
+#         # Сортировка
+#         if self.stage_name == "1-й финал":
+#             players_data.sort(key=lambda x: (x['group'], x['place']))
+#         else:
+#             exit_count = self.current_system.mesta_exit or 1
+#             if exit_count == 1:
+#                 players_data.sort(key=lambda x: x['rank'], reverse=True)
+#             else:
+#                 players_data.sort(key=lambda x: (x['place'], -x['rank']))
+
+#         self.players = players_data
+
+#         # == копирует список не изменный
+#         import copy
+
+#         self.players_copy = copy.deepcopy(players_data)
+
+#         # Берём первого как текущего
+#         if self.players:
+#             current_pl = self.players[0]
+#             idx = self.players_copy.index(current_pl)
+#             self.current_player = self.players.pop(0)
+#             self.update_player_info(current_pl)
+#             seed_positions = self.get_seed_positions(idx + 1)
+#             self.highlight_posev(seed_positions)
+#             self.highlight_conflicts(current_pl)
+#         else:
+#             self.current_player = None
+#             self.update_player_info(None)
+ 
+#         # Заполняем список
+#         self.players_list.clear()
+#         for p in players_data:
+#             item = PlayerItem(p)
+#             self.players_list.addItem(item)
+# #=======================
+#     def place_current_player(self, pos):
+#         """Размещает текущего игрока на указанной позиции"""
+#         player_data = self.current_player # Игрок, который сеятся
+#         if not player_data:
+#             return False
+#         self.place_player(pos, player_data)
+#         self.current_player = self.players[0]
+#         # Удаляем из списка и переходим к следующему
+#         idx = self.players.index(self.current_player)
+#         index = self.players_copy.index(self.current_player)
+#         self.players.pop(idx)
+#         # обновляем отображение списка
+#         self.update_players_list()  
+#         self.update_player_info(self.current_player)
+
+#         seed_positions = self.get_seed_positions(index + 1)
+#         self.highlight_posev(seed_positions)
+#         self.highlight_conflicts(self.current_player)
+#         return True
+
+#     def update_players_list(self):
+#         """Обновляет список оставшихся игроков"""
+#         self.players_list.clear()
+#         for p in self.players:
+#             item = PlayerItem(p)
+#             self.players_list.addItem(item)
+
+#     def update_net_display(self):
+#         if not hasattr(self, 'net_table') or self.net_table is None:
+#             return
+        
+#         for pos, data in self.net_positions.items():
+#             row = pos - 1
+#             # Формируем текст: фамилия + перенос + город
+#             text = f"{data['name']}/ {data['city']}"
+#             item = QTableWidgetItem(text)
+#             item.setTextAlignment(Qt.AlignLeft)
+#             self.net_table.setItem(row, 1, item)
+
+#     def closeEvent(self, event):
+#         if self.net_positions:
+#             reply = QMessageBox.question(
+#                 self,
+#                 "Сохранение жеребьёвки",
+#                 "Вы хотите сохранить текущую жеребьёвку?",
+#                 QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel
+#             )
+#             if reply == QMessageBox.Cancel:
+#                 event.ignore()
+#                 return
+#             elif reply == QMessageBox.Yes:
+#                 self.save_drawing()
+#                 event.accept()
+#             else:
+#                 # Не сохраняем, просто закрываем
+#                 event.accept()
+#         else:
+#             event.accept()
+
+#     def load_existing_net(self):
+#         """Загрузка уже размещённых игроков из Game_list"""
+#         if not self.current_system:
+#             return
+
+#         game_players = Game_list.select().where(
+#             (Game_list.title_id == self.title_id) &
+#             (Game_list.system_id == self.current_system.id)
+#         ).order_by(Game_list.rank_num_player)
+
+#         self.net_positions = {}
+#         for gp in game_players:
+#             pos = gp.rank_num_player
+#             player = Player.get_or_none(Player.id == gp.player_group.id)
+#             if player:
+#                 self.net_positions[pos] = {
+#                     'player_id': player.id,
+#                     'name': player.fio or player.player,
+#                     'city': player.city or ""
+#                 }
+#                 # Удаляем игрока из списка, если он там есть
+#                 for i in range(self.players_list.count()):
+#                     item = self.players_list.item(i)
+#                     if item.player_data['player_id'] == player.id:
+#                         self.players_list.takeItem(i)
+#                         break
+
+#         self.update_net_display()
+
+#     def update_player_info(self, player_data):
+#         """Обновляет информацию о текущем игроке"""
+#         if not player_data:
+#             self.player_info['name'].setText("-")
+#             self.player_info['city'].setText("-")
+#             self.player_info['region'].setText("-")
+#             self.player_info['coach'].setText("-")
+#             return
+#         self.player_info['name'].setText(player_data.get('name', "-"))
+#         self.player_info['city'].setText(player_data.get('city', "-"))
+#         self.player_info['region'].setText(player_data.get('region', "-"))
+#         self.player_info['coach'].setText(player_data.get('coach', "-"))
+
+#     def on_list_item_clicked(self, item):
+#         if not item:
+#             return
+#         player_data = item.player_data
+#         self.update_player_info(player_data)
+#         self.highlight_conflicts(player_data)  
+
+#     def save_drawing(self):
+#         """Сохранение жеребьёвки в БД"""
+#         if len(self.net_positions) != self.max_players:
+#             QMessageBox.warning(self, "Ошибка", f"Не все позиции заполнены. Осталось {self.max_players - len(self.net_positions)}")
+#             return
+
+#         reply = QMessageBox.question(
+#             self,
+#             "Подтверждение",
+#             f"Сохранить жеребьёвку для {self.current_stage}?",
+#             QMessageBox.Yes | QMessageBox.No
+#         )
+#         if reply != QMessageBox.Yes:
+#             return
+
+#         try:
+#             # Удаляем старые записи в Game_list для этого этапа
+#             Game_list.delete().where(
+#                 (Game_list.title_id == self.title_id) &
+#                 (Game_list.system_id == self.current_system.id)
+#             ).execute()
+
+#             # Сохраняем новые
+#             for pos, data in self.net_positions.items():
+#                 Game_list.create(
+#                     number_group=self.current_stage,
+#                     rank_num_player=pos,
+#                     player_group_id=data['player_id'],
+#                     system_id=self.current_system.id,
+#                     title_id=self.title_id,
+#                     sex=self.sex if self.sex else "man"
+#                 )
+
+#             # Обновляем Choice (posev_final)
+#             Choice.update(posev_final=0).where(
+#                 (Choice.title_id == self.title_id) &
+#                 (Choice.final == self.current_stage)
+#             ).execute()
+
+#             for pos, data in self.net_positions.items():
+#                 Choice.update(posev_final=pos).where(
+#                     (Choice.title_id == self.title_id) &
+#                     (Choice.player_choice == data['player_id'])
+#                 ).execute()
+
+#             # Устанавливаем флаг choice_flag для системы
+#             System.update(choice_flag=1).where(System.id == self.current_system.id).execute()
+
+#             QMessageBox.information(self, "Успех", f"Жеребьёвка для {self.current_stage} сохранена")
+#             self.accept()
+
+#         except Exception as e:
+#             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить жеребьёвку: {str(e)}")
+
+#     def get_seed_positions(self, player_index):
+#         """
+#         Возвращает список рекомендуемых позиций для игрока с номером player_index (начиная с 1).
+#         """
+#         if not hasattr(self.parent, 'setka_choice_number'):
+#             return []
+#         try:
+#             count_exit = self.current_system.mesta_exit or 1
+#             posev_structure = self.parent.setka_choice_number(self.stage_name, count_exit)
+#             # posev_structure[0] - общее количество игроков
+#             # posev_structure[1:] - списки групп для каждого уровня посева
+#             # Игроки с индексом 1,2 относятся к 1-й группе посева, 3-4 ко 2-й, 5-8 к 3-й, 9-16 к 4-й, 17-32 к 5-й
+#             # Но в структуре группы могут быть разного размера, поэтому нужно распределять игроков по группам
+#             # Для простоты определим, к какой группе относится player_index
+#             total_players = posev_structure[0]
+#             if player_index > total_players:
+#                 return []
+#             # Собираем все группы в плоский список с указанием диапазона индексов игроков
+#             groups = []
+#             start_idx = 1
+#             for level in posev_structure[1:]:
+#                 for group in level:
+#                     # group - список позиций (например, [1, 8])
+#                     # Количество игроков в этой группе = len(group)
+#                     end_idx = start_idx + len(group) - 1
+#                     groups.append({
+#                         'start': start_idx,
+#                         'end': end_idx,
+#                         'positions': group
+#                     })
+#                     start_idx = end_idx + 1
+#             # Находим группу, в которую попадает player_index
+#             for g in groups:
+#                 if g['start'] <= player_index <= g['end']:
+#                     return g['positions']
+#             return []
+#         except Exception as e:
+#             print(f"Ошибка получения позиций посева: {e}")
+#             return []
+
+#     def highlight_posev(self, seed_positions):
+#         """Подсвечивает номера посева"""
+#         # Сбрасываем подсветку
+#         for row in range(self.net_table.rowCount()):
+#             item = self.net_table.item(row, 1)
+#             if item:
+#                 item.setBackground(Qt.white) 
+#         for pos in seed_positions:
+#             row = pos - 1
+#             item = self.net_table.item(row, 0)
+#             if item:
+#                 item.setBackground(QColor(0, 255, 255))
+
+#     def on_net_cell_clicked(self, row, col):
+#         if not self.current_player:
+#             QMessageBox.warning(self, "Ошибка", "Нет игроков для жеребьёвки")
+#             return
+#         pos = row + 1
+#         if pos < 1 or pos > self.max_players:
+#             return
+#         self.place_current_player(pos)
+
+# ========== new ==========
+# import copy
+# import re
+# from PyQt5.QtWidgets import (
+#     QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
+#     QTableWidget, QTableWidgetItem, QHeaderView, QGroupBox,
+#     QSplitter, QMessageBox, QWidget, QListWidget, QListWidgetItem,
+#     QAbstractItemView, QFormLayout
+# )
+# from PyQt5.QtCore import Qt, QSize
+# from PyQt5.QtGui import QColor
+# from models import System, Game_list, Choice, Player, Coach
+
+class PlayerItem(QListWidgetItem):
+    def __init__(self, player_data):
+        super().__init__()
+        self.player_data = player_data
+        self.setText(f"{player_data['name']} ({player_data['city']})")
+
+
 class ManualNetDrawDialog(QDialog):
     def __init__(self, parent=None, title_id=None, stage_name=None, sex=None):
         super().__init__(parent)
@@ -2229,38 +2940,35 @@ class ManualNetDrawDialog(QDialog):
         self.stage_name = stage_name
         self.sex = sex
         self.current_system = None
-        self.current_player = None  # текущий игрок, который будет сеяться
-
+        self.current_player = None
         self.players = []
+        self.players_copy = []
         self.net_positions = {}
         self.max_players = 0
+        self.all_players = []  # полный список для подсветки посева
         self.setWindowTitle(f"Ручная жеребьевка - {stage_name}")
         self.setMinimumSize(1000, 850)
         self.setModal(True)
         self.init_ui()
         self.load_stage_data()
-#====================
+
     def init_ui(self):
         main_layout = QVBoxLayout(self)
 
-        # Верхняя панель с информацией
+        # Верхняя панель
         top_panel = QHBoxLayout()
         top_panel.addWidget(QLabel(f"Этап: {self.stage_name}"))
         top_panel.addStretch()
-
-        # Статусная строка
         self.status_label = QLabel("Загрузка данных...")
-        self.status_label.setStyleSheet("padding: 5px; background-color: #FFFFE0; border-top: 1px solid #ddd;font-size: 12px;")
+        self.status_label.setStyleSheet("padding: 5px; background-color: #FFFFE0; border-top: 1px solid #ddd; font-size: 12px;")
         top_panel.addWidget(self.status_label)
-        
-
         self.save_btn = QPushButton("💾 Сохранить жеребьевку")
         self.save_btn.setEnabled(False)
         self.save_btn.clicked.connect(self.save_drawing)
         top_panel.addWidget(self.save_btn)
         main_layout.addLayout(top_panel)
 
-        # Основной сплиттер (горизонтальный)
+        # Основной сплиттер
         splitter = QSplitter(Qt.Horizontal)
 
         # Левая панель
@@ -2290,12 +2998,14 @@ class ManualNetDrawDialog(QDialog):
             'name': QLabel("-"),
             'city': QLabel("-"),
             'region': QLabel("-"),
-            'coach': QLabel("-")
+            'coach': QLabel("-"),
+            'group': QLabel("-"),
         }
         info_layout.addRow("ФИО:", self.player_info['name'])
         info_layout.addRow("Город:", self.player_info['city'])
         info_layout.addRow("Регион:", self.player_info['region'])
         info_layout.addRow("Тренер:", self.player_info['coach'])
+        info_layout.addRow("Группа:", self.player_info['group'])
         left_layout.addWidget(info_group)
 
         # Список оставшихся игроков (растягивается)
@@ -2319,6 +3029,7 @@ class ManualNetDrawDialog(QDialog):
         list_layout = QVBoxLayout(list_group)
         list_layout.setContentsMargins(10, 15, 10, 10)
         self.players_list = QListWidget()
+        self.players_list.itemClicked.connect(self.on_list_item_clicked)
         list_layout.addWidget(self.players_list)
         left_layout.addWidget(list_group)
 
@@ -2348,19 +3059,16 @@ class ManualNetDrawDialog(QDialog):
                 color: white;
             }
         """)
-        # Растягиваем сетку
         self.net_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         right_layout.addWidget(self.net_table)
-
         splitter.addWidget(right_widget)
 
-        # Устанавливаем пропорции (левая - 30%, правая - 70%)
         splitter.setSizes([500, 500])
-
         main_layout.addWidget(splitter)
 
-      
-
+    # ----------------------------------------------
+    # Загрузка данных
+    # ----------------------------------------------
     def load_stage_data(self):
         if not self.stage_name:
             return
@@ -2374,7 +3082,7 @@ class ManualNetDrawDialog(QDialog):
             self.close()
             return
         self.max_players = self.current_system.max_player
-        # Проверяем, есть ли уже жеребьёвка
+
         existing = Game_list.select().where(
             (Game_list.title_id == self.title_id) &
             (Game_list.system_id == self.current_system.id)
@@ -2400,14 +3108,13 @@ class ManualNetDrawDialog(QDialog):
             self.close()
             return
         elif reply == QMessageBox.Yes:
-            # Загружаем существующую
-            self.load_players()
             self.draw_net()
+            self.load_players()
             self.load_existing_net()
             self.save_btn.setEnabled(True)
             self.status_label.setText(f"Загружена существующая жеребьёвка для {self.stage_name}")
         else:
-            # Сброс: удаляем старые записи
+            # Сброс
             Game_list.delete().where(
                 (Game_list.title_id == self.title_id) &
                 (Game_list.system_id == self.current_system.id)
@@ -2420,6 +3127,142 @@ class ManualNetDrawDialog(QDialog):
             self.draw_net()
             self.save_btn.setEnabled(True)
             self.status_label.setText(f"Старая жеребьёвка сброшена для {self.stage_name}")
+    # ----------------------------------------------
+    # Загрузка игроков
+    # ----------------------------------------------
+    def load_players(self):
+        """Загрузка игроков для текущего финала с использованием real_place_for_final"""
+        if not self.current_system:
+            return
+
+        self.players.clear()
+        try:
+            self.players_list.clear()
+        except RuntimeError:
+            self.players_list = QListWidget()
+
+        # Получаем информацию о том, какие места выходят в этот финал
+        try:
+            final_info = self.parent.real_place_for_final(self.stage_name)
+            # final_info должно быть словарём {'stage_exit': ..., 'place_stage': [список мест]}
+            if not final_info or 'place_stage' not in final_info:
+                QMessageBox.warning(self, "Ошибка", "Некорректные данные от real_place_for_final")
+                return
+            nums = final_info['place_stage']
+            stage_exit = final_info.get('stage_exit', '')
+        except AttributeError:
+            QMessageBox.warning(self, "Ошибка", "Метод real_place_for_final не найден в родительском окне")
+            return
+
+        if not nums:
+            QMessageBox.warning(self, "Ошибка", f"Нет мест для финала {self.stage_name}")
+            return
+
+        # Определяем поля в зависимости от источника
+        if "полуфинал" in stage_exit.lower():
+            semi_num = 1 if "1-й" in stage_exit else 2
+            choices = Choice.select().where(
+                (Choice.title_id == self.title_id) &
+                (Choice.semi_final == semi_num) &
+                (Choice.sex == self.sex)
+            )
+            group_field = 'sf_group'
+            pos_field = 'posev_sf'
+            place_field = 'mesto_semi_final'
+        else:
+            choices = Choice.select().where(
+                (Choice.title_id == self.title_id) &
+                (Choice.group.contains("группа")) &
+                (Choice.sex == self.sex)
+            )
+            group_field = 'group'
+            pos_field = 'posev_group'
+            place_field = 'mesto_group'
+
+        # Собираем данные
+        players_data = []
+        for ch in choices:
+            place = getattr(ch, place_field) or 0
+            if place not in nums:
+                continue
+            player = Player.get_or_none(Player.id == ch.player_choice.id)
+            if not player:
+                continue
+            group_name = getattr(ch, group_field)
+            match = re.search(r'\d+', group_name)
+            group_num = int(match.group()) if match else 0
+            pos = getattr(ch, pos_field)
+
+            coach_name = ""
+            if player.coach_id:
+                coach = Coach.get_or_none(Coach.id == player.coach_id)
+                if coach:
+                    coach_name = coach.coach
+
+            players_data.append({
+                'choice_id': ch.id,
+                'player_id': player.id,
+                'name': player.fio or player.player,
+                'city': player.city or "",
+                'region': player.region or "",
+                'rank': player.rank or 0,
+                'group': group_num,
+                'position': pos,
+                'place': place,
+                'coach': coach_name,
+                'sex': player.sex or ""
+            })
+
+        # Сортировка
+        if self.stage_name == "1-й финал":
+            players_data.sort(key=lambda x: (x['group'], x['place']))
+        else:
+            exit_count = self.current_system.mesta_exit or 1
+            if exit_count == 1:
+                players_data.sort(key=lambda x: x['rank'], reverse=True)
+            else:
+                players_data.sort(key=lambda x: (x['place'], -x['rank']))
+
+        import copy
+
+        self.all_players = copy.deepcopy(players_data)
+
+        # Устанавливаем текущего игрока и список оставшихся
+        if players_data:
+            self.current_player = players_data[0]
+            self.players = players_data[1:]  # остальные игроки
+            self.update_player_info(self.current_player)
+            self.update_players_list()
+            self.highlight_posev()
+            self.highlight_conflicts(self.current_player)         
+        else:
+            self.current_player = None
+            self.players = []
+            self.update_player_info(None)
+
+    def update_players_list(self):
+        """Обновляет список оставшихся игроков"""
+        self.players_list.clear()
+        for p in self.players:
+            item = PlayerItem(p)
+            self.players_list.addItem(item)
+    # ----------------------------------------------
+    # Отрисовка сетки
+    # ----------------------------------------------
+    def update_net_display(self):
+        """Обновляет отображение сетки и подсветку"""
+        if not hasattr(self, 'net_table') or self.net_table is None:
+            return
+        # Обновляем имена
+        for pos, data in self.net_positions.items():
+            row = pos - 1
+            text = f"{data['name']} / {data['city']} - {data['group']} группа"
+            item = QTableWidgetItem(text)
+            item.setTextAlignment(Qt.AlignLeft)
+            self.net_table.setItem(row, 1, item)
+        # Подсветка
+        self.highlight_conflicts(self.current_player)
+        self.highlight_posev()
 
     def draw_net(self):
         if not self.current_system:
@@ -2430,57 +3273,188 @@ class ManualNetDrawDialog(QDialog):
         self.net_table.setHorizontalHeaderLabels(["№", "Игрок / Город"])
         self.net_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.net_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        # Устанавливаем фиксированную высоту строк, чтобы поместилось 32 строки
+
+        # Высота строк
         if max_pl > 20:
             self.net_table.verticalHeader().setDefaultSectionSize(18)
         else:
             self.net_table.verticalHeader().setDefaultSectionSize(24)
-    # ... остальное
-        # if not self.current_system:
-        #     return
-        # max_pl = self.max_players
-        # self.net_table.setRowCount(max_pl)  # одна строка на игрока
-        # self.net_table.setColumnCount(2)    # № и Игрок/Город
-        # self.net_table.setHorizontalHeaderLabels(["№", "Игрок / Город"])
-        # self.net_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        # self.net_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
 
+        # Заполняем данными
         for pos in range(1, max_pl + 1):
-            # Номер посева
+            row = pos - 1
             item = QTableWidgetItem(str(pos))
             item.setTextAlignment(Qt.AlignCenter)
             item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-            self.net_table.setItem(pos - 1, 0, item)
-            # Ячейка для игрока
-            self.net_table.setItem(pos - 1, 1, QTableWidgetItem(""))
+            self.net_table.setItem(row, 0, item)
+            self.net_table.setItem(row, 1, QTableWidgetItem(""))
+
+        # Устанавливаем делегат для отрисовки линий между четвертями
+        quarter_size = max_pl // 4 if max_pl >= 8 else max_pl
+        delegate = QuarterLineDelegate(self.net_table, quarter_size, max_pl)
+        self.net_table.setItemDelegate(delegate)
 
         self.net_table.resizeColumnsToContents()
         self.net_table.resizeRowsToContents()
-
+    # ----------------------------------------------
+    # Размещение игрока
+    # ----------------------------------------------
     def place_player(self, pos, player_data):
+        """Размещает игрока на позиции (без удаления из списка)"""
         self.net_positions[pos] = {
             'player_id': player_data['player_id'],
             'name': player_data['name'],
             'city': player_data['city'],
+            'group': player_data['group'],
             'choice_id': player_data['choice_id']
         }
 
-        # Убираем игрока из списка
-        for i in range(self.players_list.count()):
-            item = self.players_list.item(i)
-            if item.player_data['player_id'] == player_data['player_id']:
-                self.players_list.takeItem(i)
-                break
-        self.update_net_display()
-        self.status_label.setText(f"Игрок {player_data['name']} размещён на позиции {pos}")
-        # Проверяем, все ли заполнены
-        if len(self.net_positions) == self.max_players:
-            self.status_label.setText(f"✅ Все {self.max_players} позиций заполнены!")
-            self.save_btn.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold;")
+    def place_current_player(self, pos):
+        """Размещает текущего игрока на указанной позиции"""
+        if self.current_player is None:
+            QMessageBox.warning(self, "Ошибка", "Нет текущего игрока для размещения")
+            return False
 
+        # Проверяем, свободна ли позиция
+        if pos in self.net_positions:
+            # Заменяем игрока: текущий становится на место, а тот, кто был, становится текущим
+            replaced_data = self.net_positions.pop(pos)
+            # Добавляем вытесненного игрока в начало списка (как нового текущего)
+            # Но правильнее будет сделать его текущим, а старого current_player отправить в список
+            old_player = self.current_player
+            self.current_player = replaced_data
+            # Старого current_player добавляем в список
+            self.players.insert(0, old_player)
+            # Размещаем нового текущего на позицию
+            self.place_player(pos, old_player)
+            self.update_player_info(self.current_player)
+            self.update_players_list()
+            self.update_net_display()
+            self.status_label.setText(f"Игрок {old_player['name']} перемещён на позицию {pos}, {replaced_data['name']} стал текущим")
+            return True
+        else:
+            # Размещаем текущего на свободную позицию
+            self.place_player(pos, self.current_player)
+            # Удаляем его из списка оставшихся (если он там есть)
+            for i, p in enumerate(self.players):
+                if p['player_id'] == self.current_player['player_id']:
+                    self.players.pop(i)
+                    break
+            # Выбираем следующего игрока
+            if self.players:
+                self.current_player = self.players.pop(0)
+            else:
+                self.current_player = None
+            self.update_player_info(self.current_player)
+            self.update_players_list()
+            self.update_net_display()
+           
+            player = self.net_positions[pos]
+            name_player = player['name']
+            self.status_label.setText(f"Игрок {name_player} размещён на позиции {pos}")
+            # получаем реально число игроков в финале
+            choice = Choice.select().where(
+                        (Choice.title_id == self.title_id) &
+                        (Choice.sex == self.sex)
+                    )
+            result = self.parent.real_place_for_final(self.stage_name)      
+            nums = result['place_stage']
+            if result['stage_exit'] == "Квалификация":
+                real_all_player_in_final = len(choice.select().where(Choice.mesto_group.in_(nums))) # реальное число игроков в сетке
+            else:
+                real_all_player_in_final = len(choice.select().where(Choice.mesto_semi_final.in_(nums))) # реальное число игроков в сетке
+            
+            if len(self.net_positions) == real_all_player_in_final:
+                self.free_place_in_setka()
+                self.status_label.setText(f"✅ Все {real_all_player_in_final} позиций заполнены!")
+                self.save_btn.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold;")
+            return True
+    #=======================
+    # def place_current_player(self, pos):
+    #     """Размещает текущего игрока на указанной позиции"""
+    #     player_data = self.current_player
+    #     if not player_data:
+    #         return False
+
+    #     # Проверяем, занята ли позиция
+    #     if pos in self.net_positions:
+    #         # Если занята, удаляем старого игрока и возвращаем его в список
+    #         old_player_data = self.net_positions[pos]
+    #         # Удаляем из сетки
+    #         del self.net_positions[pos]
+    #         # Возвращаем старого игрока в список (в начало)
+    #         self.players.insert(0, old_player_data)
+    #         # Обновляем список
+    #         self.update_players_list()
+
+    #     # Размещаем нового игрока
+    #     self.net_positions[pos] = {
+    #         'player_id': player_data['player_id'],
+    #         'name': player_data['name'],
+    #         'city': player_data['city'],
+    #         'choice_id': player_data['choice_id'],
+    #         'group': player_data.get('group', '')
+    #     }
+
+    #     # Убираем игрока из списка current_player
+    #     self.current_player = None
+
+    #     # Обновляем сетку
+    #     self.update_net_display()
+
+    #     # Если есть ещё игроки, берём следующего
+    #     if self.players:
+    #         self.current_player = self.players.pop(0)
+    #         self.update_player_info(self.current_player)
+    #         # Подсветка конфликтов и посева
+    #         self.highlight_conflicts(self.current_player)
+    #         # seed_positions = self.get_seed_positions(self._get_player_index(self.current_player))
+    #         seed_positions = self.get_seed_positions(self.current_player)
+    #         self.highlight_posev(seed_positions)
+    #     else:
+    #         # Все игроки размещены, заполняем оставшиеся позиции "X"
+    #         self.fill_empty_positions_with_x()
+    #         self.update_player_info(None)
+    #         self.status_label.setText("✅ Все игроки размещены! Оставшиеся позиции заполнены 'X'.")
+    #         self.save_btn.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold;")
+
+    #     self.update_players_list()
+    #     return True
+    # ----------------------------------------------
+    # Обработчики событий
+    # ----------------------------------------------
+    def on_net_cell_clicked(self, row, col):
+        if self.current_player is None:
+            QMessageBox.warning(self, "Ошибка", "Нет игроков для жеребьёвки")
+            return
+        pos = row + 1
+        if pos < 1 or pos > self.max_players:
+            return
+        self.place_current_player(pos)
+
+    def on_list_item_clicked(self, item):
+        if not item:
+            return
+        player_data = item.player_data
+        # Делаем выбранного игрока текущим, а старого текущего возвращаем в список
+        old_current = self.current_player
+        if old_current:
+            # Добавляем старого текущего в список (в начало)
+            self.players.insert(0, old_current)
+        self.current_player = player_data
+        # Удаляем выбранного из списка
+        for i, p in enumerate(self.players):
+            if p['player_id'] == player_data['player_id']:
+                self.players.pop(i)
+                break
+        self.update_player_info(self.current_player)
+        self.update_players_list()
+        self.update_net_display()
+    # ----------------------------------------------
+    # Подсветка
+    # ----------------------------------------------
     def highlight_conflicts(self, selected_player=None):
-        """Подсвечивает игроков из того же региона или тренера, что и выбранный"""
-        # Сбрасываем подсветку
+        """Подсвечивает игроков из того же региона или тренера"""
         for row in range(self.net_table.rowCount()):
             item = self.net_table.item(row, 1)
             if item:
@@ -2492,9 +3466,7 @@ class ManualNetDrawDialog(QDialog):
         region = selected_player.get('region', '')
         coach = selected_player.get('coach', '')
 
-        # Получаем список размещённых игроков с регионами и тренерами
         for pos, data in self.net_positions.items():
-            # Получаем полные данные игрока
             player = Player.get_or_none(Player.id == data['player_id'])
             if not player:
                 continue
@@ -2509,256 +3481,88 @@ class ManualNetDrawDialog(QDialog):
                 row = pos - 1
                 item = self.net_table.item(row, 1)
                 if item:
-                    item.setBackground(QColor(244, 164, 96))
+                    item.setBackground(QColor(244, 164, 96))  # светло-оранжевый
             if coach and p_coach == coach:
                 row = pos - 1
                 item = self.net_table.item(row, 1)
                 if item:
-                    item.setBackground(QColor(240, 128, 128))
+                    item.setBackground(QColor(240, 128, 128))  # светло-красный
 
-    def save_drawing(self):
-        """Сохранение жеребьёвки в БД"""
-        if len(self.net_positions) != self.max_players:
-            QMessageBox.warning(self, "Ошибка", f"Не все позиции заполнены. Осталось {self.max_players - len(self.net_positions)}")
+    def highlight_posev(self):
+        """Подсвечивает номера посева для текущего игрока"""
+        # Сбрасываем подсветку в первом столбце
+        for row in range(self.net_table.rowCount()):
+            item = self.net_table.item(row, 0)
+            if item:
+                item.setBackground(Qt.white)
+
+        if not self.current_player:
             return
 
-        reply = QMessageBox.question(
-            self,
-            "Подтверждение",
-            f"Сохранить жеребьёвку для {self.current_stage}?",
-            QMessageBox.Yes | QMessageBox.No
-        )
-        if reply != QMessageBox.Yes:
+        # Определяем номер текущего игрока в исходном списке (индекс + 1)
+        # Для этого нужно знать полный список участников до сортировки
+        # Мы сохраним его в self.all_players при загрузке
+        if not hasattr(self, 'all_players'):
             return
-
         try:
-            # Удаляем старые записи в Game_list для этого этапа
-            Game_list.delete().where(
-                (Game_list.title_id == self.title_id) &
-                (Game_list.system_id == self.current_system.id)
-            ).execute()
+            idx = self.all_players.index(self.current_player)
+            player_index = idx + 1
+            seed_positions = self.get_seed_positions(player_index)
+            for pos in seed_positions:
+                if pos not in self.net_positions:
+                    row = pos - 1
+                    item = self.net_table.item(row, 0)
+                    if item:
+                        item.setBackground(QColor(173, 216, 230))  # светло-голубой
+        except ValueError:
+            pass
 
-            # Сохраняем новые
-            for pos, data in self.net_positions.items():
-                Game_list.create(
-                    number_group=self.stage_name,
-                    rank_num_player=pos,
-                    player_group_id=data['player_id'],
-                    system_id=self.current_system.id,
-                    title_id=self.title_id,
-                    sex=self.sex if self.sex else "man"
-                )
-
-            # Обновляем Choice (posev_final)
-            Choice.update(posev_final=0).where(
-                (Choice.title_id == self.title_id) &
-                (Choice.sex == self.current_sex) &
-                (Choice.final == self.stage_name)
-            ).execute()
-
-            for pos, data in self.net_positions.items():
-                Choice.update(posev_final=pos).where(
-                    (Choice.title_id == self.title_id) &
-                    (Choice.sex == self.current_sex) &
-                    (Choice.player_choice == data['player_id'])
-                ).execute()
-
-            # Устанавливаем флаг choice_flag для системы
-            System.update(choice_flag=1).where(System.id == self.current_system.id).execute()
-
-            QMessageBox.information(self, "Успех", f"Жеребьёвка для {self.current_stage} сохранена")
-            self.accept()
-
+    def get_seed_positions(self, player_index):
+        if not hasattr(self.parent, 'setka_choice_number'):
+            return []
+        try:
+            count_exit = self.current_system.mesta_exit or 1
+            posev_structure = self.parent.setka_choice_number(self.stage_name, count_exit)
+            if not posev_structure:
+                return []
+            total_players = posev_structure[0]
+            if player_index > total_players:
+                return []
+            groups = []
+            start_idx = 1
+            for level in posev_structure[1:]:
+                for group in level:
+                    end_idx = start_idx + len(group) - 1
+                    groups.append({
+                        'start': start_idx,
+                        'end': end_idx,
+                        'positions': group
+                    })
+                    start_idx = end_idx + 1
+            for g in groups:
+                if g['start'] <= player_index <= g['end']:
+                    return g['positions']
+            return []
         except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить жеребьёвку: {str(e)}")  
-
-    def load_players(self):
-        """Загрузка игроков для текущего финала с использованием real_place_for_final"""
-
-        if not self.current_system:
-            return
-
-        self.players.clear()
-        try:
-            self.players_list.clear()
-        except RuntimeError:
-            self.players_list = QListWidget()
-
-        # Получаем информацию о том, какие места выходят в этот финал
-        choice = Choice.get_or_none(
-            (Choice.title_id == self.title_id) &
-            (Choice.sex == self.sex)
-            )   
-        stage_exit = self.current_system.stage_exit
-
-        try:
-            final_info = self.parent.real_place_for_final(self.stage_name)
-            nums = final_info['place_stage']
-        except AttributeError:
-            QMessageBox.warning(self, "Ошибка", "Метод real_place_for_final не найден в родительском окне")
-            return
-
-        stage_sources = final_info['stage_exit']
-        if not stage_sources:
-            QMessageBox.warning(self, "Ошибка", f"Не указан источник для финала {self.stage_name}")
-            return
-
-        # Обрабатываем все источники (если их несколько)
-        players_data = []
-
-        # Определяем поля в зависимости от источника
-        if "полуфинал" in stage_exit.lower():
-            semi_num = 1 if "1-й" in stage_exit else 2
-            choices = Choice.select().where(
-                (Choice.title_id == self.title_id) &
-                (Choice.semi_final == semi_num)
-            )
-            group_field = 'sf_group'
-            pos_field = 'posev_sf'
-            place_field = 'mesto_semi_final'
-        else:
-            choices = Choice.select().where(
-                (Choice.title_id == self.title_id) &
-                (Choice.group.contains("группа"))
-            )
-            group_field = 'group'
-            pos_field = 'posev_group'
-            place_field = 'mesto_group'
-
-            # Фильтруем по полу
-            if self.sex:
-                choices = choices.where(Choice.sex == self.sex)
-
-            # Собираем данные
-            for ch in choices:
-                place = getattr(ch, place_field) or 0
-                if place not in nums:
-                    continue
-                player = Player.get_or_none(Player.id == ch.player_choice.id)
-                if not player:
-                    continue
-                group_name = getattr(ch, group_field)
-                match = re.search(r'\d+', group_name)
-                group_num = int(match.group()) if match else 0
-                pos = getattr(ch, pos_field)
-
-                coach_name = ""
-                if player.coach_id:
-                    coach = Coach.get_or_none(Coach.id == player.coach_id)
-                    if coach:
-                        coach_name = coach.coach
-
-                players_data.append({
-                    'choice_id': ch.id,
-                    'player_id': player.id,
-                    'name': player.fio or player.player,
-                    'city': player.city or "",
-                    'region': player.region or "",
-                    'rank': player.rank or 0,
-                    'group': group_num,
-                    'position': pos,
-                    'place': place,
-                    'coach': coach_name,
-                    'sex': player.sex or ""
-                })
-
-        # Сортировка
-        if self.stage_name == "1-й финал":
-            players_data.sort(key=lambda x: (x['group'], x['place']))
-        else:
-            exit_count = self.current_system.mesta_exit or 1
-            if exit_count == 1:
-                players_data.sort(key=lambda x: x['rank'], reverse=True)
-            else:
-                players_data.sort(key=lambda x: (x['place'], -x['rank']))
-
-        self.players = players_data
-
-        # == копирует список не изменный
-        import copy
-
-        self.players_copy = copy.deepcopy(players_data)
-
-        # Берём первого как текущего
-        if self.players:
-            current_pl = self.players[0]
-            idx = self.players_copy.index(current_pl)
-            self.current_player = self.players.pop(0)
-            self.update_player_info(current_pl)
-            seed_positions = self.get_seed_positions(idx + 1)
-            self.highlight_posev(seed_positions)
-            self.highlight_conflicts(current_pl)
-        else:
-            self.current_player = None
-            self.update_player_info(None)
- 
-        # Заполняем список
-        self.players_list.clear()
-        for p in players_data:
-            item = PlayerItem(p)
-            self.players_list.addItem(item)
-#=======================
-    def place_current_player(self, pos):
-        """Размещает текущего игрока на указанной позиции"""
-        player_data = self.current_player # Игрок, который сеятся
+            print(f"Ошибка получения позиций посева: {e}")
+            return []
+    # ----------------------------------------------
+    # Информация об игроке
+    # ----------------------------------------------
+    def update_player_info(self, player_data):
         if not player_data:
-            return False
-        self.place_player(pos, player_data)
-        self.current_player = self.players[0]
-        # Удаляем из списка и переходим к следующему
-        idx = self.players.index(self.current_player)
-        index = self.players_copy.index(self.current_player)
-        self.players.pop(idx)
-        # обновляем отображение списка
-        self.update_players_list()  
-        self.update_player_info(self.current_player)
-
-        seed_positions = self.get_seed_positions(index + 1)
-        self.highlight_posev(seed_positions)
-        self.highlight_conflicts(self.current_player)
-        return True
-
-    def update_players_list(self):
-        """Обновляет список оставшихся игроков"""
-        self.players_list.clear()
-        for p in self.players:
-            item = PlayerItem(p)
-            self.players_list.addItem(item)
-
-    def update_net_display(self):
-        if not hasattr(self, 'net_table') or self.net_table is None:
+            for key in self.player_info:
+                self.player_info[key].setText("-")
             return
-        
-        for pos, data in self.net_positions.items():
-            row = pos - 1
-            # Формируем текст: фамилия + перенос + город
-            text = f"{data['name']}/ {data['city']}"
-            item = QTableWidgetItem(text)
-            item.setTextAlignment(Qt.AlignLeft)
-            self.net_table.setItem(row, 1, item)
-
-    def closeEvent(self, event):
-        if self.net_positions:
-            reply = QMessageBox.question(
-                self,
-                "Сохранение жеребьёвки",
-                "Вы хотите сохранить текущую жеребьёвку?",
-                QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel
-            )
-            if reply == QMessageBox.Cancel:
-                event.ignore()
-                return
-            elif reply == QMessageBox.Yes:
-                self.save_drawing()
-                event.accept()
-            else:
-                # Не сохраняем, просто закрываем
-                event.accept()
-        else:
-            event.accept()
-
+        self.player_info['name'].setText(player_data.get('name', "-"))
+        self.player_info['city'].setText(player_data.get('city', "-"))
+        self.player_info['region'].setText(player_data.get('region', "-"))
+        self.player_info['coach'].setText(player_data.get('coach', "-"))
+        self.player_info['group'].setText(str(player_data.get('group', "-")))
+    # ----------------------------------------------
+    # Загрузка существующей жеребьёвки
+    # ----------------------------------------------
     def load_existing_net(self):
-        """Загрузка уже размещённых игроков из Game_list"""
         if not self.current_system:
             return
 
@@ -2775,39 +3579,20 @@ class ManualNetDrawDialog(QDialog):
                 self.net_positions[pos] = {
                     'player_id': player.id,
                     'name': player.fio or player.player,
-                    'city': player.city or ""
+                    'city': player.city or "",
+                    'group': player.group
                 }
-                # Удаляем игрока из списка, если он там есть
-                for i in range(self.players_list.count()):
-                    item = self.players_list.item(i)
-                    if item.player_data['player_id'] == player.id:
-                        self.players_list.takeItem(i)
+                # Удаляем этого игрока из списка, если он там есть
+                for i, p in enumerate(self.players):
+                    if p['player_id'] == player.id:
+                        self.players.pop(i)
                         break
 
         self.update_net_display()
-
-    def update_player_info(self, player_data):
-        """Обновляет информацию о текущем игроке"""
-        if not player_data:
-            self.player_info['name'].setText("-")
-            self.player_info['city'].setText("-")
-            self.player_info['region'].setText("-")
-            self.player_info['coach'].setText("-")
-            return
-        self.player_info['name'].setText(player_data.get('name', "-"))
-        self.player_info['city'].setText(player_data.get('city', "-"))
-        self.player_info['region'].setText(player_data.get('region', "-"))
-        self.player_info['coach'].setText(player_data.get('coach', "-"))
-
-    def on_list_item_clicked(self, item):
-        if not item:
-            return
-        player_data = item.player_data
-        self.update_player_info(player_data)
-        self.highlight_conflicts(player_data)  
-
+    # ----------------------------------------------
+    # Сохранение
+    # ----------------------------------------------
     def save_drawing(self):
-        """Сохранение жеребьёвки в БД"""
         if len(self.net_positions) != self.max_players:
             QMessageBox.warning(self, "Ошибка", f"Не все позиции заполнены. Осталось {self.max_players - len(self.net_positions)}")
             return
@@ -2815,23 +3600,25 @@ class ManualNetDrawDialog(QDialog):
         reply = QMessageBox.question(
             self,
             "Подтверждение",
-            f"Сохранить жеребьёвку для {self.current_stage}?",
+            f"Сохранить жеребьёвку для {self.stage_name}?",
             QMessageBox.Yes | QMessageBox.No
         )
         if reply != QMessageBox.Yes:
             return
 
         try:
-            # Удаляем старые записи в Game_list для этого этапа
             Game_list.delete().where(
                 (Game_list.title_id == self.title_id) &
                 (Game_list.system_id == self.current_system.id)
             ).execute()
+            Result.delete().where(
+                (Result.title_id == self.title_id) &
+                (Result.system_id == self.current_system.id)
+            ).execute()
 
-            # Сохраняем новые
             for pos, data in self.net_positions.items():
                 Game_list.create(
-                    number_group=self.current_stage,
+                    number_group=self.stage_name,
                     rank_num_player=pos,
                     player_group_id=data['player_id'],
                     system_id=self.current_system.id,
@@ -2839,99 +3626,240 @@ class ManualNetDrawDialog(QDialog):
                     sex=self.sex if self.sex else "man"
                 )
 
-            # Обновляем Choice (posev_final)
-            Choice.update(posev_final=0).where(
+            Choice.update(posev_final=0, final="").where(
                 (Choice.title_id == self.title_id) &
-                (Choice.final == self.current_stage)
+                (Choice.sex == self.sex) &
+                (Choice.final == self.stage_name)
             ).execute()
 
             for pos, data in self.net_positions.items():
-                Choice.update(posev_final=pos).where(
+                Choice.update(posev_final=pos, final=self.stage_name).where(
                     (Choice.title_id == self.title_id) &
+                    (Choice.sex == self.sex) & 
                     (Choice.player_choice == data['player_id'])
                 ).execute()
 
-            # Устанавливаем флаг choice_flag для системы
+            choices = Choice.select().where((Choice.title_id == self.title_id) &
+                                            (Choice.final == self.stage_name) &
+                                            (Choice.sex == self.sex)
+                                            )
+            
+            posev_data = {} # окончательные посев номер в сетке - игрок/ город
+
+            for i in self.net_positions.keys():
+                id = self.net_positions[i]['player_id']
+                if id == "X":
+                    # Получаем ID игрока X
+                    x_player_id = self.get_x_player_id()
+                    posev_data[i] = {
+                    'player_id':x_player_id,
+                        'name_city':'X',
+                        'name':'X'
+                    }
+                else:
+                    # id = tmp_list[0]
+                    pl_id = Player.get(Player.id == id)
+                    family_city = pl_id.fio_city
+                    family_shot = pl_id.fio
+                    posev_data[i] = {
+                    'player_id':id,
+                        'name_city':family_city,
+                        'name':family_shot
+                    }
+            # # 7. Создаём туры и матчи заполняем Results
+            max_pl = self.max_players
+            # число игр в сетке
+            total_game = self.parent.number_game_of_net(self.stage_name)
+            # =========== проба записи стадии ====
+            # наивысшее место 
+            highest_place = self.parent.get_final_start_place(self.stage_name)
+            # определяет количество игр в сетке
+            game = self.parent.number_game_of_net(self.stage_name)
+
+            self.parent.get_match_title(i, game, highest_place, max_pl)
+            # =======================
+            # присваивает встречи 1-ого тура и записывает в тбл Results
+            for i in range(1, max_pl // 2 + 1):   
+                pl1 = posev_data[i * 2 - 1]['name_city']
+                pl2 = posev_data[i * 2]['name_city']
+                if pl1 is not None and pl2 is not None:
+                    with db:
+                        results = Result(number_group=self.stage_name, system_stage='финальный', player1=pl1, player2=pl2,
+                                        tours=i, title_id=self.title_id,
+                                        system_id=self.current_system.id, sex=self.sex).save()
+            # дополняет номера будущих встреч            
+            for i in range(max_pl // 2 + 1, total_game + 1): 
+                with db:
+                    results = Result(number_group=self.stage_name, system_stage="Финальный", player1="", player2="",
+                                    tours=i, title_id=self.title_id,
+                                    system_id=self.current_system.id, sex=self.sex).save()
+
+            # записывает стадии сетки в Result
+            stadia = self.parent.whrite_stadia_on_net(game, highest_place, max_pl)
+
+            results_stadia = Result.select().where(
+                (Result.title_id == self.title_id) &
+                (Result.system_id == self.current_system.id))
+
+            for k in results_stadia:
+                num_game = int(k.tours)
+                stadia_str = stadia[num_game]
+                Result.update(stage_net=stadia_str).where(Result.id == k).execute()
+
             System.update(choice_flag=1).where(System.id == self.current_system.id).execute()
 
-            QMessageBox.information(self, "Успех", f"Жеребьёвка для {self.current_stage} сохранена")
+            QMessageBox.information(self, "Успех", f"Жеребьёвка для {self.stage_name} сохранена")
             self.accept()
 
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить жеребьёвку: {str(e)}")
+    #================
+    # def save_drawing(self):
+    #     if len(self.net_positions) != self.max_players:
+    #         QMessageBox.warning(self, "Ошибка", f"Не все позиции заполнены. Осталось {self.max_players - len(self.net_positions)}")
+    #         return
 
-    def get_seed_positions(self, player_index):
-        """
-        Возвращает список рекомендуемых позиций для игрока с номером player_index (начиная с 1).
-        """
-        if not hasattr(self.parent, 'setka_choice_number'):
-            return []
-        try:
-            count_exit = self.current_system.mesta_exit or 1
-            posev_structure = self.parent.setka_choice_number(self.stage_name, count_exit)
-            # posev_structure[0] - общее количество игроков
-            # posev_structure[1:] - списки групп для каждого уровня посева
-            # Игроки с индексом 1,2 относятся к 1-й группе посева, 3-4 ко 2-й, 5-8 к 3-й, 9-16 к 4-й, 17-32 к 5-й
-            # Но в структуре группы могут быть разного размера, поэтому нужно распределять игроков по группам
-            # Для простоты определим, к какой группе относится player_index
-            total_players = posev_structure[0]
-            if player_index > total_players:
-                return []
-            # Собираем все группы в плоский список с указанием диапазона индексов игроков
-            groups = []
-            start_idx = 1
-            for level in posev_structure[1:]:
-                for group in level:
-                    # group - список позиций (например, [1, 8])
-                    # Количество игроков в этой группе = len(group)
-                    end_idx = start_idx + len(group) - 1
-                    groups.append({
-                        'start': start_idx,
-                        'end': end_idx,
-                        'positions': group
-                    })
-                    start_idx = end_idx + 1
-            # Находим группу, в которую попадает player_index
-            for g in groups:
-                if g['start'] <= player_index <= g['end']:
-                    return g['positions']
-            return []
-        except Exception as e:
-            print(f"Ошибка получения позиций посева: {e}")
-            return []
+    #     reply = QMessageBox.question(
+    #         self,
+    #         "Подтверждение",
+    #         f"Сохранить жеребьёвку для {self.stage_name}?",
+    #         QMessageBox.Yes | QMessageBox.No
+    #     )
+    #     if reply != QMessageBox.Yes:
+    #         return
 
-    def highlight_posev(self, seed_positions):
-        """Подсвечивает номера посева"""
-        # Сбрасываем подсветку
-        for row in range(self.net_table.rowCount()):
-            item = self.net_table.item(row, 1)
-            if item:
-                item.setBackground(Qt.white) 
-        for pos in seed_positions:
-            row = pos - 1
-            item = self.net_table.item(row, 0)
-            if item:
-                item.setBackground(QColor(0, 255, 255))
+    #     try:
+    #         # Удаляем старые записи
+    #         Game_list.delete().where(
+    #             (Game_list.title_id == self.title_id) &
+    #             (Game_list.system_id == self.current_system.id)
+    #         ).execute()
 
-    def on_net_cell_clicked(self, row, col):
-        if not self.current_player:
-            QMessageBox.warning(self, "Ошибка", "Нет игроков для жеребьёвки")
+    #         # Сохраняем новые
+    #         for pos, data in self.net_positions.items():
+    #             Game_list.create(
+    #                 number_group=self.stage_name,
+    #                 rank_num_player=pos,
+    #                 player_group_id=data['player_id'],
+    #                 system_id=self.current_system.id,
+    #                 title_id=self.title_id,
+    #                 sex=self.sex if self.sex else "man"
+    #             )
+
+    #         # Обновляем Choice (posev_final)
+    #         Choice.update(posev_final=0).where(
+    #             (Choice.title_id == self.title_id) &
+    #             (Choice.final == self.stage_name) &
+    #             (Choice.sex == self.sex)
+    #         ).execute()
+
+    #         for pos, data in self.net_positions.items():
+    #             if data['choice_id']:
+    #                 Choice.update(posev_final=pos).where(
+    #                     (Choice.title_id == self.title_id) &
+    #                     (Choice.player_choice == data['player_id'])
+    #                 ).execute()
+    #             # Для X не обновляем Choice
+
+    #         System.update(choice_flag=1).where(System.id == self.current_system.id).execute()
+
+    #         QMessageBox.information(self, "Успех", f"Жеребьёвка для {self.stage_name} сохранена")
+    #         self.accept()
+    #     except Exception as e:
+    #         QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить жеребьёвку: {str(e)}")
+    # ----------------------------------------------
+    # Закрытие окна
+    # ----------------------------------------------
+    def closeEvent(self, event):
+        if self.net_positions:
+            reply = QMessageBox.question(
+                self,
+                "Сохранение жеребьёвки",
+                "Вы хотите сохранить текущую жеребьёвку?",
+                QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel
+            )
+            if reply == QMessageBox.Cancel:
+                event.ignore()
+                return
+            elif reply == QMessageBox.Yes:
+                self.save_drawing()
+                event.accept()
+            else:
+                event.accept()
+        else:
+            event.accept()
+    # ----------------------------------------------
+    # свободные номера в сетке
+    # ----------------------------------------------
+    def free_place_in_setka(self):
+        """находит свободные места в сетке"""
+        free_num = []
+        for row in range(0, self.max_players):
+            item = self.net_table.item(row, 1).text()
+            if item == "":
+                value = self.net_table.item(row, 0).text()
+                free_num.append(int(value))
+
+        # Получаем ID игрока X
+        x_player_id = self.parent.get_x_player_id()
+
+        # Создаем данные для игрока X
+        x_player_data = {
+            'player_id': x_player_id,  # id
+            'name': "X",          # name
+            'region': "",           # region
+            'group_number': 0,            # group_number
+            'group': "",           # group
+            'city': "",           # city
+            'rank': 0,            # rank
+            'place': 0             # place
+        }
+
+        # Заполняем свободные места данными игрока X
+        for pos in free_num:
+            self.net_positions[pos] = x_player_data
+
+    def fill_empty_positions_with_x(self):
+            """Заполняет свободные позиции игроком X"""
+            x_player_id = self.parent.get_x_player_id() if hasattr(self.parent, 'get_x_player_id') else None
+            if not x_player_id:
+                QMessageBox.warning(self, "Ошибка", "Не удалось получить ID игрока X")
+                return
+
+            # Находим свободные позиции
+            free_positions = [pos for pos in range(1, self.max_players + 1) if pos not in self.net_positions]
+            for pos in free_positions:
+                self.net_positions[pos] = {
+                    'player_id': x_player_id,
+                    'name': 'X',
+                    'city': '',
+                    'choice_id': None,
+                    'group': ''
+                }
+            self.update_net_display()
+
+    # ----------------------------------------------
+    # Цвета четвертей у сетки
+    # ----------------------------------------------
+class QuarterLineDelegate(QStyledItemDelegate):
+    def __init__(self, parent=None, quarter_size=0, max_players=0):
+        super().__init__(parent)
+        self.quarter_size = quarter_size
+        self.max_players = max_players
+
+    def paint(self, painter, option, index):
+        super().paint(painter, option, index)
+
+        if self.quarter_size == 0 or self.max_players == 0:
             return
-        pos = row + 1
-        if pos < 1 or pos > self.max_players:
-            return
-        self.place_current_player(pos)
 
-    def set_current_player(self, index):
-        """Устанавливает текущего игрока по индексу в общем списке"""
-        if index < 0 or index >= len(self.players):
-            self.current_player_index = -1
-            self.update_player_info(None)
-            self.highlight_possible_positions(None)
-            return
-        self.current_player_index = index
-        player_data = self.players[index]
-        self.update_player_info(player_data)
-        # Подсвечиваем возможные позиции для этого игрока
-        self.highlight_possible_positions(player_data)
-
+        row = index.row()
+        # Проверяем, является ли строка последней в четверти
+        # и не последняя ли это четверть в таблице
+        if (row + 1) % self.quarter_size == 0 and row + 1 < self.max_players:
+            painter.save()
+            pen = QPen(QColor(210, 180, 140), 2, Qt.SolidLine)
+            painter.setPen(pen)
+            painter.drawLine(option.rect.left(), option.rect.bottom(),
+                             option.rect.right(), option.rect.bottom())
+            painter.restore()

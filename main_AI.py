@@ -23346,7 +23346,7 @@ class MainWindow(QMainWindow):
         if "полуфинал" in source_stage.lower():
             players_by_group, actual_exit_count = self.get_players_for_final(source_stage, exit_count)
         else:
-            players_by_group = self.get_players_from_qualification_for_final(exit_count)
+            players_by_group = self.get_players_from_qualification_for_final(stage, exit_count)
         
         if not players_by_group:
             QMessageBox.warning(self, "Ошибка", f"Нет игроков для финала {stage_name}")
@@ -23402,7 +23402,7 @@ class MainWindow(QMainWindow):
 
                 for pl in group_players:
                     player = pl['name']
-        # 5. Заполняем Game_list и Choice
+                # 5. Заполняем Game_list и Choice
                     choice_id = pl['choice_id']
 
                     # Обновляем Choice
@@ -23507,7 +23507,7 @@ class MainWindow(QMainWindow):
         if "полуфинал" in source_stage.lower():
             players_by_group, actual_exit_count = self.get_players_for_final(stage_name, exit_count=None)
         else:
-            players_by_group = self.get_players_from_qualification_for_final(exit_count)
+            players_by_group = self.get_players_from_qualification_for_final(stage, exit_count)
         
         if not players_by_group:
             QMessageBox.warning(self, "Ошибка", f"Нет игроков для финала {stage_name}")
@@ -23616,7 +23616,8 @@ class MainWindow(QMainWindow):
                     )
         
         # 9. Перенос результатов из предыдущих этапов (если игроки встречались ранее)
-        self.transfer_results_to_final(stage_name, source_stage, assigned_players)
+        if exit_count > 1:
+            self.transfer_results_to_final(stage_name, source_stage, assigned_players)
         
         # 10. Устанавливаем флаг choice_flag для записей Choice, участвующих в финале
         self.set_choice_flag_for_stage(stage_name, flag=1)
@@ -24057,7 +24058,7 @@ class MainWindow(QMainWindow):
             
         else:
             # Из квалификации
-            players = self.get_players_from_qualification_for_final(exit_count)
+            players = self.get_players_from_qualification_for_final(source_stage, exit_count)
         
         if not players:
             QMessageBox.warning(self, "Ошибка", "Нет игроков для формирования финала")
@@ -24162,7 +24163,7 @@ class MainWindow(QMainWindow):
         if not qualification:
             return players
         
-        result = self.real_place_for_final(stage_name=stage)
+        result = self.real_place_for_final(stage)
         # Получаем результаты мест в группах согласно выходу из групп
         place = result['place_stage']
                        
@@ -24172,6 +24173,7 @@ class MainWindow(QMainWindow):
             choices = Choice.select().where(
                 (Choice.title_id == self.current_title_id) &
                 (Choice.group == group_name) &
+                (Choice.sex == self.current_sex) &
                 (Choice.mesto_group.in_(place))
             ).order_by(Choice.mesto_group) 
 

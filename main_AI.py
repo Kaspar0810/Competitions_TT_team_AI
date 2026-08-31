@@ -15505,12 +15505,12 @@ class MainWindow(QMainWindow):
                     data.append(row_top)
                     data.append(row_bottom)
 
-                # Сохраняем данные группы
-                groups_data[group_num] = {
-                    'data': data,
-                    'players_info': players_info,
-                    'players_count': max_players_in_stage  # всегда max_pl
-                }
+                    # Сохраняем данные группы
+                    groups_data[group_num] = {
+                        'data': data,
+                        'players_info': players_info,
+                        'players_count': max_players_in_stage  # всегда max_pl
+                    }
 # ===============================            
             # ===== ЭТАП 2: ЗАПОЛНЯЕМ РЕЗУЛЬТАТАМИ ИЗ RESULT =====
             if stage in group_list or stage == "Одна таблица":
@@ -23542,78 +23542,78 @@ class MainWindow(QMainWindow):
             sorted_athletes = sorted(all_athletes, 
                                             key=lambda x: (x.get('group'), x.get('place')))
             idx = 0
-            # for group in sorted_groups:
+
             for player in sorted_athletes:
                 assigned_players[idx] = player
                 idx += 1
             
-            k = 0
+        k = 0
 
-            for group in sorted_groups:
-                
-                group_players = players_by_group[group]
-                # вариант мой с турами ===
-                tour = self.tours_list(total_players)
-                tour_first = tour[0][k]
-                positions = tour_first.split('-')
-                posic1 = int(positions[0])  # переводим в индекс массива
-                posic2 = int(positions[1])
-                pos = [posic1, posic2]
-
-                left = 0
-
-                for pl in group_players:
-                    player = pl['name']
-        # 5. Заполняем Game_list и Choice
-                    choice_id = pl['choice_id']
-
-                    # Обновляем Choice
-                    Choice.update(
-                        final=stage_name,
-                        posev_final=pos[left],
-                        mesto_final=0,
-                    ).where(Choice.id == choice_id).execute()
-
-                    # Создаём запись в Game_list
-                    Game_list.create(
-                        number_group=stage_name,
-                        rank_num_player=pos[left],
-                        player_group_id=pl['player_id'],
-                        system_id=system.id,
-                        title_id=self.current_title_id,
-                        sex=self.current_sex if self.current_sex else "man") 
-                    left += 1
-                k += 1
+        for group in sorted_groups:
             
-            # 6. Создаём туры и матчи
-            tours = self.tours_list(total_players)
-            for tour_idx, matches in enumerate(tours, 1):
-                for tour in matches:
+            group_players = players_by_group[group]
+            # вариант мой с турами ===
+            tour = self.tours_list(total_players)
+            tour_first = tour[0][k]
+            positions = tour_first.split('-')
+            posic1 = int(positions[0])  # переводим в индекс массива
+            posic2 = int(positions[1])
+            pos = [posic1, posic2]
 
-                    positions = tour.split('-')
-                    pos1 = int(positions[0])  # переводим в индекс массива
-                    pos2 = int(positions[1])
+            left = 0
 
-                    if pos1 > total_players or pos2 > total_players:
-                        continue
-                    player1 = assigned_players[pos1 - 1]
-                    player2 = assigned_players[pos2 - 1]
-                    if not player1 or not player2:
-                        continue
-                    player1_name = self.get_player_fio_city(player1['player_id'])
-                    player2_name = self.get_player_fio_city(player2['player_id'])
-                    tours_str = f"{pos1}-{pos2}"
-                    Result.create(
-                        number_group=stage_name,
-                        system_stage="финальный",
-                        player1=player1_name,
-                        player2=player2_name,
-                        tours=tours_str,
-                        round=str(tour_idx),
-                        title_id=self.current_title_id,
-                        system_id=system.id,
-                        sex=self.current_sex if self.current_sex else "man"
-                    )
+            for pl in group_players:
+                player = pl['name']
+                # 5. Заполняем Game_list и Choice
+                choice_id = pl['choice_id']
+
+                # Обновляем Choice
+                Choice.update(
+                    final=stage_name,
+                    posev_final=pos[left],
+                    mesto_final=0,
+                ).where(Choice.id == choice_id).execute()
+
+                # Создаём запись в Game_list
+                Game_list.create(
+                    number_group=stage_name,
+                    rank_num_player=pos[left],
+                    player_group_id=pl['player_id'],
+                    system_id=system.id,
+                    title_id=self.current_title_id,
+                    sex=self.current_sex if self.current_sex else "man") 
+            left += 1
+        k += 1
+            
+        # 6. Создаём туры и матчи
+        tours = self.tours_list(total_players)
+        for tour_idx, matches in enumerate(tours, 1):
+            for tour in matches:
+
+                positions = tour.split('-')
+                pos1 = int(positions[0])  # переводим в индекс массива
+                pos2 = int(positions[1])
+
+                if pos1 > total_players or pos2 > total_players:
+                    continue
+                player1 = assigned_players[pos1 - 1]
+                player2 = assigned_players[pos2 - 1]
+                if not player1 or not player2:
+                    continue
+                player1_name = self.get_player_fio_city(player1['player_id'])
+                player2_name = self.get_player_fio_city(player2['player_id'])
+                tours_str = f"{pos1}-{pos2}"
+                Result.create(
+                    number_group=stage_name,
+                    system_stage="финальный",
+                    player1=player1_name,
+                    player2=player2_name,
+                    tours=tours_str,
+                    round=str(tour_idx),
+                    title_id=self.current_title_id,
+                    system_id=system.id,
+                    sex=self.current_sex if self.current_sex else "man"
+                )
         
         # 9. Перенос результатов из предыдущих этапов (если игроки встречались ранее)
         if exit_count > 1:

@@ -23528,6 +23528,30 @@ class MainWindow(QMainWindow):
                 for player in players_by_group[group]:
                     assigned_players[idx] = player
                     idx += 1
+            #====== вариант мой =====
+            num_posev = 1
+            for pl in assigned_players:
+                player = pl['name']
+                # Заполняем Game_list и Choice
+                choice_id = pl['choice_id']
+
+                # Обновляем Choice
+                Choice.update(
+                    final=stage_name,
+                    posev_final=num_posev,
+                    mesto_final=0,
+                ).where(Choice.id == choice_id).execute()
+
+                # Создаём запись в Game_list
+                Game_list.create(
+                    number_group=stage_name,
+                    rank_num_player=num_posev,
+                    player_group_id=pl['player_id'],
+                    system_id=system.id,
+                    title_id=self.current_title_id,
+                    sex=self.current_sex if self.current_sex else "man")
+                 
+                num_posev += 1        
         else:  # exit_count = 2 и более
             # Сначала по месту затем по группе
             all_athletes = []
@@ -23547,43 +23571,44 @@ class MainWindow(QMainWindow):
                 assigned_players[idx] = player
                 idx += 1
             
-        k = 0
-
-        for group in sorted_groups:
-            
-            group_players = players_by_group[group]
-            # вариант мой с турами ===
-            tour = self.tours_list(total_players)
-            tour_first = tour[0][k]
-            positions = tour_first.split('-')
-            posic1 = int(positions[0])  # переводим в индекс массива
-            posic2 = int(positions[1])
-            pos = [posic1, posic2]
-
+            k = 0
             left = 0
 
-            for pl in group_players:
-                player = pl['name']
-                # 5. Заполняем Game_list и Choice
-                choice_id = pl['choice_id']
+            for group in sorted_groups:
+                
+                group_players = players_by_group[group]
+                # вариант мой с турами ===
+                tour = self.tours_list(total_players)
+                tour_first = tour[0][k]
+                positions = tour_first.split('-')
+                posic1 = int(positions[0])  # переводим в индекс массива
+                posic2 = int(positions[1])
+                pos = [posic1, posic2]
 
-                # Обновляем Choice
-                Choice.update(
-                    final=stage_name,
-                    posev_final=pos[left],
-                    mesto_final=0,
-                ).where(Choice.id == choice_id).execute()
+                # left = 0
 
-                # Создаём запись в Game_list
-                Game_list.create(
-                    number_group=stage_name,
-                    rank_num_player=pos[left],
-                    player_group_id=pl['player_id'],
-                    system_id=system.id,
-                    title_id=self.current_title_id,
-                    sex=self.current_sex if self.current_sex else "man") 
-            left += 1
-        k += 1
+                for pl in group_players:
+                    player = pl['name']
+                    # 5. Заполняем Game_list и Choice
+                    choice_id = pl['choice_id']
+
+                    # Обновляем Choice
+                    Choice.update(
+                        final=stage_name,
+                        posev_final=pos[left],
+                        mesto_final=0,
+                    ).where(Choice.id == choice_id).execute()
+
+                    # Создаём запись в Game_list
+                    Game_list.create(
+                        number_group=stage_name,
+                        rank_num_player=pos[left],
+                        player_group_id=pl['player_id'],
+                        system_id=system.id,
+                        title_id=self.current_title_id,
+                        sex=self.current_sex if self.current_sex else "man") 
+                    left += 1
+            k += 1
             
         # 6. Создаём туры и матчи
         tours = self.tours_list(total_players)

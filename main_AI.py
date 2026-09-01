@@ -7166,7 +7166,12 @@ class MainWindow(QMainWindow):
         # Просмотр
         view_menu = menubar.addMenu("Просмотр")
 
-        
+        # ---- ПОЛНЫЕ СОРЕВНОВАНИЯ ----
+        full_competition_action = QAction("📄 Полные соревнования", self)
+        full_competition_action.triggered.connect(self.assemble_full_competition_pdf)
+        view_menu.addAction(full_competition_action)
+
+        view_menu.addSeparator()  # разделитель
 
         # Титульный лист
         title_page_action = QAction("📄 Титульный лист", self)
@@ -25844,7 +25849,7 @@ class MainWindow(QMainWindow):
 
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось открыть титульный лист: {str(e)}")
-
+# ГСК
     def view_gsk_list(self):
         """Просмотр списка ГСК (генерирует PDF)"""
         if not self.current_title_id:
@@ -25962,7 +25967,152 @@ class MainWindow(QMainWindow):
             os.startfile(filename)
         else:
             os.system(f'open "{filename}"')
+# Полные соревнования
+    def assemble_full_competition_pdf(self):
+        """Сборка полного PDF-файла соревнования из существующих PDF-файлов (для обоих полов)"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
 
+        try:
+            from PyPDF2 import PdfMerger
+            import os
+            import re
+            import glob
+
+            title = Title.get_by_id(self.current_title_id)
+            short_name = title.short_name_comp if title.short_name_comp else title.name
+            clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
+            clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
+
+            table_pdf_dir = "table_pdf"
+            competition_pdf_dir = "competition_pdf"
+            if not os.path.exists(competition_pdf_dir):
+                os.makedirs(competition_pdf_dir)
+
+            # Список недостающих файлов
+            missing_files = []
+
+            # --- ОБЩИЕ ФАЙЛЫ (для обоих полов) ---
+            common_files = [
+                (f"{clean_name}_title_page", "Титульный лист"),
+                (f"{clean_name}_GSK_list", "Список ГСК"),
+                (f"{clean_name}_regions", "Список регионов"),
+            ]
+
+            found_common = []
+            for pattern, desc in common_files:
+                file_path = os.path.join(table_pdf_dir, pattern + ".pdf")
+                if os.path.exists(file_path):
+                    found_common.append((file_path, desc))
+                else:
+                    missing_files.append(f"Общий: {desc}")
+
+            # --- ФАЙЛЫ ДЛЯ ДЕВУШЕК (W) ---
+            girls_files = []
+            for suffix in ["_W_*_one_table", "_W_*_table_group", "_W_*_semifinal", "_W_*_final"]:
+                pattern = os.path.join(table_pdf_dir, f"{clean_name}{suffix}.pdf")
+                matches = glob.glob(pattern)
+                if matches:
+                    girls_files.extend([(m, "Таблица (девушки)") for m in matches])
+                else:
+                    missing_files.append("Таблицы девушек")
+
+            # Списки девушек
+            for pattern, desc in [
+                (f"{clean_name}_W_players_alf", "Список участников (девушки)"),
+                (f"{clean_name}_W_players_rating", "Список участников (девушки)"),
+                (f"{clean_name}_W_winners", "Список призёров (девушки)"),
+                (f"{clean_name}_W_final_protocol", "Итоговый протокол (девушки)")
+            ]:
+                file_path = os.path.join(table_pdf_dir, pattern + ".pdf")
+                if os.path.exists(file_path):
+                    girls_files.append((file_path, desc))
+                else:
+                    # Не считаем критическими, если нет
+                    pass
+
+            # --- ФАЙЛЫ ДЛЯ ЮНОШЕЙ (M) ---
+            boys_files = []
+            for suffix in ["_M_*_one_table", "_M_*_table_group", "_M_*_semifinal", "_M_*_final"]:
+                pattern = os.path.join(table_pdf_dir, f"{clean_name}{suffix}.pdf")
+                matches = glob.glob(pattern)
+                if matches:
+                    boys_files.extend([(m, "Таблица (юноши)") for m in matches])
+                else:
+                    missing_files.append("Таблицы юношей")
+
+            for pattern, desc in [
+                (f"{clean_name}_M_players_alf", "Список участников (юноши)"),
+                (f"{clean_name}_M_players_rating", "Список участников (юноши)"),
+                (f"{clean_name}_M_winners", "Список призёров (юноши)"),
+                (f"{clean_name}_M_final_protocol", "Итоговый протокол (юноши)")
+            ]:
+                file_path = os.path.join(table_pdf_dir, pattern + ".pdf")
+                if os.path.exists(file_path):
+                    boys_files.append((file_path, desc))
+                else:
+                    pass
+
+            if missing_files:
+                QMessageBox.warning(
+                    self,
+                    "Отсутствуют файлы",
+                    f"Для сборки полного соревнования не хватает следующих файлов:\n\n" +
+                    "\n".join(f"• {desc}" for desc in missing_files[:10]) +
+                    (f"\n... и ещё {len(missing_files) - 10}" if len(missing_files) > 10 else "") +
+                    "\n\nСоздайте недостающие файлы через соответствующие пункты меню."
+                )
+                return
+
+            # Собираем все файлы в нужном порядке
+            all_files = []
+
+            # 1. Общие файлы
+            all_files.extend(found_common)
+
+            # 2. Девушки
+            all_files.extend(girls_files)
+
+            # 3. Юноши
+            all_files.extend(boys_files)
+
+            if not all_files:
+                QMessageBox.warning(self, "Ошибка", "Не найдено ни одного PDF-файла для сборки")
+                return
+
+            # Объединяем
+            merger = PdfMerger()
+            for file_path, desc in all_files:
+                try:
+                    merger.append(file_path)
+                    print(f"Добавлен файл: {os.path.basename(file_path)} ({desc})")
+                except Exception as e:
+                    print(f"Ошибка добавления файла {file_path}: {e}")
+                    continue
+
+            output_file = os.path.join(competition_pdf_dir, f"{clean_name}_full_competition.pdf")
+            merger.write(output_file)
+            merger.close()
+
+            QMessageBox.information(self, "Успех", f"Полный файл соревнования сохранён:\n{output_file}")
+
+            reply = QMessageBox.question(self, "Открыть файл",
+                                        "Открыть созданный PDF файл?",
+                                        QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                if sys.platform == 'win32':
+                    os.startfile(output_file)
+                else:
+                    os.system(f'open "{output_file}"')
+
+        except ImportError:
+            QMessageBox.critical(self, "Ошибка", "Не установлен модуль PyPDF2. Установите его: pip install PyPDF2")
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "Ошибка", f"Не удалось собрать PDF: {str(e)}")
+#============
 from models import Referee, GskMember, Title
 
 class GskManagementDialog(QDialog):
@@ -26193,8 +26343,6 @@ class GskManagementDialog(QDialog):
 
         QMessageBox.information(self, "Успех", "Состав ГСК сохранён")
         self.accept()
-
-
 # =================================
 class RatingLoaderThread(QThread):
     progress = pyqtSignal(int)

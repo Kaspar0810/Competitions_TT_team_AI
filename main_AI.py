@@ -23061,6 +23061,8 @@ class MainWindow(QMainWindow):
 
     def begunki_made(self, stage, subgroup, runner_type):
         """создание бегунков для выбранного этапа"""
+        from reportlab.platypus import Table
+
         if not self.current_title_id:
             QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
             return None
@@ -23281,6 +23283,51 @@ class MainWindow(QMainWindow):
             traceback.print_exc()
             QMessageBox.critical(self, "Ошибка", f"Не удалось создать бегунки: {str(e)}")
 
+    def _parse_player_for_runner_full(self, player_full):
+            """
+            Парсинг строки игрока для бегунка
+            Формат: "Фамилия Имя Отчество/Город"
+            Возвращает словарь с именем, рангом и городом
+            """
+            result = {'name': "X", 'rank': "", 'city': ""}
+            
+            if not player_full:
+                return result
+            
+            # Разделяем ФИО и город
+            znak = player_full.find('/')
+            if znak == -1:
+                fio_part = player_full
+                city = ""
+            else:
+                fio_part = player_full[:znak]
+                city = player_full[znak + 1:]
+            
+            # Разделяем ФИО на части
+            fio_parts = fio_part.split()
+            if len(fio_parts) >= 2:
+                # Фамилия и инициалы
+                surname = fio_parts[0]
+                formatted_name = f"{surname}\n{fio_parts[1]} {fio_parts[2]}" if fio_parts[2] else f"{surname}\n{fio_parts[1]}"
+            else:
+                formatted_name = fio_part
+            
+            # Получаем рейтинг игрока
+            try:
+                player = Player.get_or_none(Player.fio_city == player_full)
+                if not player:
+                    # Пробуем найти по ФИО
+                    player = Player.get_or_none(Player.fio == fio_part)
+                if player:
+                    result['rank'] = str(player.rank) if player.rank else ""
+            except:
+                result['rank'] = ""
+            
+            result['name'] = formatted_name
+            result['city'] = city
+            
+            return result
+
 # ======= полные соревнования
     def export_competition_full_pdf(self):
         """Экспорт полного файла соревнования в PDF (сохраняется в competition_pdf)"""
@@ -23312,164 +23359,164 @@ class MainWindow(QMainWindow):
         match = re.search(r'\d+', group_name)
         return int(match.group()) if match else 0
 # ============ оригинал ===================    
-    def _create_round_robin_final_automatically(self, stage, source_stage, exit_count):
-        """
-        Автоматическая жеребьевка финала по круговой системе.
-        final_number: номер финала (1, 2, ...)
-        source_stage: откуда брать игроков (если None – определяется автоматически)
-        exit_count: сколько игроков выходит из каждой группы (1 или 2)
-        """
-        stage_name = stage.stage
-        system = System.get_or_none(
-            (System.title_id == self.current_title_id) &
-            (System.sex == self.current_sex) &
-            (System.stage == stage_name))
+    # def _create_round_robin_final_automatically(self, stage, source_stage, exit_count):
+    #     """
+    #     Автоматическая жеребьевка финала по круговой системе.
+    #     final_number: номер финала (1, 2, ...)
+    #     source_stage: откуда брать игроков (если None – определяется автоматически)
+    #     exit_count: сколько игроков выходит из каждой группы (1 или 2)
+    #     """
+    #     stage_name = stage.stage
+    #     system = System.get_or_none(
+    #         (System.title_id == self.current_title_id) &
+    #         (System.sex == self.current_sex) &
+    #         (System.stage == stage_name))
 
-        # 1. Определяем источник игроков
-        if source_stage is None:
-            if stage_name == "1-й финал":
-                # Сначала проверяем наличие 1-го полуфинала
-                semifinal1 = System.get_or_none(
-                    (System.title_id == self.current_title_id) &
-                    (System.stage == "Квалификация. 1-й полуфинал")
-                )
-                if semifinal1:
-                    source_stage = "Квалификация. 1-й полуфинал"
-                else:
-                    source_stage = "Квалификация"
-            else:
-                semifinal2 = System.get_or_none(
-                    (System.title_id == self.current_title_id) &
-                    (System.stage == "Квалификация. 2-й полуфинал")
-                )
-                if semifinal2:
-                    source_stage = "Квалификация. 2-й полуфинал"
-                else:
-                    source_stage = "Квалификация"
+    #     # 1. Определяем источник игроков
+    #     if source_stage is None:
+    #         if stage_name == "1-й финал":
+    #             # Сначала проверяем наличие 1-го полуфинала
+    #             semifinal1 = System.get_or_none(
+    #                 (System.title_id == self.current_title_id) &
+    #                 (System.stage == "Квалификация. 1-й полуфинал")
+    #             )
+    #             if semifinal1:
+    #                 source_stage = "Квалификация. 1-й полуфинал"
+    #             else:
+    #                 source_stage = "Квалификация"
+    #         else:
+    #             semifinal2 = System.get_or_none(
+    #                 (System.title_id == self.current_title_id) &
+    #                 (System.stage == "Квалификация. 2-й полуфинал")
+    #             )
+    #             if semifinal2:
+    #                 source_stage = "Квалификация. 2-й полуфинал"
+    #             else:
+    #                 source_stage = "Квалификация"
         
-        # 2. Получаем игроков из источника
-        if "полуфинал" in source_stage.lower():
-            players_by_group, actual_exit_count = self.get_players_for_final(source_stage, exit_count)
-        else:
-            players_by_group = self.get_players_from_qualification_for_final(stage, exit_count)
+    #     # 2. Получаем игроков из источника
+    #     if "полуфинал" in source_stage.lower():
+    #         players_by_group, actual_exit_count = self.get_players_for_final(source_stage, exit_count)
+    #     else:
+    #         players_by_group = self.get_players_from_qualification_for_final(stage, exit_count)
         
-        if not players_by_group:
-            QMessageBox.warning(self, "Ошибка", f"Нет игроков для финала {stage_name}")
-            return None
+    #     if not players_by_group:
+    #         QMessageBox.warning(self, "Ошибка", f"Нет игроков для финала {stage_name}")
+    #         return None
         
-        # 3. Сортируем группы по номеру
-        sorted_groups = sorted(players_by_group.keys(), key=self._extract_number_from_group)
+    #     # 3. Сортируем группы по номеру
+    #     sorted_groups = sorted(players_by_group.keys(), key=self._extract_number_from_group)
         
-        # 4. Распределение игроков по позициям в круговой таблице
-        total_players = sum(len(players_by_group[g]) for g in sorted_groups)
-        assigned_players = [None] * total_players
+    #     # 4. Распределение игроков по позициям в круговой таблице
+    #     total_players = sum(len(players_by_group[g]) for g in sorted_groups)
+    #     assigned_players = [None] * total_players
         
-        if exit_count == 1:
-            # Просто по порядку групп
-            idx = 0
-            for group in sorted_groups:
-                for player in players_by_group[group]:
-                    assigned_players[idx] = player
-                    idx += 1
-        else:  # exit_count = 2 и более
-            # Сначала по месту затем по группе
-            all_athletes = []
-            for group_id, athletes in players_by_group.items():
-                for athlete in athletes:
-                    # Добавляем информацию о группе (опционально)
-                    athlete_with_group = athlete.copy()
-                    athlete_with_group["group"] = group_id
-                    all_athletes.append(athlete_with_group)
+    #     if exit_count == 1:
+    #         # Просто по порядку групп
+    #         idx = 0
+    #         for group in sorted_groups:
+    #             for player in players_by_group[group]:
+    #                 assigned_players[idx] = player
+    #                 idx += 1
+    #     else:  # exit_count = 2 и более
+    #         # Сначала по месту затем по группе
+    #         all_athletes = []
+    #         for group_id, athletes in players_by_group.items():
+    #             for athlete in athletes:
+    #                 # Добавляем информацию о группе (опционально)
+    #                 athlete_with_group = athlete.copy()
+    #                 athlete_with_group["group"] = group_id
+    #                 all_athletes.append(athlete_with_group)
 
-            # Сортируем: сначала по месту, затем (опционально) по имени
-            sorted_athletes = sorted(all_athletes, key=lambda x: (x["place"]))
+    #         # Сортируем: сначала по месту, затем (опционально) по имени
+    #         sorted_athletes = sorted(all_athletes, key=lambda x: (x["place"]))
 
-            idx = 0
-            # for group in sorted_groups:
-            for player in sorted_athletes:
-                assigned_players[idx] = player
-                idx += 1
+    #         idx = 0
+    #         # for group in sorted_groups:
+    #         for player in sorted_athletes:
+    #             assigned_players[idx] = player
+    #             idx += 1
             
-            k = 0
+    #         k = 0
 
-            for group in sorted_groups:
+    #         for group in sorted_groups:
                 
-                group_players = players_by_group[group]
-                # вариант мой с турами ===
-                tour = self.tours_list(total_players)
-                tour_first = tour[0][k]
-                positions = tour_first.split('-')
-                posic1 = int(positions[0])  # переводим в индекс массива
-                posic2 = int(positions[1])
-                pos = [posic1, posic2]
+    #             group_players = players_by_group[group]
+    #             # вариант мой с турами ===
+    #             tour = self.tours_list(total_players)
+    #             tour_first = tour[0][k]
+    #             positions = tour_first.split('-')
+    #             posic1 = int(positions[0])  # переводим в индекс массива
+    #             posic2 = int(positions[1])
+    #             pos = [posic1, posic2]
 
-                left = 0
+    #             left = 0
 
-                for pl in group_players:
-                    player = pl['name']
-                # 5. Заполняем Game_list и Choice
-                    choice_id = pl['choice_id']
+    #             for pl in group_players:
+    #                 player = pl['name']
+    #             # 5. Заполняем Game_list и Choice
+    #                 choice_id = pl['choice_id']
 
-                    # Обновляем Choice
-                    Choice.update(
-                        final=stage_name,
-                        posev_final=pos[left],
-                        mesto_final=0,
-                    ).where(Choice.id == choice_id).execute()
+    #                 # Обновляем Choice
+    #                 Choice.update(
+    #                     final=stage_name,
+    #                     posev_final=pos[left],
+    #                     mesto_final=0,
+    #                 ).where(Choice.id == choice_id).execute()
 
-                    # Создаём запись в Game_list
-                    Game_list.create(
-                        number_group=stage_name,
-                        rank_num_player=pos[left],
-                        player_group_id=pl['player_id'],
-                        system_id=system.id,
-                        title_id=self.current_title_id,
-                        sex=self.current_sex if self.current_sex else "man") 
-                    left += 1
-                k += 1
+    #                 # Создаём запись в Game_list
+    #                 Game_list.create(
+    #                     number_group=stage_name,
+    #                     rank_num_player=pos[left],
+    #                     player_group_id=pl['player_id'],
+    #                     system_id=system.id,
+    #                     title_id=self.current_title_id,
+    #                     sex=self.current_sex if self.current_sex else "man") 
+    #                 left += 1
+    #             k += 1
             
-            # 6. Создаём туры и матчи
-            tours = self.tours_list(total_players)
-            for tour_idx, matches in enumerate(tours, 1):
-                for tour in matches:
+    #         # 6. Создаём туры и матчи
+    #         tours = self.tours_list(total_players)
+    #         for tour_idx, matches in enumerate(tours, 1):
+    #             for tour in matches:
 
-                    positions = tour.split('-')
-                    pos1 = int(positions[0])  # переводим в индекс массива
-                    pos2 = int(positions[1])
+    #                 positions = tour.split('-')
+    #                 pos1 = int(positions[0])  # переводим в индекс массива
+    #                 pos2 = int(positions[1])
 
-                    if pos1 > total_players or pos2 > total_players:
-                        continue
-                    player1 = assigned_players[pos1 - 1]
-                    player2 = assigned_players[pos2 - 1]
-                    if not player1 or not player2:
-                        continue
-                    player1_name = self.get_player_fio_city(player1['player_id'])
-                    player2_name = self.get_player_fio_city(player2['player_id'])
-                    tours_str = f"{pos1}-{pos2}"
-                    Result.create(
-                        number_group=stage_name,
-                        system_stage="финальный",
-                        player1=player1_name,
-                        player2=player2_name,
-                        tours=tours_str,
-                        round=str(tour_idx),
-                        title_id=self.current_title_id,
-                        system_id=system.id,
-                        sex=self.current_sex if self.current_sex else "man"
-                    )
+    #                 if pos1 > total_players or pos2 > total_players:
+    #                     continue
+    #                 player1 = assigned_players[pos1 - 1]
+    #                 player2 = assigned_players[pos2 - 1]
+    #                 if not player1 or not player2:
+    #                     continue
+    #                 player1_name = self.get_player_fio_city(player1['player_id'])
+    #                 player2_name = self.get_player_fio_city(player2['player_id'])
+    #                 tours_str = f"{pos1}-{pos2}"
+    #                 Result.create(
+    #                     number_group=stage_name,
+    #                     system_stage="финальный",
+    #                     player1=player1_name,
+    #                     player2=player2_name,
+    #                     tours=tours_str,
+    #                     round=str(tour_idx),
+    #                     title_id=self.current_title_id,
+    #                     system_id=system.id,
+    #                     sex=self.current_sex if self.current_sex else "man"
+    #                 )
         
-        # 9. Перенос результатов из предыдущих этапов (если игроки встречались ранее)
-        self.transfer_results_to_final(stage_name, source_stage, assigned_players)
+    #     # 9. Перенос результатов из предыдущих этапов (если игроки встречались ранее)
+    #     self.transfer_results_to_final(stage_name, source_stage, assigned_players)
         
-        # 10. Устанавливаем флаг choice_flag для записей Choice, участвующих в финале
-        self.set_choice_flag_for_stage(stage_name, flag=1)
+    #     # 10. Устанавливаем флаг choice_flag для записей Choice, участвующих в финале
+    #     self.set_choice_flag_for_stage(stage_name, flag=1)
         
-        QMessageBox.information(self, "Успех",
-            f"Автоматическая жеребьёвка {stage_name} завершена.\n"
-            f"Участников: {total_players}\n"
-            f"Создано встреч: {len(tours) * (total_players // 2)}")
+    #     QMessageBox.information(self, "Успех",
+    #         f"Автоматическая жеребьёвка {stage_name} завершена.\n"
+    #         f"Участников: {total_players}\n"
+    #         f"Создано встреч: {len(tours) * (total_players // 2)}")
         
-        return assigned_players
+    #     return assigned_players
 # =========== мой вариант ============================
     def create_round_robin_final_automatically(self, stage, source_stage, exit_count):
         """

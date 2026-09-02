@@ -22875,38 +22875,6 @@ class MainWindow(QMainWindow):
 
         self.load_schedule_matches(stage_name)
 
-    # def _print_runners(self):
-    #     """Печать бегунков для выбранного этапа"""
-    #     if not self.current_title_id:
-    #         QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
-    #         return
-        
-    #     stage_name = self.stage_for_runner_combo.currentText()
-    #     if stage_name in ["Нет активного соревнования", "Нет добавленных этапов"]:
-    #         QMessageBox.warning(self, "Ошибка", "Нет доступных этапов")
-    #         return
-        
-    #     subgroup = self.subgroup_for_runner_combo.currentText()
-    #     runner_type = self.runner_type_combo.currentText()
-        
-    #     # Создаем PDF с бегунками
-    #     filename = self.begunki_made(stage_name, subgroup, runner_type)
-        
-    #     if filename:
-    #         QMessageBox.information(self, "Успех", f"Бегунки сохранены в файл:\n{filename}")
-            
-    #         # Предлагаем открыть файл
-    #         reply = QMessageBox.question(self, "Открыть файл", 
-    #                                     "Открыть созданный PDF файл?",
-    #                                     QMessageBox.Yes | QMessageBox.No)
-    #         if reply == QMessageBox.Yes:
-    #             if sys.platform == 'win32':
-    #                 os.startfile(filename)
-    #             else:
-    #                 os.system(f'open "{filename}"')
-    #     else:
-    #         QMessageBox.warning(self, "Ошибка", "Не удалось создать бегунки")
-
     def save_notes(self):
         """Сохранение заметок в базу данных"""
         if not self.current_title_id:
@@ -22994,30 +22962,6 @@ class MainWindow(QMainWindow):
             self.stage_for_runner_combo.blockSignals(False) 
 
 # ================= рабочий урезанный бегунок ======
-    # def sync_runner_stage_to_schedule(self, stage_name):
-    #     """Синхронизирует этап из бегунков в расписание"""
-    #     if not stage_name:
-    #         return
-    #     if hasattr(self, 'schedule_stage_combo'):
-    #         self.schedule_stage_combo.blockSignals(True)
-    #         index = self.schedule_stage_combo.findText(stage_name)
-    #         if index >= 0:
-    #             self.schedule_stage_combo.setCurrentIndex(index)
-    #         self.schedule_stage_combo.blockSignals(False)
-
-    # def sync_schedule_stage_to_runner(self, stage_name):
-    #     """Синхронизирует этап из расписания в бегунки"""
-    #     if not stage_name:
-    #         return
-    #     if hasattr(self, 'stage_for_runner_combo'):
-    #         self.stage_for_runner_combo.blockSignals(True)
-    #         index = self.stage_for_runner_combo.findText(stage_name)
-    #         if index >= 0:
-    #             self.stage_for_runner_combo.setCurrentIndex(index)
-    #         self.stage_for_runner_combo.blockSignals(False)
-
-
-#===================
     def tbl_begunki(self, stage, subgroup, runner_type, tours="несыгранные", list_tours=None):
         """
         Создание данных для бегунков
@@ -23293,39 +23237,6 @@ class MainWindow(QMainWindow):
             filename = self.create_full_runners_pdf(stage, subgroup, date=None, time=None)
             return filename
 # ================== полный бегунок ====
-    # def print_runners(self):
-    #     """Печать бегунков для выбранного этапа"""
-    #     if not self.current_title_id:
-    #         QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
-    #         return
-        
-    #     stage_name = self.stage_for_runner_combo.currentText()
-    #     if stage_name in ["Нет активного соревнования", "Нет добавленных этапов"]:
-    #         QMessageBox.warning(self, "Ошибка", "Нет доступных этапов")
-    #         return
-        
-    #     subgroup = self.subgroup_for_runner_combo.currentText()
-    #     runner_type = self.runner_type_combo.currentText()
-
-    #     if runner_type == "Полный":
-    #         # Для полных бегунков используем фильтры расписания
-    #         self.print_full_runners_with_filters(stage_name, subgroup)
-    #     else:
-    #         # Урезанные бегунки (без фильтров)
-    #         filename = self.begunki_made(stage_name, subgroup, runner_type)
-    #         if filename:
-    #             QMessageBox.information(self, "Успех", f"Бегунки сохранены в файл:\n{filename}")
-    #             reply = QMessageBox.question(self, "Открыть файл", 
-    #                                         "Открыть созданный PDF файл?",
-    #                                         QMessageBox.Yes | QMessageBox.No)
-    #             if reply == QMessageBox.Yes:
-    #                 if sys.platform == 'win32':
-    #                     os.startfile(filename)
-    #                 else:
-    #                     os.system(f'open "{filename}"')
-    #         else:
-    #             QMessageBox.warning(self, "Ошибка", "Не удалось создать бегунки")
-
     def print_runners(self):
         """Печать бегунков для выбранного этапа"""
         if not self.current_title_id:
@@ -23411,9 +23322,9 @@ class MainWindow(QMainWindow):
                 player2 = get_item_text(row, 3)
                 date = get_item_text(row, 4)
                 time = get_item_text(row, 5)
-                table = get_item_text(row, 6)
-                match = get_item_text(row, 7)
-                stage = get_item_text(row, 8)
+                table = get_item_text(row, 6)                
+                stage = get_item_text(row, 7)
+                match = get_item_text(row, 8)
 
                 if not player1 and not player2:
                     continue  # пропускаем пустые строки

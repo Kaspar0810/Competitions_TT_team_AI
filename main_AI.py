@@ -2810,30 +2810,51 @@ class MainWindow(QMainWindow):
         return int(match.group()) if match else 0
 
     def update_schedule_stages(self):
-        """Обновление списка этапов для расписания с учётом текущего пола"""
+        """Обновление списка этапов для расписания"""
         self.schedule_stage_combo.blockSignals(True)
         self.schedule_stage_combo.clear()
         
         if not self.current_title_id:
             self.schedule_stage_combo.blockSignals(False)
             return
-
-        # Получаем только те этапы, которые соответствуют текущему полу
-        sex = self.current_sex if self.current_sex else "man"
-        stages = System.select().where(
-            (System.title_id == self.current_title_id) &
-            (System.sex == sex)
-        ).order_by(System.id)
-
+        
+        stages = System.select().where(System.title_id == self.current_title_id).order_by(System.id)
         for stage in stages:
             self.schedule_stage_combo.addItem(stage.stage)
-
+        
         self.schedule_stage_combo.blockSignals(False)
         
-        # Принудительно загружаем первый этап, если есть
         if self.schedule_stage_combo.count() > 0:
             self.schedule_stage_combo.setCurrentIndex(0)
+            # Синхронизируем с бегунками
+            self.sync_schedule_stage_to_runner(self.schedule_stage_combo.currentText())
             self.on_schedule_stage_changed()
+
+    # def update_schedule_stages(self):
+    #     """Обновление списка этапов для расписания с учётом текущего пола"""
+    #     self.schedule_stage_combo.blockSignals(True)
+    #     self.schedule_stage_combo.clear()
+        
+    #     if not self.current_title_id:
+    #         self.schedule_stage_combo.blockSignals(False)
+    #         return
+
+    #     # Получаем только те этапы, которые соответствуют текущему полу
+    #     sex = self.current_sex if self.current_sex else "man"
+    #     stages = System.select().where(
+    #         (System.title_id == self.current_title_id) &
+    #         (System.sex == sex)
+    #     ).order_by(System.id)
+
+    #     for stage in stages:
+    #         self.schedule_stage_combo.addItem(stage.stage)
+
+    #     self.schedule_stage_combo.blockSignals(False)
+        
+    #     # Принудительно загружаем первый этап, если есть
+    #     if self.schedule_stage_combo.count() > 0:
+    #         self.schedule_stage_combo.setCurrentIndex(0)
+    #         self.on_schedule_stage_changed()
 #
     def load_competition_dates(self):
         """Заполняет QComboBox датами в диапазоне соревнования"""
@@ -2908,8 +2929,13 @@ class MainWindow(QMainWindow):
 
     def on_schedule_stage_changed(self):
         stage_name = self.schedule_stage_combo.currentText()
+
         if not stage_name:
             return
+
+        # Синхронизируем с бегунками
+        self.sync_schedule_stage_to_runner(stage_name)
+
         system = System.get_or_none(
             (System.title_id == self.current_title_id) &
             (System.sex == self.current_sex) &
@@ -8863,19 +8889,19 @@ class MainWindow(QMainWindow):
         # Обновляем этапы для бегунков
         self.update_runner_stages()
 
-    def update_schedule_stages_data(self):
-        """Обновление данных этапов для расписания без изменения UI (для фонового обновления)"""
-        if not self.current_title_id:
-            return
+    # def update_schedule_stages_data(self):
+    #     """Обновление данных этапов для расписания без изменения UI (для фонового обновления)"""
+    #     if not self.current_title_id:
+    #         return
         
-        sex = self.current_sex if self.current_sex else "man"
-        stages = System.select().where(
-            (System.title_id == self.current_title_id) &
-            (System.sex == sex)
-        ).order_by(System.id)
+    #     sex = self.current_sex if self.current_sex else "man"
+    #     stages = System.select().where(
+    #         (System.title_id == self.current_title_id) &
+    #         (System.sex == sex)
+    #     ).order_by(System.id)
         
-        # Просто сохраняем список этапов для использования при активации вкладки
-        self._schedule_stages_cache = list(stages)
+    #     # Просто сохраняем список этапов для использования при активации вкладки
+    #     self._schedule_stages_cache = list(stages)
 
 #===============================
     def load_participants_for_title(self):
@@ -22732,21 +22758,71 @@ class MainWindow(QMainWindow):
             print(f"  Группа: {ch.sf_group}, Посев: {ch.posev_sf}, Игрок: {ch.family}")
 # ==== бегунки =================
     def update_runner_stages(self):
-        """Обновление списка этапов для печати бегунков"""
+        """Обновление списка этапов для печати бегунков с учётом пола"""
+        self.stage_for_runner_combo.blockSignals(True)
         self.stage_for_runner_combo.clear()
         
         if not self.current_title_id:
-            self.stage_for_runner_combo.addItem("Нет активного соревнования")
+            self.stage_for_runner_combo.blockSignals(False)
             return
         
-        stages = System.select().where((System.title_id == self.current_title_id) & (System.sex == self.current_sex)).order_by(System.id)
-        
-        if stages.count() == 0:
-            self.stage_for_runner_combo.addItem("Нет добавленных этапов")
-            return
+        sex = self.current_sex if self.current_sex else "man"
+        stages = System.select().where(
+            (System.title_id == self.current_title_id) &
+            (System.sex == sex)
+        ).order_by(System.id)
         
         for stage in stages:
             self.stage_for_runner_combo.addItem(stage.stage, stage.id)
+        
+        self.stage_for_runner_combo.blockSignals(False)
+        
+        if self.stage_for_runner_combo.count() > 0:
+            self.stage_for_runner_combo.setCurrentIndex(0)
+            self.sync_runner_stage_to_schedule(self.stage_for_runner_combo.currentText())
+
+    def update_schedule_stages(self):
+        """Обновление списка этапов для расписания с учётом пола"""
+        self.schedule_stage_combo.blockSignals(True)
+        self.schedule_stage_combo.clear()
+        
+        if not self.current_title_id:
+            self.schedule_stage_combo.blockSignals(False)
+            return
+        
+        sex = self.current_sex if self.current_sex else "man"
+        stages = System.select().where(
+            (System.title_id == self.current_title_id) &
+            (System.sex == sex)
+        ).order_by(System.id)
+        
+        for stage in stages:
+            self.schedule_stage_combo.addItem(stage.stage)
+        
+        self.schedule_stage_combo.blockSignals(False)
+        
+        if self.schedule_stage_combo.count() > 0:
+            self.schedule_stage_combo.setCurrentIndex(0)
+            self.sync_schedule_stage_to_runner(self.schedule_stage_combo.currentText())
+            self.on_schedule_stage_changed()
+
+
+    # def update_runner_stages(self):
+    #     """Обновление списка этапов для печати бегунков"""
+    #     self.stage_for_runner_combo.clear()
+        
+    #     if not self.current_title_id:
+    #         self.stage_for_runner_combo.addItem("Нет активного соревнования")
+    #         return
+        
+    #     stages = System.select().where((System.title_id == self.current_title_id) & (System.sex == self.current_sex)).order_by(System.id)
+        
+    #     if stages.count() == 0:
+    #         self.stage_for_runner_combo.addItem("Нет добавленных этапов")
+    #         return
+        
+    #     for stage in stages:
+    #         self.stage_for_runner_combo.addItem(stage.stage, stage.id)
 
     def on_runner_stage_changed(self, stage_name):
         """Обработчик изменения этапа для бегунков"""
@@ -22755,6 +22831,9 @@ class MainWindow(QMainWindow):
         if not stage_name or stage_name in ["Нет активного соревнования", "Нет добавленных этапов"]:
             return
         
+         # Синхронизируем с расписанием
+        self.sync_runner_stage_to_schedule(stage_name)
+
         # Получаем систему для выбранного этапа
         system = System.get_or_none(
             (System.title_id == self.current_title_id) &
@@ -22793,6 +22872,8 @@ class MainWindow(QMainWindow):
         
         else:
             self.subgroup_for_runner_combo.addItem("Все")
+
+        self.load_schedule_matches(stage_name)
 
     # def _print_runners(self):
     #     """Печать бегунков для выбранного этапа"""
@@ -22864,8 +22945,79 @@ class MainWindow(QMainWindow):
             print(f"Ошибка загрузки заметок: {e}")
             if hasattr(self, 'notes_text'):
                 self.notes_text.clear()
-  
+
+    def sync_runner_stage_to_schedule(self, stage_name):
+        """Синхронизирует этап из бегунков в расписание с учётом пола"""
+        if not stage_name:
+            return
+        if hasattr(self, 'schedule_stage_combo'):
+            # Проверяем, существует ли такой этап для текущего пола
+            sex = self.current_sex if self.current_sex else "man"
+            stage_exists = System.get_or_none(
+                (System.title_id == self.current_title_id) &
+                (System.stage == stage_name) &
+                (System.sex == sex)
+            )
+            if not stage_exists:
+                # Если этап не соответствует полу, не синхронизируем
+                print(f"Этап {stage_name} не найден для пола {sex}")
+                return
+                
+            self.schedule_stage_combo.blockSignals(True)
+            index = self.schedule_stage_combo.findText(stage_name)
+            if index >= 0:
+                self.schedule_stage_combo.setCurrentIndex(index)
+            self.schedule_stage_combo.blockSignals(False)
+
+
+    def sync_schedule_stage_to_runner(self, stage_name):
+        """Синхронизирует этап из расписания в бегунки с учётом пола"""
+        if not stage_name:
+            return
+        if hasattr(self, 'stage_for_runner_combo'):
+            # Проверяем, существует ли такой этап для текущего пола
+            sex = self.current_sex if self.current_sex else "man"
+            stage_exists = System.get_or_none(
+                (System.title_id == self.current_title_id) &
+                (System.stage == stage_name) &
+                (System.sex == sex)
+            )
+            if not stage_exists:
+                # Если этап не соответствует полу, не синхронизируем
+                print(f"Этап {stage_name} не найден для пола {sex}")
+                return
+                
+            self.stage_for_runner_combo.blockSignals(True)
+            index = self.stage_for_runner_combo.findText(stage_name)
+            if index >= 0:
+                self.stage_for_runner_combo.setCurrentIndex(index)
+            self.stage_for_runner_combo.blockSignals(False) 
+
 # ================= рабочий урезанный бегунок ======
+    # def sync_runner_stage_to_schedule(self, stage_name):
+    #     """Синхронизирует этап из бегунков в расписание"""
+    #     if not stage_name:
+    #         return
+    #     if hasattr(self, 'schedule_stage_combo'):
+    #         self.schedule_stage_combo.blockSignals(True)
+    #         index = self.schedule_stage_combo.findText(stage_name)
+    #         if index >= 0:
+    #             self.schedule_stage_combo.setCurrentIndex(index)
+    #         self.schedule_stage_combo.blockSignals(False)
+
+    # def sync_schedule_stage_to_runner(self, stage_name):
+    #     """Синхронизирует этап из расписания в бегунки"""
+    #     if not stage_name:
+    #         return
+    #     if hasattr(self, 'stage_for_runner_combo'):
+    #         self.stage_for_runner_combo.blockSignals(True)
+    #         index = self.stage_for_runner_combo.findText(stage_name)
+    #         if index >= 0:
+    #             self.stage_for_runner_combo.setCurrentIndex(index)
+    #         self.stage_for_runner_combo.blockSignals(False)
+
+
+#===================
     def tbl_begunki(self, stage, subgroup, runner_type, tours="несыгранные", list_tours=None):
         """
         Создание данных для бегунков
@@ -23141,6 +23293,39 @@ class MainWindow(QMainWindow):
             filename = self.create_full_runners_pdf(stage, subgroup, date=None, time=None)
             return filename
 # ================== полный бегунок ====
+    # def print_runners(self):
+    #     """Печать бегунков для выбранного этапа"""
+    #     if not self.current_title_id:
+    #         QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+    #         return
+        
+    #     stage_name = self.stage_for_runner_combo.currentText()
+    #     if stage_name in ["Нет активного соревнования", "Нет добавленных этапов"]:
+    #         QMessageBox.warning(self, "Ошибка", "Нет доступных этапов")
+    #         return
+        
+    #     subgroup = self.subgroup_for_runner_combo.currentText()
+    #     runner_type = self.runner_type_combo.currentText()
+
+    #     if runner_type == "Полный":
+    #         # Для полных бегунков используем фильтры расписания
+    #         self.print_full_runners_with_filters(stage_name, subgroup)
+    #     else:
+    #         # Урезанные бегунки (без фильтров)
+    #         filename = self.begunki_made(stage_name, subgroup, runner_type)
+    #         if filename:
+    #             QMessageBox.information(self, "Успех", f"Бегунки сохранены в файл:\n{filename}")
+    #             reply = QMessageBox.question(self, "Открыть файл", 
+    #                                         "Открыть созданный PDF файл?",
+    #                                         QMessageBox.Yes | QMessageBox.No)
+    #             if reply == QMessageBox.Yes:
+    #                 if sys.platform == 'win32':
+    #                     os.startfile(filename)
+    #                 else:
+    #                     os.system(f'open "{filename}"')
+    #         else:
+    #             QMessageBox.warning(self, "Ошибка", "Не удалось создать бегунки")
+
     def print_runners(self):
         """Печать бегунков для выбранного этапа"""
         if not self.current_title_id:
@@ -23152,11 +23337,37 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Нет доступных этапов")
             return
         
+        # Проверяем, что этап соответствует текущему полу
+        sex = self.current_sex if self.current_sex else "man"
+        stage_exists = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.stage == stage_name) &
+            (System.sex == sex)
+        )
+        if not stage_exists:
+            QMessageBox.warning(
+                self,
+                "Ошибка",
+                f"Этап '{stage_name}' не найден для текущего пола."
+            )
+            return
+        
         subgroup = self.subgroup_for_runner_combo.currentText()
         runner_type = self.runner_type_combo.currentText()
 
         if runner_type == "Полный":
-            # Для полных бегунков используем фильтры расписания
+            # Предупреждение о фильтрах
+            reply = QMessageBox.question(
+                self,
+                "Печать полных бегунков",
+                "Полные бегунки будут напечатаны с учётом текущих фильтров расписания "
+                "(дата, время, стадия).\n\n"
+                "Если фильтры применены, будут напечатаны только видимые матчи.\n\n"
+                "Продолжить?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if reply != QMessageBox.Yes:
+                return
             self.print_full_runners_with_filters(stage_name, subgroup)
         else:
             # Урезанные бегунки (без фильтров)

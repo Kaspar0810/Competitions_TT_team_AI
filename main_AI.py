@@ -14495,7 +14495,7 @@ class MainWindow(QMainWindow):
             
             # Создаем PDF документ
             doc = SimpleDocTemplate(filename, pagesize=A4,
-                                    topMargin=30*mm, bottomMargin=10*mm,
+                                    topMargin=20*mm, bottomMargin=30*mm,
                                     leftMargin=5*mm, rightMargin=5*mm)
             
             # Стиль заголовка

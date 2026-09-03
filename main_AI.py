@@ -14572,6 +14572,8 @@ class MainWindow(QMainWindow):
             clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
             clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
             
+            sex = 'M' if self.current_sex == 'man' else 'W'
+
             # Сортируем список участников в зависимости от выбора
             if sorting_type == "alpha":
                 player_list = Player.select().where(
@@ -14589,7 +14591,7 @@ class MainWindow(QMainWindow):
                 file_suffix = "rating"
             
             # Путь к файлу (в папке table_pdf)
-            file_path = os.path.join(pdf_dir, f"{clean_name}_player_list_{file_suffix}.pdf")
+            file_path = os.path.join(pdf_dir, f"{clean_name}_{sex}_player_list_{file_suffix}.pdf")
             
             if player_list.count() == 0:
                 QMessageBox.warning(self, "Ошибка", "Нет участников для экспорта")
@@ -14723,7 +14725,7 @@ class MainWindow(QMainWindow):
 
         try:
             # Получаем всех участников текущего соревнования
-            players = Player.select().where(Player.title_id == self.current_title_id)
+            players = Player.select().where((Player.title_id == self.current_title_id) & (Player.sex == self.current_sex))
 
             if players.count() == 0:
                 QMessageBox.warning(self, "Ошибка", "Нет участников в соревновании")
@@ -26197,9 +26199,9 @@ class MainWindow(QMainWindow):
 
             # Списки девушек
             for pattern, desc in [
-                (f"{clean_name}_W_players_alf", "Список участников (девушки)"),
+                (f"{clean_name}_W_players_list_alf", "Список участников (девушки)"),
                 (f"{clean_name}_W_players_rating", "Список участников (девушки)"),
-                (f"{clean_name}_W_winners", "Список призёров (девушки)"),
+                # (f"{clean_name}_W_podim_list", "Список призёров (девушки)"),
                 (f"{clean_name}_W_final_protocol", "Итоговый протокол (девушки)")
             ]:
                 file_path = os.path.join(table_pdf_dir, pattern + ".pdf")
@@ -26220,9 +26222,9 @@ class MainWindow(QMainWindow):
                     missing_files.append("Таблицы юношей")
 
             for pattern, desc in [
-                (f"{clean_name}_M_players_alf", "Список участников (юноши)"),
-                (f"{clean_name}_M_players_rating", "Список участников (юноши)"),
-                (f"{clean_name}_M_winners", "Список призёров (юноши)"),
+                (f"{clean_name}_M_players_list_alf", "Список участников (юноши)"),
+                # (f"{clean_name}_M_players_rating", "Список участников (юноши)"),
+                (f"{clean_name}_M_podium_list", "Список призёров (юноши)"),
                 (f"{clean_name}_M_final_protocol", "Итоговый протокол (юноши)")
             ]:
                 file_path = os.path.join(table_pdf_dir, pattern + ".pdf")

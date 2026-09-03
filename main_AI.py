@@ -19825,169 +19825,170 @@ class MainWindow(QMainWindow):
         
         dialog.exec_()
 #==============
-    def show_choice_statistics(self):
-        """Показать статистику по таблице Choice (разряды игроков)"""
-        if not self.current_title_id:
-            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
-            return
-
-        # Получаем всех игроков текущего соревнования и пола
-        players = Player.select().where(
-            (Player.title_id == self.current_title_id) &
-            (Player.sex == self.current_sex)
-        )
-
-        if players.count() == 0:
-            QMessageBox.information(self, "Информация", "Нет участников для отображения статистики")
-            return
-
-        # Собираем статистику по разрядам
-        razryad_stats = {}
-        for player in players:
-            razryad = player.razryad or "Не указан"
-            razryad_stats[razryad] = razryad_stats.get(razryad, 0) + 1
-
-        # Сортируем разряды в определённом порядке (от высшего к низшему)
-        order = ["МСМК", "МС", "КМС", "1-р", "2-р", "3-р", "1-юн", "2-юн", "3-юн", "б/р", "Не указан"]
-        sorted_stats = []
-        for key in order:
-            if key in razryad_stats:
-                sorted_stats.append((key, razryad_stats[key]))
-        # Добавляем остальные, если есть
-        for key, count in razryad_stats.items():
-            if key not in order:
-                sorted_stats.append((key, count))
-
-        total_players = players.count()
-
-        # Создаём диалог
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Статистика по разрядам")
-        dialog.setModal(True)
-        dialog.setMinimumSize(350, 400)
-
-        layout = QVBoxLayout(dialog)
-
-        # Заголовок
-        title = Title.get_by_id(self.current_title_id)
-        sex_text = "Женщины" if self.current_sex == "woman" else "Мужчины"
-        header = QLabel(f"Статистика по разрядам: {title.name} ({sex_text})")
-        header.setStyleSheet("font-weight: bold; font-size: 13px; margin: 10px;")
-        layout.addWidget(header)
-
-        # Таблица
-        table = QTableWidget()
-        table.setColumnCount(2)
-        table.setHorizontalHeaderLabels(["Разряд", "Количество"])
-        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        table.setEditTriggers(QTableWidget.NoEditTriggers)
-
-        table.setRowCount(len(sorted_stats))
-        for row, (razryad, count) in enumerate(sorted_stats):
-            table.setItem(row, 0, QTableWidgetItem(razryad))
-            count_item = QTableWidgetItem(str(count))
-            count_item.setTextAlignment(Qt.AlignCenter)
-            table.setItem(row, 1, count_item)
-
-        layout.addWidget(table)
-
-        # Итоговая строка
-        total_label = QLabel(f"Всего игроков: {total_players}")
-        total_label.setStyleSheet("font-weight: bold; margin: 10px;")
-        layout.addWidget(total_label)
-
-        # Кнопка обновить (пересчитать статистику)
-        refresh_btn = QPushButton("🔄 Обновить")
-        refresh_btn.clicked.connect(lambda: self._refresh_statistics_dialog(dialog))
-        layout.addWidget(refresh_btn)
-
-        # Кнопка закрыть
-        close_btn = QPushButton("Закрыть")
-        close_btn.clicked.connect(dialog.accept)
-        layout.addWidget(close_btn)
-
-        dialog.exec_()
-
-    def _refresh_statistics_dialog(self, dialog):
-        """Обновляет статистику в диалоге (пересчитывает и обновляет таблицу)"""
-        if not self.current_title_id:
-            return
-
-        # Получаем текущий диалог
-        # Находим таблицу и метку с общим количеством
-        for child in dialog.children():
-            if isinstance(child, QTableWidget):
-                table = child
-            elif isinstance(child, QLabel) and child.text().startswith("Всего игроков:"):
-                total_label = child
-
-        players = Player.select().where(
-            (Player.title_id == self.current_title_id) &
-            (Player.sex == self.current_sex)
-        )
-
-        razryad_stats = {}
-        for player in players:
-            razryad = player.razryad or "Не указан"
-            razryad_stats[razryad] = razryad_stats.get(razryad, 0) + 1
-
-        order = ["МСМК", "МС", "КМС", "1-р", "2-р", "3-р", "1-юн", "2-юн", "3-юн", "б/р", "Не указан"]
-        sorted_stats = []
-        for key in order:
-            if key in razryad_stats:
-                sorted_stats.append((key, razryad_stats[key]))
-        for key, count in razryad_stats.items():
-            if key not in order:
-                sorted_stats.append((key, count))
-
-        table.setRowCount(len(sorted_stats))
-        for row, (razryad, count) in enumerate(sorted_stats):
-            table.setItem(row, 0, QTableWidgetItem(razryad))
-            count_item = QTableWidgetItem(str(count))
-            count_item.setTextAlignment(Qt.AlignCenter)
-            table.setItem(row, 1, count_item)
-
-        total_label.setText(f"Всего игроков: {players.count()}")
-
     # def show_choice_statistics(self):
-    #     """Показать статистику по таблице Choice"""
+    #     """Показать статистику по таблице Choice (разряды игроков)"""
     #     if not self.current_title_id:
     #         QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
     #         return
+
+    #     # Получаем всех игроков текущего соревнования и пола
+    #     players = Player.select().where(
+    #         (Player.title_id == self.current_title_id) &
+    #         (Player.sex == self.current_sex)
+    #     )
+
+    #     if players.count() == 0:
+    #         QMessageBox.information(self, "Информация", "Нет участников для отображения статистики")
+    #         return
+
+    #     # Собираем статистику по разрядам
+    #     razryad_stats = {}
+    #     for player in players:
+    #         razryad = player.razryad or "Не указан"
+    #         razryad_stats[razryad] = razryad_stats.get(razryad, 0) + 1
+
+    #     # Сортируем разряды в определённом порядке (от высшего к низшему)
+    #     order = ["МСМК", "МС", "КМС", "1-р", "2-р", "3-р", "1-юн", "2-юн", "3-юн", "б/р", "Не указан"]
+    #     sorted_stats = []
+    #     for key in order:
+    #         if key in razryad_stats:
+    #             sorted_stats.append((key, razryad_stats[key]))
+    #     # Добавляем остальные, если есть
+    #     for key, count in razryad_stats.items():
+    #         if key not in order:
+    #             sorted_stats.append((key, count))
+
+    #     total_players = players.count()
+
+    #     # Создаём диалог
+    #     dialog = QDialog(self)
+    #     dialog.setWindowTitle("Статистика по разрядам")
+    #     dialog.setModal(True)
+    #     dialog.setMinimumSize(350, 400)
+
+    #     layout = QVBoxLayout(dialog)
+
+    #     # Заголовок
+    #     title = Title.get_by_id(self.current_title_id)
+    #     sex_text = "Женщины" if self.current_sex == "woman" else "Мужчины"
+    #     header = QLabel(f"Статистика по разрядам: {title.name} ({sex_text})")
+    #     header.setStyleSheet("font-weight: bold; font-size: 13px; margin: 10px;")
+    #     layout.addWidget(header)
+
+    #     # Таблица
+    #     table = QTableWidget()
+    #     table.setColumnCount(2)
+    #     table.setHorizontalHeaderLabels(["Разряд", "Количество"])
+    #     table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+    #     table.setEditTriggers(QTableWidget.NoEditTriggers)
+
+    #     table.setRowCount(len(sorted_stats))
+    #     for row, (razryad, count) in enumerate(sorted_stats):
+    #         table.setItem(row, 0, QTableWidgetItem(razryad))
+    #         count_item = QTableWidgetItem(str(count))
+    #         count_item.setTextAlignment(Qt.AlignCenter)
+    #         table.setItem(row, 1, count_item)
+
+    #     layout.addWidget(table)
+
+    #     # Итоговая строка
+    #     total_label = QLabel(f"Всего игроков: {total_players}")
+    #     total_label.setStyleSheet("font-weight: bold; margin: 10px;")
+    #     layout.addWidget(total_label)
+
+    #     # Кнопка обновить (пересчитать статистику)
+    #     refresh_btn = QPushButton("🔄 Обновить")
+    #     refresh_btn.clicked.connect(lambda: self._refresh_statistics_dialog(dialog))
+    #     layout.addWidget(refresh_btn)
+
+    #     # Кнопка закрыть
+    #     close_btn = QPushButton("Закрыть")
+    #     close_btn.clicked.connect(dialog.accept)
+    #     layout.addWidget(close_btn)
+
+    #     dialog.exec_()
+
+    # def _refresh_statistics_dialog(self, dialog):
+    #     """Обновляет статистику в диалоге (пересчитывает и обновляет таблицу)"""
+    #     if not self.current_title_id:
+    #         return
+
+    #     # Получаем текущий диалог
+    #     # Находим таблицу и метку с общим количеством
+    #     for child in dialog.children():
+    #         if isinstance(child, QTableWidget):
+    #             table = child
+    #         elif isinstance(child, QLabel) and child.text().startswith("Всего игроков:"):
+    #             total_label = child
+
+    #     players = Player.select().where(
+    #         (Player.title_id == self.current_title_id) &
+    #         (Player.sex == self.current_sex)
+    #     )
+
+    #     razryad_stats = {}
+    #     for player in players:
+    #         razryad = player.razryad or "Не указан"
+    #         razryad_stats[razryad] = razryad_stats.get(razryad, 0) + 1
+
+    #     order = ["МСМК", "МС", "КМС", "1-р", "2-р", "3-р", "1-юн", "2-юн", "3-юн", "б/р", "Не указан"]
+    #     sorted_stats = []
+    #     for key in order:
+    #         if key in razryad_stats:
+    #             sorted_stats.append((key, razryad_stats[key]))
+    #     for key, count in razryad_stats.items():
+    #         if key not in order:
+    #             sorted_stats.append((key, count))
+
+    #     table.setRowCount(len(sorted_stats))
+    #     for row, (razryad, count) in enumerate(sorted_stats):
+    #         table.setItem(row, 0, QTableWidgetItem(razryad))
+    #         count_item = QTableWidgetItem(str(count))
+    #         count_item.setTextAlignment(Qt.AlignCenter)
+    #         table.setItem(row, 1, count_item)
+
+    #     total_label.setText(f"Всего игроков: {players.count()}")
+
+    def show_choice_statistics(self):
+        """Показать статистику по таблице Choice"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
         
-    #     try:
-    #         total_players = Choice.select().where(Choice.title_id == self.current_title_id).count()
+        try:
+            total_players = Choice.select().where(Choice.title_id == self.current_title_id).count()
             
-    #         # Группировка по группам
-    #         from collections import Counter
-    #         groups_counter = Counter()
-    #         regions_counter = Counter()
+            # Группировка по группам
+            from collections import Counter
+            razryad_counter = Counter()
+            regions_counter = Counter()
             
-    #         choices = Choice.select().where(Choice.title_id == self.current_title_id)
+            # choices = Choice.select().where((Choice.title_id == self.current_title_id) & (Choice.sex == self.current_sex))
+            players = Player.select().where((Player.title_id == self.current_title_id) & (Player.sex == self.current_sex))
+
+            for player in players:
+                razryad_counter[player.razryad] += 1
+                if player.razryad:
+                    razryad_counter[player.razryad] += 1             
             
-    #         for choice in choices:
-    #             groups_counter[choice.group] += 1
-    #             if choice.region:
-    #                 regions_counter[choice.region] += 1
+            stats_text = f"📊 СТАТИСТИКА СОРЕВНОВАНИЯ\n"
+            stats_text += "=" * 40 + "\n\n"
+            stats_text += f"👥 Всего участников: {total_players}\n\n"
             
-    #         stats_text = f"📊 СТАТИСТИКА СОРЕВНОВАНИЯ\n"
-    #         stats_text += "=" * 40 + "\n\n"
-    #         stats_text += f"👥 Всего участников: {total_players}\n\n"
+            stats_text += "🏆 РАСПРЕДЕЛЕНИЕ ПО РАЗРЯДАМ:\n"
+            for razryad, count in sorted(razryad_counter.items()):
+                stats_text += f"   • {razryad}: {count} чел.\n"
             
-    #         # stats_text += "🏆 РАСПРЕДЕЛЕНИЕ ПО ГРУППАМ:\n"
-    #         # for group, count in sorted(groups_counter.items()):
-    #         #     stats_text += f"   • {group}: {count} чел.\n"
-            
-    #         if regions_counter:
-    #             stats_text += "\n📍 РАСПРЕДЕЛЕНИЕ ПО РЕГИОНАМ:\n"
-    #             for region, count in regions_counter.most_common(10):
-    #                 stats_text += f"   • {region}: {count} чел.\n"
+            if regions_counter:
+                stats_text += "\n📍 РАСПРЕДЕЛЕНИЕ ПО РЕГИОНАМ:\n"
+                for region, count in regions_counter.most_common(10):
+                    stats_text += f"   • {region}: {count} чел.\n"
             
             
-    #         QMessageBox.information(self, "Статистика", stats_text)
+            QMessageBox.information(self, "Статистика", stats_text)
             
-    #     except Exception as e:
-    #         QMessageBox.critical(self, "Ошибка", f"Ошибка: {str(e)}")
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Ошибка: {str(e)}")
 
     def clear_choice_table(self):
         """Очистка таблицы Choice для текущего соревнования"""

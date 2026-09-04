@@ -14932,13 +14932,14 @@ class MainWindow(QMainWindow):
                 return
 
             # Собираем регионы и считаем количество участников
-            regions_count = {}
+            regions_list = []
             for player in players:
                 region = player.region.strip() if player.region else "Не указан"
-                regions_count[region] = regions_count.get(region, 0) + 1
+                if region not in regions_list:
+                    regions_list.append(region)
 
             # Сортируем по убыванию количества участников, затем по алфавиту
-            sorted_regions = sorted(regions_count.items(), key=lambda x: (-x[1], x[0]))
+            regions_list.sort()
 
             # Создаём папку, если её нет
             pdf_dir = "table_pdf"
@@ -14958,7 +14959,7 @@ class MainWindow(QMainWindow):
 
             # Создаём документ
             doc = SimpleDocTemplate(filename, pagesize=A4,
-                                    topMargin=2*cm, bottomMargin=1.5*cm,
+                                    topMargin=2*cm, bottomMargin=3.0*cm,
                                     leftMargin=1.5*cm, rightMargin=1.5*cm)
 
             styles = getSampleStyleSheet()
@@ -14974,12 +14975,14 @@ class MainWindow(QMainWindow):
             elements.append(Spacer(1, 0.5*cm))
 
             # Данные таблицы
-            table_data = [["№", "Регион", "Кол-во участников"]]
-            for i, (region, count) in enumerate(sorted_regions, 1):
-                table_data.append([str(i), region, str(count)])
+            table_data = [["№", "Регион"]]
+            i = 1
+            for region in regions_list:
+                table_data.append([str(i), region])
+                i += 1
 
             # Таблица
-            table = Table(table_data, colWidths=[1.5*cm, 12*cm, 3*cm], repeatRows=1)
+            table = Table(table_data, colWidths=[1.5*cm, 12*cm], repeatRows=1)
             table.setStyle(TableStyle([
                 ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSerif'),
                 ('FONTSIZE', (0, 0), (-1, -1), 9),

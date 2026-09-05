@@ -12271,12 +12271,6 @@ class MainWindow(QMainWindow):
                     system.mesta_exit = new_mesta_exit
                     
                     # --- ПЕРЕСЧЕТ КОЛИЧЕСТВА ИГР ---
-                    # количество игроков без Х
-                    # total_players = Player.select().where(
-                    #     (Player.title_id == self.current_title_id) &
-                    #     (Player.sex == self.current_sex) &
-                    #     (Player.player != "X")
-                    #     ).count()
                     total_players = new_max_player
                     group_sizes  = 1
                     # Получаем предыдущий этап
@@ -12336,7 +12330,10 @@ class MainWindow(QMainWindow):
                         if new_total_group > 1:
                             system.label_string = f"{new_total_group} групп по {new_max_player} чел."
                         else:
-                            system.label_string = f"Одна таблица, {total_players} участников"
+                            # Для одной таблицы показываем диапазон мест
+                            start_place = 1
+                            end_place = new_max_player
+                            system.label_string = f"Места с {start_place} по {end_place}"
                     
                     system.choice_flag = 0  # Сбрасываем флаг жеребьевки
                     system.save()

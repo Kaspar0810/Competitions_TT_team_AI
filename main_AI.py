@@ -14365,7 +14365,7 @@ class MainWindow(QMainWindow):
                                 f"Жеребьевка для этапа '{stage.stage}' сохранена!\n"
                                 f"Таблицы Choice и Result обновлены.")
             self.update_stages_info()
-            # self.dialog.accept()
+
         
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка при сохранении: {str(e)}")
@@ -14398,8 +14398,23 @@ class MainWindow(QMainWindow):
 
             # Имя файла
             title = Title.get_by_id(self.current_title_id)
+            sredi = title.sredi
+            # Определяем пол игроков для сообщения
+            if sredi == "юношей и девушек":
+                men_text = "Юноши"
+                women_text = "Девушки"
+            elif sredi == "мальчиков и девочек":
+                men_text = "Мальчики"
+                women_text = "Девочки"
+            elif sredi == "юниоров и юниорок":
+                men_text = "Юниоры"
+                women_text = "Юниорки"
+            else:
+                men_text = "Мужчины"
+                women_text = "Женщины"
 
-            gamer = title.gamer if title.gamer else "Участники"
+            gamer = men_text if sex == 'man' else women_text
+            # ========
             otc = title.otchestvo if title.otchestvo else 0
 
             short_name = title.short_name_comp if title.short_name_comp else title.name
@@ -14556,7 +14571,31 @@ class MainWindow(QMainWindow):
         
         try:
             # Получаем данные о соревновании
-            title = Title.get(Title.id == self.current_title_id)
+
+            # Имя файла
+            title = Title.get_by_id(self.current_title_id)
+            sredi = title.sredi
+            # Определяем пол игроков для сообщения
+            if sredi == "юношей и девушек":
+                men_text = "Юноши"
+                women_text = "Девушки"
+            elif sredi == "мальчиков и девочек":
+                men_text = "Мальчики"
+                women_text = "Девочки"
+            elif sredi == "юниоров и юниорок":
+                men_text = "Юниоры"
+                women_text = "Юниорки"
+            else:
+                men_text = "Мужчины"
+                women_text = "Женщины"
+
+             
+            if self.current_sex == 'man':
+                gamer = men_text
+                sex = 'M'
+            else:
+                gamer = women_text
+                sex = 'W'
             
             # Создаем папку table_pdf, если её нет
             pdf_dir = "table_pdf"
@@ -14571,8 +14610,6 @@ class MainWindow(QMainWindow):
             clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
             clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
             
-            sex = 'M' if self.current_sex == 'man' else 'W'
-
             # Сортируем список участников в зависимости от выбора
             if sorting_type == "alpha":
                 player_list = Player.select().where(
@@ -14597,7 +14634,6 @@ class MainWindow(QMainWindow):
                 return
 #=====================================            
             # Получаем параметры
-            gamer = title.gamer if title.gamer else "Участники"
             otc = title.otchestvo if title.otchestvo else 0
                         
             # Подготовка данных для таблицы
@@ -15044,8 +15080,30 @@ class MainWindow(QMainWindow):
 
             # Имя файла
             title = Title.get_by_id(self.current_title_id)
+            # ============
+            sredi = title.sredi
+            # Определяем пол игроков для сообщения
+            if sredi == "юношей и девушек":
+                men_text = "Юноши"
+                women_text = "Девушки"
+            elif sredi == "мальчиков и девочек":
+                men_text = "Мальчики"
+                women_text = "Девочки"
+            elif sredi == "юниоров и юниорок":
+                men_text = "Юниоры"
+                women_text = "Юниорки"
+            else:
+                men_text = "Мужчины"
+                women_text = "Женщины"
 
-            gamer = title.gamer if title.gamer else "Участники"
+             
+            if self.current_sex == 'man':
+                gamer = men_text
+                sex = 'M'
+            else:
+                gamer = women_text
+                sex = 'W'
+            # ============
             otc = title.otchestvo if title.otchestvo else 0
 
             short_name = title.short_name_comp if title.short_name_comp else title.name
@@ -26242,10 +26300,11 @@ class MainWindow(QMainWindow):
                     pattern = f"{clean_name}_{sex_mark}_player_list_alf"
                     file_path = os.path.join(table_pdf_dir, pattern + ".pdf")
                     if os.path.exists(file_path):
-                        found_files.append((file_path, f"Список участников ({sex_label}, 'alf')"))
+                        file_pdf = (file_path, f"Список участников ({sex_label}, 'alf')")
+                        if file_pdf not in found_files:
+                            found_files.append(file_pdf)
                     else:
                         # Не считаем критическим, если нет, но добавим в список отсутствующих
-
                         file_pdf = f"Список участников ({sex_label}, 'по алфавиту')"
                         if file_pdf not in missing_files:
                             missing_files.append(file_pdf)
@@ -26254,7 +26313,9 @@ class MainWindow(QMainWindow):
                     pattern = f"{clean_name}_{sex_mark}_podium_list"
                     file_path = os.path.join(table_pdf_dir, pattern + ".pdf")
                     if os.path.exists(file_path):
-                        found_files.append((file_path, f"Список призёров ({sex_label})"))
+                        file_pdf = (file_path, f"Список призёров ({sex_label})")
+                        if file_pdf not in found_files:
+                            found_files.append(file_pdf)
                     else:
                         file_pdf = f"Список призёров ({sex_label})"
                         if file_pdf not in missing_files:
@@ -26264,7 +26325,9 @@ class MainWindow(QMainWindow):
                     pattern = f"{clean_name}_{sex_mark}_final_protocol"
                     file_path = os.path.join(table_pdf_dir, pattern + ".pdf")
                     if os.path.exists(file_path):
-                        found_files.append((file_path, f"Итоговый протокол ({sex_label})"))
+                        file_pdf = (file_path, f"Итоговый протокол ({sex_label})")
+                        if file_pdf not in found_files:
+                            found_files.append(file_pdf)
                     else:
                         file_pdf = f"Итоговый протокол ({sex_label}))"
                         if file_pdf not in missing_files:
@@ -26304,7 +26367,9 @@ class MainWindow(QMainWindow):
                         for pat in patterns:
                             file_path = os.path.join(table_pdf_dir, pat + ".pdf")
                             if os.path.exists(file_path):
-                                found_files.append((file_path, f"Таблица ({sex_label}, {stage_name})"))
+                                file_pdf = (file_path, f"Таблица ({sex_label}, {stage_name})")
+                                if file_pdf not in found_files:
+                                    found_files.append(file_pdf)
                             else:
                                 file_pdf = f"Таблица ({sex_label}, {stage_name}))"
                                 if file_pdf not in missing_files:
@@ -26320,7 +26385,9 @@ class MainWindow(QMainWindow):
                             pattern = f"{clean_name}_{sex_mark}_{num}-final"
                             file_path = os.path.join(table_pdf_dir, pattern + ".pdf")
                             if os.path.exists(file_path):
-                                found_files.append((file_path, f"Сетка ({sex_label}, {stage_name})"))
+                                file_pdf = (file_path, f"Сетка ({sex_label}, {stage_name})")
+                                if file_pdf not in found_files:
+                                    found_files.append(file_pdf)
                             else:
                                 file_pdf = f"Таблица ({sex_label}, {stage_name}))"
                                 if file_pdf not in missing_files:

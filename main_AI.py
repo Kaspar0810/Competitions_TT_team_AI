@@ -1243,8 +1243,8 @@ class MainWindow(QMainWindow):
                 men_text = f"Юниоры {age_short}"
                 women_text = f"Юниорки {age_short}"
             else:
-                men_text = f"Мужчины"
-                women_text = f"Женщины"
+                men_text = "Мужчины"
+                women_text = "Женщины"
             
             # Создаем кнопку для мужчин (man)
             man_btn = QPushButton(men_text)
@@ -8889,19 +8889,19 @@ class MainWindow(QMainWindow):
         # Обновляем этапы для бегунков
         self.update_runner_stages()
 
-    # def update_schedule_stages_data(self):
-    #     """Обновление данных этапов для расписания без изменения UI (для фонового обновления)"""
-    #     if not self.current_title_id:
-    #         return
+    def update_schedule_stages_data(self):
+        """Обновление данных этапов для расписания без изменения UI (для фонового обновления)"""
+        if not self.current_title_id:
+            return
         
-    #     sex = self.current_sex if self.current_sex else "man"
-    #     stages = System.select().where(
-    #         (System.title_id == self.current_title_id) &
-    #         (System.sex == sex)
-    #     ).order_by(System.id)
+        sex = self.current_sex if self.current_sex else "man"
+        stages = System.select().where(
+            (System.title_id == self.current_title_id) &
+            (System.sex == sex)
+        ).order_by(System.id)
         
-    #     # Просто сохраняем список этапов для использования при активации вкладки
-    #     self._schedule_stages_cache = list(stages)
+        # Просто сохраняем список этапов для использования при активации вкладки
+        self._schedule_stages_cache = list(stages)
 
 #===============================
     def load_participants_for_title(self):
@@ -14379,6 +14379,8 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
             return
 
+        sex = "M" if self.current_sex == "man" else "W"
+
         try:
             # Получаем участников, отсортированных по месту (mesto)
             players_list = Player.select().where(
@@ -14408,7 +14410,7 @@ class MainWindow(QMainWindow):
             clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
             clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
 
-            filename = os.path.join(pdf_dir, f"{clean_name}_final_protocol.pdf")
+            filename = os.path.join(pdf_dir, f"{clean_name}_{sex}_final_protocol.pdf")
 
             from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 
@@ -14681,7 +14683,7 @@ class MainWindow(QMainWindow):
             
             # Создаем PDF документ
             doc = SimpleDocTemplate(file_path, pagesize=A4,
-                                    topMargin=25*mm, bottomMargin=10*mm,
+                                    topMargin=25*mm, bottomMargin=30*mm,
                                     leftMargin=5*mm, rightMargin=5*mm)
             
             # Стиль заголовка
@@ -15023,6 +15025,8 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
             return
 
+        sex = "M" if self.current_sex == "man" else "W"
+
         try:
             # Получаем участников, отсортированных по месту (mesto)
             players_list = Player.select().where(
@@ -15052,7 +15056,7 @@ class MainWindow(QMainWindow):
             clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
             clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
 
-            filename = os.path.join(pdf_dir, f"{clean_name}_podium_list.pdf")
+            filename = os.path.join(pdf_dir, f"{clean_name}_{sex}_podium_list.pdf")
 
             from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 
@@ -15200,7 +15204,6 @@ class MainWindow(QMainWindow):
         )
         # определяем пол для титула на PDF
         title = Title.get_by_id(self.current_title_id)
-        # sex = title.sredi if title.sredi else "Участники"
 
         title_sex = self.sex_for_title(stage)
       
@@ -15405,9 +15408,10 @@ class MainWindow(QMainWindow):
             title_text = f"Квалификационные соревнования. {title_sex}."
             name_table = f"{clean_name}_{sex}_table_group.pdf"
         elif stage in ["Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]:
-            number_fin = stage[:stage.rfind("-")]
+            number_str = stage[:stage.rfind("-")]
+            number_fin = number_str.replace("Квалификация. ", "")
             title_text = f"{stage}. {title_sex}."
-            name_table = f"{clean_name}_{number_fin}_{sex}_semifinal.pdf"
+            name_table = f"{clean_name}_{sex}_{number_fin}-semifinal.pdf"
         else:
             # Финал
             number_fin = stage[:stage.rfind("-")] if "-" in stage else stage
@@ -16650,6 +16654,8 @@ class MainWindow(QMainWindow):
         from reportlab.platypus import Table
         table = "setka_8_full"
 
+        sex = "M" if self.current_sex == "man" else "W"
+
         # Папка для сохранения
         pdf_dir = "table_pdf"
         if not os.path.exists(pdf_dir):
@@ -16838,7 +16844,7 @@ class MainWindow(QMainWindow):
                 name_table_final = f"{short_name}_{f}-final.pdf"                   
         else:
             short_name = "clear_8_full_net"  # имя для чистой сетки
-            name_table_final = f"{short_name}.pdf"
+            name_table_final = f"{short_name}_{sex}.pdf"
 
         # Создаем PDF
         filename = os.path.join(pdf_dir, name_table_final)
@@ -16852,6 +16858,8 @@ class MainWindow(QMainWindow):
         """сетка на 16 в pdf"""
         from reportlab.platypus import Table
         table = "setka_16_full"
+
+        sex = "M" if self.current_sex == "man" else "W" 
 
         # Папка для сохранения
         pdf_dir = "table_pdf"
@@ -17049,13 +17057,13 @@ class MainWindow(QMainWindow):
             if tds is not None:
                 short_name = t_id.short_name_comp
             if fin == "Одна таблица":
-                name_table_final = f"{short_name}_one_table.pdf"
+                name_table_final = f"{short_name}_{sex}_one_table.pdf"
             elif fin == "Парный разряд" :
-                name_table_final = f"{short_name}_double_{f}.pdf"
+                name_table_final = f"{short_name}_{sex}_double_{f}.pdf"
             elif fin == "Суперфинал":
-                name_table_final = f"{short_name}_{f}.pdf"
+                name_table_final = f"{short_name}_{sex}_{f}.pdf"
             elif fin != "Суперфинал":
-                name_table_final = f"{short_name}_{f}-final.pdf"
+                name_table_final = f"{short_name}_{sex}_{f}-final.pdf"
         else:
             short_name = "clear_16_full_net"  # имя для чистой сетки
             name_table_final = f"{short_name}.pdf"
@@ -17073,6 +17081,8 @@ class MainWindow(QMainWindow):
         from reportlab.platypus import Table
 
         table = "setka_32_full"
+
+        sex = "M" if self.current_sex == "man" else "W"
 
         # Папка для сохранения
         pdf_dir = "table_pdf"
@@ -17322,13 +17332,13 @@ class MainWindow(QMainWindow):
             if tds is not None:
                 short_name = t_id.short_name_comp
             if fin == "Одна таблица":
-                name_table_final = f"{short_name}_one_table.pdf"
+                name_table_final = f"{short_name}_{sex}_one_table.pdf"
             elif fin == "Парный разряд" :
-                name_table_final = f"{short_name}_double_{f}.pdf"
+                name_table_final = f"{short_name}_{sex}_double_{f}.pdf"
             elif fin == "Суперфинал":
-                name_table_final = f"{short_name}_{f}.pdf"
+                name_table_final = f"{short_name}_{sex}_{f}.pdf"
             elif fin != "Суперфинал":
-                name_table_final = f"{short_name}_{f}-final.pdf"
+                name_table_final = f"{short_name}_{sex}_{f}-final.pdf"
         else:
             short_name = "clear_32_full_net"  # имя для чистой сетки
             name_table_final = f"{short_name}.pdf"
@@ -26150,8 +26160,151 @@ class MainWindow(QMainWindow):
         else:
             os.system(f'open "{filename}"')
 # Полные соревнования
+    # def assemble_full_competition_pdf(self):
+    #     """Сборка полного PDF-файла соревнования из существующих PDF-файлов (для обоих полов)"""
+    #     if not self.current_title_id:
+    #         QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+    #         return
+
+    #     try:
+    #         from PyPDF2 import PdfMerger
+    #         import os
+    #         import re
+    #         import glob
+
+    #         title = Title.get_by_id(self.current_title_id)
+    #         short_name = title.short_name_comp if title.short_name_comp else title.name
+    #         clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
+    #         clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
+
+    #         table_pdf_dir = "table_pdf"
+    #         competition_pdf_dir = "competition_pdf"
+    #         if not os.path.exists(competition_pdf_dir):
+    #             os.makedirs(competition_pdf_dir)
+
+    #         missing_files = []
+
+    #         # --- ОБЩИЕ ФАЙЛЫ ---
+    #         common_files = [
+    #             (f"{clean_name}_title_page", "Титульный лист"),
+    #             (f"{clean_name}_GSK_list", "Список ГСК"),
+    #             (f"{clean_name}_regions", "Список регионов"),
+    #         ]
+    #         found_common = []
+    #         for pattern, desc in common_files:
+    #             file_path = os.path.join(table_pdf_dir, pattern + ".pdf")
+    #             if os.path.exists(file_path):
+    #                 found_common.append((file_path, desc))
+    #             else:
+    #                 missing_files.append(f"Общий: {desc} (ожидался файл: {pattern}.pdf)")
+
+    #         # --- ДЕВУШКИ (W) ---
+    #         girls_files = []
+    #         # Таблицы
+    #         for suffix in ["_W_*_one_table", "_W_*_table_group", "_W_*_semifinal", "_W_*_final"]:
+    #             pattern = os.path.join(table_pdf_dir, f"{clean_name}{suffix}.pdf")
+    #             matches = glob.glob(pattern)
+    #             if matches:
+    #                 girls_files.extend([(m, "Таблица (девушки)") for m in matches])
+    #             else:
+    #                 missing_files.append(f"Таблицы девушек (ожидался файл: {clean_name}{suffix}.pdf)")
+
+    #         # Списки девушек
+    #         girls_patterns = [
+    #             (f"{clean_name}_W_players_list_alf", "Список участников по алфавиту (девушки)"),
+    #             (f"{clean_name}_W_players_list_rating", "Список участников по рейтингу (девушки)"),
+    #             (f"{clean_name}_W_podium_list", "Список призёров (девушки)"),
+    #             (f"{clean_name}_W_final_protocol", "Итоговый протокол (девушки)")
+    #         ]
+    #         for pattern, desc in girls_patterns:
+    #             file_path = os.path.join(table_pdf_dir, pattern + ".pdf")
+    #             if os.path.exists(file_path):
+    #                 girls_files.append((file_path, desc))
+    #             else:
+    #                 missing_files.append(f"{desc} (ожидался файл: {pattern}.pdf)")
+
+    #         # --- ЮНОШИ (M) ---
+    #         boys_files = []
+    #         for suffix in ["_M_*_one_table", "_M_*_table_group", "_M_*_semifinal", "_M_*_final"]:
+    #             pattern = os.path.join(table_pdf_dir, f"{clean_name}{suffix}.pdf")
+    #             matches = glob.glob(pattern)
+    #             if matches:
+    #                 boys_files.extend([(m, "Таблица (юноши)") for m in matches])
+    #             else:
+    #                 missing_files.append(f"Таблицы юношей (ожидался файл: {clean_name}{suffix}.pdf)")
+
+    #         boys_patterns = [
+    #             (f"{clean_name}_M_players_list_alf", "Список участников по алфавиту (юноши)"),
+    #             (f"{clean_name}_M_players_list_rating", "Список участников по рейтингу (юноши)"),
+    #             (f"{clean_name}_M_podium_list", "Список призёров (юноши)"),
+    #             (f"{clean_name}_M_final_protocol", "Итоговый протокол (юноши)")
+    #         ]
+    #         for pattern, desc in boys_patterns:
+    #             file_path = os.path.join(table_pdf_dir, pattern + ".pdf")
+    #             if os.path.exists(file_path):
+    #                 boys_files.append((file_path, desc))
+    #             else:
+    #                 missing_files.append(f"{desc} (ожидался файл: {pattern}.pdf)")
+
+    #         if missing_files:
+    #             # Формируем сообщение с деталями
+    #             msg = "Для сборки полного соревнования не хватает следующих файлов:\n\n"
+    #             for item in missing_files:
+    #                 msg += f"• {item}\n"
+    #             msg += "\nСоздайте недостающие файлы через соответствующие пункты меню."
+    #             QMessageBox.warning(self, "Отсутствуют файлы", msg)
+    #             return
+
+    #         # Собираем все файлы в нужном порядке
+    #         all_files = []
+
+    #         # 1. Общие файлы
+    #         all_files.extend(found_common)
+
+    #         # 2. Девушки
+    #         all_files.extend(girls_files)
+
+    #         # 3. Юноши
+    #         all_files.extend(boys_files)
+
+    #         if not all_files:
+    #             QMessageBox.warning(self, "Ошибка", "Не найдено ни одного PDF-файла для сборки")
+    #             return
+
+    #         # Объединяем
+    #         merger = PdfMerger()
+    #         for file_path, desc in all_files:
+    #             try:
+    #                 merger.append(file_path)
+    #                 print(f"Добавлен файл: {os.path.basename(file_path)} ({desc})")
+    #             except Exception as e:
+    #                 print(f"Ошибка добавления файла {file_path}: {e}")
+    #                 continue
+
+    #         output_file = os.path.join(competition_pdf_dir, f"{clean_name}_full_competition.pdf")
+    #         merger.write(output_file)
+    #         merger.close()
+
+    #         QMessageBox.information(self, "Успех", f"Полный файл соревнования сохранён:\n{output_file}")
+
+    #         reply = QMessageBox.question(self, "Открыть файл",
+    #                                     "Открыть созданный PDF файл?",
+    #                                     QMessageBox.Yes | QMessageBox.No)
+    #         if reply == QMessageBox.Yes:
+    #             if sys.platform == 'win32':
+    #                 os.startfile(output_file)
+    #             else:
+    #                 os.system(f'open "{output_file}"')
+
+    #     except ImportError:
+    #         QMessageBox.critical(self, "Ошибка", "Не установлен модуль PyPDF2. Установите его: pip install PyPDF2")
+    #     except Exception as e:
+    #         import traceback
+    #         traceback.print_exc()
+    #         QMessageBox.critical(self, "Ошибка", f"Не удалось собрать PDF: {str(e)}")
+
     def assemble_full_competition_pdf(self):
-        """Сборка полного PDF-файла соревнования из существующих PDF-файлов (для обоих полов)"""
+        """Сборка полного PDF-файла соревнования на основе реальных этапов в системе"""
         if not self.current_title_id:
             QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
             return
@@ -26163,115 +26316,202 @@ class MainWindow(QMainWindow):
             import glob
 
             title = Title.get_by_id(self.current_title_id)
+            sredi = title.sredi
             short_name = title.short_name_comp if title.short_name_comp else title.name
             clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
             clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
 
             table_pdf_dir = "table_pdf"
+
             competition_pdf_dir = "competition_pdf"
             if not os.path.exists(competition_pdf_dir):
                 os.makedirs(competition_pdf_dir)
 
-            # Список недостающих файлов
             missing_files = []
+            found_files = []
 
-            # --- ОБЩИЕ ФАЙЛЫ (для обоих полов) ---
+            # --- 1. ОБЩИЕ ФАЙЛЫ ---
             common_files = [
                 (f"{clean_name}_title_page", "Титульный лист"),
                 (f"{clean_name}_GSK_list", "Список ГСК"),
                 (f"{clean_name}_regions", "Список регионов"),
             ]
-
-            found_common = []
             for pattern, desc in common_files:
                 file_path = os.path.join(table_pdf_dir, pattern + ".pdf")
                 if os.path.exists(file_path):
-                    found_common.append((file_path, desc))
+                    found_files.append((file_path, desc))
                 else:
                     missing_files.append(f"Общий: {desc}")
 
-            # --- ФАЙЛЫ ДЛЯ ДЕВУШЕК (W) ---
-            girls_files = []
-            for suffix in ["_W_*_one_table", "_W_*_table_group", "_W_*_semifinal", "_W_*_final"]:
-                pattern = os.path.join(table_pdf_dir, f"{clean_name}{suffix}.pdf")
-                matches = glob.glob(pattern)
-                if matches:
-                    girls_files.extend([(m, "Таблица (девушки)") for m in matches])
-                else:
-                    missing_files.append("Таблицы девушек")
+            # --- 2. ФАЙЛЫ ПО ПОЛУ (на основе этапов из System) ---
+            sexes = ['woman', 'man']
+            for sex in sexes:
+                # Получаем все этапы для данного пола
+                stages = System.select().where(
+                    (System.title_id == self.current_title_id) &
+                    (System.sex == sex)
+                ).order_by(System.id)
 
-            # Списки девушек
-            for pattern, desc in [
-                (f"{clean_name}_W_players_list_alf", "Список участников (девушки)"),
-                (f"{clean_name}_W_players_rating", "Список участников (девушки)"),
-                # (f"{clean_name}_W_podim_list", "Список призёров (девушки)"),
-                (f"{clean_name}_W_final_protocol", "Итоговый протокол (девушки)")
-            ]:
-                file_path = os.path.join(table_pdf_dir, pattern + ".pdf")
-                if os.path.exists(file_path):
-                    girls_files.append((file_path, desc))
-                else:
-                    # Не считаем критическими, если нет
-                    pass
+                if stages.count() == 0:
+                    continue
+                sex_mark = "M" if sex == 'man' else 'W'
 
-            # --- ФАЙЛЫ ДЛЯ ЮНОШЕЙ (M) ---
-            boys_files = []
-            for suffix in ["_M_*_one_table", "_M_*_table_group", "_M_*_semifinal", "_M_*_final"]:
-                pattern = os.path.join(table_pdf_dir, f"{clean_name}{suffix}.pdf")
-                matches = glob.glob(pattern)
-                if matches:
-                    boys_files.extend([(m, "Таблица (юноши)") for m in matches])
+                # Определяем надписи для сообщения
+                if sredi == "юношей и девушек":
+                    men_text = "Юноши"
+                    women_text = "Девушки"
+                elif sredi == "мальчиков и девочек":
+                    men_text = "Мальчики"
+                    women_text = "Девочки"
+                elif sredi == "юниоров и юниорок":
+                    men_text = "Юниоры"
+                    women_text = "Юниорки"
                 else:
-                    missing_files.append("Таблицы юношей")
+                    men_text = "Мужчины"
+                    women_text = "Женщины"
 
-            for pattern, desc in [
-                (f"{clean_name}_M_players_list_alf", "Список участников (юноши)"),
-                # (f"{clean_name}_M_players_rating", "Список участников (юноши)"),
-                (f"{clean_name}_M_podium_list", "Список призёров (юноши)"),
-                (f"{clean_name}_M_final_protocol", "Итоговый протокол (юноши)")
-            ]:
-                file_path = os.path.join(table_pdf_dir, pattern + ".pdf")
-                if os.path.exists(file_path):
-                    boys_files.append((file_path, desc))
-                else:
-                    pass
 
+                sex_label = men_text if sex == 'man' else women_text
+
+                # Для каждого этапа определяем, какие PDF должны быть
+                for stage in stages:
+                    stage_name = stage.stage
+                    type_table = stage.type_table if hasattr(stage, 'type_table') else ""
+
+                    # Формируем префикс для файлов этого пола и этапа
+                    # Имена файлов создаются в других функциях (table_made, export_*)
+                    # Мы должны знать, какие файлы генерируются для каждого типа этапа
+
+                    # --- Список участников (по алфавиту и по рейтингу) ---
+                    # Эти файлы создаются при экспорте списка участников
+                    pattern = f"{clean_name}_{sex_mark}_player_list_alf"
+                    file_path = os.path.join(table_pdf_dir, pattern + ".pdf")
+                    if os.path.exists(file_path):
+                        found_files.append((file_path, f"Список участников ({sex_label}, 'alf')"))
+                    else:
+                        # Не считаем критическим, если нет, но добавим в список отсутствующих
+
+                        file_pdf = f"Список участников ({sex_label}, 'по алфавиту')"
+                        if file_pdf not in missing_files:
+                            missing_files.append(file_pdf)
+
+                    # --- Список призёров ---
+                    pattern = f"{clean_name}_{sex_mark}_podium_list"
+                    file_path = os.path.join(table_pdf_dir, pattern + ".pdf")
+                    if os.path.exists(file_path):
+                        found_files.append((file_path, f"Список призёров ({sex_label})"))
+                    else:
+                        file_pdf = f"Список призёров ({sex_label})"
+                        if file_pdf not in missing_files:
+                            missing_files.append(file_pdf)
+
+                    # --- Итоговый протокол ---
+                    pattern = f"{clean_name}_{sex_mark}_final_protocol"
+                    file_path = os.path.join(table_pdf_dir, pattern + ".pdf")
+                    if os.path.exists(file_path):
+                        found_files.append((file_path, f"Итоговый протокол ({sex_label})"))
+                    else:
+                        file_pdf = f"Итоговый протокол ({sex_label}))"
+                        if file_pdf not in missing_files:
+                            missing_files.append(file_pdf)
+
+                    # --- Таблицы (в зависимости от типа этапа) ---
+                    if "Круговая" in type_table:
+                        # Для круговой системы создаются файлы table_made
+                        # Имена файлов зависят от stage и пола
+                        # Например: clean_name_M_one_table.pdf, clean_name_M_table_group.pdf, clean_name_M_1-final.pdf
+                        if stage_name == "Одна таблица":
+                            patterns = [f"{clean_name}_{sex_mark}_one_table"]
+                        elif stage_name == "Квалификация":
+                            patterns = [f"{clean_name}_{sex_mark}_table_group"]
+                        elif "полуфинал" in stage_name.lower():
+                            # Полуфиналы: clean_name_M_1-semifinal.pdf, clean_name_M_2-semifinal.pdf
+                            # Извлекаем номер полуфинала из названия
+                            import re
+                            match = re.search(r'(\d+)', stage_name)
+                            if match:
+                                num = match.group(1)
+                                patterns = [f"{clean_name}_{sex_mark}_{num}-semifinal"]
+                            else:
+                                patterns = []
+                        elif "финал" in stage_name.lower():
+                            # Финалы: clean_name_M_1-final.pdf, clean_name_M_2-final.pdf и т.д.
+                            import re
+                            match = re.search(r'(\d+)', stage_name)
+                            if match:
+                                num = match.group(1)
+                                patterns = [f"{clean_name}_{sex_mark}_{num}-final"]
+                            else:
+                                patterns = []
+                        else:
+                            patterns = []
+
+                        for pat in patterns:
+                            file_path = os.path.join(table_pdf_dir, pat + ".pdf")
+                            if os.path.exists(file_path):
+                                found_files.append((file_path, f"Таблица ({sex_label}, {stage_name})"))
+                            else:
+                                file_pdf = f"Таблица ({sex_label}, {stage_name}))"
+                                if file_pdf not in missing_files:
+                                    missing_files.append(file_pdf)
+
+                    elif "Олимпийская" in type_table:
+                        # Для олимпийской системы создаются сетки (setka_*_full_made)
+                        # Имена файлов: clean_name_M_1-final.pdf и т.д.
+                        import re
+                        match = re.search(r'(\d+)', stage_name)
+                        if match:
+                            num = match.group(1)
+                            pattern = f"{clean_name}_{sex_mark}_{num}-final"
+                            file_path = os.path.join(table_pdf_dir, pattern + ".pdf")
+                            if os.path.exists(file_path):
+                                found_files.append((file_path, f"Сетка ({sex_label}, {stage_name})"))
+                            else:
+                                file_pdf = f"Таблица ({sex_label}, {stage_name}))"
+                                if file_pdf not in missing_files:
+                                    missing_files.append(file_pdf)
+
+            # Если есть недостающие файлы, выводим сообщение
             if missing_files:
-                QMessageBox.warning(
-                    self,
-                    "Отсутствуют файлы",
-                    f"Для сборки полного соревнования не хватает следующих файлов:\n\n" +
-                    "\n".join(f"• {desc}" for desc in missing_files[:10]) +
-                    (f"\n... и ещё {len(missing_files) - 10}" if len(missing_files) > 10 else "") +
-                    "\n\nСоздайте недостающие файлы через соответствующие пункты меню."
-                )
+                msg = "Для сборки полного соревнования не хватает следующих файлов:\n\n"
+                # Группируем по типу для удобства
+                for item in missing_files[:20]:  # ограничим, чтобы не перегружать
+                    msg += f"• {item}\n"
+                if len(missing_files) > 20:
+                    msg += f"\n... и ещё {len(missing_files) - 20} файлов"
+                msg += "\n\nСоздайте недостающие файлы через соответствующие пункты меню."
+                QMessageBox.warning(self, "Отсутствуют файлы", msg)
                 return
 
-            # Собираем все файлы в нужном порядке
-            all_files = []
+            # Сортируем найденные файлы: сначала общие, затем по полу (девушки, потом юноши)
+            # Определяем приоритет
+            def get_sort_key(item):
+                file_path, desc = item
+                # Общие файлы в начале
+                if "Титульный" in desc:
+                    return 0
+                if "ГСК" in desc:
+                    return 1
+                if "регионов" in desc:
+                    return 2
+                # Девушки
+                if "девушки" in desc or "(W)" in desc:
+                    return 10
+                # Юноши
+                if "юноши" in desc or "(M)" in desc:
+                    return 20
+                return 99
 
-            # 1. Общие файлы
-            all_files.extend(found_common)
-
-            # 2. Девушки
-            all_files.extend(girls_files)
-
-            # 3. Юноши
-            all_files.extend(boys_files)
-
-            if not all_files:
-                QMessageBox.warning(self, "Ошибка", "Не найдено ни одного PDF-файла для сборки")
-                return
+            found_files.sort(key=get_sort_key)
 
             # Объединяем
             merger = PdfMerger()
-            for file_path, desc in all_files:
+            for file_path, desc in found_files:
                 try:
                     merger.append(file_path)
                     print(f"Добавлен файл: {os.path.basename(file_path)} ({desc})")
                 except Exception as e:
                     print(f"Ошибка добавления файла {file_path}: {e}")
-                    continue
 
             output_file = os.path.join(competition_pdf_dir, f"{clean_name}_full_competition.pdf")
             merger.write(output_file)

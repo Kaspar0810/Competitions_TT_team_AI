@@ -7267,16 +7267,16 @@ class MainWindow(QMainWindow):
         self.results_menu_actions["Квалификация"].triggered.connect(lambda: self.show_results_for_stage("Квалификация"))
         results_view_menu.addAction(self.results_menu_actions["Квалификация"])
         
-        # 3. Полуфиналы - подменю
-        semifinals_results_menu = results_view_menu.addMenu("Полуфиналы")
+        # 3. Полуфиналы - подменю (динамическое)
+        self.semifinals_results_menu = results_view_menu.addMenu("Полуфиналы")
         
-        self.results_menu_actions["1-й полуфинал"] = QAction("1-й полуфинал", self)
-        self.results_menu_actions["1-й полуфинал"].triggered.connect(lambda: self.show_results_for_stage("1-й полуфинал"))
-        semifinals_results_menu.addAction(self.results_menu_actions["1-й полуфинал"])
+        # self.results_menu_actions["1-й полуфинал"] = QAction("1-й полуфинал", self)
+        # self.results_menu_actions["1-й полуфинал"].triggered.connect(lambda: self.show_results_for_stage("1-й полуфинал"))
+        # semifinals_results_menu.addAction(self.results_menu_actions["1-й полуфинал"])
         
-        self.results_menu_actions["2-й полуфинал"] = QAction("2-й полуфинал", self)
-        self.results_menu_actions["2-й полуфинал"].triggered.connect(lambda: self.show_results_for_stage("2-й полуфинал"))
-        semifinals_results_menu.addAction(self.results_menu_actions["2-й полуфинал"])
+        # self.results_menu_actions["2-й полуфинал"] = QAction("2-й полуфинал", self)
+        # self.results_menu_actions["2-й полуфинал"].triggered.connect(lambda: self.show_results_for_stage("2-й полуфинал"))
+        # semifinals_results_menu.addAction(self.results_menu_actions["2-й полуфинал"])
         
         # 4. Финалы - подменю (динамическое)
         self.finals_results_menu = results_view_menu.addMenu("Финалы")
@@ -20857,6 +20857,8 @@ class MainWindow(QMainWindow):
             
             # Обновляем подменю финалов
             self.update_finals_results_menu(stage_names)
+
+            self.update_semifinals_results_menu(stage_names)
             
             # Также обновляем меню финалов для жеребьевки
             for action in self.menuBar().actions():
@@ -20933,25 +20935,24 @@ class MainWindow(QMainWindow):
             no_finals_action = QAction("Нет доступных финалов", self)
             no_finals_action.setEnabled(False)
             self.finals_results_menu.addAction(no_finals_action)
-            
-#==========================================
-    # def update_finals_results_menu(self, stage_names):
-    #     """Обновление подменю финалов в меню результатов"""
-    #     # Очищаем существующее подменю
-    #     self.finals_results_menu.clear()
+
+
+    def update_semifinals_results_menu(self, stage_names):
+        """Обновление подменю полуфиналов в меню результатов"""
+        self.semifinals_results_menu.clear()
         
-    #     # Находим все финалы в системе
-    #     finals = [s for s in stage_names if "финал" in s.lower() and "полуфинал" not in s.lower()]
+        # Находим все финалы в системе для текущего пола
+        semifinals = [s for s in stage_names if "полуфинал" in s.lower()]
         
-    #     if finals:
-    #         for final in sorted(finals):
-    #             final_action = QAction(final, self)
-    #             final_action.triggered.connect(lambda checked, f=final: self.show_results_for_stage(f))
-    #             self.finals_results_menu.addAction(final_action)
-    #     else:
-    #         no_finals_action = QAction("Нет доступных финалов", self)
-    #         no_finals_action.setEnabled(False)
-    #         self.finals_results_menu.addAction(no_finals_action)
+        if semifinals:
+            for semifinal in sorted(semifinals):
+                semifinal_action = QAction(semifinal, self)
+                semifinal_action.triggered.connect(lambda checked, f=semifinal: self.show_results_for_stage(f))
+                self.semifinals_results_menu.addAction(semifinal_action)
+        else:
+            no_semifinals_action = QAction("Нет доступных финалов", self)
+            no_semifinals_action.setEnabled(False)
+            self.semifinals_results_menu.addAction(no_semifinals_action)         
 #==================================================
     def show_results_for_stage(self, stage_name):
         """Показать результаты для выбранного этапа"""
@@ -26160,149 +26161,6 @@ class MainWindow(QMainWindow):
         else:
             os.system(f'open "{filename}"')
 # Полные соревнования
-    # def assemble_full_competition_pdf(self):
-    #     """Сборка полного PDF-файла соревнования из существующих PDF-файлов (для обоих полов)"""
-    #     if not self.current_title_id:
-    #         QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
-    #         return
-
-    #     try:
-    #         from PyPDF2 import PdfMerger
-    #         import os
-    #         import re
-    #         import glob
-
-    #         title = Title.get_by_id(self.current_title_id)
-    #         short_name = title.short_name_comp if title.short_name_comp else title.name
-    #         clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
-    #         clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
-
-    #         table_pdf_dir = "table_pdf"
-    #         competition_pdf_dir = "competition_pdf"
-    #         if not os.path.exists(competition_pdf_dir):
-    #             os.makedirs(competition_pdf_dir)
-
-    #         missing_files = []
-
-    #         # --- ОБЩИЕ ФАЙЛЫ ---
-    #         common_files = [
-    #             (f"{clean_name}_title_page", "Титульный лист"),
-    #             (f"{clean_name}_GSK_list", "Список ГСК"),
-    #             (f"{clean_name}_regions", "Список регионов"),
-    #         ]
-    #         found_common = []
-    #         for pattern, desc in common_files:
-    #             file_path = os.path.join(table_pdf_dir, pattern + ".pdf")
-    #             if os.path.exists(file_path):
-    #                 found_common.append((file_path, desc))
-    #             else:
-    #                 missing_files.append(f"Общий: {desc} (ожидался файл: {pattern}.pdf)")
-
-    #         # --- ДЕВУШКИ (W) ---
-    #         girls_files = []
-    #         # Таблицы
-    #         for suffix in ["_W_*_one_table", "_W_*_table_group", "_W_*_semifinal", "_W_*_final"]:
-    #             pattern = os.path.join(table_pdf_dir, f"{clean_name}{suffix}.pdf")
-    #             matches = glob.glob(pattern)
-    #             if matches:
-    #                 girls_files.extend([(m, "Таблица (девушки)") for m in matches])
-    #             else:
-    #                 missing_files.append(f"Таблицы девушек (ожидался файл: {clean_name}{suffix}.pdf)")
-
-    #         # Списки девушек
-    #         girls_patterns = [
-    #             (f"{clean_name}_W_players_list_alf", "Список участников по алфавиту (девушки)"),
-    #             (f"{clean_name}_W_players_list_rating", "Список участников по рейтингу (девушки)"),
-    #             (f"{clean_name}_W_podium_list", "Список призёров (девушки)"),
-    #             (f"{clean_name}_W_final_protocol", "Итоговый протокол (девушки)")
-    #         ]
-    #         for pattern, desc in girls_patterns:
-    #             file_path = os.path.join(table_pdf_dir, pattern + ".pdf")
-    #             if os.path.exists(file_path):
-    #                 girls_files.append((file_path, desc))
-    #             else:
-    #                 missing_files.append(f"{desc} (ожидался файл: {pattern}.pdf)")
-
-    #         # --- ЮНОШИ (M) ---
-    #         boys_files = []
-    #         for suffix in ["_M_*_one_table", "_M_*_table_group", "_M_*_semifinal", "_M_*_final"]:
-    #             pattern = os.path.join(table_pdf_dir, f"{clean_name}{suffix}.pdf")
-    #             matches = glob.glob(pattern)
-    #             if matches:
-    #                 boys_files.extend([(m, "Таблица (юноши)") for m in matches])
-    #             else:
-    #                 missing_files.append(f"Таблицы юношей (ожидался файл: {clean_name}{suffix}.pdf)")
-
-    #         boys_patterns = [
-    #             (f"{clean_name}_M_players_list_alf", "Список участников по алфавиту (юноши)"),
-    #             (f"{clean_name}_M_players_list_rating", "Список участников по рейтингу (юноши)"),
-    #             (f"{clean_name}_M_podium_list", "Список призёров (юноши)"),
-    #             (f"{clean_name}_M_final_protocol", "Итоговый протокол (юноши)")
-    #         ]
-    #         for pattern, desc in boys_patterns:
-    #             file_path = os.path.join(table_pdf_dir, pattern + ".pdf")
-    #             if os.path.exists(file_path):
-    #                 boys_files.append((file_path, desc))
-    #             else:
-    #                 missing_files.append(f"{desc} (ожидался файл: {pattern}.pdf)")
-
-    #         if missing_files:
-    #             # Формируем сообщение с деталями
-    #             msg = "Для сборки полного соревнования не хватает следующих файлов:\n\n"
-    #             for item in missing_files:
-    #                 msg += f"• {item}\n"
-    #             msg += "\nСоздайте недостающие файлы через соответствующие пункты меню."
-    #             QMessageBox.warning(self, "Отсутствуют файлы", msg)
-    #             return
-
-    #         # Собираем все файлы в нужном порядке
-    #         all_files = []
-
-    #         # 1. Общие файлы
-    #         all_files.extend(found_common)
-
-    #         # 2. Девушки
-    #         all_files.extend(girls_files)
-
-    #         # 3. Юноши
-    #         all_files.extend(boys_files)
-
-    #         if not all_files:
-    #             QMessageBox.warning(self, "Ошибка", "Не найдено ни одного PDF-файла для сборки")
-    #             return
-
-    #         # Объединяем
-    #         merger = PdfMerger()
-    #         for file_path, desc in all_files:
-    #             try:
-    #                 merger.append(file_path)
-    #                 print(f"Добавлен файл: {os.path.basename(file_path)} ({desc})")
-    #             except Exception as e:
-    #                 print(f"Ошибка добавления файла {file_path}: {e}")
-    #                 continue
-
-    #         output_file = os.path.join(competition_pdf_dir, f"{clean_name}_full_competition.pdf")
-    #         merger.write(output_file)
-    #         merger.close()
-
-    #         QMessageBox.information(self, "Успех", f"Полный файл соревнования сохранён:\n{output_file}")
-
-    #         reply = QMessageBox.question(self, "Открыть файл",
-    #                                     "Открыть созданный PDF файл?",
-    #                                     QMessageBox.Yes | QMessageBox.No)
-    #         if reply == QMessageBox.Yes:
-    #             if sys.platform == 'win32':
-    #                 os.startfile(output_file)
-    #             else:
-    #                 os.system(f'open "{output_file}"')
-
-    #     except ImportError:
-    #         QMessageBox.critical(self, "Ошибка", "Не установлен модуль PyPDF2. Установите его: pip install PyPDF2")
-    #     except Exception as e:
-    #         import traceback
-    #         traceback.print_exc()
-    #         QMessageBox.critical(self, "Ошибка", f"Не удалось собрать PDF: {str(e)}")
-
     def assemble_full_competition_pdf(self):
         """Сборка полного PDF-файла соревнования на основе реальных этапов в системе"""
         if not self.current_title_id:

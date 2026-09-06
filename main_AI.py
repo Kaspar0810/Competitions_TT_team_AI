@@ -18185,11 +18185,9 @@ class MainWindow(QMainWindow):
             
             consolation = [
                 # Места 9-10 (финал основной сетки)
-                {'matches': [9, 10], 'offset': 0, 'type': 'final_group'},
+                {'matches': [8], 'offset': 2, 'type': 'final_group'},
                 # Места 11-14
-                {'matches': [8, 11, 12, 13], 'offset': 2, 'type': 'mixed_group'},
-                # Места 15-16
-                {'matches': [14, 15, 16, 17], 'offset': 6, 'type': 'full_group'},
+                {'matches': [9, 10, 11, 12], 'offset': 4, 'type': 'full_group_4'},
             ]
         
         # Проверка на допустимый номер матча

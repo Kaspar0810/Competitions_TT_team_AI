@@ -820,10 +820,7 @@ class MainWindow(QMainWindow):
                 background-color: #4CAF50;
                 color: white;
             }
-        """)
-
-        # Устанавливаем стиль для подсказок (можно добавить в setStyleSheet)
-        self.list_widget.setStyleSheet("""
+            # Устанавливаем стиль для подсказок (можно добавить в setStyleSheet)
             QListWidget::item:hover {
                 background-color: #e3f2fd;
             }
@@ -18169,15 +18166,13 @@ class MainWindow(QMainWindow):
             
             consolation = [
                 # Места 17-18 (финал основной сетки)
-                {'matches': [19, 20], 'offset': 0, 'type': 'final_group'},
+                {'matches': [16], 'offset': 2, 'type': 'final_group'},
                 # Места 19-22
-                {'matches': [16, 17, 18, 21], 'offset': 2, 'type': 'mixed_group'},
+                {'matches': [17, 18, 19, 20], 'offset': 4, 'type': 'full_group_4'},
                 # Места 23-26
-                {'matches': [22, 23, 24, 25], 'offset': 6, 'type': 'full_group'},
-                # Места 27-30
-                {'matches': [26, 27, 28, 29], 'offset': 10, 'type': 'full_group'},
+                {'matches': [21, 22, 23, 24, 25, 26, 27, 28], 'offset': 8, 'type': 'full_group_8'},
                 # Места 31-32
-                {'matches': [30, 31, 32, 33], 'offset': 14, 'type': 'full_group'},
+                {'matches': [29, 30, 31, 32], 'offset': 12, 'type': 'full_group_4'},
             ]
         else:  # total_players == 8
             max_match = game
@@ -23108,14 +23103,14 @@ class MainWindow(QMainWindow):
         if not system:
             return None
 
-        # Получаем результаты
+        # Получаем результаты для групповых этапов или одной таблицы
         if stage in group_list or stage == "Одна таблица":
             results = Result.select().where(
                 (Result.title_id == self.current_title_id) &
                 (Result.sex == self.current_sex) &
                 (Result.system_stage == stage)
             )
-        else:
+        else: # Для финальных этапов
             results = Result.select().where(
                 (Result.title_id == self.current_title_id) &
                 (Result.sex == self.current_sex) &
@@ -23124,24 +23119,29 @@ class MainWindow(QMainWindow):
 
         if runner_type == "Урезанный":
             # ====  Одна таблица ====
-            if stage != "Одна таблица":            
-                # Фильтруем по номеру группы/финала
-                if subgroup != "Все группы" and subgroup != "Все финалы":
-                    results = results.where(Result.number_group == subgroup)
+            if stage in group_list:            
+                # Фильтруем по номеру группы
+                if subgroup != "Все группы":
+                    results = results.where(Result.system_stage == stage)
+                else:
+                    results = results.where((Result.system_stage == stage) & (Result.number_group == subgroup))
             elif stage == "Одна таблица":
                  # Фильтруем по номеру группы/финала
-                if subgroup != "Все группы" and subgroup != "Все финалы":
-                    results = results.where(Result.number_group == "1 группа")
+                results = results.where((Result.system_stage == stage) & (Result.number_group == "1 группа"))
             else:
-                # Фильтруем по номеру группы/финала
-                if subgroup != "Все группы" and subgroup != "Все финалы":
-                    results = results.where(Result.number_group == subgroup)
+                # Фильтруем по номеру финала
+                if subgroup == "Все финалы":
+                    results = results.where(Result.number_group == stage)
 
             # Фильтруем по турам
             if tours == "несыгранные":
-                results = results.where(Result.winner.is_null())
-            elif tours == "диапазон" and list_tours:
-                results = results.where(Result.tours.in_(list_tours))
+                results = results.where(
+                    (Result.winner.is_null(True)) &
+                    (Result.player1 != "") &
+                    (Result.player2 != "")
+                    )
+            # elif tours == "диапазон" and list_tours:
+            #     results = results.where(Result.tours.in_(list_tours))
 
             results_list = list(results)
             if not results_list:

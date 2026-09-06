@@ -631,7 +631,7 @@ class MainWindow(QMainWindow):
         month_label.setStyleSheet("font-size: 12px; font-weight: bold; color: #555; min-width: 40px;")
         month_layout.addWidget(month_label)
         self.month_combo = QComboBox()
-        self.month_combo.addItem("Все")
+        self.month_combo.addItem("Все месяцы")
         months = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
                 "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"]
         for month in months:
@@ -650,12 +650,12 @@ class MainWindow(QMainWindow):
         sredi_layout = QHBoxLayout(sredi_container)
         sredi_layout.setContentsMargins(0, 0, 0, 0)
         sredi_layout.setSpacing(5)
-        sredi_label = QLabel("Категория:")
+        sredi_label = QLabel("Среди:")
         sredi_label.setStyleSheet("font-size: 12px; font-weight: bold; color: #555; min-width: 60px;")
         sredi_layout.addWidget(sredi_label)
         self.sredi_combo = QComboBox()
         self.sredi_combo.addItem("Все категории")
-        self.sredi_combo.addItems(["мальчики и девочки", "юноши и девушки", "юниоры и юниорки", "мужчины и женщины"])
+        self.sredi_combo.addItems(["мальчиков и девочек", "юношей и девушек", "юниоров и юниорок", "мужчин и женщин"])
         self.sredi_combo.currentTextChanged.connect(self.filter_competitions)
         sredi_layout.addWidget(self.sredi_combo)
         sredi_layout.addStretch()
@@ -5432,7 +5432,6 @@ class MainWindow(QMainWindow):
             self.change_label_ListWidget(index)
 
             self.table_container.setCurrentWidget(self.rating_table_view)  # предполагаем, что есть rating_table_view
-            # self.table_header.setText("⭐ Рейтинг участников")
             self.table_header.setStyleSheet("""
                 background-color: #FF9800;
                 color: white;
@@ -8165,7 +8164,6 @@ class MainWindow(QMainWindow):
             
             # Устанавливаем фокус на поле "Отчество"
             self.patronymic_edit.setFocus()
-            # self.fio_edit.clear()
 
     def _reset_search_label(self):
         """Сброс заголовка поиска"""
@@ -8229,8 +8227,8 @@ class MainWindow(QMainWindow):
                     display_name = title.name[:40] + "..." if len(title.name) > 40 else title.name
                     
                     item_text = f"""🏆 {display_name}
-        📅 {start_date} | {title.mesto or '—'}
-        👥 {title.sredi or '—'} | {title.vozrast or '—'}"""
+        📅 {start_date} | {title.mesto}
+        👥 {title.sredi} | {title.vozrast}"""
                     
                     item = QListWidgetItem(item_text)
                     item.setData(Qt.UserRole, title.id)

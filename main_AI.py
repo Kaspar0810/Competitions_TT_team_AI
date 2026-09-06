@@ -14828,7 +14828,7 @@ class MainWindow(QMainWindow):
 
             # Заголовок
             elements.append(Paragraph("Список спортсменов с повторяющимися фамилиями", title_style))
-            elements.append(Paragraph(f"Соревнование: {title.name}", styles['Normal']))
+            elements.append(Paragraph(f"Соревнование: {title.name}", title_style))
             elements.append(Spacer(1, 0.5*cm))
 
             # Для каждой фамилии создаём таблицу
@@ -14839,16 +14839,16 @@ class MainWindow(QMainWindow):
                 elements.append(Paragraph(f"Фамилия: {surname} ({len(players_list)} чел.)", surname_style))
 
                 # Таблица с данными
-                table_data = [["№", "ФИО", "Город", "Регион", "Разряд", "Рейтинг"]]
+                table_data = [["№", "ФИО", "Город", "Регион", "Рейтинг"]]
                 for idx, player in enumerate(players_list, 1):
                     fio = player.fio if player.fio else player.player
                     city = player.city or ""
                     region = player.region or ""
-                    razryad = player.razryad or ""
+                    # razryad = player.razryad or ""
                     rank = str(player.rank) if player.rank else "0"
-                    table_data.append([str(idx), fio, city, region, razryad, rank])
+                    table_data.append([str(idx), fio, city, region, rank])
 
-                table = Table(table_data, colWidths=[1*cm, 5*cm, 3*cm, 4*cm, 2*cm, 2*cm], repeatRows=1)
+                table = Table(table_data, colWidths=[1*cm, 6*cm, 3*cm, 4*cm, 2*cm], repeatRows=1)
                 table.setStyle(TableStyle([
                     ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSerif'),
                     ('FONTSIZE', (0, 0), (-1, -1), 9),

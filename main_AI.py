@@ -821,6 +821,25 @@ class MainWindow(QMainWindow):
                 color: white;
             }
         """)
+
+        # Устанавливаем стиль для подсказок (можно добавить в setStyleSheet)
+        self.list_widget.setStyleSheet("""
+            QListWidget::item:hover {
+                background-color: #e3f2fd;
+            }
+            QToolTip {
+                background-color: #f5f5f5;
+                border: 1px solid #4CAF50;
+                border-radius: 4px;
+                padding: 8px;
+                font-size: 11px;
+                max-width: 400px;
+            }
+        """)
+
+        self.list_widget.itemEntered.connect(self.show_competition_tooltip)
+        self.list_widget.setMouseTracking(True)
+
         self.list_widget.itemClicked.connect(self.on_title_selected)
         right_panel_layout.addWidget(self.list_widget)
         
@@ -8178,6 +8197,31 @@ class MainWindow(QMainWindow):
                     font-size: 11px;
                     border-radius: 3px;
                 """)
+
+    def show_competition_tooltip(self, item):
+        """Показывает всплывающую подсказку с информацией о соревновании"""
+        title_id = item.data(Qt.UserRole)
+        if not title_id:
+            return
+
+        try:
+            title = Title.get_by_id(title_id)
+            if not title:
+                return
+
+            # Формируем текст подсказки
+            tooltip_text = f"""<b>{title.name}</b><br/>
+    <b>Даты:</b> {title.data_start.strftime('%d.%m.%Y') if title.data_start else '---'} - {title.data_end.strftime('%d.%m.%Y') if title.data_end else '---'}<br/>
+    <b>Категория:</b> {title.sredi or '—'}<br/>
+    <b>Возраст:</b> {title.vozrast or '—'}<br/>
+    <b>Место:</b> {title.mesto or '—'}<br/>
+    <b>Главный судья:</b> {title.referee or '—'}<br/>
+    <b>Главный секретарь:</b> {title.secretary or '—'}"""
+
+            # Устанавливаем подсказку для элемента
+            item.setToolTip(tooltip_text)
+        except Exception as e:
+            print(f"Ошибка загрузки данных для подсказки: {e}")
 
     def filter_competitions(self):
         """Фильтрация списка соревнований по критериям"""

@@ -283,15 +283,47 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             print(f"Ошибка загрузки команд: {e}")
-
+# ======== старый
+    # def load_doubles_for_title(self):
+    #     """Загрузка пар для выбранного соревнования"""
+    #     if not self.current_title_id:
+    #         self.doubles_table_view.setModel(None)
+    #         return
+        
+    #     try:
+    #         query = Players_double.select().where(Players_double.title_id == self.current_title_id)
+    #         doubles_data = []
+    #         for double in query:
+    #             doubles_data.append({
+    #                 'id': double.id,
+    #                 'player1': double.player_1 or "",
+    #                 'player2': double.player_2 or "",
+    #                 'region': double.region_main or "",
+    #                 'r_sum': double.r_sum or 0,
+    #                 'posev': double.posev or 0,
+    #                 'mesto': double.mesto or 0
+    #             })
+            
+    #         self.double_players_model.setData(doubles_data)
+    #         self.doubles_table_view.setModel(self.double_players_model)
+            
+    #     except Exception as e:
+    #         print(f"Ошибка загрузки пар: {e}")
+# ============= new 0709
     def load_doubles_for_title(self):
         """Загрузка пар для выбранного соревнования"""
         if not self.current_title_id:
             self.doubles_table_view.setModel(None)
             return
-        
+
         try:
             query = Players_double.select().where(Players_double.title_id == self.current_title_id)
+            
+            if query.count() == 0:
+                self.double_players_model.setData([])
+                self.doubles_table_view.setModel(self.double_players_model)
+                return
+
             doubles_data = []
             for double in query:
                 doubles_data.append({
@@ -303,13 +335,51 @@ class MainWindow(QMainWindow):
                     'posev': double.posev or 0,
                     'mesto': double.mesto or 0
                 })
-            
+
             self.double_players_model.setData(doubles_data)
             self.doubles_table_view.setModel(self.double_players_model)
-            
+
         except Exception as e:
             print(f"Ошибка загрузки пар: {e}")
+            self.double_players_model.setData([])
+            self.doubles_table_view.setModel(self.double_players_model)
 
+    # def load_doubles_for_title(self):
+    #     """Загрузка пар для выбранного соревнования"""
+    #     if not self.current_title_id:
+    #         self.doubles_table_view.setModel(None)
+    #         return
+
+    #     try:
+    #         query = Players_double.select().where(Players_double.title_id == self.current_title_id)
+            
+    #         if query.count() == 0:
+    #             self.double_players_model.setData([])
+    #             self.doubles_table_view.setModel(self.double_players_model)
+    #             return
+
+    #         doubles_data = []
+    #         for double in query:
+    #             doubles_data.append({
+    #                 'id': double.id,
+    #                 'player1': double.para_shot or double.player_1 or "",
+    #                 'player2': double.para_full or f"{double.player_1} / {double.player_2}" or "",
+    #                 'region': double.region_main or "",
+    #                 'r_sum': double.r_sum or 0,
+    #                 'posev': double.posev or 0,
+    #                 'mesto': double.mesto or 0,
+    #                 'double_vid': double.double_vid or ""
+    #             })
+
+    #         self.double_players_model.setData(doubles_data)
+    #         self.doubles_table_view.setModel(self.double_players_model)
+
+    #     except Exception as e:
+    #         print(f"Ошибка загрузки пар: {e}")
+    #         self.double_players_model.setData([])
+    #         self.doubles_table_view.setModel(self.double_players_model)
+
+#===========
     def load_results_for_title(self):
         """Загрузка результатов для выбранного соревнования"""
         if not self.current_title_id:
@@ -1991,9 +2061,84 @@ class MainWindow(QMainWindow):
         main_layout.addStretch()
         
         return tab_widget
+# ==== old ====
+    # def create_doubles_tab(self):
+    #     """Вкладка пар"""
+    #     tab_widget = QWidget()
+    #     main_layout = QVBoxLayout(tab_widget)
+    #     main_layout.setSpacing(8)
+    #     main_layout.setContentsMargins(10, 10, 10, 10)
+        
+    #     input_style = """
+    #         QLineEdit, QComboBox {
+    #             max-height: 26px;
+    #             padding: 3px 5px;
+    #             font-size: 10px;
+    #             border: 1px solid #ccc;
+    #             border-radius: 3px;
+    #         }
+    #         QLabel {
+    #             font-size: 10px;
+    #         }
+    #     """
+        
+    #     form_widget = QWidget()
+    #     form_layout = QFormLayout(form_widget)
+    #     form_layout.setSpacing(8)
+    #     form_layout.setContentsMargins(0, 0, 0, 0)
+        
+    #     self.player1_edit = QLineEdit()
+    #     self.player1_edit.setPlaceholderText("ФИО первого игрока")
+    #     self.player1_edit.setMaximumHeight(26)
+    #     self.player1_edit.setStyleSheet(input_style)
+    #     form_layout.addRow("Игрок 1:", self.player1_edit)
+        
+    #     self.player2_edit = QLineEdit()
+    #     self.player2_edit.setPlaceholderText("ФИО второго игрока")
+    #     self.player2_edit.setMaximumHeight(26)
+    #     self.player2_edit.setStyleSheet(input_style)
+    #     form_layout.addRow("Игрок 2:", self.player2_edit)
+    #     # =========== new =======0709
+    #     # В create_doubles_tab или в init_ui после создания полей
+    #     # self.player1_edit = QLineEdit()
+    #     # self.player2_edit = QLineEdit()
+
+    #     # Создаём QCompleter для поля "Игрок 1"
+    #     self.player1_completer = QCompleter()
+    #     self.player1_completer.setCaseSensitivity(Qt.CaseInsensitive)
+    #     self.player1_completer.setFilterMode(Qt.MatchContains)
+    #     self.player1_edit.setCompleter(self.player1_completer)
+
+    #     # Создаём QCompleter для поля "Игрок 2"
+    #     self.player2_completer = QCompleter()
+    #     self.player2_completer.setCaseSensitivity(Qt.CaseInsensitive)
+    #     self.player2_completer.setFilterMode(Qt.MatchContains)
+    #     self.player2_edit.setCompleter(self.player2_completer)
+
+    #     # Подключаем обновление списка при смене соревнования
+    #     self.player1_edit.textChanged.connect(self.update_player_completer)
+    #     self.player2_edit.textChanged.connect(self.update_player_completer)
+    #     #========================
+    #     self.double_region_combo = QComboBox()
+    #     self.double_region_combo.addItem("", None)
+    #     for rid, rname in self.regions_list:
+    #         self.double_region_combo.addItem(rname, rid)
+    #     self.double_region_combo.setMaximumHeight(26)
+    #     self.double_region_combo.setStyleSheet(input_style)
+    #     form_layout.addRow("Регион:", self.double_region_combo)
+        
+    #     self.double_vid_combo = QComboBox()
+    #     self.double_vid_combo.addItems(["Мужская", "Женская", "Смешанная"])
+    #     self.double_vid_combo.setMaximumHeight(26)
+    #     self.double_vid_combo.setStyleSheet(input_style)
+    #     form_layout.addRow("Вид пары:", self.double_vid_combo)
+        
+    #     main_layout.addWidget(form_widget)
+    #     main_layout.addStretch()
+        
+    #     return tab_widget
 
     def create_doubles_tab(self):
-        """Вкладка пар"""
         tab_widget = QWidget()
         main_layout = QVBoxLayout(tab_widget)
         main_layout.setSpacing(8)
@@ -2021,21 +2166,33 @@ class MainWindow(QMainWindow):
         self.player1_edit.setPlaceholderText("ФИО первого игрока")
         self.player1_edit.setMaximumHeight(26)
         self.player1_edit.setStyleSheet(input_style)
+        # Добавляем Completer для поиска игроков
+        self.player1_completer = QCompleter()
+        self.player1_completer.setCaseSensitivity(Qt.CaseInsensitive)
+        self.player1_completer.setFilterMode(Qt.MatchContains)
+        self.player1_edit.setCompleter(self.player1_completer)
+        # Подключаем обработчик для заполнения региона
+        self.player1_edit.textChanged.connect(lambda: self.update_double_region())
         form_layout.addRow("Игрок 1:", self.player1_edit)
         
         self.player2_edit = QLineEdit()
         self.player2_edit.setPlaceholderText("ФИО второго игрока")
         self.player2_edit.setMaximumHeight(26)
         self.player2_edit.setStyleSheet(input_style)
+        self.player2_completer = QCompleter()
+        self.player2_completer.setCaseSensitivity(Qt.CaseInsensitive)
+        self.player2_completer.setFilterMode(Qt.MatchContains)
+        self.player2_edit.setCompleter(self.player2_completer)
+        self.player2_edit.textChanged.connect(lambda: self.update_double_region())
         form_layout.addRow("Игрок 2:", self.player2_edit)
         
-        self.double_region_combo = QComboBox()
-        self.double_region_combo.addItem("", None)
-        for rid, rname in self.regions_list:
-            self.double_region_combo.addItem(rname, rid)
-        self.double_region_combo.setMaximumHeight(26)
-        self.double_region_combo.setStyleSheet(input_style)
-        form_layout.addRow("Регион:", self.double_region_combo)
+        # Заменяем comboBox на QLineEdit
+        self.double_region_edit = QLineEdit()
+        self.double_region_edit.setPlaceholderText("Регион (заполняется автоматически)")
+        self.double_region_edit.setMaximumHeight(26)
+        self.double_region_edit.setStyleSheet(input_style)
+        self.double_region_edit.setReadOnly(True)  # Делаем поле только для чтения
+        form_layout.addRow("Регион:", self.double_region_edit)
         
         self.double_vid_combo = QComboBox()
         self.double_vid_combo.addItems(["Мужская", "Женская", "Смешанная"])
@@ -2047,7 +2204,482 @@ class MainWindow(QMainWindow):
         main_layout.addStretch()
         
         return tab_widget
+# =========== для парных списков 0709
+    # def update_player_completer(self):
+    #     """Обновляет список игроков для автодополнения на вкладке 'Пары'"""
+    #     if not self.current_title_id:
+    #         return
 
+    #     # Получаем список игроков текущего соревнования
+    #     players = Player.select().where(
+    #         (Player.title_id == self.current_title_id) &
+    #         (Player.player != "X")  # исключаем "X"
+    #     )
+
+    #     # Формируем список строк для Completer
+    #     player_list = []
+    #     for player in players:
+    #         # Формируем отображаемое имя: ФИО (Город)
+    #         display_name = player.fio if player.fio else player.player
+    #         if player.city:
+    #             display_name += f" ({player.city})"
+    #         player_list.append(display_name)
+
+    #     # Обновляем Completer для поля "Игрок 1"
+    #     model = QStringListModel(player_list)
+    #     self.player1_completer.setModel(model)
+    #     # Обновляем Completer для поля "Игрок 2"
+    #     self.player2_completer.setModel(model)
+
+    # def update_double_region(self):
+    #     """Обновляет поле региона при вводе игроков"""
+    #     player1_text = self.player1_edit.text().strip()
+    #     player2_text = self.player2_edit.text().strip()
+        
+    #     if not player1_text or not player2_text:
+    #         return
+        
+    #     # Получаем данные игроков из базы
+    #     player1 = self._find_player_by_name(player1_text)
+    #     player2 = self._find_player_by_name(player2_text)
+        
+    #     if not player1 or not player2:
+    #         return
+        
+    #     city1 = player1.city if player1.city else ""
+    #     city2 = player2.city if player2.city else ""
+    #     rank1 = player1.rank if player1.rank else 0
+    #     rank2 = player2.rank if player2.rank else 0
+        
+    #     # Определяем порядок городов: сначала город с более высоким рейтингом
+    #     if rank1 >= rank2:
+    #         first_city = city1
+    #         second_city = city2
+    #     else:
+    #         first_city = city2
+    #         second_city = city1
+        
+    #     # Формируем регион
+    #     if city1 and city2 and city1 != city2:
+    #         region = f"{first_city}-{second_city}"
+    #     elif city1:
+    #         region = city1
+    #     elif city2:
+    #         region = city2
+    #     else:
+    #         region = ""
+        
+    #     self.double_region_edit.setText(region)
+
+    def update_double_region(self):
+        """Обновляет поле региона при вводе игроков"""
+        player1_text = self.player1_edit.text().strip()
+        player2_text = self.player2_edit.text().strip()
+        
+        if not player1_text or not player2_text:
+            return
+        
+        # Получаем данные игроков из базы
+        player1 = self._find_player_by_name(player1_text)
+        player2 = self._find_player_by_name(player2_text)
+        
+        if not player1 or not player2:
+            return
+        
+        city1 = player1.city if player1.city else ""
+        city2 = player2.city if player2.city else ""
+        rank1 = player1.rank if player1.rank else 0
+        rank2 = player2.rank if player2.rank else 0
+        
+        # Определяем порядок городов: сначала город с более высоким рейтингом
+        if rank1 >= rank2:
+            first_city = city1
+            second_city = city2
+        else:
+            first_city = city2
+            second_city = city1
+        
+        # Формируем регион
+        if city1 and city2 and city1 != city2:
+            region = f"{first_city}-{second_city}"
+        elif city1:
+            region = city1
+        elif city2:
+            region = city2
+        else:
+            region = ""
+    
+        self.double_region_edit.setText(region)
+
+    def _find_player_by_name(self, name_text):
+        """Находит игрока в базе по ФИО (с учётом города)"""
+        if not name_text:
+            return None
+        
+        # Ищем по полному совпадению с городом
+        player = Player.get_or_none(Player.fio_city == name_text)
+        if player:
+            return player
+        
+        # Ищем по ФИО без города
+        if ' (' in name_text:
+            name_only = name_text.split(' (')[0]
+            player = Player.get_or_none(Player.fio == name_only)
+            if player:
+                return player
+        
+        # Ищем по частичному совпадению
+        players = Player.select().where(
+            (Player.title_id == self.current_title_id) &
+            ((Player.fio.contains(name_text)) | (Player.player.contains(name_text)))
+        )
+        if players.count() > 0:
+            return players[0]
+        
+        return None
+
+    def update_double_player_completer(self):
+        """Обновляет список игроков для автодополнения на вкладке 'Пары'"""
+        if not self.current_title_id:
+            return
+
+        query = Player.select().where(Player.title_id == self.current_title_id)
+        
+        # Исключаем "X"
+        query = query.where(Player.player != "X")
+        
+        player_list = []
+        for player in query:
+            display_name = player.fio if player.fio else player.player
+            if player.city:
+                display_name += f" ({player.city})"
+            player_list.append(display_name)
+
+        model = QStringListModel(player_list)
+        self.player1_completer.setModel(model)
+        self.player2_completer.setModel(model)
+
+    # def generate_pairs(self):
+    #     """Формирование пар из введённых игроков"""
+    #     player1_text = self.player1_edit.text().strip()
+    #     player2_text = self.player2_edit.text().strip()
+        
+    #     if not player1_text or not player2_text:
+    #         QMessageBox.warning(self, "Ошибка", "Введите обоих игроков")
+    #         return
+        
+    #     if player1_text == player2_text:
+    #         QMessageBox.warning(self, "Ошибка", "Игроки должны быть разными")
+    #         return
+        
+    #     # Получаем игроков из базы
+    #     player1 = self._find_player_by_name(player1_text)
+    #     player2 = self._find_player_by_name(player2_text)
+        
+    #     if not player1:
+    #         QMessageBox.warning(self, "Ошибка", f"Игрок '{player1_text}' не найден")
+    #         return
+        
+    #     if not player2:
+    #         QMessageBox.warning(self, "Ошибка", f"Игрок '{player2_text}' не найден")
+    #         return
+        
+    #     # Проверяем, не существует ли уже такая пара
+    #     existing = Players_double.get_or_none(
+    #         (Players_double.title_id == self.current_title_id) &
+    #         (Players_double.player_1 == player1_text) &
+    #         (Players_double.player_2 == player2_text)
+    #     )
+    #     if existing:
+    #         QMessageBox.warning(self, "Ошибка", f"Пара {player1_text} - {player2_text} уже существует")
+    #         return
+        
+    #     # Получаем регион из поля (уже сформирован)
+    #     region = self.double_region_edit.text().strip()
+        
+    #     # Рассчитываем сумму рейтингов
+    #     r_sum = (player1.rank or 0) + (player2.rank or 0)
+        
+    #     try:
+    #         # Создаём пару
+    #         double = Players_double.create(
+    #             title_id=self.current_title_id,
+    #             player_1=player1_text,
+    #             player_2=player2_text,
+    #             player_1_id=player1.id,
+    #             player_2_id=player2.id,
+    #             region_main=region,
+    #             r_sum=r_sum,
+    #             posev=0,
+    #             mesto=0,
+    #             vid_pari=self.double_vid_combo.currentText()
+    #         )
+            
+    #         # Обновляем таблицу
+    #         self.load_doubles_for_title()
+            
+    #         # Очищаем форму
+    #         self.player1_edit.clear()
+    #         self.player2_edit.clear()
+    #         self.double_region_edit.clear()
+            
+    #         QMessageBox.information(self, "Успех", f"Пара успешно создана")
+            
+    #     except Exception as e:
+    #         QMessageBox.critical(self, "Ошибка", f"Не удалось создать пару: {str(e)}")
+
+    # def generate_pairs(self):
+    #     """Формирование пар из введённых игроков"""
+    #     player1_text = self.player1_edit.text().strip()
+    #     player2_text = self.player2_edit.text().strip()
+        
+    #     if not player1_text or not player2_text:
+    #         QMessageBox.warning(self, "Ошибка", "Введите обоих игроков")
+    #         return
+        
+    #     if player1_text == player2_text:
+    #         QMessageBox.warning(self, "Ошибка", "Игроки должны быть разными")
+    #         return
+        
+    #     # Получаем игроков из базы
+    #     player1 = self._find_player_by_name(player1_text)
+    #     player2 = self._find_player_by_name(player2_text)
+        
+    #     if not player1:
+    #         QMessageBox.warning(self, "Ошибка", f"Игрок '{player1_text}' не найден")
+    #         return
+        
+    #     if not player2:
+    #         QMessageBox.warning(self, "Ошибка", f"Игрок '{player2_text}' не найден")
+    #         return
+        
+    #     # Проверяем, не существует ли уже такая пара
+    #     existing = Players_double.get_or_none(
+    #         (Players_double.title_id == self.current_title_id) &
+    #         (Players_double.player_1 == player1.fio) &
+    #         (Players_double.player_2 == player2.fio)
+    #     )
+    #     if existing:
+    #         QMessageBox.warning(self, "Ошибка", f"Пара {player1.fio} - {player2.fio} уже существует")
+    #         return
+        
+    #     # Получаем регионы и рейтинги
+    #     region1 = player1.city or ""
+    #     region2 = player2.city or ""
+    #     r1 = player1.rank or 0
+    #     r2 = player2.rank or 0
+        
+    #     # Формируем регион пары (город с более высоким рейтингом первым)
+    #     if r1 >= r2:
+    #         first_city = region1
+    #         second_city = region2
+    #     else:
+    #         first_city = region2
+    #         second_city = region1
+        
+    #     if region1 and region2 and region1 != region2:
+    #         region_main = f"{first_city}-{second_city}"
+    #     elif region1:
+    #         region_main = region1
+    #     elif region2:
+    #         region_main = region2
+    #     else:
+    #         region_main = ""
+        
+    #     # Сумма рейтингов
+    #     r_sum = r1 + r2
+        
+    #     # Определяем вид пары на основе пола игроков
+    #     sex1 = player1.sex if player1.sex else "man"
+    #     sex2 = player2.sex if player2.sex else "man"
+        
+    #     if sex1 == "woman" and sex2 == "woman":
+    #         double_vid = "woman"
+    #     elif sex1 == "man" and sex2 == "man":
+    #         double_vid = "man"
+    #     else:
+    #         double_vid = "mix"
+        
+    #     # Формируем para_shot (Фамилия И. / Фамилия И.) и para_full (ФИО1 / ФИО2)
+    #     # Разбиваем ФИО на части
+    #     def get_short_name(fio):
+    #         parts = fio.split()
+    #         if len(parts) >= 2:
+    #             return f"{parts[0]} {parts[1][0]}."
+    #         return fio
+        
+    #     # Короткое имя: Фамилия И. / Фамилия И.
+    #     shot1 = get_short_name(player1.fio)
+    #     shot2 = get_short_name(player2.fio)
+    #     para_shot = f"{shot1} / {shot2}"
+        
+    #     # Полное имя: ФИО1 / ФИО2
+    #     para_full = f"{player1.fio} / {player2.fio}"
+        
+    #     try:
+    #         # Создаём пару
+    #         double = Players_double.create(
+    #             title_id=self.current_title_id,
+    #             player_1=player1.fio,
+    #             region_1=region1,
+    #             r_1=r1,
+    #             player_2=player2.fio,
+    #             region_2=region2,
+    #             r_2=r2,
+    #             region_main=region_main,
+    #             r_sum=r_sum,
+    #             double_vid=double_vid,
+    #             sex=self.current_sex if self.current_sex else "man",
+    #             para_full=para_full,
+    #             para_shot=para_shot,
+    #             posev=0,
+    #             mesto=0
+    #         )
+            
+    #         # Обновляем таблицу
+    #         self.load_doubles_for_title()
+            
+    #         # Очищаем форму
+    #         self.player1_edit.clear()
+    #         self.player2_edit.clear()
+    #         self.double_region_edit.clear()
+            
+    #         QMessageBox.information(self, "Успех", 
+    #             f"Пара успешно создана:\n"
+    #             f"{player1.fio} / {player2.fio}\n"
+    #             f"Вид: {double_vid}\n"
+    #             f"Рейтинг: {r_sum}")
+            
+    #     except Exception as e:
+    #         QMessageBox.critical(self, "Ошибка", f"Не удалось создать пару: {str(e)}")
+    #         import traceback
+    #         traceback.print_exc()
+
+    def generate_pairs(self):
+        """Формирование пар из введённых игроков"""
+        player1_text = self.player1_edit.text().strip()
+        player2_text = self.player2_edit.text().strip()
+        
+        if not player1_text or not player2_text:
+            QMessageBox.warning(self, "Ошибка", "Введите обоих игроков")
+            return
+        
+        if player1_text == player2_text:
+            QMessageBox.warning(self, "Ошибка", "Игроки должны быть разными")
+            return
+        
+        # Получаем игроков из базы
+        player1 = self._find_player_by_name(player1_text)
+        player2 = self._find_player_by_name(player2_text)
+        
+        if not player1:
+            QMessageBox.warning(self, "Ошибка", f"Игрок '{player1_text}' не найден")
+            return
+        
+        if not player2:
+            QMessageBox.warning(self, "Ошибка", f"Игрок '{player2_text}' не найден")
+            return
+        
+        # Проверяем, не существует ли уже такая пара
+        existing = Players_double.get_or_none(
+            (Players_double.title_id == self.current_title_id) &
+            (Players_double.player_1 == player1.fio) &
+            (Players_double.player_2 == player2.fio)
+        )
+        if existing:
+            QMessageBox.warning(self, "Ошибка", f"Пара {player1.fio} - {player2.fio} уже существует")
+            return
+        
+        # Получаем регионы и рейтинги
+        region1 = player1.city or ""
+        region2 = player2.city or ""
+        r1 = player1.rank or 0
+        r2 = player2.rank or 0
+        
+        # Формируем регион пары
+        if r1 >= r2:
+            first_city = region1
+            second_city = region2
+        else:
+            first_city = region2
+            second_city = region1
+        
+        if region1 and region2 and region1 != region2:
+            region_main = f"{first_city}-{second_city}"
+        elif region1:
+            region_main = region1
+        elif region2:
+            region_main = region2
+        else:
+            region_main = ""
+        
+        # Сумма рейтингов
+        r_sum = r1 + r2
+        
+        # Определяем вид пары
+        sex1 = player1.sex if player1.sex else "man"
+        sex2 = player2.sex if player2.sex else "man"
+        
+        if sex1 == "woman" and sex2 == "woman":
+            double_vid = "woman"
+        elif sex1 == "man" and sex2 == "man":
+            double_vid = "man"
+        else:
+            double_vid = "mix"
+        
+        # Формируем para_shot и para_full
+        def get_short_name(fio):
+            parts = fio.split()
+            if len(parts) >= 2:
+                return f"{parts[0]} {parts[1][0]}."
+            return fio
+        
+        shot1 = get_short_name(player1.fio)
+        shot2 = get_short_name(player2.fio)
+        para_shot = f"{shot1} / {shot2}"
+        para_full = f"{player1.fio} / {player2.fio}"
+        
+        try:
+            # Создаём пару в БД
+            double = Players_double.create(
+                title_id=self.current_title_id,
+                player_1=player1.fio,
+                region_1=region1,
+                r_1=r1,
+                player_2=player2.fio,
+                region_2=region2,
+                r_2=r2,
+                region_main=region_main,
+                r_sum=r_sum,
+                double_vid=double_vid,
+                sex=self.current_sex if self.current_sex else "man",
+                para_full=para_full,
+                para_shot=para_shot,
+                posev=0,
+                mesto=0
+            )
+            
+            # Обновляем таблицу
+            self.load_doubles_for_title()
+            
+            # Очищаем форму
+            self.player1_edit.clear()
+            self.player2_edit.clear()
+            self.double_region_edit.clear()
+            
+            QMessageBox.information(self, "Успех", 
+                f"Пара успешно создана:\n"
+                f"{player1.fio} / {player2.fio}\n"
+                f"Вид: {double_vid}\n"
+                f"Рейтинг: {r_sum}")
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось создать пару: {str(e)}")
+            import traceback
+            traceback.print_exc()
+
+
+# ===================================
     def create_system_tab(self):
         """Вкладка Система"""
         tab_widget = QWidget()
@@ -5262,6 +5894,12 @@ class MainWindow(QMainWindow):
                 # Обновляем список этапов для расписания      
                 self.update_schedule_stages()
 
+    # =========== пары 0709
+                # self.update_player_completer()
+
+                self.update_double_player_completer()
+    #==================
+
     def update_finals_menu_after_selection(self):
         """Обновление меню финалов после выбора соревнования"""
         # Находим меню "Соревнования" -> "Жеребьевка" -> "Финалы"
@@ -5436,6 +6074,10 @@ class MainWindow(QMainWindow):
             """)
             if self.current_title_id:
                 self.load_doubles_for_title() 
+            else:
+                # Если нет соревнования, очищаем таблицу
+                self.double_players_model.setData([])
+                self.doubles_table_view.setModel(self.double_players_model)
 
             # отображение заголовка и информации в QListWidget
             self.change_label_ListWidget(index)
@@ -8928,6 +9570,16 @@ class MainWindow(QMainWindow):
         # Обновляем этапы для бегунков
         self.update_runner_stages()
 
+    # ============ пары 0709
+        # self.update_player_completer()
+
+        self.update_double_player_completer()
+#================= пары 0709
+    def clear_doubles(self):
+        """Очистка таблицы пар"""
+        self.double_players_model.setData([])
+        self.doubles_table_view.setModel(self.double_players_model)
+#======================
     def update_schedule_stages_data(self):
         """Обновление данных этапов для расписания без изменения UI (для фонового обновления)"""
         if not self.current_title_id:
@@ -9243,8 +9895,8 @@ class MainWindow(QMainWindow):
     def show_team_rating(self):
         QMessageBox.information(self, "Рейтинг", "Рейтинг команд")
 
-    def generate_pairs(self):
-        QMessageBox.information(self, "Пары", "Формирование пар")
+    # def generate_pairs(self):
+    #     QMessageBox.information(self, "Пары", "Формирование пар")
 
     def break_pairs(self):
         QMessageBox.information(self, "Пары", "Разбивка пар")

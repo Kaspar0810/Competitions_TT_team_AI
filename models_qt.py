@@ -233,13 +233,39 @@ class ResultsTableModel(QAbstractTableModel):
 class DoublePlayersTableModel(QAbstractTableModel):
     """Модель для отображения пар игроков"""
     
+    # def __init__(self, title_id=None, parent=None):
+    #     super().__init__(parent)
+    #     self._data = []
+    #     self.title_id = title_id
+    #     self._headers = ['ID', 'Игрок 1', 'Игрок 2', 'Регион', 'Сумма рейтинга', 'Посев', 'Место']
+    #     self.load_data()
+
     def __init__(self, title_id=None, parent=None):
         super().__init__(parent)
         self._data = []
         self.title_id = title_id
-        self._headers = ['ID', 'Игрок 1', 'Игрок 2', 'Регион', 'Сумма рейтинга', 'Посев', 'Место']
+        self._headers = ['id', 'player1', 'player2', 'region', 'r_sum', 'posev', 'mesto', 'double_vid']
+        self.hidden_columns = ['id']
         self.load_data()
-    
+
+# ======== 0709
+    def setData(self, data):
+        """Установка данных для модели"""
+        self.beginResetModel()
+        if data is None or len(data) == 0:
+            self._data = []
+        else:
+            self._data = data
+        self.endResetModel()
+    # def setData(self, data):
+    #     """Установка данных для модели"""
+    #     self.beginResetModel()
+    #     if data is None:
+    #         self._data = []
+    #     else:
+    #         self._data = data
+    #     self.endResetModel()
+# =======================    
     def load_data(self):
         try:
             query = Players_double.select().order_by(Players_double.r_sum.desc())
@@ -268,11 +294,11 @@ class DoublePlayersTableModel(QAbstractTableModel):
             if col == 0:
                 return str(double.id)
             elif col == 1:
-                return double.player_1 or ""
+                return double.player1 or ""
             elif col == 2:
-                return double.player_2 or ""
+                return double.player2 or ""
             elif col == 3:
-                return double.region_main or ""
+                return double.region or ""
             elif col == 4:
                 return str(double.r_sum) if double.r_sum else "0"
             elif col == 5:

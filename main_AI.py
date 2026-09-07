@@ -125,7 +125,7 @@ class MainWindow(QMainWindow):
             2: {"title": "Команды", "description": "Управление командами",
                 "buttons": ["➕ Добавить", "✏️ Редактировать", "🗑️ Удалить", "⭐ Рейтинг"]},
             3: {"title": "Пары", "description": "Формирование пар",
-                "buttons": ["🎲 Сформировать", "🔄 Разбить", "📊 Посев"]},
+                "buttons": ["🗑️ Удалить пару", "🎲 Сформировать", "🗑️ Очистить форму", "🔄 Разбить", "📊 Посев"]},
             4: {"title": "Система", "description": "Настройки системы проведения",
                 "buttons": [
                     ["🔍 Поиск в Choice", "📊 Статистика"],
@@ -283,9 +283,8 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             print(f"Ошибка загрузки команд: {e}")
-# ============= new 0709
+#============================
     def load_doubles_for_title(self):
-        """Загрузка пар для выбранного соревнования"""
         if not self.current_title_id:
             self.doubles_table_view.setModel(None)
             return
@@ -310,17 +309,43 @@ class MainWindow(QMainWindow):
                     'r2': double.r_2 or 0,
                     'region_main': double.region_main or "",
                     'r_sum': double.r_sum or 0,
-                    'posev': double.posev or 0,
-                    'mesto': double.mesto or 0
+                    'posev': double.posev or 0
                 })
 
             self.double_players_model.setData(doubles_data)
             self.doubles_table_view.setModel(self.double_players_model)
+            self.doubles_table_view.setColumnHidden(0, True)
+            
+            self.highlight_duplicate_players()
 
         except Exception as e:
             print(f"Ошибка загрузки пар: {e}")
             self.double_players_model.setData([])
-            self.doubles_table_view.setModel(self.double_players_model)
+            self.doubles_table_view.setModel(self.double_players_model)  
+
+    def highlight_duplicate_players(self):
+        model = self.doubles_table_view.model()
+        if not model or model.rowCount() == 0:
+            return
+
+        player_counts = {}
+        for row in range(model.rowCount()):
+            p1 = model.data(model.index(row, 2))
+            p2 = model.data(model.index(row, 4))
+            if p1:
+                player_counts[p1] = player_counts.get(p1, 0) + 1
+            if p2:
+                player_counts[p2] = player_counts.get(p2, 0) + 1
+
+        duplicate_players = {p for p, count in player_counts.items() if count > 1}
+        highlight_rows = []
+        for row in range(model.rowCount()):
+            p1 = model.data(model.index(row, 2))
+            p2 = model.data(model.index(row, 4))
+            if p1 in duplicate_players or p2 in duplicate_players:
+                highlight_rows.append(row)
+
+        model.set_highlight_rows(highlight_rows)
 
     def load_results_for_title(self):
         """Загрузка результатов для выбранного соревнования"""
@@ -2305,202 +2330,6 @@ class MainWindow(QMainWindow):
         self.player1_completer.setModel(model)
         self.player2_completer.setModel(model)
 
-    # def generate_pairs(self):
-    #     """Формирование пар из введённых игроков"""
-    #     player1_text = self.player1_edit.text().strip()
-    #     player2_text = self.player2_edit.text().strip()
-        
-    #     if not player1_text or not player2_text:
-    #         QMessageBox.warning(self, "Ошибка", "Введите обоих игроков")
-    #         return
-        
-    #     if player1_text == player2_text:
-    #         QMessageBox.warning(self, "Ошибка", "Игроки должны быть разными")
-    #         return
-        
-    #     # Получаем игроков из базы
-    #     player1 = self._find_player_by_name(player1_text)
-    #     player2 = self._find_player_by_name(player2_text)
-        
-    #     if not player1:
-    #         QMessageBox.warning(self, "Ошибка", f"Игрок '{player1_text}' не найден")
-    #         return
-        
-    #     if not player2:
-    #         QMessageBox.warning(self, "Ошибка", f"Игрок '{player2_text}' не найден")
-    #         return
-        
-    #     # Проверяем, не существует ли уже такая пара
-    #     existing = Players_double.get_or_none(
-    #         (Players_double.title_id == self.current_title_id) &
-    #         (Players_double.player_1 == player1_text) &
-    #         (Players_double.player_2 == player2_text)
-    #     )
-    #     if existing:
-    #         QMessageBox.warning(self, "Ошибка", f"Пара {player1_text} - {player2_text} уже существует")
-    #         return
-        
-    #     # Получаем регион из поля (уже сформирован)
-    #     region = self.double_region_edit.text().strip()
-        
-    #     # Рассчитываем сумму рейтингов
-    #     r_sum = (player1.rank or 0) + (player2.rank or 0)
-        
-    #     try:
-    #         # Создаём пару
-    #         double = Players_double.create(
-    #             title_id=self.current_title_id,
-    #             player_1=player1_text,
-    #             player_2=player2_text,
-    #             player_1_id=player1.id,
-    #             player_2_id=player2.id,
-    #             region_main=region,
-    #             r_sum=r_sum,
-    #             posev=0,
-    #             mesto=0,
-    #             vid_pari=self.double_vid_combo.currentText()
-    #         )
-            
-    #         # Обновляем таблицу
-    #         self.load_doubles_for_title()
-            
-    #         # Очищаем форму
-    #         self.player1_edit.clear()
-    #         self.player2_edit.clear()
-    #         self.double_region_edit.clear()
-            
-    #         QMessageBox.information(self, "Успех", f"Пара успешно создана")
-            
-    #     except Exception as e:
-    #         QMessageBox.critical(self, "Ошибка", f"Не удалось создать пару: {str(e)}")
-
-    # def generate_pairs(self):
-    #     """Формирование пар из введённых игроков"""
-    #     player1_text = self.player1_edit.text().strip()
-    #     player2_text = self.player2_edit.text().strip()
-        
-    #     if not player1_text or not player2_text:
-    #         QMessageBox.warning(self, "Ошибка", "Введите обоих игроков")
-    #         return
-        
-    #     if player1_text == player2_text:
-    #         QMessageBox.warning(self, "Ошибка", "Игроки должны быть разными")
-    #         return
-        
-    #     # Получаем игроков из базы
-    #     player1 = self._find_player_by_name(player1_text)
-    #     player2 = self._find_player_by_name(player2_text)
-        
-    #     if not player1:
-    #         QMessageBox.warning(self, "Ошибка", f"Игрок '{player1_text}' не найден")
-    #         return
-        
-    #     if not player2:
-    #         QMessageBox.warning(self, "Ошибка", f"Игрок '{player2_text}' не найден")
-    #         return
-        
-    #     # Проверяем, не существует ли уже такая пара
-    #     existing = Players_double.get_or_none(
-    #         (Players_double.title_id == self.current_title_id) &
-    #         (Players_double.player_1 == player1.fio) &
-    #         (Players_double.player_2 == player2.fio)
-    #     )
-    #     if existing:
-    #         QMessageBox.warning(self, "Ошибка", f"Пара {player1.fio} - {player2.fio} уже существует")
-    #         return
-        
-    #     # Получаем регионы и рейтинги
-    #     region1 = player1.city or ""
-    #     region2 = player2.city or ""
-    #     r1 = player1.rank or 0
-    #     r2 = player2.rank or 0
-        
-    #     # Формируем регион пары (город с более высоким рейтингом первым)
-    #     if r1 >= r2:
-    #         first_city = region1
-    #         second_city = region2
-    #     else:
-    #         first_city = region2
-    #         second_city = region1
-        
-    #     if region1 and region2 and region1 != region2:
-    #         region_main = f"{first_city}-{second_city}"
-    #     elif region1:
-    #         region_main = region1
-    #     elif region2:
-    #         region_main = region2
-    #     else:
-    #         region_main = ""
-        
-    #     # Сумма рейтингов
-    #     r_sum = r1 + r2
-        
-    #     # Определяем вид пары на основе пола игроков
-    #     sex1 = player1.sex if player1.sex else "man"
-    #     sex2 = player2.sex if player2.sex else "man"
-        
-    #     if sex1 == "woman" and sex2 == "woman":
-    #         double_vid = "woman"
-    #     elif sex1 == "man" and sex2 == "man":
-    #         double_vid = "man"
-    #     else:
-    #         double_vid = "mix"
-        
-    #     # Формируем para_shot (Фамилия И. / Фамилия И.) и para_full (ФИО1 / ФИО2)
-    #     # Разбиваем ФИО на части
-    #     def get_short_name(fio):
-    #         parts = fio.split()
-    #         if len(parts) >= 2:
-    #             return f"{parts[0]} {parts[1][0]}."
-    #         return fio
-        
-    #     # Короткое имя: Фамилия И. / Фамилия И.
-    #     shot1 = get_short_name(player1.fio)
-    #     shot2 = get_short_name(player2.fio)
-    #     para_shot = f"{shot1} / {shot2}"
-        
-    #     # Полное имя: ФИО1 / ФИО2
-    #     para_full = f"{player1.fio} / {player2.fio}"
-        
-    #     try:
-    #         # Создаём пару
-    #         double = Players_double.create(
-    #             title_id=self.current_title_id,
-    #             player_1=player1.fio,
-    #             region_1=region1,
-    #             r_1=r1,
-    #             player_2=player2.fio,
-    #             region_2=region2,
-    #             r_2=r2,
-    #             region_main=region_main,
-    #             r_sum=r_sum,
-    #             double_vid=double_vid,
-    #             sex=self.current_sex if self.current_sex else "man",
-    #             para_full=para_full,
-    #             para_shot=para_shot,
-    #             posev=0,
-    #             mesto=0
-    #         )
-            
-    #         # Обновляем таблицу
-    #         self.load_doubles_for_title()
-            
-    #         # Очищаем форму
-    #         self.player1_edit.clear()
-    #         self.player2_edit.clear()
-    #         self.double_region_edit.clear()
-            
-    #         QMessageBox.information(self, "Успех", 
-    #             f"Пара успешно создана:\n"
-    #             f"{player1.fio} / {player2.fio}\n"
-    #             f"Вид: {double_vid}\n"
-    #             f"Рейтинг: {r_sum}")
-            
-    #     except Exception as e:
-    #         QMessageBox.critical(self, "Ошибка", f"Не удалось создать пару: {str(e)}")
-    #         import traceback
-    #         traceback.print_exc()
-
     def generate_pairs(self):
         """Формирование пар из введённых игроков"""
         player1_text = self.player1_edit.text().strip()
@@ -2534,6 +2363,23 @@ class MainWindow(QMainWindow):
         )
         if existing:
             QMessageBox.warning(self, "Ошибка", f"Пара {player1.fio} - {player2.fio} уже существует")
+            return
+
+         # Проверяем, не состоит ли игрок 1 уже в какой-либо паре
+        existing1 = Players_double.get_or_none(
+            (Players_double.title_id == self.current_title_id) &
+            ((Players_double.player_1 == player1.fio) | (Players_double.player_2 == player1.fio))
+        )
+        if existing1:
+            QMessageBox.warning(self, "Ошибка", f"Игрок {player1.fio} уже состоит в паре")
+            return
+    
+        existing2 = Players_double.get_or_none(
+            (Players_double.title_id == self.current_title_id) &
+            ((Players_double.player_1 == player2.fio) | (Players_double.player_2 == player2.fio))
+        )
+        if existing2:
+            QMessageBox.warning(self, "Ошибка", f"Игрок {player2.fio} уже состоит в паре")
             return
         
         # Получаем регионы и рейтинги
@@ -2624,7 +2470,12 @@ class MainWindow(QMainWindow):
             import traceback
             traceback.print_exc()
 
-
+    def clear_doubles_form(self):
+        """очистка полей формы ввода пар"""
+        self.player1_edit.clear()
+        self.player2_edit.clear()
+        self.double_region_edit.clear()
+        self.player1_edit.setFocus()
 # ===================================
     def create_system_tab(self):
         """Вкладка Система"""
@@ -6025,6 +5876,9 @@ class MainWindow(QMainWindow):
                 table_header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
             table_header.setSectionResizeMode(self.doubles_table_view.model().columnCount() - 1, QHeaderView.Stretch)
 
+            # # Обновляем левую панель для отображения кнопки удаления
+            # self.update_left_panel_for_tab(index)
+           
             if self.current_title_id:
                 self.load_doubles_for_title() 
             else:
@@ -6975,6 +6829,16 @@ class MainWindow(QMainWindow):
                             btn.clicked.connect(self.break_pairs)
                         elif btn_text == "📊 Посев":
                             btn.clicked.connect(self.seeding_pairs)
+                        elif btn_text == "🗑️ Удалить пару":
+                            btn.clicked.connect(self.delete_double_pair)
+                        elif btn_text == "🗑️ Очистить форму":
+                            btn.clicked.connect(self.clear_doubles_form)
+    #                      clear_form_btn = QPushButton("🗑️ Очистить форму")
+    # clear_form_btn.setMinimumHeight(35)
+    # clear_form_btn.setStyleSheet(self.get_button_style())
+    # clear_form_btn.clicked.connect(self.clear_doubles_form)
+    # self.dynamic_filters_layout.addWidget(clear_form_btn)
+                            
                     elif tab_index == 5:  # Результаты
                         if btn_text == "🎯 Выбрать этап":
                             btn.clicked.connect(self.select_stage_for_results)
@@ -9450,40 +9314,6 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             print(f"Ошибка фильтрации: {e}")
-#======================
-    # def switch_gender_category(self, sex):
-    #     """Переключение между man и woman"""
-    #     if self.current_sex == sex:
-    #         return
-        
-    #     self.current_sex = sex
-        
-    #     # Перезагружаем участников с фильтром по полу
-    #     self.load_participants_for_title()
-        
-    #     # Обновляем кнопки
-    #     self.create_category_buttons()
-        
-    #     # Обновляем заголовок таблицы
-    #     if self.current_title_id:
-    #         title = Title.get_or_none(Title.id == self.current_title_id)
-    #         if title:
-    #             sex_text = "Женщины" if sex == "woman" else "Мужчины"
-    #             count = self.players_model.rowCount()
-    #             age_text = f" ({title.vozrast})" if title.vozrast else ""
-    #             self.table_header.setText(f"👥 {title.name}{age_text} - {sex_text} ({count} чел.)")
-        
-    #     # Обновляем список этапов для расписания (учитываем новый пол)
-    #     self.update_schedule_stages()
-
-    #     # Также обновляем этапы для бегунков
-    #     self.update_runner_stages()
-
-    #     # Очищаем результаты поиска при смене пола
-    #     self.search_results_list.clear()
-        
-    #     # Сбрасываем заголовок поиска
-    #     self.reset_search_label()
 
     def switch_gender_category(self, sex):
         """Переключение между man и woman"""
@@ -9523,11 +9353,45 @@ class MainWindow(QMainWindow):
         # Обновляем этапы для бегунков
         self.update_runner_stages()
 
-    # ============ пары 0709
-        # self.update_player_completer()
-
         self.update_double_player_completer()
-#================= пары 0709
+
+    def delete_double_pair(self):
+        """Удаление выбранной пары"""
+        selection = self.doubles_table_view.selectedIndexes()
+        if not selection:
+            QMessageBox.warning(self, "Ошибка", "Выберите пару для удаления")
+            return
+        
+        row = selection[0].row()
+        # Получаем ID пары из модели (скрытый столбец 0)
+        model = self.doubles_table_view.model()
+        if not model:
+            return
+        index = model.index(row, 0)
+        pair_id = model.data(index)
+        if not pair_id:
+            QMessageBox.warning(self, "Ошибка", "Не удалось получить ID пары")
+            return
+        
+        # Подтверждение
+        reply = QMessageBox.question(
+            self,
+            "Подтверждение",
+            f"Удалить выбранную пару?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if reply != QMessageBox.Yes:
+            return
+        
+        try:
+            # Удаляем из базы
+            Players_double.delete().where(Players_double.id == int(pair_id)).execute()
+            # Обновляем таблицу
+            self.load_doubles_for_title()
+            QMessageBox.information(self, "Успех", "Пара удалена")
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось удалить пару: {str(e)}")
+
     def clear_doubles(self):
         """Очистка таблицы пар"""
         self.double_players_model.setData([])

@@ -283,32 +283,6 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             print(f"Ошибка загрузки команд: {e}")
-# ======== старый
-    # def load_doubles_for_title(self):
-    #     """Загрузка пар для выбранного соревнования"""
-    #     if not self.current_title_id:
-    #         self.doubles_table_view.setModel(None)
-    #         return
-        
-    #     try:
-    #         query = Players_double.select().where(Players_double.title_id == self.current_title_id)
-    #         doubles_data = []
-    #         for double in query:
-    #             doubles_data.append({
-    #                 'id': double.id,
-    #                 'player1': double.player_1 or "",
-    #                 'player2': double.player_2 or "",
-    #                 'region': double.region_main or "",
-    #                 'r_sum': double.r_sum or 0,
-    #                 'posev': double.posev or 0,
-    #                 'mesto': double.mesto or 0
-    #             })
-            
-    #         self.double_players_model.setData(doubles_data)
-    #         self.doubles_table_view.setModel(self.double_players_model)
-            
-    #     except Exception as e:
-    #         print(f"Ошибка загрузки пар: {e}")
 # ============= new 0709
     def load_doubles_for_title(self):
         """Загрузка пар для выбранного соревнования"""
@@ -329,8 +303,12 @@ class MainWindow(QMainWindow):
                 doubles_data.append({
                     'id': double.id,
                     'player1': double.player_1 or "",
+                    'region1': double.region_1 or "",
+                    'r1': double.r_1 or 0,
                     'player2': double.player_2 or "",
-                    'region': double.region_main or "",
+                    'region2': double.region_2 or "",
+                    'r2': double.r_2 or 0,
+                    'region_main': double.region_main or "",
                     'r_sum': double.r_sum or 0,
                     'posev': double.posev or 0,
                     'mesto': double.mesto or 0
@@ -344,42 +322,6 @@ class MainWindow(QMainWindow):
             self.double_players_model.setData([])
             self.doubles_table_view.setModel(self.double_players_model)
 
-    # def load_doubles_for_title(self):
-    #     """Загрузка пар для выбранного соревнования"""
-    #     if not self.current_title_id:
-    #         self.doubles_table_view.setModel(None)
-    #         return
-
-    #     try:
-    #         query = Players_double.select().where(Players_double.title_id == self.current_title_id)
-            
-    #         if query.count() == 0:
-    #             self.double_players_model.setData([])
-    #             self.doubles_table_view.setModel(self.double_players_model)
-    #             return
-
-    #         doubles_data = []
-    #         for double in query:
-    #             doubles_data.append({
-    #                 'id': double.id,
-    #                 'player1': double.para_shot or double.player_1 or "",
-    #                 'player2': double.para_full or f"{double.player_1} / {double.player_2}" or "",
-    #                 'region': double.region_main or "",
-    #                 'r_sum': double.r_sum or 0,
-    #                 'posev': double.posev or 0,
-    #                 'mesto': double.mesto or 0,
-    #                 'double_vid': double.double_vid or ""
-    #             })
-
-    #         self.double_players_model.setData(doubles_data)
-    #         self.doubles_table_view.setModel(self.double_players_model)
-
-    #     except Exception as e:
-    #         print(f"Ошибка загрузки пар: {e}")
-    #         self.double_players_model.setData([])
-    #         self.doubles_table_view.setModel(self.double_players_model)
-
-#===========
     def load_results_for_title(self):
         """Загрузка результатов для выбранного соревнования"""
         if not self.current_title_id:
@@ -1089,6 +1031,10 @@ class MainWindow(QMainWindow):
         """)
         self.doubles_table_view.verticalHeader().setDefaultSectionSize(22)
         self.doubles_table_view.setModel(self.double_players_model)
+
+         # колонка растягивается по содержимому
+        header = self.doubles_table_view.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeToContents)
 
         # Таблица рейтинга
         self.rating_table_view = QTableView()
@@ -6072,6 +6018,13 @@ class MainWindow(QMainWindow):
                 font-size: 11px;
                 border-radius: 3px;
             """)
+
+            # растягиваем колонки по содержимому, последнюю на всю щшрину
+            table_header = self.doubles_table_view.horizontalHeader()
+            for i in range(self.doubles_table_view.model().columnCount() - 1):
+                table_header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
+            table_header.setSectionResizeMode(self.doubles_table_view.model().columnCount() - 1, QHeaderView.Stretch)
+
             if self.current_title_id:
                 self.load_doubles_for_title() 
             else:

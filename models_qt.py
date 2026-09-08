@@ -181,7 +181,11 @@ class ResultsTableModel(QAbstractTableModel):
         super().__init__(parent)
         self._data = []
         self._headers = ['ID', 'Этап', 'Группа', 'Встреча', 'Игрок 1', 'Игрок 2', 'Победитель', 'Общий счет', 'Счет в матче']
-    
+
+    def set_highlight_rows(self, rows):
+        self._highlight_rows = set(rows)
+        self.layoutChanged.emit()
+
     def setData(self, data):
         self.beginResetModel()
         self._data = data
@@ -197,6 +201,11 @@ class ResultsTableModel(QAbstractTableModel):
         if not index.isValid() or role != Qt.DisplayRole:
             return None
         
+        if role == Qt.BackgroundRole:
+            if hasattr(self, '_highlight_rows') and index.row() in self._highlight_rows:
+                return QColor(255, 255, 0)  # жёлтый
+            return None
+    
         if index.row() >= len(self._data):
             return None
         
@@ -230,85 +239,6 @@ class ResultsTableModel(QAbstractTableModel):
                 return self._headers[section]
         return None
 # =============================
-# class DoublePlayersTableModel(QAbstractTableModel):
-#     """Модель для отображения пар игроков"""
-    
-#     def __init__(self, title_id=None, parent=None):
-#         super().__init__(parent)
-#         self._data = []
-#         self.title_id = title_id
-#         self._headers = ['ID', 'Игрок 1','Город', 'R', 'Игрок 2', 'Город', 'R', 'Регион', 'Сумма рейтинга', 'Посев']
-#         self.hidden_columns = ['ID']
-#         self.load_data()
-
-
-#     def setData(self, data):
-#         """Установка данных для модели"""
-#         self.beginResetModel()
-#         if data is None or len(data) == 0:
-#             self._data = []
-#         else:
-#             self._data = data
-#         self.endResetModel()
-  
-#     def load_data(self):
-#         try:
-#             query = Players_double.select().order_by(Players_double.r_sum.desc())
-#             if self.title_id:
-#                 query = query.where(Players_double.title_id == self.title_id)
-#             self._data = list(query)
-#             self.layoutChanged.emit()
-#         except Exception as e:
-#             print(f"Ошибка загрузки пар: {e}")
-#             self._data = []
-    
-#     def rowCount(self, parent=QModelIndex()):
-#         return len(self._data)
-    
-#     def columnCount(self, parent=QModelIndex()):
-#         return len(self._headers)
-    
-#     def data(self, index, role=Qt.DisplayRole):
-#         if not index.isValid() or role != Qt.DisplayRole:
-#             return None
-        
-#         try:
-#             double = self._data[index.row()]
-#             col = index.column()
-            
-#             if col == 0:
-#                 return str(double.get('id', ""))
-#             elif col == 1:
-#                 return double.get('player1', "")
-#             elif col == 2:
-#                 return double.get('region1', "")
-#             elif col == 3:
-#                 return double.get('r1', "")
-#             elif col == 4:
-#                 return double.get('player2', "")
-#             elif col == 5:
-#                 return double.get('region2', "")
-#             elif col == 6:
-#                 return double.get('r2', "")
-#             elif col == 7:
-#                 return double.get('region_main',"")
-#             elif col == 8:
-#                 return str(double.get('r_sum', "")) 
-#             elif col == 9:
-#                 return str(double.get('posev', ""))
-
-            
-#             return ""
-#         except Exception as e:
-#             print(f"Ошибка получения данных пары: {e}")
-#             return ""
-    
-#     def headerData(self, section, orientation, role=Qt.DisplayRole):
-#         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
-#             if section < len(self._headers):
-#                 return self._headers[section]
-#         return None
-
 class DoublePlayersTableModel(QAbstractTableModel):
     """Модель для отображения пар игроков"""
     
@@ -342,7 +272,7 @@ class DoublePlayersTableModel(QAbstractTableModel):
             return None
         
         if role == Qt.BackgroundRole:
-            if index.row() in self._highlight_rows:
+            if hasattr(self, '_highlight_rows') and index.row() in self._highlight_rows:
                 return QColor(255, 255, 0)  # жёлтый
             return None
         
@@ -379,12 +309,14 @@ class DoublePlayersTableModel(QAbstractTableModel):
         except Exception as e:
             print(f"Ошибка получения данных пары: {e}")
             return ""
-    
+        
     def headerData(self, section, orientation, role=Qt.DisplayRole):
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
             if section < len(self._headers):
                 return self._headers[section]
         return None
+
+
 # =======================
 class TitlesTableModel(QAbstractTableModel):
     """Модель для отображения соревнований"""
@@ -508,10 +440,6 @@ class CoachesTableModel(QAbstractTableModel):
             if section < len(self._headers):
                 return self._headers[section]
         return None
-
-
-from PyQt5.QtCore import QAbstractTableModel, Qt, QModelIndex
-from datetime import date
 
 class RatingTableModel(QAbstractTableModel):
     """Модель для отображения рейтинга участников из таблиц R_list_*"""

@@ -151,7 +151,7 @@ class MainWindow(QMainWindow):
         # Для редактирования участников
         self.editing_player_id = None
         
-         # Инициализация интерфейса
+        # Инициализация интерфейса
         self.init_ui()
         
         # Загрузка списка соревнований
@@ -315,37 +315,15 @@ class MainWindow(QMainWindow):
             self.double_players_model.setData(doubles_data)
             self.doubles_table_view.setModel(self.double_players_model)
             self.doubles_table_view.setColumnHidden(0, True)
-            
-            self.highlight_duplicate_players()
 
         except Exception as e:
             print(f"Ошибка загрузки пар: {e}")
             self.double_players_model.setData([])
-            self.doubles_table_view.setModel(self.double_players_model)  
+            self.doubles_table_view.setModel(self.double_players_model) 
 
-    def highlight_duplicate_players(self):
-        model = self.doubles_table_view.model()
-        if not model or model.rowCount() == 0:
-            return
-
-        player_counts = {}
-        for row in range(model.rowCount()):
-            p1 = model.data(model.index(row, 2))
-            p2 = model.data(model.index(row, 4))
-            if p1:
-                player_counts[p1] = player_counts.get(p1, 0) + 1
-            if p2:
-                player_counts[p2] = player_counts.get(p2, 0) + 1
-
-        duplicate_players = {p for p, count in player_counts.items() if count > 1}
-        highlight_rows = []
-        for row in range(model.rowCount()):
-            p1 = model.data(model.index(row, 2))
-            p2 = model.data(model.index(row, 4))
-            if p1 in duplicate_players or p2 in duplicate_players:
-                highlight_rows.append(row)
-
-        model.set_highlight_rows(highlight_rows)
+        # После загрузки данных сбрасываем подсветку
+        if hasattr(self, 'double_players_model'):
+            self.double_players_model.set_highlight_rows([])
 
     def load_results_for_title(self):
         """Загрузка результатов для выбранного соревнования"""
@@ -2282,6 +2260,8 @@ class MainWindow(QMainWindow):
     
         self.double_region_edit.setText(region)
 
+        self.highlight_player_duplicates()
+
     def _find_player_by_name(self, name_text):
         """Находит игрока в базе по ФИО (с учётом города)"""
         if not name_text:
@@ -2308,6 +2288,93 @@ class MainWindow(QMainWindow):
             return players[0]
         
         return None
+
+    def highlight_player_duplicates(self):
+        """Подсвечивает строки с дублирующимися игроками при вводе"""
+        player1_text = self.player1_edit.text().strip()
+        player2_text = self.player2_edit.text().strip()
+        
+        if not player1_text and not player2_text:
+            # Если оба поля пустые, сбрасываем подсветку
+            if hasattr(self, 'double_players_model'):
+                self.double_players_model.set_highlight_rows([])
+            return
+        
+        # Получаем игроков из базы по введённому тексту
+        player1 = self._find_player_by_name(player1_text) if player1_text else None
+        player2 = self._find_player_by_name(player2_text) if player2_text else None
+        
+        player_names = set()
+        if player1:
+            player_names.add(player1.fio)
+        if player2:
+            player_names.add(player2.fio)
+        
+        if not player_names:
+            # Если игроки не найдены, сбрасываем подсветку
+            if hasattr(self, 'double_players_model'):
+                self.double_players_model.set_highlight_rows([])
+            return
+        
+        # Получаем все пары из базы
+        query = Players_double.select().where(Players_double.title_id == self.current_title_id)
+        
+        highlight_rows = []
+        duplicate_info = []
+        
+        model = self.doubles_table_view.model()
+        if not model:
+            return
+        
+        for row in range(model.rowCount()):
+            p1 = model.data(model.index(row, 2))
+            p2 = model.data(model.index(row, 4))
+            
+            # Проверяем, совпадает ли имя игрока с введённым
+            if p1 in player_names or p2 in player_names:
+                highlight_rows.append(row)
+                if p1 in player_names:
+                    duplicate_info.append(f"Строка {row+1}: {p1}")
+                if p2 in player_names:
+                    duplicate_info.append(f"Строка {row+1}: {p2}")
+        
+        # Устанавливаем подсветку
+        if hasattr(self, 'double_players_model'):
+            self.double_players_model.set_highlight_rows(highlight_rows)
+        
+        # Если найдены дубликаты, показываем сообщение
+        if duplicate_info:
+            msg = "Внимание! Найдены дублирующиеся игроки:\n\n" + "\n".join(duplicate_info)
+            self.status_label.setText(msg)
+            # Можно также показать всплывающее сообщение
+            QMessageBox.information(self, "Дублирующиеся игроки", msg)
+
+    # def _find_player_by_name(self, name_text):
+    #     """Находит игрока в базе по ФИО (с учётом города)"""
+    #     if not name_text:
+    #         return None
+        
+    #     # Ищем по полному совпадению с городом
+    #     player = Player.get_or_none(Player.fio_city == name_text)
+    #     if player:
+    #         return player
+        
+    #     # Ищем по ФИО без города
+    #     if ' (' in name_text:
+    #         name_only = name_text.split(' (')[0]
+    #         player = Player.get_or_none(Player.fio == name_only)
+    #         if player:
+    #             return player
+        
+    #     # Ищем по частичному совпадению
+    #     players = Player.select().where(
+    #         (Player.title_id == self.current_title_id) &
+    #         ((Player.fio.contains(name_text)) | (Player.player.contains(name_text)))
+    #     )
+    #     if players.count() > 0:
+    #         return players[0]
+        
+    #     return None
 
     def update_double_player_completer(self):
         """Обновляет список игроков для автодополнения на вкладке 'Пары'"""
@@ -6769,6 +6836,18 @@ class MainWindow(QMainWindow):
                                 btn.clicked.connect(self.export_players)
                             elif btn_text == "🗑️ Очистить":
                                 btn.clicked.connect(self.clear_player_form)
+                        # elif tab_index == 3:  # Пары
+                        #     if btn_text == "🎲 Сформировать":
+                        #         btn.clicked.connect(self.generate_pairs)
+                        #     elif btn_text == "🔄 Разбить":
+                        #         btn.clicked.connect(self.break_pairs)
+                        #     elif btn_text == "📊 Посев":
+                        #         btn.clicked.connect(self.seeding_pairs)
+                        #     elif btn_text == "🗑️ Удалить пару":
+                        #         btn.clicked.connect(self.delete_double_pair)
+                        #     elif btn_text == "🗑️ Очистить форму":
+                        #         btn.clicked.connect(self.clear_doubles_form)
+
                         elif tab_index == 4:  # Система
                             if btn_text == "🔍 Поиск в Choice":
                                 btn.clicked.connect(self.search_in_choice_table)
@@ -6833,11 +6912,6 @@ class MainWindow(QMainWindow):
                             btn.clicked.connect(self.delete_double_pair)
                         elif btn_text == "🗑️ Очистить форму":
                             btn.clicked.connect(self.clear_doubles_form)
-    #                      clear_form_btn = QPushButton("🗑️ Очистить форму")
-    # clear_form_btn.setMinimumHeight(35)
-    # clear_form_btn.setStyleSheet(self.get_button_style())
-    # clear_form_btn.clicked.connect(self.clear_doubles_form)
-    # self.dynamic_filters_layout.addWidget(clear_form_btn)
                             
                     elif tab_index == 5:  # Результаты
                         if btn_text == "🎯 Выбрать этап":

@@ -125,7 +125,7 @@ class MainWindow(QMainWindow):
             2: {"title": "Команды", "description": "Управление командами",
                 "buttons": ["➕ Добавить", "✏️ Редактировать", "🗑️ Удалить", "⭐ Рейтинг"]},
             3: {"title": "Пары", "description": "Формирование пар",
-                "buttons": ["🗑️ Удалить пару", "🎲 Сформировать", "🗑️ Очистить форму", "🔄 Разбить", "📊 Посев"]},
+                "buttons": ["🗑️ Удалить пару", "🎲 Сформировать", "🗑️ Очистить форму", "🔄 Разбить", "📊 Посев", "📊 Сортировать по рейтингу"]},
             4: {"title": "Система", "description": "Настройки системы проведения",
                 "buttons": [
                     ["🔍 Поиск в Choice", "📊 Статистика"],
@@ -284,13 +284,115 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Ошибка загрузки команд: {e}")
 #============================
+    # def load_doubles_for_title(self):
+    #     if not self.current_title_id:
+    #         self.doubles_table_view.setModel(None)
+    #         return
+
+    #     # Сбрасываем фильтр на "Все пары"
+    #     if hasattr(self, 'double_vid_filter'):
+    #         self.double_vid_filter.blockSignals(True)
+    #         self.double_vid_filter.setCurrentText("Все пары")
+    #         self.double_vid_filter.blockSignals(False)
+
+    #     try:
+    #         query = Players_double.select().where(Players_double.title_id == self.current_title_id)
+    #         # Добавляем сортировку по убыванию суммы рейтингов
+    #         query = Players_double.select().where(
+    #             Players_double.title_id == self.current_title_id
+    #         ).order_by(Players_double.r_sum.desc())
+
+    #         if query.count() == 0:
+    #             self.double_players_model.setData([])
+    #             self.doubles_table_view.setModel(self.double_players_model)
+    #             return
+
+    #         doubles_data = []
+    #         for double in query:
+    #             doubles_data.append({
+    #                 'id': double.id,
+    #                 'player1': double.player_1 or "",
+    #                 'region1': double.region_1 or "",
+    #                 'r1': double.r_1 or 0,
+    #                 'player2': double.player_2 or "",
+    #                 'region2': double.region_2 or "",
+    #                 'r2': double.r_2 or 0,
+    #                 'region_main': double.region_main or "",
+    #                 'r_sum': double.r_sum or 0,
+    #                 'posev': double.posev or 0
+    #             })
+
+    #         self.double_players_model.setData(doubles_data)
+    #         self.doubles_table_view.setModel(self.double_players_model)
+    #         self.doubles_table_view.setColumnHidden(0, True)
+
+    #     except Exception as e:
+    #         print(f"Ошибка загрузки пар: {e}")
+    #         self.double_players_model.setData([])
+    #         self.doubles_table_view.setModel(self.double_players_model) 
+
+    #     # После загрузки данных сбрасываем подсветку
+    #     if hasattr(self, 'double_players_model'):
+    #         self.double_players_model.set_highlight_rows([])
+
+    # def _load_doubles_for_title(self):
+    #     """Загрузка пар для выбранного соревнования с сортировкой по рейтингу"""
+    #     if not self.current_title_id:
+    #         self.doubles_table_view.setModel(None)
+    #         return
+
+    #     try:
+    #         # Добавляем сортировку по убыванию суммы рейтингов
+    #         query = Players_double.select().where(
+    #             Players_double.title_id == self.current_title_id
+    #         ).order_by(Players_double.r_sum.desc())
+            
+    #         if query.count() == 0:
+    #             self.double_players_model.setData([])
+    #             self.doubles_table_view.setModel(self.double_players_model)
+    #             return
+
+    #         doubles_data = []
+    #         for double in query:
+    #             doubles_data.append({
+    #                 'id': double.id,
+    #                 'player1': double.player_1 or "",
+    #                 'region1': double.region_1 or "",
+    #                 'r1': double.r_1 or 0,
+    #                 'player2': double.player_2 or "",
+    #                 'region2': double.region_2 or "",
+    #                 'r2': double.r_2 or 0,
+    #                 'region_main': double.region_main or "",
+    #                 'r_sum': double.r_sum or 0,
+    #                 'posev': double.posev or 0
+    #             })
+
+    #         self.double_players_model.setData(doubles_data)
+    #         self.doubles_table_view.setModel(self.double_players_model)
+    #         self.doubles_table_view.setColumnHidden(0, True)
+    #         self.highlight_duplicate_players()
+
+    #     except Exception as e:
+    #         print(f"Ошибка загрузки пар: {e}")
+    #         self.double_players_model.setData([])
+    #         self.doubles_table_view.setModel(self.double_players_model)
+
     def load_doubles_for_title(self):
+        """Загрузка пар для выбранного соревнования с фильтром по виду"""
         if not self.current_title_id:
             self.doubles_table_view.setModel(None)
             return
 
         try:
             query = Players_double.select().where(Players_double.title_id == self.current_title_id)
+            
+            # Применяем фильтр по виду, если комбобокс существует и выбран не "все"
+            if hasattr(self, 'double_vid_filter_combo'):
+                vid = self.double_vid_filter_combo.currentText()
+                if vid and vid != "все":
+                    query = query.where(Players_double.double_vid == vid)
+            
+            query = query.order_by(Players_double.r_sum.desc())
             
             if query.count() == 0:
                 self.double_players_model.setData([])
@@ -309,21 +411,19 @@ class MainWindow(QMainWindow):
                     'r2': double.r_2 or 0,
                     'region_main': double.region_main or "",
                     'r_sum': double.r_sum or 0,
-                    'posev': double.posev or 0
+                    'posev': double.posev or 0,
+                    'double_vid': double.double_vid or ""
                 })
 
             self.double_players_model.setData(doubles_data)
             self.doubles_table_view.setModel(self.double_players_model)
             self.doubles_table_view.setColumnHidden(0, True)
+            self.highlight_player_duplicate()
 
         except Exception as e:
             print(f"Ошибка загрузки пар: {e}")
             self.double_players_model.setData([])
-            self.doubles_table_view.setModel(self.double_players_model) 
-
-        # После загрузки данных сбрасываем подсветку
-        if hasattr(self, 'double_players_model'):
-            self.double_players_model.set_highlight_rows([])
+            self.doubles_table_view.setModel(self.double_players_model)
 
     def load_results_for_title(self):
         """Загрузка результатов для выбранного соревнования"""
@@ -2011,82 +2111,6 @@ class MainWindow(QMainWindow):
         
         return tab_widget
 # ==== old ====
-    # def create_doubles_tab(self):
-    #     """Вкладка пар"""
-    #     tab_widget = QWidget()
-    #     main_layout = QVBoxLayout(tab_widget)
-    #     main_layout.setSpacing(8)
-    #     main_layout.setContentsMargins(10, 10, 10, 10)
-        
-    #     input_style = """
-    #         QLineEdit, QComboBox {
-    #             max-height: 26px;
-    #             padding: 3px 5px;
-    #             font-size: 10px;
-    #             border: 1px solid #ccc;
-    #             border-radius: 3px;
-    #         }
-    #         QLabel {
-    #             font-size: 10px;
-    #         }
-    #     """
-        
-    #     form_widget = QWidget()
-    #     form_layout = QFormLayout(form_widget)
-    #     form_layout.setSpacing(8)
-    #     form_layout.setContentsMargins(0, 0, 0, 0)
-        
-    #     self.player1_edit = QLineEdit()
-    #     self.player1_edit.setPlaceholderText("ФИО первого игрока")
-    #     self.player1_edit.setMaximumHeight(26)
-    #     self.player1_edit.setStyleSheet(input_style)
-    #     form_layout.addRow("Игрок 1:", self.player1_edit)
-        
-    #     self.player2_edit = QLineEdit()
-    #     self.player2_edit.setPlaceholderText("ФИО второго игрока")
-    #     self.player2_edit.setMaximumHeight(26)
-    #     self.player2_edit.setStyleSheet(input_style)
-    #     form_layout.addRow("Игрок 2:", self.player2_edit)
-    #     # =========== new =======0709
-    #     # В create_doubles_tab или в init_ui после создания полей
-    #     # self.player1_edit = QLineEdit()
-    #     # self.player2_edit = QLineEdit()
-
-    #     # Создаём QCompleter для поля "Игрок 1"
-    #     self.player1_completer = QCompleter()
-    #     self.player1_completer.setCaseSensitivity(Qt.CaseInsensitive)
-    #     self.player1_completer.setFilterMode(Qt.MatchContains)
-    #     self.player1_edit.setCompleter(self.player1_completer)
-
-    #     # Создаём QCompleter для поля "Игрок 2"
-    #     self.player2_completer = QCompleter()
-    #     self.player2_completer.setCaseSensitivity(Qt.CaseInsensitive)
-    #     self.player2_completer.setFilterMode(Qt.MatchContains)
-    #     self.player2_edit.setCompleter(self.player2_completer)
-
-    #     # Подключаем обновление списка при смене соревнования
-    #     self.player1_edit.textChanged.connect(self.update_player_completer)
-    #     self.player2_edit.textChanged.connect(self.update_player_completer)
-    #     #========================
-    #     self.double_region_combo = QComboBox()
-    #     self.double_region_combo.addItem("", None)
-    #     for rid, rname in self.regions_list:
-    #         self.double_region_combo.addItem(rname, rid)
-    #     self.double_region_combo.setMaximumHeight(26)
-    #     self.double_region_combo.setStyleSheet(input_style)
-    #     form_layout.addRow("Регион:", self.double_region_combo)
-        
-    #     self.double_vid_combo = QComboBox()
-    #     self.double_vid_combo.addItems(["Мужская", "Женская", "Смешанная"])
-    #     self.double_vid_combo.setMaximumHeight(26)
-    #     self.double_vid_combo.setStyleSheet(input_style)
-    #     form_layout.addRow("Вид пары:", self.double_vid_combo)
-        
-    #     main_layout.addWidget(form_widget)
-    #     main_layout.addStretch()
-        
-    #     return tab_widget
-
     def create_doubles_tab(self):
         tab_widget = QWidget()
         main_layout = QVBoxLayout(tab_widget)
@@ -2154,71 +2178,6 @@ class MainWindow(QMainWindow):
         
         return tab_widget
 # =========== для парных списков 0709
-    # def update_player_completer(self):
-    #     """Обновляет список игроков для автодополнения на вкладке 'Пары'"""
-    #     if not self.current_title_id:
-    #         return
-
-    #     # Получаем список игроков текущего соревнования
-    #     players = Player.select().where(
-    #         (Player.title_id == self.current_title_id) &
-    #         (Player.player != "X")  # исключаем "X"
-    #     )
-
-    #     # Формируем список строк для Completer
-    #     player_list = []
-    #     for player in players:
-    #         # Формируем отображаемое имя: ФИО (Город)
-    #         display_name = player.fio if player.fio else player.player
-    #         if player.city:
-    #             display_name += f" ({player.city})"
-    #         player_list.append(display_name)
-
-    #     # Обновляем Completer для поля "Игрок 1"
-    #     model = QStringListModel(player_list)
-    #     self.player1_completer.setModel(model)
-    #     # Обновляем Completer для поля "Игрок 2"
-    #     self.player2_completer.setModel(model)
-
-    # def update_double_region(self):
-    #     """Обновляет поле региона при вводе игроков"""
-    #     player1_text = self.player1_edit.text().strip()
-    #     player2_text = self.player2_edit.text().strip()
-        
-    #     if not player1_text or not player2_text:
-    #         return
-        
-    #     # Получаем данные игроков из базы
-    #     player1 = self._find_player_by_name(player1_text)
-    #     player2 = self._find_player_by_name(player2_text)
-        
-    #     if not player1 or not player2:
-    #         return
-        
-    #     city1 = player1.city if player1.city else ""
-    #     city2 = player2.city if player2.city else ""
-    #     rank1 = player1.rank if player1.rank else 0
-    #     rank2 = player2.rank if player2.rank else 0
-        
-    #     # Определяем порядок городов: сначала город с более высоким рейтингом
-    #     if rank1 >= rank2:
-    #         first_city = city1
-    #         second_city = city2
-    #     else:
-    #         first_city = city2
-    #         second_city = city1
-        
-    #     # Формируем регион
-    #     if city1 and city2 and city1 != city2:
-    #         region = f"{first_city}-{second_city}"
-    #     elif city1:
-    #         region = city1
-    #     elif city2:
-    #         region = city2
-    #     else:
-    #         region = ""
-        
-    #     self.double_region_edit.setText(region)
 
     def update_double_region(self):
         """Обновляет поле региона при вводе игроков"""
@@ -2349,33 +2308,6 @@ class MainWindow(QMainWindow):
             # Можно также показать всплывающее сообщение
             QMessageBox.information(self, "Дублирующиеся игроки", msg)
 
-    # def _find_player_by_name(self, name_text):
-    #     """Находит игрока в базе по ФИО (с учётом города)"""
-    #     if not name_text:
-    #         return None
-        
-    #     # Ищем по полному совпадению с городом
-    #     player = Player.get_or_none(Player.fio_city == name_text)
-    #     if player:
-    #         return player
-        
-    #     # Ищем по ФИО без города
-    #     if ' (' in name_text:
-    #         name_only = name_text.split(' (')[0]
-    #         player = Player.get_or_none(Player.fio == name_only)
-    #         if player:
-    #             return player
-        
-    #     # Ищем по частичному совпадению
-    #     players = Player.select().where(
-    #         (Player.title_id == self.current_title_id) &
-    #         ((Player.fio.contains(name_text)) | (Player.player.contains(name_text)))
-    #     )
-    #     if players.count() > 0:
-    #         return players[0]
-        
-    #     return None
-
     def update_double_player_completer(self):
         """Обновляет список игроков для автодополнения на вкладке 'Пары'"""
         if not self.current_title_id:
@@ -2413,7 +2345,9 @@ class MainWindow(QMainWindow):
         # Получаем игроков из базы
         player1 = self._find_player_by_name(player1_text)
         player2 = self._find_player_by_name(player2_text)
-        
+        #====================
+
+        #=================
         if not player1:
             QMessageBox.warning(self, "Ошибка", f"Игрок '{player1_text}' не найден")
             return
@@ -2421,7 +2355,46 @@ class MainWindow(QMainWindow):
         if not player2:
             QMessageBox.warning(self, "Ошибка", f"Игрок '{player2_text}' не найден")
             return
+        # Получаем выбранный вид из комбобокса
+        vid_filter = self.double_vid_filter_combo.currentText() if hasattr(self, 'double_vid_filter_combo') else None
+        if not vid_filter:
+            QMessageBox.warning(self, "Ошибка", "Не выбран вид пары")
+            return
         
+        # Проверяем, что игроки имеют соответствующий пол
+        sex1 = player1.sex if player1.sex else "man"
+        sex2 = player2.sex if player2.sex else "man"
+        
+        if vid_filter == "мужские" and (sex1 != "man" or sex2 != "man"):
+            QMessageBox.warning(self, "Ошибка", "Для мужской пары оба игрока должны быть мужчинами")
+            return
+        if vid_filter == "женские" and (sex1 != "woman" or sex2 != "woman"):
+            QMessageBox.warning(self, "Ошибка", "Для женской пары оба игрока должны быть женщинами")
+            return
+        if vid_filter == "смешанные" and (sex1 == sex2):
+            QMessageBox.warning(self, "Ошибка", "Для смешанной пары игроки должны быть разных полов")
+            return
+        
+        # Проверка дубликатов только среди пар того же вида
+        existing1 = Players_double.get_or_none(
+            (Players_double.title_id == self.current_title_id) &
+            (Players_double.double_vid == vid_filter) &
+            ((Players_double.player_1 == player1.fio) | (Players_double.player_2 == player1.fio))
+        )
+        if existing1:
+            QMessageBox.warning(self, "Ошибка", f"Игрок {player1.fio} уже участвует в паре вида {vid_filter}")
+            return
+        
+        existing2 = Players_double.get_or_none(
+            (Players_double.title_id == self.current_title_id) &
+            (Players_double.double_vid == vid_filter) &
+            ((Players_double.player_1 == player2.fio) | (Players_double.player_2 == player2.fio))
+        )
+        if existing2:
+            QMessageBox.warning(self, "Ошибка", f"Игрок {player2.fio} уже участвует в паре вида {vid_filter}")
+            return
+    
+    # ... создание пары (double_vid = vid_filter)
         # Проверяем, не существует ли уже такая пара
         existing = Players_double.get_or_none(
             (Players_double.title_id == self.current_title_id) &
@@ -2543,6 +2516,14 @@ class MainWindow(QMainWindow):
         self.player2_edit.clear()
         self.double_region_edit.clear()
         self.player1_edit.setFocus()
+
+    def sort_doubles_by_rating(self):
+        """Сортировка пар по рейтингу (по убыванию)"""
+        self.load_doubles_for_title()
+        # Сбрасываем подсветку после сортировки
+        if hasattr(self, 'double_players_model'):
+            self.double_players_model.set_highlight_rows([])
+        QMessageBox.information(self, "Сортировка", "Список пар отсортирован по рейтингу")
 # ===================================
     def create_system_tab(self):
         """Вкладка Система"""
@@ -6836,18 +6817,6 @@ class MainWindow(QMainWindow):
                                 btn.clicked.connect(self.export_players)
                             elif btn_text == "🗑️ Очистить":
                                 btn.clicked.connect(self.clear_player_form)
-                        # elif tab_index == 3:  # Пары
-                        #     if btn_text == "🎲 Сформировать":
-                        #         btn.clicked.connect(self.generate_pairs)
-                        #     elif btn_text == "🔄 Разбить":
-                        #         btn.clicked.connect(self.break_pairs)
-                        #     elif btn_text == "📊 Посев":
-                        #         btn.clicked.connect(self.seeding_pairs)
-                        #     elif btn_text == "🗑️ Удалить пару":
-                        #         btn.clicked.connect(self.delete_double_pair)
-                        #     elif btn_text == "🗑️ Очистить форму":
-                        #         btn.clicked.connect(self.clear_doubles_form)
-
                         elif tab_index == 4:  # Система
                             if btn_text == "🔍 Поиск в Choice":
                                 btn.clicked.connect(self.search_in_choice_table)
@@ -6902,6 +6871,30 @@ class MainWindow(QMainWindow):
                         elif btn_text == "⭐ Рейтинг":
                             btn.clicked.connect(self.show_team_rating)
                     elif tab_index == 3:  # Пары
+                        self.action_title.setText("🔧 Пары")
+                        self.action_description.setText("Управление парами игроков")
+
+                        # ---- Фильтр по виду пар ----
+                        filter_label = QLabel("Вид пары:")
+                        self.double_vid_filter_combo = QComboBox()
+                        # Заполняем в зависимости от пола
+                        pairs_list = ["Все пары", "Мужские","Женские", "Смешанные"]
+                        self.double_vid_filter_combo.addItems(pairs_list)
+                        # if self.current_sex == "man":
+                        #     self.double_vid_filter_combo.addItem("мужские")
+                        #     self.double_vid_filter_combo.addItem("женские")
+                        #     self.double_vid_filter_combo.addItem("смешанные")
+                        # else:
+                        #     self.double_vid_filter_combo.addItem("женские")
+                        #     self.double_vid_filter_combo.addItem("мужские")
+                        #     self.double_vid_filter_combo.addItem("смешанные")
+                        self.double_vid_filter_combo.currentIndexChanged.connect(self.filter_doubles_by_vid)
+                        
+                        filter_layout = QHBoxLayout()
+                        filter_layout.addWidget(filter_label)
+                        filter_layout.addWidget(self.double_vid_filter_combo, 1)
+                        self.dynamic_filters_layout.addLayout(filter_layout)
+
                         if btn_text == "🎲 Сформировать":
                             btn.clicked.connect(self.generate_pairs)
                         elif btn_text == "🔄 Разбить":
@@ -6912,7 +6905,10 @@ class MainWindow(QMainWindow):
                             btn.clicked.connect(self.delete_double_pair)
                         elif btn_text == "🗑️ Очистить форму":
                             btn.clicked.connect(self.clear_doubles_form)
-                            
+                        elif btn_text == "📊 Сортировать по рейтингу":
+                            btn.clicked.connect(self.sort_doubles_by_rating)
+
+        
                     elif tab_index == 5:  # Результаты
                         if btn_text == "🎯 Выбрать этап":
                             btn.clicked.connect(self.select_stage_for_results)
@@ -9429,6 +9425,10 @@ class MainWindow(QMainWindow):
 
         self.update_double_player_completer()
 
+    # Если текущая вкладка "Пары", обновляем левую панель
+        if self.tab_widget.currentIndex() == 3:
+            self.update_left_panel_for_tab(3)
+
     def delete_double_pair(self):
         """Удаление выбранной пары"""
         selection = self.doubles_table_view.selectedIndexes()
@@ -9470,6 +9470,67 @@ class MainWindow(QMainWindow):
         """Очистка таблицы пар"""
         self.double_players_model.setData([])
         self.doubles_table_view.setModel(self.double_players_model)
+
+    def filter_doubles_by_vid(self):
+        """Фильтрация пар по виду пары"""
+        if not self.current_title_id:
+            return
+
+        filter_text = self.double_vid_filter_combo.currentText()
+        # Сбрасываем подсветку при фильтрации
+        if hasattr(self, 'double_players_model'):
+            self.double_players_model.set_highlight_rows([])
+
+        try:
+            # Базовый запрос
+            query = Players_double.select().where(Players_double.title_id == self.current_title_id)
+
+            # Применяем фильтр по виду пары
+            if filter_text == "Мужские":
+                query = query.where(Players_double.double_vid == "man")
+            elif filter_text == "Женские":
+                query = query.where(Players_double.double_vid == "woman")
+            elif filter_text == "Смешанные":
+                query = query.where(Players_double.double_vid == "mix")
+            # else:
+            #     self.double_players_model.setData([])
+            #     self.doubles_table_view.setModel(self.double_players_model)
+            #     return
+            # "Все пары" - без фильтра
+
+            query = query.order_by(Players_double.r_sum.desc())
+
+            if query.count() == 0:
+                self.double_players_model.setData([])
+                self.doubles_table_view.setModel(self.double_players_model)
+                return
+
+            doubles_data = []
+            for double in query:
+                doubles_data.append({
+                    'id': double.id,
+                    'player1': double.player_1 or "",
+                    'region1': double.region_1 or "",
+                    'r1': double.r_1 or 0,
+                    'player2': double.player_2 or "",
+                    'region2': double.region_2 or "",
+                    'r2': double.r_2 or 0,
+                    'region_main': double.region_main or "",
+                    'r_sum': double.r_sum or 0,
+                    'posev': double.posev or 0
+                })
+
+            self.double_players_model.setData(doubles_data)
+            self.doubles_table_view.setModel(self.double_players_model)
+            self.doubles_table_view.setColumnHidden(0, True)
+            # self.highlight_player_duplicate()
+
+        except Exception as e:
+            print(f"Ошибка фильтрации пар: {e}")
+            self.double_players_model.setData([])
+            self.doubles_table_view.setModel(self.double_players_model)
+
+
 #======================
     def update_schedule_stages_data(self):
         """Обновление данных этапов для расписания без изменения UI (для фонового обновления)"""

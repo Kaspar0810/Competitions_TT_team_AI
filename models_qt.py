@@ -316,7 +316,57 @@ class DoublePlayersTableModel(QAbstractTableModel):
                 return self._headers[section]
         return None
 
+class DoublesResultsTableModel(QAbstractTableModel):
+    """Модель для отображения результатов парных матчей"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._data = []
+        self._headers = ['ID', 'Пара', 'Игрок 1', 'Игрок 2', 'Счет', 'Победитель']
+        self.hidden_columns = ['ID']
 
+    def setData(self, data):
+        self.beginResetModel()
+        if data is None or len(data) == 0:
+            self._data = []
+        else:
+            self._data = data
+        self.endResetModel()
+
+    def rowCount(self, parent=QModelIndex()):
+        return len(self._data)
+
+    def columnCount(self, parent=QModelIndex()):
+        return len(self._headers)
+
+    def data(self, index, role=Qt.DisplayRole):
+        if not index.isValid() or role != Qt.DisplayRole:
+            return None
+        
+        try:
+            item = self._data[index.row()]
+            col = index.column()
+            if col == 0:
+                return str(item.get('id', ""))
+            elif col == 1:
+                return item.get('pair', "")
+            elif col == 2:
+                return item.get('player1', "")
+            elif col == 3:
+                return item.get('player2', "")
+            elif col == 4:
+                return item.get('score', "")
+            elif col == 5:
+                return item.get('winner', "")
+            return ""
+        except:
+            return ""
+
+    def headerData(self, section, orientation, role=Qt.DisplayRole):
+        if orientation == Qt.Horizontal and role == Qt.DisplayRole:
+            if section < len(self._headers):
+                return self._headers[section]
+        return None
 # =======================
 class TitlesTableModel(QAbstractTableModel):
     """Модель для отображения соревнований"""

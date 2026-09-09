@@ -3380,10 +3380,10 @@ class MainWindow(QMainWindow):
         main_layout.setSpacing(5)
         main_layout.setContentsMargins(5, 5, 5, 5)
 
-        top_widget = QWidget()
-        top_layout = QVBoxLayout(top_widget)
-        top_layout.setSpacing(10)
-        top_layout.setContentsMargins(0, 0, 0, 0)
+        # top_widget = QWidget()
+        # top_layout = QVBoxLayout(top_widget)
+        # top_layout.setSpacing(10)
+        # top_layout.setContentsMargins(0, 0, 0, 0)
         # ---- Верхняя часть: список пар (видна по умолчанию) ----
 # =============================
         # 1. Создание списка пар
@@ -3453,36 +3453,36 @@ class MainWindow(QMainWindow):
         # double_list_layout.addWidget(form_widget) # form_widget - это форма ввода игроков
                 
         # main_layout.addWidget(doubles_list_widget)
-        top_layout.addWidget(double_list_group, 1)  # stretch 1
-
+        # top_layout.addWidget(double_list_group, 1)  # stretch 1
+        main_layout.addWidget(double_list_group, 1)  # stretch 1
         # Создание полей ввода результатов парных встреч
         # ---- Нижняя часть: результаты (изначально скрыта) ----
-        doubles_results_widget = QWidget()
+        score_widget = QWidget()
         # doubles_results_widget.setVisible(False)
-        doubles_results_layout = QVBoxLayout(doubles_results_widget)
-        doubles_results_layout.setSpacing(5)
-        doubles_results_layout.setContentsMargins(0, 0, 0, 0)
+        score_layout = QVBoxLayout(score_widget)
+        score_layout.setSpacing(5)
+        score_layout.setContentsMargins(0, 0, 0, 0)
 
-        # 2. Ввод результатов пар
-        doubles_results_group = QGroupBox("📝 Результаты парных встреч")
-        doubles_results_group.setStyleSheet("""
-            QGroupBox {
-                font-weight: bold;
-                font-size: 12px;
-                border: 2px solid #2196F3;
-                border-radius: 8px;
-                margin-top: 10px;
-            }
-            QGroupBox::title {
-                color: #2196F3;
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 8px 0 8px;
-            }
-        """)
-        doubles_results_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        doubles_results_layout = QVBoxLayout(doubles_results_group)
-        doubles_results_layout.setContentsMargins(10, 15, 10, 10)
+        # # 2. Ввод результатов пар
+        # doubles_results_group = QGroupBox("📝 Результаты парных встреч")
+        # doubles_results_group.setStyleSheet("""
+        #     QGroupBox {
+        #         font-weight: bold;
+        #         font-size: 12px;
+        #         border: 2px solid #2196F3;
+        #         border-radius: 8px;
+        #         margin-top: 10px;
+        #     }
+        #     QGroupBox::title {
+        #         color: #2196F3;
+        #         subcontrol-origin: margin;
+        #         left: 10px;
+        #         padding: 0 8px 0 8px;
+        #     }
+        # """)
+        # doubles_results_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        # doubles_results_layout = QVBoxLayout(doubles_results_group)
+        # doubles_results_layout.setContentsMargins(10, 15, 10, 10)
 # =============================
         # Панель управления (горизонтальная)
         control_panel = QWidget()
@@ -3506,11 +3506,30 @@ class MainWindow(QMainWindow):
         form_layout.addLayout(top_row)
         
         # Группа ввода счета
-        
-        score_group = QGroupBox("Ввод результата")
+        # 2. Ввод результатов пар
+        score_group = QGroupBox("📝 Результаты парных встреч")
+        score_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                font-size: 12px;
+                border: 2px solid #2196F3;
+                border-radius: 8px;
+                margin-top: 10px;
+            }
+            QGroupBox::title {
+                color: #2196F3;
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 8px 0 8px;
+            }
+        """)
+        score_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        # score_layout = QVBoxLayout(score_group)
+        score_layout.setContentsMargins(10, 15, 10, 10)
+        # score_group = QGroupBox("Ввод результата")
         score_layout = QGridLayout(score_group)
-        score_layout.setSpacing(3)
-        score_layout.setContentsMargins(5, 10, 5, 5)
+        # score_layout.setSpacing(3)
+        # score_layout.setContentsMargins(5, 10, 5, 5)
         
         # Заголовки: статус, игроки, общий счет
         score_layout.addWidget(QLabel("Статус"), 0, 0)
@@ -3575,7 +3594,7 @@ class MainWindow(QMainWindow):
             self.doubles_score_edits_p2[i] = edit
         
         # Кнопки
-        btn_layout = QHBoxLayout()
+        btn_layout = QVBoxLayout()
         save_btn = QPushButton("💾 Сохранить")
         save_btn.clicked.connect(self.save_doubles_result)
         clear_btn = QPushButton("🗑️ Очистить")
@@ -3583,14 +3602,14 @@ class MainWindow(QMainWindow):
         btn_layout.addWidget(save_btn)
         btn_layout.addWidget(clear_btn)
         btn_layout.addStretch()
-        score_layout.addLayout(btn_layout, 3, 0, 1, 8)
+        score_layout.addLayout(btn_layout, 1, 8, 2, 1)
         
         form_layout.addWidget(score_group)
 
-        top_layout.addWidget(doubles_results_group, 1)  # stretch 1
+        # top_layout.addWidget(doubles_results_group, 1)  # stretch 1
         
 
-        main_layout.addWidget(top_widget, 2)  # stretch 3 (30%)
+        main_layout.addWidget(score_group, 2)  # stretch 3 (30%)
 
 # ==================
 

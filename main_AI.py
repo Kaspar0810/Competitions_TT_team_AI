@@ -2322,16 +2322,55 @@ class MainWindow(QMainWindow):
             # Можно также показать всплывающее сообщение
             QMessageBox.information(self, "Дублирующиеся игроки", msg)
 
-    def update_double_player_completer(self):
-        """Обновляет список игроков для автодополнения на вкладке 'Пары'"""
+    # def update_double_player_completer(self):
+    #     """Обновляет список игроков для автодополнения на вкладке 'Пары'"""
+    #     if not self.current_title_id:
+    #         return
+
+    #     query = Player.select().where(Player.title_id == self.current_title_id)
+        
+    #     # Исключаем "X"
+    #     query = query.where(Player.player != "X")
+        
+    #     player_list = []
+    #     for player in query:
+    #         display_name = player.fio if player.fio else player.player
+    #         if player.city:
+    #             display_name += f" ({player.city})"
+    #         player_list.append(display_name)
+
+    #     model = QStringListModel(player_list)
+    #     self.player1_completer.setModel(model)
+    #     self.player2_completer.setModel(model)
+
+    def update_double_player_completers(self):
+        """Обновляет списки игроков для автодополнения с учётом вида пары"""
         if not self.current_title_id:
             return
 
-        query = Player.select().where(Player.title_id == self.current_title_id)
-        
-        # Исключаем "X"
-        query = query.where(Player.player != "X")
-        
+        # Определяем вид пары из комбобокса
+        vid = self.double_vid_combo.currentText() if hasattr(self, 'double_vid_combo') else "мужские"
+
+        # Базовый запрос: игроки текущего соревнования, исключая "X"
+        query = Player.select().where(
+            (Player.title_id == self.current_title_id) &
+            (Player.player != "X")
+        )
+
+        # Фильтруем по полу в зависимости от вида пары
+        if vid == "мужские":
+            query = query.where(Player.sex == "man")
+        elif vid == "женские":
+            query = query.where(Player.sex == "woman")
+        elif vid == "смешанные":
+            # Оба пола, фильтр по полу не применяем
+            pass
+        else:
+            # По умолчанию фильтруем по текущему полу соревнования
+            if self.current_sex:
+                query = query.where(Player.sex == self.current_sex)
+
+        # Формируем список ФИО с городом
         player_list = []
         for player in query:
             display_name = player.fio if player.fio else player.player
@@ -2339,9 +2378,16 @@ class MainWindow(QMainWindow):
                 display_name += f" ({player.city})"
             player_list.append(display_name)
 
-        model = QStringListModel(player_list)
-        self.player1_completer.setModel(model)
-        self.player2_completer.setModel(model)
+        # Сортируем по алфавиту
+        player_list.sort()
+
+        # Обновляем оба QCompleter
+        model1 = QStringListModel(player_list)
+        model2 = QStringListModel(player_list)
+        if hasattr(self, 'double_player1_completer'):
+            self.double_player1_completer.setModel(model1)
+        if hasattr(self, 'double_player2_completer'):
+            self.double_player2_completer.setModel(model2)
 
     def generate_pairs(self):
         """Формирование пар из введённых игроков"""
@@ -2367,44 +2413,72 @@ class MainWindow(QMainWindow):
         if not player2:
             QMessageBox.warning(self, "Ошибка", f"Игрок '{player2_text}' не найден")
             return
-        # Получаем выбранный вид из комбобокса
-        vid_filter = self.double_vid_combo.currentText() if hasattr(self, 'double_vid_combo') else None
-        if not vid_filter:
-            QMessageBox.warning(self, "Ошибка", "Не выбран вид пары")
-            return
-        
-        # Проверяем, что игроки имеют соответствующий пол
+    # ========================
+        # Получаем выбранный вид пары
+        vid = self.double_vid_combo.currentText() if hasattr(self, 'double_vid_combo') else "мужские"
+
         sex1 = player1.sex if player1.sex else "man"
         sex2 = player2.sex if player2.sex else "man"
-        
-        if vid_filter == "мужские" and (sex1 != "man" or sex2 != "man"):
+
+        # Проверка соответствия виду пары
+        if vid == "мужские" and (sex1 != "man" or sex2 != "man"):
             QMessageBox.warning(self, "Ошибка", "Для мужской пары оба игрока должны быть мужчинами")
             return
-        if vid_filter == "женские" and (sex1 != "woman" or sex2 != "woman"):
+        if vid == "женские" and (sex1 != "woman" or sex2 != "woman"):
             QMessageBox.warning(self, "Ошибка", "Для женской пары оба игрока должны быть женщинами")
             return
-        if vid_filter == "смешанные" and (sex1 == sex2):
+        if vid == "смешанные" and sex1 == sex2:
             QMessageBox.warning(self, "Ошибка", "Для смешанной пары игроки должны быть разных полов")
             return
+
+        # double_vid для записи в БД: man / woman / mix
+        if vid == "мужские":
+            double_vid = "man"
+        elif vid == "женские":
+            double_vid = "woman"
+        else:
+            double_vid = "mix"
+
+    # =================
+
+        # # Получаем выбранный вид из комбобокса
+        # vid_filter = self.double_vid_combo.currentText() if hasattr(self, 'double_vid_combo') else None
+        # if not vid_filter:
+        #     QMessageBox.warning(self, "Ошибка", "Не выбран вид пары")
+        #     return
         
-        # Проверка дубликатов только среди пар того же вида
-        existing1 = Players_double.get_or_none(
-            (Players_double.title_id == self.current_title_id) &
-            (Players_double.double_vid == vid_filter) &
-            ((Players_double.player_1 == player1.fio) | (Players_double.player_2 == player1.fio))
-        )
-        if existing1:
-            QMessageBox.warning(self, "Ошибка", f"Игрок {player1.fio} уже участвует в паре вида {vid_filter}")
-            return
+        # # Проверяем, что игроки имеют соответствующий пол
+        # sex1 = player1.sex if player1.sex else "man"
+        # sex2 = player2.sex if player2.sex else "man"
         
-        existing2 = Players_double.get_or_none(
-            (Players_double.title_id == self.current_title_id) &
-            (Players_double.double_vid == vid_filter) &
-            ((Players_double.player_1 == player2.fio) | (Players_double.player_2 == player2.fio))
-        )
-        if existing2:
-            QMessageBox.warning(self, "Ошибка", f"Игрок {player2.fio} уже участвует в паре вида {vid_filter}")
-            return
+        # if vid_filter == "мужские" and (sex1 != "man" or sex2 != "man"):
+        #     QMessageBox.warning(self, "Ошибка", "Для мужской пары оба игрока должны быть мужчинами")
+        #     return
+        # if vid_filter == "женские" and (sex1 != "woman" or sex2 != "woman"):
+        #     QMessageBox.warning(self, "Ошибка", "Для женской пары оба игрока должны быть женщинами")
+        #     return
+        # if vid_filter == "смешанные" and (sex1 == sex2):
+        #     QMessageBox.warning(self, "Ошибка", "Для смешанной пары игроки должны быть разных полов")
+        #     return
+        
+        # # Проверка дубликатов только среди пар того же вида
+        # existing1 = Players_double.get_or_none(
+        #     (Players_double.title_id == self.current_title_id) &
+        #     (Players_double.double_vid == vid_filter) &
+        #     ((Players_double.player_1 == player1.fio) | (Players_double.player_2 == player1.fio))
+        # )
+        # if existing1:
+        #     QMessageBox.warning(self, "Ошибка", f"Игрок {player1.fio} уже участвует в паре вида {vid_filter}")
+        #     return
+        
+        # existing2 = Players_double.get_or_none(
+        #     (Players_double.title_id == self.current_title_id) &
+        #     (Players_double.double_vid == vid_filter) &
+        #     ((Players_double.player_1 == player2.fio) | (Players_double.player_2 == player2.fio))
+        # )
+        # if existing2:
+        #     QMessageBox.warning(self, "Ошибка", f"Игрок {player2.fio} уже участвует в паре вида {vid_filter}")
+        #     return
     
     # ... создание пары (double_vid = vid_filter)
         # Проверяем, не существует ли уже такая пара
@@ -2700,52 +2774,6 @@ class MainWindow(QMainWindow):
         # Аналогично update_total_score для личных соревнований
         pass
 
-    # def change_radiobutton_double_tab(self):
-    #     """Смена списков и результатов по выбору радиокнопок"""
-    #     # ---- Разделитель 1 ----
-    #     line1 = QFrame()
-    #     line1.setFrameShape(QFrame.HLine)
-    #     line1.setFrameShadow(QFrame.Sunken)
-    #     line1.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
-    #     self.dynamic_filters_layout.addWidget(line1)
-
-    #     # ---- Радиокнопки переключения режимов ----
-    #     self.doubles_mode_group = QButtonGroup(self)
-    #     self.doubles_mode_group.buttonClicked.connect(self.on_doubles_mode_changed)
-
-    #     mode_label = QLabel("Режим:")
-    #     mode_label.setStyleSheet("font-weight: bold; font-size: 11px;")
-    #     self.dynamic_filters_layout.addWidget(mode_label)
-
-    #     mode_layout = QHBoxLayout()
-    #     self.radio_list_mode = QRadioButton("📋 Списки пар")
-    #     self.radio_list_mode.setChecked(True)
-    #     self.radio_results_mode = QRadioButton("📊 Результаты")
-
-    #     self.doubles_mode_group.addButton(self.radio_list_mode, 1)
-    #     self.doubles_mode_group.addButton(self.radio_results_mode, 2)
-
-    #     mode_layout.addWidget(self.radio_list_mode)
-    #     mode_layout.addWidget(self.radio_results_mode)
-    #     self.dynamic_filters_layout.addLayout(mode_layout)
-
-    #     # ---- Разделитель 2 ----
-    #     line2 = QFrame()
-    #     line2.setFrameShape(QFrame.HLine)
-    #     line2.setFrameShadow(QFrame.Sunken)
-    #     line2.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
-    #     self.dynamic_filters_layout.addWidget(line2)
-
-    #     # ---- Комбобокс выбора вида пары ----
-    #     vid_layout = QHBoxLayout()
-    #     vid_layout.addWidget(QLabel("Вид:"))
-    #     self.double_vid_combo = QComboBox()
-    #     self.double_vid_combo.addItems(["мужские", "женские", "смешанные"])
-    #     self.double_vid_combo.setStyleSheet("font-weight: bold; font-size: 14px;")
-    #     self.double_vid_combo.setMaximumWidth(300)
-    #     vid_layout.addWidget(self.double_vid_combo)
-    #     # vid_layout.addStretch()
-    #     self.dynamic_filters_layout.addLayout(vid_layout)
 # =======================
     def left_panel_double_tab(self):
         """Смена списков и результатов по выбору радиокнопок"""
@@ -6246,7 +6274,7 @@ class MainWindow(QMainWindow):
                 # Обновляем список этапов для расписания      
                 self.update_schedule_stages()
 
-                self.update_double_player_completer()
+                self.update_double_player_completers()
     #==================
 
     def update_finals_menu_after_selection(self):
@@ -9920,7 +9948,7 @@ class MainWindow(QMainWindow):
         # Обновляем этапы для бегунков
         self.update_runner_stages()
 
-        self.update_double_player_completer()
+        self.update_double_player_completers()
 
     # Если текущая вкладка "Пары", обновляем левую панель
         if self.tab_widget.currentIndex() == 3:

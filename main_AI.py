@@ -127,8 +127,8 @@ class MainWindow(QMainWindow):
                 "buttons": ["➕ Добавить", "✏️ Редактировать", "🗑️ Удалить", "⭐ Рейтинг"]},
             3: {"title": "Пары", "description": "Формирование пар",
                 "buttons": [
-                    ["🗑️ Удалить пару", "🎲 Сформировать"],
-                    ["🗑️ Очистить форму", "🔄 Разбить"],
+                    ["🗑️ Удалить пару", "🎲 Создать"],
+                    ["🗑️ Очистить форму"],
                     ["📊 Посев", "📊 По рейтингу"]]},
             4: {"title": "Система", "description": "Настройки системы проведения",
                 "buttons": [
@@ -2697,57 +2697,50 @@ class MainWindow(QMainWindow):
 
     def change_radiobutton_double_tab(self):
         """Смена списков и результатов по выбору радиокнопок"""
-    # # Проверяем, есть ли уже фильтры
-    #     if hasattr(self, '_filters_added') and self._filters_added:
-    #         return
-        # Разделитель
-        line = QFrame()
-        line.setFrameShape(QFrame.HLine)
-        line.setFrameShadow(QFrame.Sunken)
-        line.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
-        self.dynamic_filters_layout.addWidget(line)
-        
-        # Создаем контейнер для фильтров
-        filters_container = QWidget()
-        filters_layout = QVBoxLayout(filters_container)
-        filters_layout.setSpacing(8)
-        
+        # ---- Разделитель 1 ----
+        line1 = QFrame()
+        line1.setFrameShape(QFrame.HLine)
+        line1.setFrameShadow(QFrame.Sunken)
+        line1.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
+        self.dynamic_filters_layout.addWidget(line1)
+
         # ---- Радиокнопки переключения режимов ----
         self.doubles_mode_group = QButtonGroup(self)
         self.doubles_mode_group.buttonClicked.connect(self.on_doubles_mode_changed)
-        
+
         mode_label = QLabel("Режим:")
         mode_label.setStyleSheet("font-weight: bold; font-size: 11px;")
         self.dynamic_filters_layout.addWidget(mode_label)
-        
+
         mode_layout = QHBoxLayout()
         self.radio_list_mode = QRadioButton("📋 Списки пар")
         self.radio_list_mode.setChecked(True)
         self.radio_results_mode = QRadioButton("📊 Результаты")
-        
+
         self.doubles_mode_group.addButton(self.radio_list_mode, 1)
         self.doubles_mode_group.addButton(self.radio_results_mode, 2)
-        
+
         mode_layout.addWidget(self.radio_list_mode)
         mode_layout.addWidget(self.radio_results_mode)
         self.dynamic_filters_layout.addLayout(mode_layout)
 
-        self.dynamic_filters_layout.addStretch()
+        # ---- Разделитель 2 ----
+        line2 = QFrame()
+        line2.setFrameShape(QFrame.HLine)
+        line2.setFrameShadow(QFrame.Sunken)
+        line2.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
+        self.dynamic_filters_layout.addWidget(line2)
 
-        # Разделитель
-        line = QFrame()
-        line.setFrameShape(QFrame.HLine)
-        line.setFrameShadow(QFrame.Sunken)
-        line.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
-        self.dynamic_filters_layout.addWidget(line)
-
-    
-        # Вид пары
-        mode_layout.addWidget(QLabel("Вид:"))
+        # ---- Комбобокс выбора вида пары ----
+        vid_layout = QHBoxLayout()
+        vid_layout.addWidget(QLabel("Вид:"))
         self.double_vid_combo = QComboBox()
         self.double_vid_combo.addItems(["мужские", "женские", "смешанные"])
-        self.double_vid_combo.setMaximumWidth(100)
-        mode_layout.addWidget(self.double_vid_combo)
+        self.double_vid_combo.setStyleSheet("font-weight: bold; font-size: 14px;")
+        self.double_vid_combo.setMaximumWidth(300)
+        vid_layout.addWidget(self.double_vid_combo)
+        # vid_layout.addStretch()
+        self.dynamic_filters_layout.addLayout(vid_layout)
 
 # ============== Создание вкладок ====
     def create_system_tab(self):
@@ -7308,52 +7301,10 @@ class MainWindow(QMainWindow):
                         self.action_title.setText("🔧 Пары")
                         self.action_description.setText("Управление парами игроков")
 
-                    # # ---- Радиокнопки переключения режимов ----
-                    #     self.doubles_mode_group = QButtonGroup(self)
-                    #     self.doubles_mode_group.buttonClicked.connect(self.on_doubles_mode_changed)
-                        
-                    #     mode_label = QLabel("Режим:")
-                    #     mode_label.setStyleSheet("font-weight: bold; font-size: 11px;")
-                    #     self.dynamic_filters_layout.addWidget(mode_label)
-                        
-                    #     mode_layout = QHBoxLayout()
-                    #     self.radio_list_mode = QRadioButton("📋 Списки пар")
-                    #     self.radio_list_mode.setChecked(True)
-                    #     self.radio_results_mode = QRadioButton("📊 Результаты")
-                        
-                    #     self.doubles_mode_group.addButton(self.radio_list_mode, 1)
-                    #     self.doubles_mode_group.addButton(self.radio_results_mode, 2)
-                        
-                    #     mode_layout.addWidget(self.radio_list_mode)
-                    #     mode_layout.addWidget(self.radio_results_mode)
-                    #     self.dynamic_filters_layout.addLayout(mode_layout)
-
-                    #     self.dynamic_filters_layout.addStretch()
-                        # # ---- Фильтр по виду пар ----
-                        # filter_label = QLabel("Вид пары:")
-                        # self.double_vid_filter_combo = QComboBox()
-                        # # Заполняем в зависимости от пола
-                        # pairs_list = ["Все пары", "Мужские","Женские", "Смешанные"]
-                        # self.double_vid_filter_combo.addItems(pairs_list)
-                        # # if self.current_sex == "man":
-                        # #     self.double_vid_filter_combo.addItem("мужские")
-                        # #     self.double_vid_filter_combo.addItem("женские")
-                        # #     self.double_vid_filter_combo.addItem("смешанные")
-                        # # else:
-                        # #     self.double_vid_filter_combo.addItem("женские")
-                        # #     self.double_vid_filter_combo.addItem("мужские")
-                        # #     self.double_vid_filter_combo.addItem("смешанные")
-                        # self.double_vid_filter_combo.currentIndexChanged.connect(self.filter_doubles_by_vid)
-                        
-                        # filter_layout = QHBoxLayout()
-                        # filter_layout.addWidget(filter_label)
-                        # filter_layout.addWidget(self.double_vid_filter_combo, 1)
-                        # self.dynamic_filters_layout.addLayout(filter_layout)
-
                         if btn_text == "🎲 Сформировать":
                             btn.clicked.connect(self.generate_pairs)
-                        elif btn_text == "🔄 Разбить":
-                            btn.clicked.connect(self.break_pairs)
+                        # elif btn_text == "🔄 Разбить":
+                        #     btn.clicked.connect(self.break_pairs)
                         elif btn_text == "📊 Посев":
                             btn.clicked.connect(self.seeding_pairs)
                         elif btn_text == "🗑️ Удалить пару":

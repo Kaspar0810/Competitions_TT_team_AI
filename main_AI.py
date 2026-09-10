@@ -126,10 +126,10 @@ class MainWindow(QMainWindow):
             2: {"title": "Команды", "description": "Управление командами",
                 "buttons": ["➕ Добавить", "✏️ Редактировать", "🗑️ Удалить", "⭐ Рейтинг"]},
             3: {"title": "Пары", "description": "Формирование пар",
-                "buttons": [
-                    ["🗑️ Удалить пару", "🎲 Создать"],
-                    ["🗑️ Очистить форму"],
-                    ["📊 Посев", "📊 По рейтингу"]]},
+                "buttons": []},
+                    # ["🗑️ Удалить пару", "🎲 Создать"],
+                    # ["🗑️ Очистить форму"],
+                    # ["📊 Посев", "📊 По рейтингу"]]},
             4: {"title": "Система", "description": "Настройки системы проведения",
                 "buttons": [
                     ["🔍 Поиск в Choice", "📊 Статистика"],
@@ -392,10 +392,17 @@ class MainWindow(QMainWindow):
             query = Players_double.select().where(Players_double.title_id == self.current_title_id)
             
             # Применяем фильтр по виду, если комбобокс существует и выбран не "все"
-            if hasattr(self, 'double_vid_filter_combo'):
-                vid = self.double_vid_filter_combo.currentText()
+            if hasattr(self, 'double_vid_combo'):
+                vid = self.double_vid_combo.currentText()
                 if vid and vid != "все":
-                    query = query.where(Players_double.double_vid == vid)
+                    # Применяем фильтр по виду пары
+                    if vid == "мужские":
+                        query = query.where(Players_double.double_vid == "man")
+                    elif vid == "женские":
+                        query = query.where(Players_double.double_vid == "woman")
+                    elif vid == "смешанные":
+                        query = query.where(Players_double.double_vid == "mix")
+
             
             query = query.order_by(Players_double.r_sum.desc())
             
@@ -2352,9 +2359,7 @@ class MainWindow(QMainWindow):
         # Получаем игроков из базы
         player1 = self._find_player_by_name(player1_text)
         player2 = self._find_player_by_name(player2_text)
-        #====================
-
-        #=================
+ 
         if not player1:
             QMessageBox.warning(self, "Ошибка", f"Игрок '{player1_text}' не найден")
             return
@@ -2363,7 +2368,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", f"Игрок '{player2_text}' не найден")
             return
         # Получаем выбранный вид из комбобокса
-        vid_filter = self.double_vid_filter_combo.currentText() if hasattr(self, 'double_vid_filter_combo') else None
+        vid_filter = self.double_vid_combo.currentText() if hasattr(self, 'double_vid_combo') else None
         if not vid_filter:
             QMessageBox.warning(self, "Ошибка", "Не выбран вид пары")
             return
@@ -2695,8 +2700,92 @@ class MainWindow(QMainWindow):
         # Аналогично update_total_score для личных соревнований
         pass
 
-    def change_radiobutton_double_tab(self):
+    # def change_radiobutton_double_tab(self):
+    #     """Смена списков и результатов по выбору радиокнопок"""
+    #     # ---- Разделитель 1 ----
+    #     line1 = QFrame()
+    #     line1.setFrameShape(QFrame.HLine)
+    #     line1.setFrameShadow(QFrame.Sunken)
+    #     line1.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
+    #     self.dynamic_filters_layout.addWidget(line1)
+
+    #     # ---- Радиокнопки переключения режимов ----
+    #     self.doubles_mode_group = QButtonGroup(self)
+    #     self.doubles_mode_group.buttonClicked.connect(self.on_doubles_mode_changed)
+
+    #     mode_label = QLabel("Режим:")
+    #     mode_label.setStyleSheet("font-weight: bold; font-size: 11px;")
+    #     self.dynamic_filters_layout.addWidget(mode_label)
+
+    #     mode_layout = QHBoxLayout()
+    #     self.radio_list_mode = QRadioButton("📋 Списки пар")
+    #     self.radio_list_mode.setChecked(True)
+    #     self.radio_results_mode = QRadioButton("📊 Результаты")
+
+    #     self.doubles_mode_group.addButton(self.radio_list_mode, 1)
+    #     self.doubles_mode_group.addButton(self.radio_results_mode, 2)
+
+    #     mode_layout.addWidget(self.radio_list_mode)
+    #     mode_layout.addWidget(self.radio_results_mode)
+    #     self.dynamic_filters_layout.addLayout(mode_layout)
+
+    #     # ---- Разделитель 2 ----
+    #     line2 = QFrame()
+    #     line2.setFrameShape(QFrame.HLine)
+    #     line2.setFrameShadow(QFrame.Sunken)
+    #     line2.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
+    #     self.dynamic_filters_layout.addWidget(line2)
+
+    #     # ---- Комбобокс выбора вида пары ----
+    #     vid_layout = QHBoxLayout()
+    #     vid_layout.addWidget(QLabel("Вид:"))
+    #     self.double_vid_combo = QComboBox()
+    #     self.double_vid_combo.addItems(["мужские", "женские", "смешанные"])
+    #     self.double_vid_combo.setStyleSheet("font-weight: bold; font-size: 14px;")
+    #     self.double_vid_combo.setMaximumWidth(300)
+    #     vid_layout.addWidget(self.double_vid_combo)
+    #     # vid_layout.addStretch()
+    #     self.dynamic_filters_layout.addLayout(vid_layout)
+# =======================
+    def left_panel_double_tab(self):
         """Смена списков и результатов по выбору радиокнопок"""
+        # ---- Кнопки управления (вверху левой панели) ----
+        # Горизонтальный ряд для "Сформировать" и "Удалить пару"
+        btn_row1 = QVBoxLayout()
+        btn_row1.setSpacing(10)
+
+        generate_btn = QPushButton("🎲 Сформировать")
+        generate_btn.setMinimumHeight(35)
+        generate_btn.setStyleSheet(self.get_button_style())
+        generate_btn.clicked.connect(self.generate_pairs)
+        btn_row1.addWidget(generate_btn)
+
+        delete_btn = QPushButton("🗑️ Удалить пару")
+        delete_btn.setMinimumHeight(40)
+        delete_btn.setStyleSheet(self.get_button_style())
+        delete_btn.clicked.connect(self.delete_double_pair)
+        btn_row1.addWidget(delete_btn)
+
+        self.dynamic_filters_layout.addLayout(btn_row1)
+
+        # Горизонтальный ряд для "Очистить форму" и "По рейтингу"
+        btn_row2 = QHBoxLayout()
+        btn_row2.setSpacing(10)
+
+        clear_btn = QPushButton("🧹 Очистить форму")
+        clear_btn.setMinimumHeight(40)
+        clear_btn.setStyleSheet(self.get_button_style())
+        clear_btn.clicked.connect(self.clear_doubles_form)
+        btn_row2.addWidget(clear_btn)
+
+        # sort_btn = QPushButton("📊 По рейтингу")
+        # sort_btn.setMinimumHeight(40)
+        # sort_btn.setStyleSheet(self.get_button_style())
+        # sort_btn.clicked.connect(self.sort_doubles_by_rating)
+        # btn_row2.addWidget(sort_btn)
+
+        self.dynamic_filters_layout.addLayout(btn_row2)
+
         # ---- Разделитель 1 ----
         line1 = QFrame()
         line1.setFrameShape(QFrame.HLine)
@@ -2735,11 +2824,11 @@ class MainWindow(QMainWindow):
         vid_layout = QHBoxLayout()
         vid_layout.addWidget(QLabel("Вид:"))
         self.double_vid_combo = QComboBox()
+        self.double_vid_combo.setStyleSheet("font-weight: bold; font-size: 12px;")
         self.double_vid_combo.addItems(["мужские", "женские", "смешанные"])
-        self.double_vid_combo.setStyleSheet("font-weight: bold; font-size: 14px;")
-        self.double_vid_combo.setMaximumWidth(300)
+        self.double_vid_combo.setMaximumWidth(120)
         vid_layout.addWidget(self.double_vid_combo)
-        # vid_layout.addStretch()
+        vid_layout.addStretch()
         self.dynamic_filters_layout.addLayout(vid_layout)
 
 # ============== Создание вкладок ====
@@ -3495,7 +3584,7 @@ class MainWindow(QMainWindow):
         # self.double_vid_combo.setMaximumWidth(100)
         # form_layout.addWidget(self.double_vid_combo)
         
-        # Кнопка "Сформировать"
+        # # Кнопка "Сформировать"
         # generate_btn = QPushButton("➕ Сформировать")
         # generate_btn.clicked.connect(self.generate_pairs)
         # form_layout.addWidget(generate_btn)
@@ -7301,7 +7390,7 @@ class MainWindow(QMainWindow):
                         self.action_title.setText("🔧 Пары")
                         self.action_description.setText("Управление парами игроков")
 
-                        if btn_text == "🎲 Сформировать":
+                        if btn_text == "🎲 Создать":
                             btn.clicked.connect(self.generate_pairs)
                         # elif btn_text == "🔄 Разбить":
                         #     btn.clicked.connect(self.break_pairs)
@@ -7347,7 +7436,7 @@ class MainWindow(QMainWindow):
             if tab_index == 1:
                 self.add_participant_filters()
             elif tab_index == 3:
-                self.change_radiobutton_double_tab()
+                self.left_panel_double_tab()
             
             self.dynamic_filters_layout.addStretch()
         finally:
@@ -9879,66 +9968,6 @@ class MainWindow(QMainWindow):
         self.double_players_model.setData([])
         self.doubles_table_view.setModel(self.double_players_model)
 
-    def filter_doubles_by_vid(self):
-        """Фильтрация пар по виду пары"""
-        if not self.current_title_id:
-            return
-
-        filter_text = self.double_vid_filter_combo.currentText()
-        # Сбрасываем подсветку при фильтрации
-        if hasattr(self, 'double_players_model'):
-            self.double_players_model.set_highlight_rows([])
-
-        try:
-            # Базовый запрос
-            query = Players_double.select().where(Players_double.title_id == self.current_title_id)
-
-            # Применяем фильтр по виду пары
-            if filter_text == "Мужские":
-                query = query.where(Players_double.double_vid == "man")
-            elif filter_text == "Женские":
-                query = query.where(Players_double.double_vid == "woman")
-            elif filter_text == "Смешанные":
-                query = query.where(Players_double.double_vid == "mix")
-            # else:
-            #     self.double_players_model.setData([])
-            #     self.doubles_table_view.setModel(self.double_players_model)
-            #     return
-            # "Все пары" - без фильтра
-
-            query = query.order_by(Players_double.r_sum.desc())
-
-            if query.count() == 0:
-                self.double_players_model.setData([])
-                self.doubles_table_view.setModel(self.double_players_model)
-                return
-
-            doubles_data = []
-            for double in query:
-                doubles_data.append({
-                    'id': double.id,
-                    'player1': double.player_1 or "",
-                    'region1': double.region_1 or "",
-                    'r1': double.r_1 or 0,
-                    'player2': double.player_2 or "",
-                    'region2': double.region_2 or "",
-                    'r2': double.r_2 or 0,
-                    'region_main': double.region_main or "",
-                    'r_sum': double.r_sum or 0,
-                    'posev': double.posev or 0
-                })
-
-            self.double_players_model.setData(doubles_data)
-            self.doubles_table_view.setModel(self.double_players_model)
-            self.doubles_table_view.setColumnHidden(0, True)
-            self.highlight_player_duplicates()
-
-        except Exception as e:
-            print(f"Ошибка фильтрации пар: {e}")
-            self.double_players_model.setData([])
-            self.doubles_table_view.setModel(self.double_players_model)
-
-
 #======================
     def update_schedule_stages_data(self):
         """Обновление данных этапов для расписания без изменения UI (для фонового обновления)"""
@@ -9954,7 +9983,6 @@ class MainWindow(QMainWindow):
         # Просто сохраняем список этапов для использования при активации вкладки
         self._schedule_stages_cache = list(stages)
 
-#===============================
     def load_participants_for_title(self):
         """Загрузка участников для выбранного соревнования"""
         if not self.current_title_id:

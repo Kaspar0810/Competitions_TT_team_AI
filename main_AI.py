@@ -1605,34 +1605,91 @@ class MainWindow(QMainWindow):
         pass  # Можно оставить пустым 
 
 # ========== списки пар ====
+    # def update_double_region(self):
+    #     """Обновляет поле региона при вводе игроков"""
+    #     player1_text = self.player1_edit.text().strip()
+    #     player2_text = self.player2_edit.text().strip()
+        
+    #     if not player1_text or not player2_text:
+    #         return
+        
+    #     # Получаем данные игроков из базы
+    #     player1 = self._find_player_by_name(player1_text)
+    #     player2 = self._find_player_by_name(player2_text)
+        
+    #     if not player1 or not player2:
+    #         return
+        
+    #     region1 = player1.region if player1.region else ""
+    #     region2 = player2.region if player2.region else ""
+    #     rank1 = player1.rank if player1.rank else 0
+    #     rank2 = player2.rank if player2.rank else 0
+        
+    #     # Определяем порядок городов: сначала город с более высоким рейтингом
+    #     if rank1 >= rank2:
+    #         first_region = region1
+    #         second_region = region2
+    #     else:
+    #         first_region = region2
+    #         second_region = region1
+        
+    #     # Формируем регион
+    #     if region1 and region2 and region1 != region2:
+    #         region = f"{first_region}-{second_region}"
+    #     elif region1:
+    #         region = region1
+    #     elif region2:
+    #         region = region2
+    #     else:
+    #         region = ""
+    
+    #     self.double_region_edit.setText(region)
+
+    #     self.highlight_player_duplicates()
+
     def update_double_region(self):
         """Обновляет поле региона при вводе игроков"""
         player1_text = self.player1_edit.text().strip()
         player2_text = self.player2_edit.text().strip()
-        
+
         if not player1_text or not player2_text:
             return
-        
+
         # Получаем данные игроков из базы
         player1 = self._find_player_by_name(player1_text)
         player2 = self._find_player_by_name(player2_text)
-        
+
         if not player1 or not player2:
             return
-        
+
         region1 = player1.region if player1.region else ""
         region2 = player2.region if player2.region else ""
         rank1 = player1.rank if player1.rank else 0
         rank2 = player2.rank if player2.rank else 0
-        
-        # Определяем порядок городов: сначала город с более высоким рейтингом
-        if rank1 >= rank2:
-            first_region = region1
-            second_region = region2
+
+        # Определяем вид пары
+        vid = self.double_vid_combo.currentText() if hasattr(self, 'double_vid_combo') else "мужские"
+
+        if vid == "смешанные":
+            # Для смешанных пар регион определяется по региону мужчины (игрок 1)
+            # Мужчина всегда должен быть первым игроком
+            sex1 = player1.sex if player1.sex else "man"
+            if sex1 == "man":
+                first_region = region1
+                second_region = region2
+            else:
+                # Если первый — женщина (что нештатно), меняем порядок
+                first_region = region2
+                second_region = region1
         else:
-            first_region = region2
-            second_region = region1
-        
+            # Для остальных видов: сначала город игрока с более высоким рейтингом
+            if rank1 >= rank2:
+                first_region = region1
+                second_region = region2
+            else:
+                first_region = region2
+                second_region = region1
+
         # Формируем регион
         if region1 and region2 and region1 != region2:
             region = f"{first_region}-{second_region}"
@@ -1642,10 +1699,8 @@ class MainWindow(QMainWindow):
             region = region2
         else:
             region = ""
-    
-        self.double_region_edit.setText(region)
 
-        self.highlight_player_duplicates()
+        self.double_region_edit.setText(region)
 
     def _find_player_by_name(self, name_text):
         """Находит игрока в базе по ФИО (с учётом города)"""
@@ -1733,45 +1788,121 @@ class MainWindow(QMainWindow):
             self.status_label.setText(msg)
             # Можно также показать всплывающее сообщение
             QMessageBox.information(self, "Дублирующиеся игроки", msg)
+# ===============
+    # def update_double_player_completers(self):
+    #     """Обновляет список игроков для автодополнения на вкладке 'Пары'"""
+    #     if not self.current_title_id:
+    #         return
+        
+    #     # Определяем вид пары из комбобокса
+    #     vid = self.double_vid_combo.currentText() if hasattr(self, 'double_vid_combo') else "мужские"
 
+    #     query = Player.select().where(Player.title_id == self.current_title_id)
+        
+    #     # Исключаем "X"
+    #     query = query.where(Player.player != "X")
+
+    #     # Фильтруем по полу в зависимости от вида пары
+    #     if vid == "мужские":
+    #         query = query.where(Player.sex == "man")
+    #     elif vid == "женские":
+    #         query = query.where(Player.sex == "woman")
+    #     elif vid == "смешанные":
+    #         # Оба пола, фильтр по полу не применяем
+    #         pass
+    #     else:
+    #         # По умолчанию фильтруем по текущему полу соревнования
+    #         if self.current_sex:
+    #             query = query.where(Player.sex == self.current_sex)
+        
+        
+    #     player_list = []
+    #     for player in query:
+    #         display_name = player.fio if player.fio else player.player
+    #         if player.region:
+    #             display_name += f" ({player.region})"
+    #         player_list.append(display_name)
+
+    #     model = QStringListModel(player_list)
+    #     self.player1_completer.setModel(model)
+    #     self.player2_completer.setModel(model)
+
+    #==========
     def update_double_player_completers(self):
-        """Обновляет список игроков для автодополнения на вкладке 'Пары'"""
+        """Обновляет списки игроков для автодополнения с учётом вида пары"""
         if not self.current_title_id:
             return
-        
-        # Определяем вид пары из комбобокса
+
         vid = self.double_vid_combo.currentText() if hasattr(self, 'double_vid_combo') else "мужские"
 
-        query = Player.select().where(Player.title_id == self.current_title_id)
-        
-        # Исключаем "X"
-        query = query.where(Player.player != "X")
+        # Базовый запрос: все игроки соревнования, кроме "X"
+        base_query = Player.select().where(
+            (Player.title_id == self.current_title_id) &
+            (Player.player != "X")
+        )
 
-        # Фильтруем по полу в зависимости от вида пары
-        if vid == "мужские":
-            query = query.where(Player.sex == "man")
-        elif vid == "женские":
-            query = query.where(Player.sex == "woman")
-        elif vid == "смешанные":
-            # Оба пола, фильтр по полу не применяем
-            pass
+        # Формируем списки для каждого поля
+        if vid == "смешанные":
+            # Для смешанных: игрок 1 — мужчины, игрок 2 — женщины
+            men_query = base_query.where(Player.sex == "man")
+            women_query = base_query.where(Player.sex == "woman")
+
+            men_list = []
+            for p in men_query:
+                name = p.fio if p.fio else p.player
+                if p.city:
+                    name += f" ({p.city})"
+                men_list.append(name)
+            men_list.sort()
+
+            women_list = []
+            for p in women_query:
+                name = p.fio if p.fio else p.player
+                if p.city:
+                    name += f" ({p.city})"
+                women_list.append(name)
+            women_list.sort()
+
+            model1 = QStringListModel(men_list)
+            model2 = QStringListModel(women_list)
         else:
-            # По умолчанию фильтруем по текущему полу соревнования
-            if self.current_sex:
-                query = query.where(Player.sex == self.current_sex)
-        
-        
-        player_list = []
-        for player in query:
-            display_name = player.fio if player.fio else player.player
-            if player.region:
-                display_name += f" ({player.region})"
-            player_list.append(display_name)
+            # Для мужских или женских: оба поля получают одинаковый список
+            if vid == "мужские":
+                query = base_query.where(Player.sex == "man")
+            elif vid == "женские":
+                query = base_query.where(Player.sex == "woman")
+            else:
+                query = base_query
 
-        model = QStringListModel(player_list)
-        self.player1_completer.setModel(model)
-        self.player2_completer.setModel(model)
+            player_list = []
+            for p in query:
+                name = p.fio if p.fio else p.player
+                if p.city:
+                    name += f" ({p.city})"
+                player_list.append(name)
+            player_list.sort()
 
+            model1 = QStringListModel(player_list)
+            model2 = QStringListModel(player_list)
+
+        # Применяем модели к соответствующим QCompleter
+        if hasattr(self, 'player1_completer'):
+            self.player1_completer.setModel(model1)
+        if hasattr(self, 'player2_completer'):
+            self.player2_completer.setModel(model2)
+
+        # Обновляем placeholder-текст для наглядности
+        if vid == "смешанные":
+            if hasattr(self, 'player1_edit'):
+                self.player1_edit.setPlaceholderText("Мужчина (ФИО)")
+            if hasattr(self, 'player2_edit'):
+                self.player2_edit.setPlaceholderText("Женщина (ФИО)")
+        else:
+            if hasattr(self, 'player1_edit'):
+                self.player1_edit.setPlaceholderText("ФИО")
+            if hasattr(self, 'player2_edit'):
+                self.player2_edit.setPlaceholderText("ФИО")
+  
     def generate_pairs(self):
         """Формирование пар из введённых игроков"""
         player1_text = self.player1_edit.text().strip()
@@ -1796,7 +1927,7 @@ class MainWindow(QMainWindow):
         if not player2:
             QMessageBox.warning(self, "Ошибка", f"Игрок '{player2_text}' не найден")
             return
-    # ========================
+
         # Получаем выбранный вид пары
         vid = self.double_vid_combo.currentText() if hasattr(self, 'double_vid_combo') else "мужские"
 
@@ -1850,28 +1981,38 @@ class MainWindow(QMainWindow):
             return
         
         # Получаем регионы и рейтинги
-        region1 = player1.city or ""
-        region2 = player2.city or ""
+        region1 = player1.region or ""
+        region2 = player2.region or ""
         r1 = player1.rank or 0
         r2 = player2.rank or 0
-        
-        # Формируем регион пары
-        if r1 >= r2:
-            first_city = region1
-            second_city = region2
+
+        if vid == "смешанные":
+            # Для смешанных пар регион определяется по региону мужчины (игрок 1)
+            sex1 = player1.sex if player1.sex else "man"
+            if sex1 == "man":
+                first_region = region1
+                second_region = region2
+            else:
+                first_region = region2
+                second_region = region1
         else:
-            first_city = region2
-            second_city = region1
-        
+            # Для остальных видов: сначала город игрока с более высоким рейтингом
+            if r1 >= r2:
+                first_region = region1
+                second_region = region2
+            else:
+                first_region = region2
+                second_region = region1
+
         if region1 and region2 and region1 != region2:
-            region_main = f"{first_city}-{second_city}"
+            region_main = f"{first_region}-{second_region}"
         elif region1:
             region_main = region1
         elif region2:
             region_main = region2
         else:
             region_main = ""
-        
+       
         # Сумма рейтингов
         r_sum = r1 + r2
         
@@ -2223,8 +2364,7 @@ class MainWindow(QMainWindow):
         player_list = []
         for player in query:
             display_name = player.fio if player.fio else player.player
-            # if player.city:
-            #     display_name += f" ({player.city})"
+
             if player.region:
                 display_name += f" ({player.region})"
             player_list.append(display_name)

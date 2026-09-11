@@ -288,154 +288,6 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             print(f"Ошибка загрузки команд: {e}")
-#============================
-    # def load_doubles_for_title(self):
-    #     if not self.current_title_id:
-    #         self.doubles_table_view.setModel(None)
-    #         return
-
-    #     # Сбрасываем фильтр на "Все пары"
-    #     if hasattr(self, 'double_vid_filter'):
-    #         self.double_vid_filter.blockSignals(True)
-    #         self.double_vid_filter.setCurrentText("Все пары")
-    #         self.double_vid_filter.blockSignals(False)
-
-    #     try:
-    #         query = Players_double.select().where(Players_double.title_id == self.current_title_id)
-    #         # Добавляем сортировку по убыванию суммы рейтингов
-    #         query = Players_double.select().where(
-    #             Players_double.title_id == self.current_title_id
-    #         ).order_by(Players_double.r_sum.desc())
-
-    #         if query.count() == 0:
-    #             self.double_players_model.setData([])
-    #             self.doubles_table_view.setModel(self.double_players_model)
-    #             return
-
-    #         doubles_data = []
-    #         for double in query:
-    #             doubles_data.append({
-    #                 'id': double.id,
-    #                 'player1': double.player_1 or "",
-    #                 'region1': double.region_1 or "",
-    #                 'r1': double.r_1 or 0,
-    #                 'player2': double.player_2 or "",
-    #                 'region2': double.region_2 or "",
-    #                 'r2': double.r_2 or 0,
-    #                 'region_main': double.region_main or "",
-    #                 'r_sum': double.r_sum or 0,
-    #                 'posev': double.posev or 0
-    #             })
-
-    #         self.double_players_model.setData(doubles_data)
-    #         self.doubles_table_view.setModel(self.double_players_model)
-    #         self.doubles_table_view.setColumnHidden(0, True)
-
-    #     except Exception as e:
-    #         print(f"Ошибка загрузки пар: {e}")
-    #         self.double_players_model.setData([])
-    #         self.doubles_table_view.setModel(self.double_players_model) 
-
-    #     # После загрузки данных сбрасываем подсветку
-    #     if hasattr(self, 'double_players_model'):
-    #         self.double_players_model.set_highlight_rows([])
-
-    # def _load_doubles_for_title(self):
-    #     """Загрузка пар для выбранного соревнования с сортировкой по рейтингу"""
-    #     if not self.current_title_id:
-    #         self.doubles_table_view.setModel(None)
-    #         return
-
-    #     try:
-    #         # Добавляем сортировку по убыванию суммы рейтингов
-    #         query = Players_double.select().where(
-    #             Players_double.title_id == self.current_title_id
-    #         ).order_by(Players_double.r_sum.desc())
-            
-    #         if query.count() == 0:
-    #             self.double_players_model.setData([])
-    #             self.doubles_table_view.setModel(self.double_players_model)
-    #             return
-
-    #         doubles_data = []
-    #         for double in query:
-    #             doubles_data.append({
-    #                 'id': double.id,
-    #                 'player1': double.player_1 or "",
-    #                 'region1': double.region_1 or "",
-    #                 'r1': double.r_1 or 0,
-    #                 'player2': double.player_2 or "",
-    #                 'region2': double.region_2 or "",
-    #                 'r2': double.r_2 or 0,
-    #                 'region_main': double.region_main or "",
-    #                 'r_sum': double.r_sum or 0,
-    #                 'posev': double.posev or 0
-    #             })
-
-    #         self.double_players_model.setData(doubles_data)
-    #         self.doubles_table_view.setModel(self.double_players_model)
-    #         self.doubles_table_view.setColumnHidden(0, True)
-    #         self.highlight_duplicate_players()
-
-    #     except Exception as e:
-    #         print(f"Ошибка загрузки пар: {e}")
-    #         self.double_players_model.setData([])
-    #         self.doubles_table_view.setModel(self.double_players_model)
-
-    # def load_doubles_for_title(self):
-    #     """Загрузка пар для выбранного соревнования с фильтром по виду"""
-    #     if not self.current_title_id:
-    #         self.doubles_table_view.setModel(None)
-    #         return
-
-    #     try:
-    #         query = Players_double.select().where(Players_double.title_id == self.current_title_id)
-            
-    #         # Применяем фильтр по виду, если комбобокс существует и выбран не "все"
-    #         if hasattr(self, 'double_vid_combo'):
-    #             vid = self.double_vid_combo.currentText()
-    #             if vid and vid != "все":
-    #                 # Применяем фильтр по виду пары
-    #                 if vid == "мужские":
-    #                     query = query.where(Players_double.double_vid == "man")
-    #                 elif vid == "женские":
-    #                     query = query.where(Players_double.double_vid == "woman")
-    #                 elif vid == "смешанные":
-    #                     query = query.where(Players_double.double_vid == "mix")
-
-            
-    #         query = query.order_by(Players_double.r_sum.desc())
-            
-    #         if query.count() == 0:
-    #             self.double_players_model.setData([])
-    #             self.doubles_table_view.setModel(self.double_players_model)
-    #             return
-
-    #         doubles_data = []
-    #         for double in query:
-    #             doubles_data.append({
-    #                 'id': double.id,
-    #                 'player1': double.player_1 or "",
-    #                 'region1': double.region_1 or "",
-    #                 'r1': double.r_1 or 0,
-    #                 'player2': double.player_2 or "",
-    #                 'region2': double.region_2 or "",
-    #                 'r2': double.r_2 or 0,
-    #                 'region_main': double.region_main or "",
-    #                 'r_sum': double.r_sum or 0,
-    #                 'posev': double.posev or 0,
-    #                 'double_vid': double.double_vid or ""
-    #             })
-
-    #         self.double_players_model.setData(doubles_data)
-    #         self.doubles_table_view.setModel(self.double_players_model)
-    #         self.doubles_table_view.setColumnHidden(0, True)
-    #         # self.highlight_player_duplicates()
-
-    #     except Exception as e:
-    #         print(f"Ошибка загрузки пар: {e}")
-    #         self.double_players_model.setData([])
-    #         self.doubles_table_view.setModel(self.double_players_model)
 
     def load_doubles_for_title(self):
         if not self.current_title_id:
@@ -2396,22 +2248,32 @@ class MainWindow(QMainWindow):
         self.dynamic_filters_layout.addWidget(line2)
 
         # ---- Комбобокс выбора вида пары ----
-        # vid_layout = QHBoxLayout()
-        # vid_layout.addWidget(QLabel("Вид:"))
-        # self.double_vid_combo = QComboBox()
-        # self.double_vid_combo.setStyleSheet("font-weight: bold; font-size: 12px;")
-        # self.double_vid_combo.addItems(["мужские", "женские", "смешанные"])
-        # self.double_vid_combo.setMaximumWidth(120)
-        # vid_layout.addWidget(self.double_vid_combo)
-        # vid_layout.addStretch()
-        # self.dynamic_filters_layout.addLayout(vid_layout)
-
         vid_layout = QHBoxLayout()
         vid_layout.addWidget(QLabel("Вид:"))
         self.double_vid_combo = QComboBox()
         self.double_vid_combo.addItems(["мужские", "женские", "смешанные"])
-        self.double_vid_combo.setMaximumWidth(120)
-        self.double_vid_combo.currentIndexChanged.connect(self.on_double_vid_changed)  # <-- подключаем
+        self.double_vid_combo.setMinimumWidth(180)          # Минимальная ширина
+        self.double_vid_combo.setMinimumHeight(30)          # Высота
+        self.double_vid_combo.setStyleSheet("""
+            QComboBox {
+                font-size: 13px;
+                padding: 4px 8px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                background-color: white;
+            }
+            QComboBox:hover {
+                border: 1px solid #4CAF50;
+            }
+            QComboBox::drop-down {
+                width: 24px;
+            }
+            QComboBox QAbstractItemView {
+                font-size: 13px;
+                padding: 4px;
+            }
+        """)
+        self.double_vid_combo.currentIndexChanged.connect(self.on_double_vid_changed)
         vid_layout.addWidget(self.double_vid_combo)
         vid_layout.addStretch()
         self.dynamic_filters_layout.addLayout(vid_layout)
@@ -2434,8 +2296,10 @@ class MainWindow(QMainWindow):
         player_list = []
         for player in query:
             display_name = player.fio if player.fio else player.player
-            if player.city:
-                display_name += f" ({player.city})"
+            # if player.city:
+            #     display_name += f" ({player.city})"
+            if player.region:
+                display_name += f" ({player.region})"
             player_list.append(display_name)
         
         model = QStringListModel(player_list)

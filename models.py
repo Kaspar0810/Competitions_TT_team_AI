@@ -193,7 +193,6 @@ class Players_double(BaseModel):
     r_sum = IntegerField(10)
     double_vid = CharField(10)
     title_id = ForeignKeyField(Title)
-    sex = CharField(10)
     para_full = CharField(100)
     posev = IntegerField()
     mesto = IntegerField()
@@ -356,6 +355,7 @@ class Choice_double_player(BaseModel):
     mesto_final = IntegerField()
     vid_para = CharField(15)
     title_id = ForeignKeyField(Title)
+    player_double_id = ForeignKeyField(Players_double)
   
 
     class Meta:

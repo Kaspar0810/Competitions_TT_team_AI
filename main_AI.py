@@ -567,8 +567,7 @@ class MainWindow(QMainWindow):
         line2.setFrameShadow(QFrame.Sunken)
         line2.setStyleSheet("background-color: #ccc; max-height: 2px; margin: 10px 0;")
         left_layout.addWidget(line2)
-        
-        
+            
         # Контейнер для кнопок действий
         self.dynamic_filters_widget = QWidget()
         self.dynamic_filters_layout = QVBoxLayout(self.dynamic_filters_widget)
@@ -1605,48 +1604,6 @@ class MainWindow(QMainWindow):
         pass  # Можно оставить пустым 
 
 # ========== списки пар ====
-    # def update_double_region(self):
-    #     """Обновляет поле региона при вводе игроков"""
-    #     player1_text = self.player1_edit.text().strip()
-    #     player2_text = self.player2_edit.text().strip()
-        
-    #     if not player1_text or not player2_text:
-    #         return
-        
-    #     # Получаем данные игроков из базы
-    #     player1 = self._find_player_by_name(player1_text)
-    #     player2 = self._find_player_by_name(player2_text)
-        
-    #     if not player1 or not player2:
-    #         return
-        
-    #     region1 = player1.region if player1.region else ""
-    #     region2 = player2.region if player2.region else ""
-    #     rank1 = player1.rank if player1.rank else 0
-    #     rank2 = player2.rank if player2.rank else 0
-        
-    #     # Определяем порядок городов: сначала город с более высоким рейтингом
-    #     if rank1 >= rank2:
-    #         first_region = region1
-    #         second_region = region2
-    #     else:
-    #         first_region = region2
-    #         second_region = region1
-        
-    #     # Формируем регион
-    #     if region1 and region2 and region1 != region2:
-    #         region = f"{first_region}-{second_region}"
-    #     elif region1:
-    #         region = region1
-    #     elif region2:
-    #         region = region2
-    #     else:
-    #         region = ""
-    
-    #     self.double_region_edit.setText(region)
-
-    #     self.highlight_player_duplicates()
-
     def update_double_region(self):
         """Обновляет поле региона при вводе игроков"""
         player1_text = self.player1_edit.text().strip()
@@ -1788,46 +1745,7 @@ class MainWindow(QMainWindow):
             self.status_label.setText(msg)
             # Можно также показать всплывающее сообщение
             QMessageBox.information(self, "Дублирующиеся игроки", msg)
-# ===============
-    # def update_double_player_completers(self):
-    #     """Обновляет список игроков для автодополнения на вкладке 'Пары'"""
-    #     if not self.current_title_id:
-    #         return
-        
-    #     # Определяем вид пары из комбобокса
-    #     vid = self.double_vid_combo.currentText() if hasattr(self, 'double_vid_combo') else "мужские"
 
-    #     query = Player.select().where(Player.title_id == self.current_title_id)
-        
-    #     # Исключаем "X"
-    #     query = query.where(Player.player != "X")
-
-    #     # Фильтруем по полу в зависимости от вида пары
-    #     if vid == "мужские":
-    #         query = query.where(Player.sex == "man")
-    #     elif vid == "женские":
-    #         query = query.where(Player.sex == "woman")
-    #     elif vid == "смешанные":
-    #         # Оба пола, фильтр по полу не применяем
-    #         pass
-    #     else:
-    #         # По умолчанию фильтруем по текущему полу соревнования
-    #         if self.current_sex:
-    #             query = query.where(Player.sex == self.current_sex)
-        
-        
-    #     player_list = []
-    #     for player in query:
-    #         display_name = player.fio if player.fio else player.player
-    #         if player.region:
-    #             display_name += f" ({player.region})"
-    #         player_list.append(display_name)
-
-    #     model = QStringListModel(player_list)
-    #     self.player1_completer.setModel(model)
-    #     self.player2_completer.setModel(model)
-
-    #==========
     def update_double_player_completers(self):
         """Обновляет списки игроков для автодополнения с учётом вида пары"""
         if not self.current_title_id:
@@ -2016,29 +1934,43 @@ class MainWindow(QMainWindow):
         # Сумма рейтингов
         r_sum = r1 + r2
         
-        # Определяем вид пары
-        sex1 = player1.sex if player1.sex else "man"
-        sex2 = player2.sex if player2.sex else "man"
-        
-        if sex1 == "woman" and sex2 == "woman":
-            double_vid = "woman"
-        elif sex1 == "man" and sex2 == "man":
-            double_vid = "man"
-        else:
-            double_vid = "mix"
-        
         # Формируем para_shot и para_full
         def get_short_name(fio):
-            parts = fio.split()
-            if len(parts) >= 2:
+            """Формирует Фамилия И.О. из ФИО"""
+            parts = fio.strip().split()
+            if len(parts) >= 3:
+                return f"{parts[0]} {parts[1][0]}.{parts[2][0]}."
+            elif len(parts) == 2:
                 return f"{parts[0]} {parts[1][0]}."
+            elif len(parts) == 1:
+                return parts[0]
             return fio
-        
+
         shot1 = get_short_name(player1.fio)
         shot2 = get_short_name(player2.fio)
-        para_shot = f"{shot1} / {shot2}"
-        para_full = f"{player1.fio} / {player2.fio}"
-        
+
+        # para_shot: Фамилия И.О.-Фамилия И.О.
+        para_shot = f"{shot1}-{shot2}"
+
+        # Формируем регионы
+        region_part1 = region1 if region1 else ""
+        region_part2 = region2 if region2 else ""
+
+        if region_part1 and region_part2:
+            region_str = f"{region_part1}-{region_part2}"
+        elif region_part1:
+            region_str = region_part1
+        elif region_part2:
+            region_str = region_part2
+        else:
+            region_str = ""
+
+        # para_full: Фамилия И.О.-Фамилия И.О./Область-Область
+        if region_str:
+            para_full = f"{para_shot}/{region_str}"
+        else:
+            para_full = para_shot
+
         try:
             # Создаём пару в БД
             double = Players_double.create(
@@ -2052,7 +1984,6 @@ class MainWindow(QMainWindow):
                 region_main=region_main,
                 r_sum=r_sum,
                 double_vid=double_vid,
-                sex=self.current_sex if self.current_sex else "man",
                 para_full=para_full,
                 para_shot=para_shot,
                 posev=0,
@@ -2304,11 +2235,11 @@ class MainWindow(QMainWindow):
         clear_btn.clicked.connect(self.clear_doubles_form)
         btn_row2.addWidget(clear_btn)
 
-        # sort_btn = QPushButton("📊 По рейтингу")
-        # sort_btn.setMinimumHeight(40)
-        # sort_btn.setStyleSheet(self.get_button_style())
-        # sort_btn.clicked.connect(self.sort_doubles_by_rating)
-        # btn_row2.addWidget(sort_btn)
+        posev_btn = QPushButton("📊 Посев")
+        posev_btn.setMinimumHeight(40)
+        posev_btn.setStyleSheet(self.get_button_style())
+        posev_btn.clicked.connect(self.seeding_pairs)
+        btn_row2.addWidget(posev_btn)
 
         self.dynamic_filters_layout.addLayout(btn_row2)
 
@@ -2346,6 +2277,55 @@ class MainWindow(QMainWindow):
         line2.setStyleSheet("background-color: #ccc; max-height: 1px; margin: 10px 0;")
         self.dynamic_filters_layout.addWidget(line2)
 
+    def left_panel_system_tab(self):
+        """отображение левой панели вкладки система"""
+        # ---- Группа "Пары" ----
+        pairs_group = QGroupBox("🤝 Пары")
+        pairs_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                font-size: 12px;
+                border: 2px solid #9C27B0;
+                border-radius: 8px;
+                margin-top: 10px;
+            }
+            QGroupBox::title {
+                color: #9C27B0;
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 8px 0 8px;
+            }
+        """)
+        pairs_layout = QVBoxLayout(pairs_group)
+
+        # Чекбоксы
+        self.chk_pairs_men = QCheckBox("Мужские")
+        self.chk_pairs_women = QCheckBox("Женские")
+        self.chk_pairs_mix = QCheckBox("Смешанные")
+        pairs_layout.addWidget(self.chk_pairs_men)
+        pairs_layout.addWidget(self.chk_pairs_women)
+        pairs_layout.addWidget(self.chk_pairs_mix)
+
+        # Кнопка "Создать"
+        create_pairs_btn = QPushButton("➕ Создать")
+        create_pairs_btn.setMinimumHeight(32)
+        create_pairs_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #9C27B0;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 8px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #7B1FA2; }
+        """)
+        create_pairs_btn.clicked.connect(self.create_pairs_stages)
+        pairs_layout.addWidget(create_pairs_btn)
+
+        self.dynamic_filters_layout.addWidget(pairs_group)
+
     def update_double_completer_for_field(self, text, completer):
         """Обновляет конкретный QCompleter при вводе текста"""
         if len(text) < 2:
@@ -2371,6 +2351,152 @@ class MainWindow(QMainWindow):
         
         model = QStringListModel(player_list)
         completer.setModel(model)
+
+    def fill_choice_double_players(self):
+        """Заполняет таблицу Choice_double_player парами из Players_double"""
+        if not self.current_title_id:
+            return
+        
+        # Определяем пол для фильтрации
+        sex = self.current_sex if self.current_sex else "man"
+        
+        # Удаляем старые записи для этого соревнования и пола
+        Choice_double_player.delete().where(
+            (Choice_double_player.title_id == self.current_title_id) &
+            (Choice_double_player.vid_para == sex)
+        ).execute()
+        
+        # Получаем пары из Players_double с учётом вида пары
+        vid = self.double_vid_combo.currentText() if hasattr(self, 'double_vid_combo') else "мужские"
+        
+        query = Players_double.select().where(
+            (Players_double.title_id == self.current_title_id)
+        )
+        stage_pairs = ""
+
+        if vid == "мужские":
+            stage_pairs = "Мужские пары"
+            query = query.where(Players_double.double_vid == "man")
+        elif vid == "женские":
+            stage_pairs = "Женские пары"
+            query = query.where(Players_double.double_vid == "woman")
+        elif vid == "смешанные":
+            stage_pairs = "Смешанные пары"
+            query = query.where(Players_double.double_vid == "mix")
+
+        
+        query = query.order_by(Players_double.r_sum.desc())
+        
+        # Создаём записи в Choice_double_player
+        for double in query:
+            Choice_double_player.create(
+                title_id=self.current_title_id,
+                # player_double_id=double.id,
+                double_player=double.para_shot,
+                region=double.region_main,
+                r_sum=double.r_sum,
+                vid_para=sex,
+                posev=0,  # начальное значение
+                mesto=0
+            )
+
+        # записывает в System количество пар
+        system = System.get_or_none((System.title_id == self.current_title_id) & (System.stage == stage_pairs))
+        system_id = system.id
+        System.update(max_player=query.count()).where(System.id == system_id).execute()
+        
+        print(f"Заполнено {query.count()} записей в Choice_double_player")
+
+    def seeding_pairs(self):
+        """Посев пар с использованием ручной жеребьёвки"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+
+        # Заполняем Choice_double_player перед жеребьёвкой
+        self.fill_choice_double_players()
+
+        # Получаем вид пары из комбобокса
+        vid = self.double_vid_combo.currentText() if hasattr(self, 'double_vid_combo') else "мужские"
+
+        # Фильтруем пары по виду
+        query = Players_double.select().where(Players_double.title_id == self.current_title_id)
+        if vid == "мужские":
+            query = query.where(Players_double.double_vid == "man")
+        elif vid == "женские":
+            query = query.where(Players_double.double_vid == "woman")
+        elif vid == "смешанные":
+            query = query.where(Players_double.double_vid == "mix")
+
+        # Сортируем по убыванию суммы рейтинга
+        query = query.order_by(Players_double.r_sum.desc())
+
+        if query.count() == 0:
+            QMessageBox.warning(self, "Ошибка", "Нет пар для посева")
+            return
+
+        # Формируем список пар в формате для manual_choice
+        pairs_for_seeding = []
+        for double in query:
+            name = double.para_shot or f"{double.player_1} / {double.player_2}"
+            region = double.region_main or ""
+            rank = double.r_sum or 0
+
+            pairs_for_seeding.append([
+                double.id,          # id пары
+                name,               # название пары
+                rank,               # рейтинг (сумма)
+                region,             # регион
+                ""                  # тренер (для пар не используется)
+            ])
+
+        # Вызываем диалог ручной жеребьёвки
+        try:
+            self.open_manual_net_draw(stage="Пары")
+            # from manual_choice import choice_group_manual
+            num_id_pair = choice_group_manual(
+                self,
+                pairs_for_seeding,
+                1,                  # количество групп (для пар обычно 1)
+                "Пары",
+                parent=self
+            )
+        except ImportError:
+            QMessageBox.critical(self, "Ошибка", "Модуль manual_choice не найден")
+            return
+
+        if num_id_pair is None:
+            return  # пользователь отменил
+
+        # Сохраняем результаты жеребьёвки
+        try:
+            with db.atomic():
+                for pl in num_id_pair:
+                    pair_id = pl.get('id_player')
+                    posev = pl.get('seed_num')
+                    if pair_id and posev:
+                        # Обновляем Players_double
+                        Players_double.update(posev=posev).where(
+                            Players_double.id == pair_id
+                        ).execute()
+                        
+                        # Обновляем Choice_double_player
+                        Choice_double_player.update(posev=posev).where(
+                            (Choice_double_player.title_id == self.current_title_id) &
+                            (Choice_double_player.player_double_id == pair_id)
+                        ).execute()
+
+            QMessageBox.information(self, "Успех", 
+                f"Жеребьёвка пар выполнена успешно.\n"
+                f"Всего пар: {len(pairs_for_seeding)}")
+
+            # Обновляем таблицу пар
+            self.load_doubles_for_title()
+
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить результаты жеребьёвки: {str(e)}")
+            import traceback
+            traceback.print_exc()
 
 # ============== Создание вкладок ====
     def create_system_tab(self):
@@ -7294,6 +7420,53 @@ class MainWindow(QMainWindow):
                             elif btn_text == "🗑️ Очистить":
                                 btn.clicked.connect(self.clear_player_form)
                         elif tab_index == 4:  # Система
+                            #     # ---- Группа "Пары" ----
+                            # pairs_group = QGroupBox("🤝 Пары")
+                            # pairs_group.setStyleSheet("""
+                            #     QGroupBox {
+                            #         font-weight: bold;
+                            #         font-size: 12px;
+                            #         border: 2px solid #9C27B0;
+                            #         border-radius: 8px;
+                            #         margin-top: 10px;
+                            #     }
+                            #     QGroupBox::title {
+                            #         color: #9C27B0;
+                            #         subcontrol-origin: margin;
+                            #         left: 10px;
+                            #         padding: 0 8px 0 8px;
+                            #     }
+                            # """)
+                            # pairs_layout = QVBoxLayout(pairs_group)
+
+                            # # Чекбоксы
+                            # self.chk_pairs_men = QCheckBox("Мужские")
+                            # self.chk_pairs_women = QCheckBox("Женские")
+                            # self.chk_pairs_mix = QCheckBox("Смешанные")
+                            # pairs_layout.addWidget(self.chk_pairs_men)
+                            # pairs_layout.addWidget(self.chk_pairs_women)
+                            # pairs_layout.addWidget(self.chk_pairs_mix)
+
+                            # # Кнопка "Создать"
+                            # create_pairs_btn = QPushButton("➕ Создать")
+                            # create_pairs_btn.setMinimumHeight(32)
+                            # create_pairs_btn.setStyleSheet("""
+                            #     QPushButton {
+                            #         background-color: #9C27B0;
+                            #         color: white;
+                            #         border: none;
+                            #         border-radius: 4px;
+                            #         padding: 8px;
+                            #         font-size: 11px;
+                            #         font-weight: bold;
+                            #     }
+                            #     QPushButton:hover { background-color: #7B1FA2; }
+                            # """)
+                            # create_pairs_btn.clicked.connect(self.create_pairs_stages)
+                            # pairs_layout.addWidget(create_pairs_btn)
+
+                            # self.dynamic_filters_layout.addWidget(pairs_group)
+
                             if btn_text == "🔍 Поиск в Choice":
                                 btn.clicked.connect(self.search_in_choice_table)
                             elif btn_text == "📊 Статистика":
@@ -7397,11 +7570,258 @@ class MainWindow(QMainWindow):
                 self.add_participant_filters()
             elif tab_index == 3:
                 self.left_panel_double_tab()
+            elif tab_index == 4:
+                self.left_panel_system_tab()
             
             self.dynamic_filters_layout.addStretch()
         finally:
             self._updating_left_panel = False
+#========================
+    # def create_pairs_stages(self):
+    #     """Создание этапов для пар в таблице System с расчётом max_player"""
+    #     if not self.current_title_id:
+    #         QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+    #         return
 
+    #     # Проверяем, что выбран хотя бы один вид пар
+    #     selected = []
+    #     if self.chk_pairs_men.isChecked():
+    #         selected.append(("Мужские пары", "man"))
+    #     if self.chk_pairs_women.isChecked():
+    #         selected.append(("Женские пары", "woman"))
+    #     if self.chk_pairs_mix.isChecked():
+    #         selected.append(("Смешанные пары", "mix"))
+
+    #     if not selected:
+    #         QMessageBox.warning(self, "Ошибка", "Выберите хотя бы один вид пар")
+    #         return
+
+    #     # Получаем количество игроков каждого пола
+    #     count_men = Player.select().where(
+    #         (Player.title_id == self.current_title_id) &
+    #         (Player.sex == "man") &
+    #         (Player.player != "X")
+    #     ).count()
+
+    #     count_women = Player.select().where(
+    #         (Player.title_id == self.current_title_id) &
+    #         (Player.sex == "woman") &
+    #         (Player.player != "X")
+    #     ).count()
+
+    #     try:
+    #         for stage_name, vid in selected:
+    #             # Определяем max_player в зависимости от вида
+    #             if vid == "man":
+    #                 max_player = count_men // 2
+    #                 stage_sex = "man"
+    #             elif vid == "woman":
+    #                 max_player = count_women // 2
+    #                 stage_sex = "woman"
+    #             elif vid == "mix":
+    #                 max_player = min(count_men, count_women)
+    #                 stage_sex = "mix"
+    #             else:
+    #                 max_player = 0
+    #                 stage_sex = "man"
+
+    #             if max_player <= 0:
+    #                 QMessageBox.warning(
+    #                     self,
+    #                     "Ошибка",
+    #                     f"Недостаточно игроков для создания пар вида '{stage_name}'.\n"
+    #                     f"Мужчин: {count_men}, Женщин: {count_women}"
+    #                 )
+    #                 continue
+
+    #             # Проверяем, не существует ли уже такой этап
+    #             existing = System.get_or_none(
+    #                 (System.title_id == self.current_title_id) &
+    #                 (System.stage == stage_name) &
+    #                 (System.sex == stage_sex)
+    #             )
+    #             if existing:
+    #                 reply = QMessageBox.question(
+    #                     self,
+    #                     "Этап уже существует",
+    #                     f"Этап '{stage_name}' уже существует. Перезаписать?",
+    #                     QMessageBox.Yes | QMessageBox.No
+    #                 )
+    #                 if reply == QMessageBox.Yes:
+    #                     existing.delete_instance()
+    #                 else:
+    #                     continue
+
+    #             # Создаём запись в System
+    #             System.create(
+    #                 title_id=self.current_title_id,
+    #                 total_athletes=max_player,
+    #                 stage=stage_name,
+    #                 type_table="Олимпийская (за 1-3 место)",
+    #                 total_group=1,
+    #                 max_player=0,
+    #                 stage_exit="",
+    #                 mesta_exit=1,
+    #                 label_string="Места с 1 по 3",
+    #                 kol_game_string="",
+    #                 page_vid="книжная",
+    #                 choice_flag=0,
+    #                 score_flag=5,
+    #                 visible_game=True,
+    #                 no_game="",
+    #                 sex=stage_sex
+    #             )
+    #             print(f"Создан этап: {stage_name} для пола {stage_sex}, max_player={max_player}")
+
+    #         QMessageBox.information(
+    #             self,
+    #             "Успех",
+    #             f"Создано {len(selected)} этапов для пар:\n" +
+    #             "\n".join(f"• {name} (max_player={max_player})" for name, _ in selected)
+    #         )
+
+    #         # Обновляем информацию о системе
+    #         self.update_stages_info()
+
+    #     except Exception as e:
+    #         QMessageBox.critical(self, "Ошибка", f"Не удалось создать этапы: {str(e)}")
+    #         import traceback
+    #         traceback.print_exc()
+
+    def create_pairs_stages(self):
+        """Создание этапов для пар в таблице System с расчётом max_player"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+
+        # Проверяем, что выбран хотя бы один вид пар
+        selected = []
+        if self.chk_pairs_men.isChecked():
+            selected.append(("Мужские пары", "man"))
+        if self.chk_pairs_women.isChecked():
+            selected.append(("Женские пары", "woman"))
+        if self.chk_pairs_mix.isChecked():
+            selected.append(("Смешанные пары", "mix"))
+
+        if not selected:
+            QMessageBox.warning(self, "Ошибка", "Выберите хотя бы один вид пар")
+            return
+
+        # Получаем количество игроков каждого пола
+        count_men = Player.select().where(
+            (Player.title_id == self.current_title_id) &
+            (Player.sex == "man") &
+            (Player.player != "X")
+        ).count()
+
+        count_women = Player.select().where(
+            (Player.title_id == self.current_title_id) &
+            (Player.sex == "woman") &
+            (Player.player != "X")
+        ).count()
+
+        created_count = 0
+        created_info = []
+
+        try:
+            for stage_name, vid in selected:
+                # Определяем max_player в зависимости от вида
+                if vid == "man":
+                    max_player = count_men // 2
+                    stage_sex = "man"
+                elif vid == "woman":
+                    max_player = count_women // 2
+                    stage_sex = "woman"
+                elif vid == "mix":
+                    max_player = min(count_men, count_women)
+                    stage_sex = "mix"
+                else:
+                    max_player = 0
+                    stage_sex = "man"
+
+                if max_player <= 0:
+                    QMessageBox.warning(
+                        self,
+                        "Ошибка",
+                        f"Недостаточно игроков для создания пар вида '{stage_name}'.\n"
+                        f"Мужчин: {count_men}, Женщин: {count_women}"
+                    )
+                    continue
+
+                # Проверяем, не существует ли уже такой этап
+                existing = System.get_or_none(
+                    (System.title_id == self.current_title_id) &
+                    (System.stage == stage_name) &
+                    (System.sex == stage_sex)
+                )
+                if existing:
+                    reply = QMessageBox.question(
+                        self,
+                        "Этап уже существует",
+                        f"Этап '{stage_name}' уже существует. Перезаписать?",
+                        QMessageBox.Yes | QMessageBox.No
+                    )
+                    if reply == QMessageBox.Yes:
+                        existing.delete_instance()
+                    else:
+                        continue
+
+                # Создаём запись в System
+                System.create(
+                    title_id=self.current_title_id,
+                    stage=stage_name,
+                    type_table="Олимпийская (за 1-3 место)",
+                    total_group=1,
+                    max_player=max_player,
+                    stage_exit="",
+                    mesta_exit=1,
+                    label_string="",
+                    kol_game_string="",
+                    page_vid="книжная",
+                    choice_flag=0,
+                    score_flag=5,
+                    visible_game=True,
+                    no_game="",
+                    sex=stage_sex
+                )
+                created_count += 1
+                created_info.append(f"• {stage_name} (max_player={max_player})")
+                print(f"Создан этап: {stage_name} для пола {stage_sex}, max_player={max_player}")
+
+            # ---- Обновляем tab_enabled в Title ----
+            if created_count > 0:
+                title = Title.get_by_id(self.current_title_id)
+                tab_enabled = title.tab_enabled if title.tab_enabled else ""
+                
+                # Добавляем "Пары", если его нет
+                if "Пары" not in tab_enabled:
+                    tab_enabled = (tab_enabled + " Пары").strip()
+                    title.tab_enabled = tab_enabled
+                    title.save()
+                    print(f"Обновлен tab_enabled: {tab_enabled}")
+
+                # Обновляем активность вкладок
+                self.update_tabs_enabled()
+
+            # Итоговое сообщение
+            if created_count > 0:
+                QMessageBox.information(
+                    self,
+                    "Успех",
+                    f"Создано {created_count} этапов для пар:\n" + "\n".join(created_info)
+                )
+            else:
+                QMessageBox.warning(self, "Информация", "Ни один этап не был создан")
+
+            # Обновляем информацию о системе
+            self.update_stages_info()
+
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось создать этапы: {str(e)}")
+            import traceback
+            traceback.print_exc()
+
+# ===================
     def clear_layout(self, layout):
         """Рекурсивная очистка layout"""
         while layout.count():
@@ -7410,8 +7830,6 @@ class MainWindow(QMainWindow):
                 item.widget().deleteLater()
             elif item.layout():
                 self.clear_layout(item.layout())
-
-
 
     def add_player_from_form(self):
         """Добавление участника из формы на вкладке Участники"""
@@ -10249,8 +10667,91 @@ class MainWindow(QMainWindow):
     def break_pairs(self):
         QMessageBox.information(self, "Пары", "Разбивка пар")
 
-    def seeding_pairs(self):
-        QMessageBox.information(self, "Пары", "Посев пар")
+# =========== пробный вариант ручного посева пар ===
+    # def seeding_pairs(self):
+    #     """Посев пар с использованием ручной жеребьёвки"""
+    #     if not self.current_title_id:
+    #         QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+    #         return
+
+    #     # Получаем вид пары из комбобокса
+    #     vid = self.double_vid_combo.currentText() if hasattr(self, 'double_vid_combo') else "мужские"
+
+    #     # Фильтруем пары по виду
+    #     query = Players_double.select().where(Players_double.title_id == self.current_title_id)
+    #     if vid == "мужские":
+    #         query = query.where(Players_double.double_vid == "man")
+    #     elif vid == "женские":
+    #         query = query.where(Players_double.double_vid == "woman")
+    #     elif vid == "смешанные":
+    #         query = query.where(Players_double.double_vid == "mix")
+
+    #     # Сортируем по убыванию суммы рейтинга
+    #     query = query.order_by(Players_double.r_sum.desc())
+
+    #     if query.count() == 0:
+    #         QMessageBox.warning(self, "Ошибка", "Нет пар для посева")
+    #         return
+
+    #     # Формируем список пар в формате для manual_choice
+    #     # Каждая пара представляется как [id, имя, рейтинг, регион, тренер]
+    #     pairs_for_seeding = []
+    #     for double in query:
+    #         # Формируем отображаемое имя пары
+    #         name = double.para_shot or f"{double.player_1} / {double.player_2}"
+    #         region = double.region_main or ""
+    #         rank = double.r_sum or 0
+
+    #         pairs_for_seeding.append([
+    #             double.id,          # id пары
+    #             name,               # название пары
+    #             rank,               # рейтинг (сумма)
+    #             region,             # регион
+    #             ""                  # тренер (для пар не используется)
+    #         ])
+
+    #     # Запрашиваем количество групп для жеребьёвки (обычно 1 для пар)
+    #     num_groups = 1
+
+    #     # Вызываем диалог ручной жеребьёвки
+    #     try:
+    #         from manual_choice import choice_group_manual
+    #         num_id_pair = choice_group_manual(
+    #             self,
+    #             pairs_for_seeding,
+    #             num_groups,
+    #             "Пары",
+    #             parent=self
+    #         )
+    #     except ImportError:
+    #         QMessageBox.critical(self, "Ошибка", "Модуль manual_choice не найден")
+    #         return
+
+    #     if num_id_pair is None:
+    #         return  # пользователь отменил
+
+    #     # Сохраняем результаты жеребьёвки в таблицу Players_double
+    #     try:
+    #         for pl in num_id_pair:
+    #             pair_id = pl.get('id_player')  # в manual_choice возвращается id
+    #             posev = pl.get('seed_num')     # номер посева
+    #             if pair_id and posev:
+    #                 Players_double.update(posev=posev).where(
+    #                     Players_double.id == pair_id
+    #                 ).execute()
+
+    #         QMessageBox.information(self, "Успех", 
+    #             f"Жеребьёвка пар выполнена успешно.\n"
+    #             f"Всего пар: {len(pairs_for_seeding)}")
+
+    #         # Обновляем таблицу
+    #         self.load_doubles_for_title()
+
+    #     except Exception as e:
+    #         QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить результаты жеребьёвки: {str(e)}")
+    #         import traceback
+    #         traceback.print_exc()
+#============================================
 
     def system_settings(self):
         QMessageBox.information(self, "Система", "Настройки системы")

@@ -1057,7 +1057,33 @@ class MainWindow(QMainWindow):
          # колонка растягивается по содержимому
         header = self.doubles_table_view.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeToContents)
+# ========== проба таблицы результаты пар
+        self.doubles_result_view = QTableView()
+        self.doubles_result_view.setSelectionBehavior(QTableView.SelectRows)
+        self.doubles_result_view.setAlternatingRowColors(True)
+        self.doubles_result_view.setShowGrid(True)
+        self.doubles_result_view.setStyleSheet("""
+            QTableView {
+                font-size: 14px;
+                gridline-color: #ddd;
+                selection-background-color: #a0c4ff;
+            }
+            QHeaderView::section {
+                background-color: #4CAF50;
+                color: white;
+                padding: 4px;
+                font-weight: bold;
+                font-size: 10px;
+                border: none;
+            }
+        """)
+        self.doubles_result_view.verticalHeader().setDefaultSectionSize(22)
+        self.doubles_result_view.setModel(self.double_players_model)
 
+         # колонка растягивается по содержимому
+        header = self.doubles_result_view.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeToContents)
+# ===========================================
         # Таблица рейтинга
         self.rating_table_view = QTableView()
         self.rating_table_view.setSelectionBehavior(QTableView.SelectRows)

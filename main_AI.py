@@ -1265,37 +1265,93 @@ class MainWindow(QMainWindow):
         self.city_filter_edit.clear()
         self.rating_search_edit.clear()
 
+    # def check_rating_actual(self):
+    #     """Проверяет актуальность рейтинга и предлагает обновить при необходимости"""
+    #     try:
+    #         # Получаем последнее соревнование (или все)
+    #         titles = Title.select().order_by(Title.id.desc())
+    #         if titles.count() == 0:
+    #             return
+
+    #         # Текущий месяц в формате yyyy_MM
+    #         current_month = QDate.currentDate().toString("yyyy_MM")
+    #         outdated = []
+
+    #         for title in titles:
+    #             r_date = title.r_date if title.r_date else ""
+    #             if r_date != current_month:
+    #                 outdated.append((title.id, title.name, r_date))
+
+    #         if outdated:
+    #             # Формируем список устаревших соревнований
+    #             info = "\n".join(
+    #                 f"• {name} (рейтинг: {r_date or 'не указан'})"
+    #                 for _, name, r_date in outdated[:5]
+    #             )
+    #             if len(outdated) > 5:
+    #                 info += f"\n... и ещё {len(outdated) - 5}"
+
+    #             reply = QMessageBox.question(
+    #                 self,
+    #                 "Рейтинг устарел",
+    #                 f"Обнаружены соревнования с устаревшим рейтингом:\n\n{info}\n\n"
+    #                 f"Текущий месяц: {current_month}\n"
+    #                 f"Обновить рейтинг сейчас?",
+    #                 QMessageBox.Yes | QMessageBox.No
+    #             )
+    #             if reply == QMessageBox.Yes:
+    #                 self.open_update_rating_dialog()
+    #     except Exception as e:
+    #         print(f"Ошибка проверки рейтинга: {e}")
+
     def check_rating_actual(self):
-        """Проверяет актуальность рейтинга и предлагает обновить при необходимости"""
+        """Проверяет актуальность рейтинга только для активных соревнований"""
         try:
-            # Получаем последнее соревнование (или все)
-            titles = Title.select().order_by(Title.id.desc())
+            from datetime import date
+            today = date.today()
+            current_month = today.strftime("%Y_%m")  # например, "2025_10"
+            
+            # Получаем все соревнования
+            titles = Title.select().order_by(Title.data_start.desc())
             if titles.count() == 0:
                 return
 
-            # Текущий месяц в формате yyyy_MM
-            current_month = QDate.currentDate().toString("yyyy_MM")
             outdated = []
 
             for title in titles:
+                # Пропускаем соревнования без дат
+                if not title.data_start or not title.data_end:
+                    continue
+
+                # Проверяем, является ли соревнование активным:
+                # - дата окончания >= сегодня (ещё не завершилось)
+                # - дата начала <= конец текущего месяца (уже началось или начнётся в этом месяце/будущем)
+                # Более простое условие: дата окончания >= первое число текущего месяца
+                first_day_of_month = today.replace(day=1)
+                if title.data_end < first_day_of_month:
+                    # Соревнование уже завершилось в прошлом – пропускаем
+                    continue
+
+                # Сравниваем дату рейтинга с текущим месяцем
                 r_date = title.r_date if title.r_date else ""
                 if r_date != current_month:
-                    outdated.append((title.id, title.name, r_date))
+                    outdated.append((title.id, title.name, r_date, title.data_start, title.data_end))
 
             if outdated:
-                # Формируем список устаревших соревнований
+                # Формируем информационное сообщение
                 info = "\n".join(
-                    f"• {name} (рейтинг: {r_date or 'не указан'})"
-                    for _, name, r_date in outdated[:5]
+                    f"• {name}\n   📅 {start.strftime('%d.%m.%Y')} – {end.strftime('%d.%m.%Y')}\n"
+                    f"   🏅 Рейтинг: {r_date or 'не указан'}"
+                    for _, name, r_date, start, end in outdated[:5]
                 )
                 if len(outdated) > 5:
-                    info += f"\n... и ещё {len(outdated) - 5}"
+                    info += f"\n\n... и ещё {len(outdated) - 5} соревнований"
 
                 reply = QMessageBox.question(
                     self,
-                    "Рейтинг устарел",
-                    f"Обнаружены соревнования с устаревшим рейтингом:\n\n{info}\n\n"
-                    f"Текущий месяц: {current_month}\n"
+                    "Требуется обновление рейтинга",
+                    f"Для следующих активных соревнований рейтинг не соответствует текущему месяцу "
+                    f"({today.strftime('%m.%Y')}):\n\n{info}\n\n"
                     f"Обновить рейтинг сейчас?",
                     QMessageBox.Yes | QMessageBox.No
                 )
@@ -1303,6 +1359,8 @@ class MainWindow(QMainWindow):
                     self.open_update_rating_dialog()
         except Exception as e:
             print(f"Ошибка проверки рейтинга: {e}")
+            import traceback
+            traceback.print_exc()
 
     def open_update_rating_dialog(self):
         """Открывает диалог загрузки рейтингов и обновляет рейтинг участников"""

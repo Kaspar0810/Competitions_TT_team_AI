@@ -1827,8 +1827,6 @@ class MainWindow(QMainWindow):
         self.referee_category_combo.setCurrentIndex(0)
         self.secretary_category_combo.setCurrentIndex(0) 
 
-    
-
     def on_razryad_changed(self, index):
         """Обработка изменения выбора в поле Разряд"""
         self.coach_edit.setFocus()
@@ -2271,16 +2269,32 @@ class MainWindow(QMainWindow):
             self.load_doubles_results()
             self.table_header.setText("📊 Результаты парных матчей")
 
+    # def on_double_vid_changed(self):
+    #     """Обработка смены вида пары: обновление списка игроков и таблицы"""
+    #     # 1. Обновляем автодополнение в полях ввода игроков
+    #     self.update_double_player_completers()
+        
+    #     # 2. Обновляем таблицу пар (если открыт режим списков)
+    #     # if hasattr(self, 'doubles_mode') and self.doubles_mode == "list":
+    #     self.load_doubles_for_title()
+        
+    #     # 3. Очищаем форму ввода, т.к. старые игроки могут не соответствовать новому виду
+    #     if hasattr(self, 'player1_edit'):
+    #         self.player1_edit.clear()
+    #     if hasattr(self, 'player2_edit'):
+    #         self.player2_edit.clear()
+    #     if hasattr(self, 'double_region_edit'):
+    #         self.double_region_edit.clear()
+
     def on_double_vid_changed(self):
-        """Обработка смены вида пары: обновление списка игроков и таблицы"""
-        # 1. Обновляем автодополнение в полях ввода игроков
+        """Обработка смены вида пары"""
         self.update_double_player_completers()
-        
-        # 2. Обновляем таблицу пар (если открыт режим списков)
-        # if hasattr(self, 'doubles_mode') and self.doubles_mode == "list":
-        self.load_doubles_for_title()
-        
-        # 3. Очищаем форму ввода, т.к. старые игроки могут не соответствовать новому виду
+        if hasattr(self, 'doubles_mode'):
+            if self.doubles_mode == "list":
+                self.load_doubles_for_title()
+            else:
+                self.load_doubles_results()
+        # Очистка полей ввода
         if hasattr(self, 'player1_edit'):
             self.player1_edit.clear()
         if hasattr(self, 'player2_edit'):
@@ -2403,19 +2417,87 @@ class MainWindow(QMainWindow):
         for double in query:
             self.doubles_match_combo.addItem(f"{double.player_1} / {double.player_2}", double.id)
 
+    # def load_doubles_results(self):
+    #     """Загрузка результатов парных матчей"""
+    #     if not self.current_title_id:
+    #         self.doubles_results_model.setData([])
+    #         return
+    #     # Здесь будет реальная загрузка данных из БД
+    #     # Пока используем тестовые данные
+    #     test_data = [
+    #         {'id': 1, 'pair': 'Иванов/Петров', 'player1': 'Иванов', 'player2': 'Петров', 'score': '3:1', 'winner': 'Иванов'},
+    #         {'id': 2, 'pair': 'Сидоров/Кузнецов', 'player1': 'Сидоров', 'player2': 'Кузнецов', 'score': '2:3', 'winner': 'Кузнецов'},
+    #     ]
+    #     self.doubles_results_model.setData(test_data)
+
     def load_doubles_results(self):
-        """Загрузка результатов парных матчей"""
+        """Загрузка результатов парных матчей из таблицы Result"""
         if not self.current_title_id:
             self.doubles_results_model.setData([])
             return
-        
-        # Здесь будет реальная загрузка данных из БД
-        # Пока используем тестовые данные
-        test_data = [
-            {'id': 1, 'pair': 'Иванов/Петров', 'player1': 'Иванов', 'player2': 'Петров', 'score': '3:1', 'winner': 'Иванов'},
-            {'id': 2, 'pair': 'Сидоров/Кузнецов', 'player1': 'Сидоров', 'player2': 'Кузнецов', 'score': '2:3', 'winner': 'Кузнецов'},
-        ]
-        self.doubles_results_model.setData(test_data)
+
+        try:
+            # Определяем вид пары (man/woman/mix) по комбобоксу
+            vid_map = {"мужские": "man", "женские": "woman", "смешанные": "mix"}
+            vid_text = self.double_vid_combo.currentText() if hasattr(self, 'double_vid_combo') else "мужские"
+            vid = vid_map.get(vid_text, "man")
+
+            # Получаем все парные этапы для текущего соревнования и пола
+            stages = System.select().where(
+                (System.title_id == self.current_title_id) &
+                (System.sex == vid) &
+                (System.stage.contains("пары"))
+            ).order_by(System.id)
+
+            if stages.count() == 0:
+                self.doubles_results_model.setData([])
+                return
+
+            results_data = []
+
+            for stage in stages:
+                stage_name = stage.stage
+
+                # Получаем записи Result для этого этапа
+                results = Result.select().where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.system_id == stage.id)
+                ).order_by(Result.tours)
+
+                for res in results:
+                    # Формируем отображаемое название пары
+                    pair_name = res.number_group or stage_name
+
+                    # Определяем победителя
+                    winner_text = res.winner if res.winner else ""
+                    score_text = res.score_in_game if res.score_in_game else ""
+
+                    results_data.append({
+                        'id': res.id,
+                        'pair': pair_name,
+                        'player1': res.player1 or "",
+                        'player2': res.player2 or "",
+                        'score': score_text,
+                        'winner': winner_text,
+                        'tour': res.tours or "",
+                        'stage': stage_name
+                    })
+
+            # Если результатов нет – очищаем модель
+            if not results_data:
+                self.doubles_results_model.setData([])
+                return
+
+            # Сортируем по этапу и туру
+            results_data.sort(key=lambda x: (x['stage'], int(x['tour']) if x['tour'].isdigit() else 0))
+
+            self.doubles_results_model.setData(results_data)
+
+        except Exception as e:
+            print(f"Ошибка загрузки результатов пар: {e}")
+            import traceback
+            traceback.print_exc()
+            self.doubles_results_model.setData([])
 
     def save_doubles_result(self):
         """Сохранение результата парного матча"""
@@ -2629,7 +2711,7 @@ class MainWindow(QMainWindow):
         for double in query:
             Choice_double_player.create(
                 title_id=self.current_title_id,
-                # player_double_id=double.id,
+                player_double_id=double.id,
                 double_player=double.para_shot,
                 region=double.region_main,
                 r_sum=double.r_sum,
@@ -2690,51 +2772,51 @@ class MainWindow(QMainWindow):
 
         # Вызываем диалог ручной жеребьёвки
         try:
-            self.open_manual_net_draw(stage="Пары")
+            num_id = self.open_manual_net_draw(stage="Пары")
             # from manual_choice import choice_group_manual
-            num_id_pair = choice_group_manual(
-                self,
-                pairs_for_seeding,
-                1,                  # количество групп (для пар обычно 1)
-                "Пары",
-                parent=self
-            )
+            # num_id_pair = choice_group_manual(
+            #     self,
+            #     pairs_for_seeding,
+            #     1,                  # количество групп (для пар обычно 1)
+            #     "Пары",
+            #     parent=self
+            # )
         except ImportError:
             QMessageBox.critical(self, "Ошибка", "Модуль manual_choice не найден")
             return
 
-        if num_id_pair is None:
-            return  # пользователь отменил
+        # # if num_id_pair is None:
+        # #     return  # пользователь отменил
 
-        # Сохраняем результаты жеребьёвки
-        try:
-            with db.atomic():
-                for pl in num_id_pair:
-                    pair_id = pl.get('id_player')
-                    posev = pl.get('seed_num')
-                    if pair_id and posev:
-                        # Обновляем Players_double
-                        Players_double.update(posev=posev).where(
-                            Players_double.id == pair_id
-                        ).execute()
+        # # Сохраняем результаты жеребьёвки
+        # try:
+        #     with db.atomic():
+        #         for pl in num_id_pair:
+        #             pair_id = pl.get('id_player')
+        #             posev = pl.get('seed_num')
+        #             if pair_id and posev:
+        #                 # Обновляем Players_double
+        #                 Players_double.update(posev=posev).where(
+        #                     Players_double.id == pair_id
+        #                 ).execute()
                         
-                        # Обновляем Choice_double_player
-                        Choice_double_player.update(posev=posev).where(
-                            (Choice_double_player.title_id == self.current_title_id) &
-                            (Choice_double_player.player_double_id == pair_id)
-                        ).execute()
+        #                 # Обновляем Choice_double_player
+        #                 Choice_double_player.update(posev=posev).where(
+        #                     (Choice_double_player.title_id == self.current_title_id) &
+        #                     (Choice_double_player.player_double_id == pair_id)
+        #                 ).execute()
 
-            QMessageBox.information(self, "Успех", 
-                f"Жеребьёвка пар выполнена успешно.\n"
-                f"Всего пар: {len(pairs_for_seeding)}")
+        QMessageBox.information(self, "Успех", 
+            f"Жеребьёвка пар выполнена успешно.\n"
+            f"Всего пар: {len(pairs_for_seeding)}")
 
-            # Обновляем таблицу пар
-            self.load_doubles_for_title()
+        # Обновляем таблицу пар
+        self.load_doubles_for_title()
 
-        except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить результаты жеребьёвки: {str(e)}")
-            import traceback
-            traceback.print_exc()
+        # except Exception as e:
+        #     QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить результаты жеребьёвки: {str(e)}")
+        #     import traceback
+        #     traceback.print_exc()
 
 # ============== Создание вкладок ====
     def create_system_tab(self):
@@ -7973,9 +8055,9 @@ class MainWindow(QMainWindow):
                 elif vid == "mix":
                     max_player = min(count_men, count_women)
                     stage_sex = "mix"
-                else:
-                    max_player = 0
-                    stage_sex = "man"
+                # else:
+                #     max_player = 0
+                #     stage_sex = "man"
 
                 if max_player <= 0:
                     QMessageBox.warning(
@@ -8007,13 +8089,14 @@ class MainWindow(QMainWindow):
                 # Создаём запись в System
                 System.create(
                     title_id=self.current_title_id,
+                    total_athletes=0,
                     stage=stage_name,
                     type_table="Олимпийская (за 1-3 место)",
                     total_group=1,
                     max_player=max_player,
                     stage_exit="",
                     mesta_exit=1,
-                    label_string="",
+                    label_string="Места с 1 по 3",
                     kol_game_string="",
                     page_vid="книжная",
                     choice_flag=0,

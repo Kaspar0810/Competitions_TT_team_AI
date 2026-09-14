@@ -3869,7 +3869,8 @@ class ManualNetDrawDialog(QDialog):
                         )
                         # Обновляем posev в Players_double
                         Players_double.update(posev=pos).where(
-                            Players_double.id == pair_id
+                            (Players_double.id == pair_id) &
+                            (Players_double.title_id == self.title_id)
                         ).execute()
                         # Обновляем posev в Choice_double_player
                         if 'Choice_double_player' in globals():
@@ -3892,11 +3893,21 @@ class ManualNetDrawDialog(QDialog):
                             (Choice.player_choice == data['player_id'])
                         ).execute()
 
+                if is_pairs:
+                    # Создаём записи в Result для пар
+                    self.create_results_for_pairs()
+
                 # Устанавливаем флаг choice_flag для системы
                 System.update(choice_flag=1).where(System.id == self.current_system.id).execute()
 
             QMessageBox.information(self, "Успех", f"Жеребьёвка для {self.stage_name} сохранена")
             self.accept()
+
+            # Переключаем режим на "Результаты" (если это парный этап)
+            if is_pairs and hasattr(self.parent, 'radio_results_mode'):
+                self.parent.radio_results_mode.setChecked(True)
+                self.parent.on_doubles_mode_changed(self.parent.radio_results_mode)
+                self.parent.load_doubles_results()
 
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить жеребьёвку: {str(e)}")
@@ -3972,6 +3983,81 @@ class ManualNetDrawDialog(QDialog):
                     'group': ''
                 }
             self.update_net_display()
+
+    def create_results_for_pairs(self):
+        """Создаёт записи в таблице Result для парного этапа согласно сетке"""
+        if not self.current_system:
+            return
+
+        # Определяем этап
+        stage_name = self.stage_name
+        system = self.current_system
+        max_player = system.max_player  # количество пар в сетке
+        type_table = system.type_table
+
+        # Удаляем старые записи Result для этого этапа
+        Result.delete().where(
+            (Result.title_id == self.title_id) &
+            (Result.system_id == system.id)
+        ).execute()
+
+        # Получаем все пары в порядке посева из Game_list
+        game_pairs = Game_list.select().where(
+            (Game_list.title_id == self.title_id) &
+            (Game_list.system_id == system.id)
+        ).order_by(Game_list.rank_num_player)
+
+        # Словарь: позиция -> данные пары
+        pair_by_pos = {}
+        for gp in game_pairs:
+            pair_id = gp.player_double_id.id if gp.player_double_id else None
+            if not pair_id:
+                continue
+            double = Players_double.get_or_none(Players_double.id == pair_id)
+            if not double:
+                continue
+            pair_name = double.para_full or f"{double.player_1} / {double.player_2}"
+            pair_by_pos[gp.rank_num_player] = pair_name
+
+        # Создаём матчи первого раунда (пары 1-2, 3-4, ...)
+        total_games = self.parent.number_game_of_net(stage_name) if hasattr(self.parent, 'number_game_of_net') else max_player * 2
+
+        first_round_count = max_player // 2
+        for i in range(1, first_round_count + 1):
+            pos1 = i * 2 - 1
+            pos2 = i * 2
+            p1 = pair_by_pos.get(pos1, "")
+            p2 = pair_by_pos.get(pos2, "")
+
+            if p1 and p2:
+                Result.create(
+                    number_group=stage_name,
+                    system_stage=stage_name,
+                    tours=str(i),
+                    player1=p1,
+                    player2=p2,
+                    title_id=self.title_id,
+                    system_id=system.id,
+                    round=1,
+                    sex=self.sex if self.sex else "man"
+                )
+
+        # Создаём пустые записи для последующих раундов
+        for game_num in range(first_round_count + 1, total_games + 1):
+            Result.create(
+                number_group=stage_name,
+                system_stage=stage_name,
+                tours=str(game_num),
+                player1="",
+                player2="",
+                title_id=self.title_id,
+                system_id=system.id,
+                round=1,
+                sex=self.sex if self.sex else "man"
+            )
+
+        print(f"Создано {total_games} записей в Result для {stage_name}")
+        
 # ======new =====
     def _place_player_on_position(self, pos, player_data):
         """Размещает игрока на позиции, удаляя его из списка оставшихся"""

@@ -76,8 +76,13 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        # Проверка старых бэкапов при запуске (через 2 секунды после загрузки)
+        # Проверка актуальности рейтинга через 1.5 секунды после запуска
+        QTimer.singleShot(1500, self.check_rating_actual)
+
+        # Проверка старых бэкапов при запуске (через 5 секунды после загрузки)
         QTimer.singleShot(2000, self.check_old_backups_on_startup)
+
+
 
         self.setWindowTitle("Панель управления соревнованиями")
         self.setGeometry(100, 100, 1500, 780)
@@ -1259,6 +1264,181 @@ class MainWindow(QMainWindow):
         self.region_filter_edit.clear()
         self.city_filter_edit.clear()
         self.rating_search_edit.clear()
+
+    def check_rating_actual(self):
+        """Проверяет актуальность рейтинга и предлагает обновить при необходимости"""
+        try:
+            # Получаем последнее соревнование (или все)
+            titles = Title.select().order_by(Title.id.desc())
+            if titles.count() == 0:
+                return
+
+            # Текущий месяц в формате yyyy_MM
+            current_month = QDate.currentDate().toString("yyyy_MM")
+            outdated = []
+
+            for title in titles:
+                r_date = title.r_date if title.r_date else ""
+                if r_date != current_month:
+                    outdated.append((title.id, title.name, r_date))
+
+            if outdated:
+                # Формируем список устаревших соревнований
+                info = "\n".join(
+                    f"• {name} (рейтинг: {r_date or 'не указан'})"
+                    for _, name, r_date in outdated[:5]
+                )
+                if len(outdated) > 5:
+                    info += f"\n... и ещё {len(outdated) - 5}"
+
+                reply = QMessageBox.question(
+                    self,
+                    "Рейтинг устарел",
+                    f"Обнаружены соревнования с устаревшим рейтингом:\n\n{info}\n\n"
+                    f"Текущий месяц: {current_month}\n"
+                    f"Обновить рейтинг сейчас?",
+                    QMessageBox.Yes | QMessageBox.No
+                )
+                if reply == QMessageBox.Yes:
+                    self.open_update_rating_dialog()
+        except Exception as e:
+            print(f"Ошибка проверки рейтинга: {e}")
+
+    def open_update_rating_dialog(self):
+        """Открывает диалог загрузки рейтингов и обновляет рейтинг участников"""
+        from import_initial_data import RatingFileDialog  # или откуда у вас диалог
+
+        try:
+            dialog = RatingFileDialog(self)
+            if dialog.exec_() != QDialog.Accepted:
+                return
+
+            # После успешной загрузки обновляем рейтинги участников
+            updated_count = self.update_players_rating_from_lists()
+
+            # Обновляем r_date в Title на текущий месяц
+            current_month = QDate.currentDate().toString("yyyy_MM")
+            Title.update(r_date=current_month).execute()
+            print(f"r_date обновлён на {current_month}")
+
+            QMessageBox.information(
+                self,
+                "Успех",
+                f"Рейтинг обновлён.\nОбновлено записей участников: {updated_count}\n"
+                f"Дата рейтинга: {current_month}"
+            )
+
+            # Обновляем таблицу участников, если она открыта
+            if self.current_title_id:
+                self.load_participants_for_title()
+
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось обновить рейтинг: {str(e)}")
+            import traceback
+            traceback.print_exc()
+
+    def update_players_rating_from_lists(self):
+        """Обновляет рейтинг участников текущего соревнования из таблиц R_list_*"""
+        if not self.current_title_id:
+            return 0
+
+        updated = 0
+        players = Player.select().where(Player.title_id == self.current_title_id)
+
+        for player in players:
+            if player.player == "X":
+                continue
+
+            # Ищем в зависимости от пола игрока
+            found_rank = None
+            if player.sex == "man":
+                # Сначала ищем в текущем (R_list_m), потом в январском (R1_list_m)
+                rec = R_list_m.get_or_none(
+                    (R_list_m.r_fname == player.fio) &
+                    (R_list_m.r_bithday == player.bday)
+                )
+                if not rec:
+                    rec = R_list_m.get_or_none(R_list_m.r_fname == player.fio)
+                if rec:
+                    found_rank = rec.r_list
+                else:
+                    rec = R1_list_m.get_or_none(
+                        (R1_list_m.r1_fname == player.fio) &
+                        (R1_list_m.r1_bithday == player.bday)
+                    )
+                    if not rec:
+                        rec = R1_list_m.get_or_none(R1_list_m.r1_fname == player.fio)
+                    if rec:
+                        found_rank = rec.r1_list
+            else:
+                rec = R_list_d.get_or_none(
+                    (R_list_d.r_fname == player.fio) &
+                    (R_list_d.r_bithday == player.bday)
+                )
+                if not rec:
+                    rec = R_list_d.get_or_none(R_list_d.r_fname == player.fio)
+                if rec:
+                    found_rank = rec.r_list
+                else:
+                    rec = R1_list_d.get_or_none(
+                        (R1_list_d.r1_fname == player.fio) &
+                        (R1_list_d.r1_bithday == player.bday)
+                    )
+                    if not rec:
+                        rec = R1_list_d.get_or_none(R1_list_d.r1_fname == player.fio)
+                    if rec:
+                        found_rank = rec.r1_list
+
+            if found_rank is not None and found_rank != player.rank:
+                old_rank = player.rank
+                player.rank = found_rank
+                player.save()
+                updated += 1
+                print(f"Игрок {player.fio}: рейтинг {old_rank} → {found_rank}")
+
+        # Обновляем также в Players_full, Choice, Players_double
+        self._sync_rank_to_related_tables()
+
+        return updated
+
+    def _sync_rank_to_related_tables(self):
+        """Синхронизирует рейтинг из Player в связанные таблицы"""
+        try:
+            # Players_full
+            players = Player.select().where(Player.title_id == self.current_title_id)
+            for p in players:
+                Players_full.update(rank=p.rank).where(
+                    (Players_full.player == p.fio) &
+                    (Players_full.bday == p.bday)
+                ).execute()
+
+            # Choice
+            for p in players:
+                Choice.update(rank=p.rank).where(
+                    (Choice.title_id == self.current_title_id) &
+                    (Choice.player_choice == p.id)
+                ).execute()
+
+            # Players_double — пересчёт r_1, r_2, r_sum
+            doubles = Players_double.select().where(Players_double.title_id == self.current_title_id)
+            for d in doubles:
+                p1 = Player.get_or_none(
+                    (Player.title_id == self.current_title_id) &
+                    (Player.fio == d.player_1)
+                )
+                p2 = Player.get_or_none(
+                    (Player.title_id == self.current_title_id) &
+                    (Player.fio == d.player_2)
+                )
+                r1 = p1.rank if p1 else d.r_1
+                r2 = p2.rank if p2 else d.r_2
+                Players_double.update(
+                    r_1=r1, r_2=r2, r_sum=(r1 or 0) + (r2 or 0)
+                ).where(Players_double.id == d.id).execute()
+
+            print("Рейтинг синхронизирован в связанных таблицах")
+        except Exception as e:
+            print(f"Ошибка синхронизации рейтинга: {e}")
 # ===============================    
     def create_category_buttons(self):
         """Создание кнопок для переключения между категориями участников (только man/woman)"""
@@ -8713,9 +8893,21 @@ class MainWindow(QMainWindow):
 
         # Рейтинг
         rating_menu = menubar.addMenu("Рейтинг")
+
+        update_rating_action = QAction("🔄 Обновить рейтинг", self)
+        update_rating_action.triggered.connect(self.open_update_rating_dialog)
+        rating_menu.addAction(update_rating_action)
+
+        rating_menu.addSeparator()
+
         rating_action = QAction("Показать рейтинг", self)
-        rating_action.triggered.connect(lambda:self.tab_widget.setCurrentIndex(6))
+        rating_action.triggered.connect(lambda: QMessageBox.information(self, "Рейтинг", "Рейтинг"))
         rating_menu.addAction(rating_action)
+
+        # rating_menu = menubar.addMenu("Рейтинг")
+        # rating_action = QAction("Показать рейтинг", self)
+        # rating_action.triggered.connect(lambda:self.tab_widget.setCurrentIndex(6))
+        # rating_menu.addAction(rating_action)
         
         # База данных
         db_menu = menubar.addMenu("База данных")

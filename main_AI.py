@@ -112,7 +112,6 @@ class MainWindow(QMainWindow):
         self.double_players_model = DoublePlayersTableModel()
         self.rating_model = RatingTableModel()
         self.doubles_results_model = DoublesResultsTableModel()
-        # self.doubles_results_table_view.setModel(self.doubles_results_model)
         
         # Данные для comboBox
         self.load_combo_data()
@@ -1153,7 +1152,7 @@ class MainWindow(QMainWindow):
         
         # # Словарь для хранения высот верхней части для каждой вкладки
         self.tab_heights = {
-            0: 550,  # Титул
+            0: 570,  # Титул
             1: 180,  # Участники
             2: 350,  # Команды
             3: 270,  # Пары
@@ -3913,7 +3912,7 @@ class MainWindow(QMainWindow):
         label_sredi = QLabel("Категория:")
         label_sredi.setMinimumWidth(120)
         self.new_comp_sredi = QComboBox()
-        self.new_comp_sredi.addItems(["мальчики и девочки", "юноши и девушки", "юниоры и юниорки", "мужчины и женщины"])
+        self.new_comp_sredi.addItems(["мальчиков и девочек", "юношей и девушек", "юниоров и юниорок", "мужчин и женщин"])
         self.new_comp_sredi.setStyleSheet("padding: 5px; font-size: 11px;")
         row2.addWidget(label_sredi)
         row2.addWidget(self.new_comp_sredi, 1)
@@ -9858,8 +9857,8 @@ class MainWindow(QMainWindow):
         """Сохранение нового соревнования"""
         name = self.new_comp_name.text().strip()
 
-        title.table_on_comp = 4
-        title.time_on_match = 15
+        # self.current_title_id.table_on_comp = 4
+        # self.current_title_id.time_on_match = 15
 
         if not name:
             QMessageBox.warning(self, "Ошибка", "Введите название соревнования")
@@ -9941,7 +9940,9 @@ class MainWindow(QMainWindow):
                     multiregion=0,
                     perenos=0,
                     otchestvo=0,
-                    r_date=rating_date_str
+                    r_date=rating_date_str,
+                    table_on_comp=4,
+                    time_on_match=15
                 )
                 self.current_title_id = title.id
             else:
@@ -9974,7 +9975,7 @@ class MainWindow(QMainWindow):
                     label_string="",
                     kol_game_string="",
                     choice_flag=False,
-                    score_flag=0,
+                    score_flag=5,
                     visible_game=True,
                     stage_exit="0",
                     mesta_exit=0,

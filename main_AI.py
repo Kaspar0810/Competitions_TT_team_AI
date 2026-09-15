@@ -822,8 +822,6 @@ class MainWindow(QMainWindow):
         right_panel_layout.setContentsMargins(0, 0, 0, 0)
         right_panel_layout.setSpacing(3)
 
-        
-        
         # В методе init_ui, после создания правой панели:
         self.competitions_label = QLabel("🏆 Прошедшие соревнования")
         self.competitions_label.setStyleSheet("""
@@ -1057,19 +1055,20 @@ class MainWindow(QMainWindow):
          # колонка растягивается по содержимому
         header = self.doubles_table_view.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeToContents)
-# ========== проба таблицы результаты пар
-        self.doubles_result_view = QTableView()
-        self.doubles_result_view.setSelectionBehavior(QTableView.SelectRows)
-        self.doubles_result_view.setAlternatingRowColors(True)
-        self.doubles_result_view.setShowGrid(True)
-        self.doubles_result_view.setStyleSheet("""
+
+        # НОВОЕ: Таблица результатов пар
+        self.doubles_results_table_view = QTableView()
+        self.doubles_results_table_view.setSelectionBehavior(QTableView.SelectRows)
+        self.doubles_results_table_view.setAlternatingRowColors(True)
+        self.doubles_results_table_view.setShowGrid(True)
+        self.doubles_results_table_view.setStyleSheet("""
             QTableView {
-                font-size: 14px;
+                font-size: 12px;
                 gridline-color: #ddd;
                 selection-background-color: #a0c4ff;
             }
             QHeaderView::section {
-                background-color: #4CAF50;
+                background-color: #FF9800;
                 color: white;
                 padding: 4px;
                 font-weight: bold;
@@ -1077,13 +1076,22 @@ class MainWindow(QMainWindow):
                 border: none;
             }
         """)
-        self.doubles_result_view.verticalHeader().setDefaultSectionSize(22)
-        self.doubles_result_view.setModel(self.double_players_model)
+        self.doubles_results_table_view.verticalHeader().setDefaultSectionSize(22)
+        self.doubles_results_table_view.setModel(self.doubles_results_model)
+        self.doubles_results_table_view.setColumnHidden(0, True)
+        self.doubles_results_table_view.doubleClicked.connect(self.on_doubles_result_double_clicked)
 
-         # колонка растягивается по содержимому
-        header = self.doubles_result_view.horizontalHeader()
+        # колонка растягивается по содержимому
+        header = self.doubles_results_table_view.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeToContents)
-# ===========================================
+
+        # Добавляем в table_container
+        self.table_container.addWidget(self.table_view)               # 0 - участники
+        self.table_container.addWidget(self.results_table_view)       # 1 - личные результаты
+        self.table_container.addWidget(self.teams_table_view)         # 2 - команды
+        self.table_container.addWidget(self.doubles_table_view)       # 3 - списки пар
+        self.table_container.addWidget(self.doubles_results_table_view)  # 4 - результаты пар        
+        # ===========================================
         # Таблица рейтинга
         self.rating_table_view = QTableView()
         self.rating_table_view.setSelectionBehavior(QTableView.SelectRows)
@@ -2287,30 +2295,39 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "Сортировка", "Список пар отсортирован по рейтингу")
 
     def on_doubles_mode_changed(self, button):
-        """Обработка переключения режима пар"""
+        """Переключение между списком пар и результатами"""
         if button == self.radio_list_mode:
-            self.load_doubles_for_title()
+            self.doubles_mode = "list"
+            # Форма — страница списков
+            self.doubles_forms_stack.setCurrentIndex(0)
+            # Таблица в table_container — список пар
+            self.table_container.setCurrentWidget(self.doubles_table_view)
             self.table_header.setText("🤝 Список пар")
+            self.table_header.setStyleSheet("""
+                background-color: #4CAF50;
+                color: white;
+                padding: 6px;
+                font-weight: bold;
+                font-size: 11px;
+                border-radius: 3px;
+            """)
+            self.load_doubles_for_title()
         else:
-            self.load_doubles_results()
+            self.doubles_mode = "results"
+            # Форма — страница результатов
+            self.doubles_forms_stack.setCurrentIndex(1)
+            # Таблица в table_container — результаты
+            self.table_container.setCurrentWidget(self.doubles_results_table_view)
             self.table_header.setText("📊 Результаты парных матчей")
-
-    # def on_double_vid_changed(self):
-    #     """Обработка смены вида пары: обновление списка игроков и таблицы"""
-    #     # 1. Обновляем автодополнение в полях ввода игроков
-    #     self.update_double_player_completers()
-        
-    #     # 2. Обновляем таблицу пар (если открыт режим списков)
-    #     # if hasattr(self, 'doubles_mode') and self.doubles_mode == "list":
-    #     self.load_doubles_for_title()
-        
-    #     # 3. Очищаем форму ввода, т.к. старые игроки могут не соответствовать новому виду
-    #     if hasattr(self, 'player1_edit'):
-    #         self.player1_edit.clear()
-    #     if hasattr(self, 'player2_edit'):
-    #         self.player2_edit.clear()
-    #     if hasattr(self, 'double_region_edit'):
-    #         self.double_region_edit.clear()
+            self.table_header.setStyleSheet("""
+                background-color: #FF9800;
+                color: white;
+                padding: 6px;
+                font-weight: bold;
+                font-size: 11px;
+                border-radius: 3px;
+            """)
+            self.load_doubles_results()
 
     def on_double_vid_changed(self):
         """Обработка смены вида пары"""
@@ -2844,6 +2861,54 @@ class MainWindow(QMainWindow):
         #     import traceback
         #     traceback.print_exc()
 
+    def on_doubles_result_double_clicked(self, index):
+        """Двойной клик по таблице: в режиме 'results' — загрузка матча"""
+        if self.doubles_mode != "results":
+            return
+
+        row = index.row()
+        model = self.doubles_table_view.model()
+        if not model:
+            return
+
+        # Получаем ID результата
+        result_id = None
+        if hasattr(model, 'get_id'):
+            result_id = model.get_id(row)
+        else:
+            try:
+                result_id = int(model.data(model.index(row, 0)))
+            except:
+                pass
+
+        if not result_id:
+            return
+
+        try:
+            result = Result.get_by_id(result_id)
+            # Заполняем форму
+            self.doubles_p1_name.setText(result.player1 or "")
+            self.doubles_p2_name.setText(result.player2 or "")
+
+            # Разблокируем поля ввода
+            for edit in self.doubles_score_edits_p1:
+                if edit:
+                    edit.setEnabled(True)
+            for edit in self.doubles_score_edits_p2:
+                if edit:
+                    edit.setEnabled(True)
+
+            # Загружаем счёт, если есть
+            if result.score_in_game and ':' in result.score_in_game:
+                parts = result.score_in_game.replace(' ', '').split(':')
+                if len(parts) == 2:
+                    self.doubles_total_score1.setText(parts[0])
+                    self.doubles_total_score2.setText(parts[1])
+
+            # Сохраняем текущий ID
+            self.current_doubles_result_id = result_id
+        except Exception as e:
+            QMessageBox.warning(self, "Ошибка", f"Не удалось загрузить матч: {str(e)}")
 # ============== Создание вкладок ====
     def create_system_tab(self):
         """Вкладка Система"""
@@ -3518,14 +3583,247 @@ class MainWindow(QMainWindow):
         self.update_schedule_stages()
 
         return tab_widget
+# ========= old
+    # def create_doubles_tab(self):
+    #     """Создание вкладки пары"""
+    #     tab_widget = QWidget()
+    #     main_layout = QVBoxLayout(tab_widget)
+    #     main_layout.setSpacing(5)
+    #     main_layout.setContentsMargins(5, 5, 5, 5)
+
+    #     # 1. Создание списка пар
+    #     double_list_group = QGroupBox("🤝 Создание списка пар")
+    #     double_list_group.setStyleSheet("""
+    #         QGroupBox {
+    #             font-weight: bold;
+    #             font-size: 12px;
+    #             border: 2px solid #4CAF50;
+    #             border-radius: 8px;
+    #             margin-top: 10px;
+    #         }
+    #         QGroupBox::title {
+    #             color: #4CAF50;
+    #             subcontrol-origin: margin;
+    #             left: 10px;
+    #             padding: 0 8px 0 8px;
+    #         }
+    #     """)
+    #     double_list_layout = QVBoxLayout(double_list_group)  # используем QVBoxLayout
+    #     double_list_layout.setSpacing(8)
+    #     double_list_layout.setContentsMargins(15, 15, 15, 15)
+
+    #     # ---- Форма ввода пар (две строки) ----
+    #     form_widget = QWidget()
+    #     form_main_layout = QVBoxLayout(form_widget)
+    #     form_main_layout.setSpacing(5)
+    #     form_main_layout.setContentsMargins(0, 0, 0, 0)
+
+    #     # ----- 1-я строка: Игрок 1 и Игрок 2 -----
+    #     row1 = QHBoxLayout()
+    #     row1.setSpacing(10)
+
+    #     row1.addWidget(QLabel("Игрок 1:"))
+    #     self.player1_edit = QLineEdit()
+    #     self.player1_edit.setPlaceholderText("ФИО")
+    #     self.player1_edit.setMaximumWidth(600)
+    #     # QCompleter для игрока 1
+    #     self.player1_completer = QCompleter()
+    #     self.player1_completer.setCaseSensitivity(Qt.CaseInsensitive)
+    #     self.player1_completer.setFilterMode(Qt.MatchStartsWith)
+    #     self.player1_completer.setCompletionMode(QCompleter.PopupCompletion)
+    #     self.player1_edit.setCompleter(self.player1_completer)
+    #     row1.addWidget(self.player1_edit)
+
+    #     row1.addWidget(QLabel("Игрок 2:"))
+    #     self.player2_edit = QLineEdit()
+    #     self.player2_edit.setPlaceholderText("ФИО")
+    #     self.player2_edit.setMaximumWidth(600)
+    #     self.player2_edit.textChanged.connect(lambda: self.update_double_region())
+    #     # QCompleter для игрока 2
+    #     self.player2_completer = QCompleter()
+    #     self.player2_completer.setCaseSensitivity(Qt.CaseInsensitive)
+    #     self.player2_completer.setFilterMode(Qt.MatchStartsWith)
+    #     self.player2_completer.setCompletionMode(QCompleter.PopupCompletion)
+    #     self.player2_edit.setCompleter(self.player2_completer)
+    #     row1.addWidget(self.player2_edit)
+
+    #     # row1.addStretch()
+    #     form_main_layout.addLayout(row1)
+
+    #     # ----- 2-я строка: Регион -----
+    #     row2 = QHBoxLayout()
+    #     row2.setSpacing(10)
+
+    #     row2.addWidget(QLabel("Регион:"))
+    #     self.double_region_edit = QLineEdit()
+    #     self.double_region_edit.setPlaceholderText("автозаполнение")
+    #     self.double_region_edit.setMaximumWidth(800)
+    #     self.double_region_edit.setReadOnly(True)
+    #     row2.addWidget(self.double_region_edit)
+
+    #     # ---- Комбобокс выбора вида пары ----
+    #     # vid_layout = QHBoxLayout()
+    #     row2.addWidget(QLabel("Вид:"))
+    #     self.double_vid_combo = QComboBox()
+    #     self.double_vid_combo.addItems(["мужские", "женские", "смешанные"])
+    #     self.double_vid_combo.setMinimumWidth(180)          # Минимальная ширина
+    #     self.double_vid_combo.setMinimumHeight(25)          # Высота
+    #     self.double_vid_combo.setStyleSheet("""
+    #         QComboBox {
+    #             font-size: 12px;
+    #             padding: 4px 8px;
+    #             border: 1px solid #ccc;
+    #             border-radius: 4px;
+    #             background-color: white;
+    #         }
+    #         QComboBox:hover {
+    #             border: 1px solid #4CAF50;
+    #         }
+    #         QComboBox::drop-down {
+    #             width: 24px;
+    #         }
+    #         QComboBox QAbstractItemView {
+    #             font-size: 12px;
+    #             padding: 4px;
+    #         }
+    #     """)
+    #     self.double_vid_combo.currentIndexChanged.connect(self.on_double_vid_changed)
+    #     row2.addWidget(self.double_vid_combo)
+
+    #     form_main_layout.addLayout(row2)
+
+    #     double_list_layout.addWidget(form_widget)
+
+    #     main_layout.addWidget(double_list_group, 1)  # stretch 1
+
+    #     # ---- Нижняя часть: результаты (изначально скрыта) ----
+    #     # (остальной код без изменений)
+    #     score_widget = QWidget()
+    #     score_layout = QVBoxLayout(score_widget)
+    #     score_layout.setSpacing(5)
+    #     score_layout.setContentsMargins(0, 0, 0, 0)
+
+    #     control_panel = QWidget()
+    #     control_layout = QVBoxLayout(control_panel)
+    #     control_layout.setSpacing(8)
+    #     control_layout.setContentsMargins(0, 0, 0, 0)
+
+    #     # 2. Ввод результатов пар
+    #     score_group = QGroupBox("📝 Результаты парных встреч")
+    #     score_group.setStyleSheet("""
+    #         QGroupBox {
+    #             font-weight: bold;
+    #             font-size: 12px;
+    #             border: 2px solid #2196F3;
+    #             border-radius: 8px;
+    #             margin-top: 10px;
+    #         }
+    #         QGroupBox::title {
+    #             color: #2196F3;
+    #             subcontrol-origin: margin;
+    #             left: 10px;
+    #             padding: 0 8px 0 8px;
+    #         }
+    #     """)
+    #     score_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+    #     score_layout = QGridLayout(score_group)
+    #     score_layout.setContentsMargins(10, 15, 10, 10)
+
+    #     # Заголовки: статус, игроки, общий счет
+    #     score_layout.addWidget(QLabel("Статус"), 0, 0)
+    #     score_layout.addWidget(QLabel("Игрок 1"), 0, 1)
+    #     score_layout.addWidget(QLabel("Общий счет"), 0, 2)
+
+    #     # Заголовки для партий (до 5)
+    #     self.doubles_score_edits_p1 = []
+    #     self.doubles_score_edits_p2 = []
+    #     for i in range(5):
+    #         label = QLabel(f"П{i+1}")
+    #         label.setAlignment(Qt.AlignCenter)
+    #         label.setMaximumWidth(35)
+    #         score_layout.addWidget(label, 0, 3 + i)
+    #         self.doubles_score_edits_p1.append(None)
+    #         self.doubles_score_edits_p2.append(None)
+
+    #     # Ряд 1: Игрок 1
+    #     self.doubles_p1_status = QComboBox()
+    #     self.doubles_p1_status.addItems(["Играет", "Не явка", "Травма"])
+    #     self.doubles_p1_status.setMaximumWidth(80)
+    #     score_layout.addWidget(self.doubles_p1_status, 1, 0)
+
+    #     self.doubles_p1_name = QLineEdit()
+    #     self.doubles_p1_name.setReadOnly(True)
+    #     self.doubles_p1_name.setMinimumWidth(150)
+    #     score_layout.addWidget(self.doubles_p1_name, 1, 1)
+
+    #     self.doubles_total_score1 = QLineEdit()
+    #     self.doubles_total_score1.setMaximumWidth(50)
+    #     score_layout.addWidget(self.doubles_total_score1, 1, 2)
+
+    #     for i in range(5):
+    #         edit = QLineEdit()
+    #         edit.setMaximumWidth(35)
+    #         edit.setEnabled(False)
+    #         edit.textChanged.connect(self.update_doubles_total_score)
+    #         score_layout.addWidget(edit, 1, 3 + i)
+    #         self.doubles_score_edits_p1[i] = edit
+
+    #     # Ряд 2: Игрок 2
+    #     self.doubles_p2_status = QComboBox()
+    #     self.doubles_p2_status.addItems(["Играет", "Не явка", "Травма"])
+    #     self.doubles_p2_status.setMaximumWidth(80)
+    #     score_layout.addWidget(self.doubles_p2_status, 2, 0)
+
+    #     self.doubles_p2_name = QLineEdit()
+    #     self.doubles_p2_name.setReadOnly(True)
+    #     self.doubles_p2_name.setMinimumWidth(150)
+    #     score_layout.addWidget(self.doubles_p2_name, 2, 1)
+
+    #     self.doubles_total_score2 = QLineEdit()
+    #     self.doubles_total_score2.setMaximumWidth(50)
+    #     score_layout.addWidget(self.doubles_total_score2, 2, 2)
+
+    #     for i in range(5):
+    #         edit = QLineEdit()
+    #         edit.setMaximumWidth(35)
+    #         edit.setEnabled(False)
+    #         edit.textChanged.connect(self.update_doubles_total_score)
+    #         score_layout.addWidget(edit, 2, 3 + i)
+    #         self.doubles_score_edits_p2[i] = edit
+
+    #     # Кнопки
+    #     btn_layout = QVBoxLayout()
+    #     save_btn = QPushButton("💾 Сохранить")
+    #     save_btn.clicked.connect(self.save_doubles_result)
+    #     clear_btn = QPushButton("🗑️ Очистить")
+    #     clear_btn.clicked.connect(self.clear_doubles_result_form)
+    #     btn_layout.addWidget(save_btn)
+    #     btn_layout.addWidget(clear_btn)
+    #     btn_layout.addStretch()
+    #     score_layout.addLayout(btn_layout, 1, 8, 2, 1)
+
+    #     main_layout.addWidget(score_group, 2)  # stretch 2 (70%)
+
+    #     return tab_widget
 
     def create_doubles_tab(self):
-        """Создание вкладки пары"""
+        """Вкладка Пары: только формы ввода (таблицы в table_container)"""
         tab_widget = QWidget()
         main_layout = QVBoxLayout(tab_widget)
         main_layout.setSpacing(5)
         main_layout.setContentsMargins(5, 5, 5, 5)
 
+        # QStackedWidget для двух форм
+        self.doubles_forms_stack = QStackedWidget()
+
+        # ---- Страница 0: форма создания списка пар ----
+        form_list_page = QWidget()
+        form_list_layout = QVBoxLayout(form_list_page)
+        form_list_layout.setSpacing(5)
+        form_list_layout.setContentsMargins(0, 0, 0, 0)
+
+        # double_list_group = QGroupBox("🤝 Создание списка пар")
+        # ... (ваш код формы списка пар без изменений) ...
         # 1. Создание списка пар
         double_list_group = QGroupBox("🤝 Создание списка пар")
         double_list_group.setStyleSheet("""
@@ -3631,18 +3929,16 @@ class MainWindow(QMainWindow):
 
         main_layout.addWidget(double_list_group, 1)  # stretch 1
 
-        # ---- Нижняя часть: результаты (изначально скрыта) ----
-        # (остальной код без изменений)
-        score_widget = QWidget()
-        score_layout = QVBoxLayout(score_widget)
-        score_layout.setSpacing(5)
-        score_layout.setContentsMargins(0, 0, 0, 0)
+        # form_list_layout.addWidget(double_list_group)
 
-        control_panel = QWidget()
-        control_layout = QVBoxLayout(control_panel)
-        control_layout.setSpacing(8)
-        control_layout.setContentsMargins(0, 0, 0, 0)
+        # ---- Страница 1: форма ввода результатов ----
+        form_results_page = QWidget()
+        form_results_layout = QVBoxLayout(form_results_page)
+        form_results_layout.setSpacing(5)
+        form_results_layout.setContentsMargins(0, 0, 0, 0)
 
+        # score_group = QGroupBox("📝 Ввод результата")
+        # ... (ваш код формы результатов без изменений) ...
         # 2. Ввод результатов пар
         score_group = QGroupBox("📝 Результаты парных встреч")
         score_group.setStyleSheet("""
@@ -3738,6 +4034,14 @@ class MainWindow(QMainWindow):
         score_layout.addLayout(btn_layout, 1, 8, 2, 1)
 
         main_layout.addWidget(score_group, 2)  # stretch 2 (70%)
+
+        # form_results_layout.addWidget(score_group)
+
+        # Добавляем обе страницы в stack форм
+        self.doubles_forms_stack.addWidget(form_list_page)     # 0
+        self.doubles_forms_stack.addWidget(form_results_page)  # 1
+
+        main_layout.addWidget(self.doubles_forms_stack)
 
         return tab_widget
 
@@ -6843,47 +7147,37 @@ class MainWindow(QMainWindow):
             self.change_label_ListWidget(index)
 
         elif index == 3:  # Пары
-            self.table_container.setCurrentWidget(self.doubles_table_view)
-            self.table_header.setText("🤝 Список пар")
-            self.table_header.setStyleSheet("""
-                background-color: #4CAF50;
-                color: white;
-                padding: 6px;
-                font-weight: bold;
-                font-size: 11px;
-                border-radius: 3px;
-            """)
 
-            # Обновляем левую панель
             self.update_left_panel_for_tab(index)
-            if self.current_title_id:
-                # Загружаем данные в зависимости от режима
-                if hasattr(self, 'doubles_mode') and self.doubles_mode == "results":
-                    self.load_doubles_results()
-                else:
-                    self.load_doubles_for_title()
+
+            # Восстанавливаем режим
+            if hasattr(self, 'doubles_mode') and self.doubles_mode == "results":
+                self.doubles_forms_stack.setCurrentIndex(1)
+                self.table_container.setCurrentWidget(self.doubles_results_table_view)
+                self.table_header.setText("📊 Результаты парных матчей")
+                self.table_header.setStyleSheet("""
+                    background-color: #FF9800;
+                    color: white;
+                    padding: 6px;
+                    font-weight: bold;
+                    font-size: 11px;
+                    border-radius: 3px;
+                """)
+                self.load_doubles_results()
             else:
-                self.double_players_model.setData([])
-                self.doubles_results_model.setData([])
-
-            # растягиваем колонки по содержимому, последнюю на всю щшрину
-            table_header = self.doubles_table_view.horizontalHeader()
-            for i in range(self.doubles_table_view.model().columnCount() - 1):
-                table_header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
-            table_header.setSectionResizeMode(self.doubles_table_view.model().columnCount() - 1, QHeaderView.Stretch)
-
-            # # Обновляем левую панель для отображения кнопки удаления
-            # self.update_left_panel_for_tab(index)
-           
-            # if self.current_title_id:
-            #     self.load_doubles_for_title() 
-            # else:
-            #     # Если нет соревнования, очищаем таблицу
-            #     self.double_players_model.setData([])
-            #     self.doubles_table_view.setModel(self.double_players_model)
-
-            # отображение заголовка и информации в QListWidget
-            self.change_label_ListWidget(index)
+                self.doubles_forms_stack.setCurrentIndex(0)
+                self.table_container.setCurrentWidget(self.doubles_table_view)
+                self.table_header.setText("🤝 Список пар")
+                self.table_header.setStyleSheet("""
+                    background-color: #4CAF50;
+                    color: white;
+                    padding: 6px;
+                    font-weight: bold;
+                    font-size: 11px;
+                    border-radius: 3px;
+                """)
+                if self.current_title_id:
+                    self.load_doubles_for_title()
 
         elif index == 6:  # Рейтинг
             self.table_header.setText("⭐ Рейтинг участников")
@@ -7766,53 +8060,6 @@ class MainWindow(QMainWindow):
                             elif btn_text == "🗑️ Очистить":
                                 btn.clicked.connect(self.clear_player_form)
                         elif tab_index == 4:  # Система
-                            #     # ---- Группа "Пары" ----
-                            # pairs_group = QGroupBox("🤝 Пары")
-                            # pairs_group.setStyleSheet("""
-                            #     QGroupBox {
-                            #         font-weight: bold;
-                            #         font-size: 12px;
-                            #         border: 2px solid #9C27B0;
-                            #         border-radius: 8px;
-                            #         margin-top: 10px;
-                            #     }
-                            #     QGroupBox::title {
-                            #         color: #9C27B0;
-                            #         subcontrol-origin: margin;
-                            #         left: 10px;
-                            #         padding: 0 8px 0 8px;
-                            #     }
-                            # """)
-                            # pairs_layout = QVBoxLayout(pairs_group)
-
-                            # # Чекбоксы
-                            # self.chk_pairs_men = QCheckBox("Мужские")
-                            # self.chk_pairs_women = QCheckBox("Женские")
-                            # self.chk_pairs_mix = QCheckBox("Смешанные")
-                            # pairs_layout.addWidget(self.chk_pairs_men)
-                            # pairs_layout.addWidget(self.chk_pairs_women)
-                            # pairs_layout.addWidget(self.chk_pairs_mix)
-
-                            # # Кнопка "Создать"
-                            # create_pairs_btn = QPushButton("➕ Создать")
-                            # create_pairs_btn.setMinimumHeight(32)
-                            # create_pairs_btn.setStyleSheet("""
-                            #     QPushButton {
-                            #         background-color: #9C27B0;
-                            #         color: white;
-                            #         border: none;
-                            #         border-radius: 4px;
-                            #         padding: 8px;
-                            #         font-size: 11px;
-                            #         font-weight: bold;
-                            #     }
-                            #     QPushButton:hover { background-color: #7B1FA2; }
-                            # """)
-                            # create_pairs_btn.clicked.connect(self.create_pairs_stages)
-                            # pairs_layout.addWidget(create_pairs_btn)
-
-                            # self.dynamic_filters_layout.addWidget(pairs_group)
-
                             if btn_text == "🔍 Поиск в Choice":
                                 btn.clicked.connect(self.search_in_choice_table)
                             elif btn_text == "📊 Статистика":
@@ -7922,117 +8169,6 @@ class MainWindow(QMainWindow):
             self.dynamic_filters_layout.addStretch()
         finally:
             self._updating_left_panel = False
-#========================
-    # def create_pairs_stages(self):
-    #     """Создание этапов для пар в таблице System с расчётом max_player"""
-    #     if not self.current_title_id:
-    #         QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
-    #         return
-
-    #     # Проверяем, что выбран хотя бы один вид пар
-    #     selected = []
-    #     if self.chk_pairs_men.isChecked():
-    #         selected.append(("Мужские пары", "man"))
-    #     if self.chk_pairs_women.isChecked():
-    #         selected.append(("Женские пары", "woman"))
-    #     if self.chk_pairs_mix.isChecked():
-    #         selected.append(("Смешанные пары", "mix"))
-
-    #     if not selected:
-    #         QMessageBox.warning(self, "Ошибка", "Выберите хотя бы один вид пар")
-    #         return
-
-    #     # Получаем количество игроков каждого пола
-    #     count_men = Player.select().where(
-    #         (Player.title_id == self.current_title_id) &
-    #         (Player.sex == "man") &
-    #         (Player.player != "X")
-    #     ).count()
-
-    #     count_women = Player.select().where(
-    #         (Player.title_id == self.current_title_id) &
-    #         (Player.sex == "woman") &
-    #         (Player.player != "X")
-    #     ).count()
-
-    #     try:
-    #         for stage_name, vid in selected:
-    #             # Определяем max_player в зависимости от вида
-    #             if vid == "man":
-    #                 max_player = count_men // 2
-    #                 stage_sex = "man"
-    #             elif vid == "woman":
-    #                 max_player = count_women // 2
-    #                 stage_sex = "woman"
-    #             elif vid == "mix":
-    #                 max_player = min(count_men, count_women)
-    #                 stage_sex = "mix"
-    #             else:
-    #                 max_player = 0
-    #                 stage_sex = "man"
-
-    #             if max_player <= 0:
-    #                 QMessageBox.warning(
-    #                     self,
-    #                     "Ошибка",
-    #                     f"Недостаточно игроков для создания пар вида '{stage_name}'.\n"
-    #                     f"Мужчин: {count_men}, Женщин: {count_women}"
-    #                 )
-    #                 continue
-
-    #             # Проверяем, не существует ли уже такой этап
-    #             existing = System.get_or_none(
-    #                 (System.title_id == self.current_title_id) &
-    #                 (System.stage == stage_name) &
-    #                 (System.sex == stage_sex)
-    #             )
-    #             if existing:
-    #                 reply = QMessageBox.question(
-    #                     self,
-    #                     "Этап уже существует",
-    #                     f"Этап '{stage_name}' уже существует. Перезаписать?",
-    #                     QMessageBox.Yes | QMessageBox.No
-    #                 )
-    #                 if reply == QMessageBox.Yes:
-    #                     existing.delete_instance()
-    #                 else:
-    #                     continue
-
-    #             # Создаём запись в System
-    #             System.create(
-    #                 title_id=self.current_title_id,
-    #                 total_athletes=max_player,
-    #                 stage=stage_name,
-    #                 type_table="Олимпийская (за 1-3 место)",
-    #                 total_group=1,
-    #                 max_player=0,
-    #                 stage_exit="",
-    #                 mesta_exit=1,
-    #                 label_string="Места с 1 по 3",
-    #                 kol_game_string="",
-    #                 page_vid="книжная",
-    #                 choice_flag=0,
-    #                 score_flag=5,
-    #                 visible_game=True,
-    #                 no_game="",
-    #                 sex=stage_sex
-    #             )
-    #             print(f"Создан этап: {stage_name} для пола {stage_sex}, max_player={max_player}")
-
-    #         QMessageBox.information(
-    #             self,
-    #             "Успех",
-    #             f"Создано {len(selected)} этапов для пар:\n" +
-    #             "\n".join(f"• {name} (max_player={max_player})" for name, _ in selected)
-    #         )
-
-    #         # Обновляем информацию о системе
-    #         self.update_stages_info()
-
-    #     except Exception as e:
-    #         QMessageBox.critical(self, "Ошибка", f"Не удалось создать этапы: {str(e)}")
-    #         import traceback
-    #         traceback.print_exc()
 
     def create_pairs_stages(self):
         """Создание этапов для пар в таблице System с расчётом max_player"""
@@ -9035,15 +9171,7 @@ class MainWindow(QMainWindow):
         
         # 3. Полуфиналы - подменю (динамическое)
         self.semifinals_results_menu = results_view_menu.addMenu("Полуфиналы")
-        
-        # self.results_menu_actions["1-й полуфинал"] = QAction("1-й полуфинал", self)
-        # self.results_menu_actions["1-й полуфинал"].triggered.connect(lambda: self.show_results_for_stage("1-й полуфинал"))
-        # semifinals_results_menu.addAction(self.results_menu_actions["1-й полуфинал"])
-        
-        # self.results_menu_actions["2-й полуфинал"] = QAction("2-й полуфинал", self)
-        # self.results_menu_actions["2-й полуфинал"].triggered.connect(lambda: self.show_results_for_stage("2-й полуфинал"))
-        # semifinals_results_menu.addAction(self.results_menu_actions["2-й полуфинал"])
-        
+                
         # 4. Финалы - подменю (динамическое)
         self.finals_results_menu = results_view_menu.addMenu("Финалы")
         
@@ -9070,11 +9198,6 @@ class MainWindow(QMainWindow):
         rating_action = QAction("Показать рейтинг", self)
         rating_action.triggered.connect(lambda: QMessageBox.information(self, "Рейтинг", "Рейтинг"))
         rating_menu.addAction(rating_action)
-
-        # rating_menu = menubar.addMenu("Рейтинг")
-        # rating_action = QAction("Показать рейтинг", self)
-        # rating_action.triggered.connect(lambda:self.tab_widget.setCurrentIndex(6))
-        # rating_menu.addAction(rating_action)
         
         # База данных
         db_menu = menubar.addMenu("База данных")
@@ -9283,8 +9406,6 @@ class MainWindow(QMainWindow):
                 # Экспортируем базу данных
                 # self.export_database_internal(backup_file, None)
                 self.run_backup_db()
-
-                # QMessageBox.information(self, "Успех", f"База данных сохранена в:\n{backup_file}")
             
             # Закрываем соединение с БД
             close_db()
@@ -13892,157 +14013,6 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка: {str(e)}")
-# =================================
-    # def edit_system_stage(self, system_id):
-    #     """Редактирование выбранного этапа с очисткой связанных данных"""
-    #     from models import System, Result, Game_list, Choice
-        
-    #     try:
-    #         system = System.get_by_id(system_id)
-            
-    #         # Проверяем наличие связанных данных
-    #         results_count = Result.select().where(Result.system_id == system_id).count()
-    #         games_count = Game_list.select().where(Game_list.system_id == system_id).count()
-    #         choices_count = Choice.select().where(Choice.title_id == self.current_title_id).count()
-            
-    #         total_count = results_count + games_count + choices_count
-            
-    #         if total_count > 0:
-    #             message = f"Для этого этапа есть связанные данные:\n"
-    #             if results_count > 0:
-    #                 message += f"📊 Результаты: {results_count} записей\n"
-    #             if games_count > 0:
-    #                 message += f"🎮 Игры: {games_count} записей\n"
-    #             if choices_count > 0:
-    #                 message += f"🎯 Выборы: {choices_count} записей\n"
-    #             message += f"\nПри изменении параметров этапа все эти данные будут удалены.\n\nПродолжить?"
-                
-    #             reply = QMessageBox.question(self, "Предупреждение", 
-    #                                         message,
-    #                                         QMessageBox.Yes | QMessageBox.No)
-    #             if reply == QMessageBox.No:
-    #                 return
-            
-    #         dialog = QDialog(self)
-    #         dialog.setWindowTitle(f"Редактирование этапа: {system.stage}")
-    #         dialog.setModal(True)
-    #         dialog.setMinimumWidth(450)
-            
-    #         layout = QVBoxLayout(dialog)
-            
-    #         group = QGroupBox("Параметры этапа")
-    #         group_layout = QFormLayout(group)
-    #         group_layout.setSpacing(10)
-            
-    #         # Название этапа
-    #         stage_edit = QComboBox()
-    #         stage_edit.addItems([
-    #             "Одна таблица",
-    #             "Квалификация",
-    #             "Квалификация. 1-й полуфинал",
-    #             "Квалификация. 2-й полуфинал",
-    #             "Финал",
-    #             "Суперфинал"
-    #         ])
-    #         stage_edit.setEditable(True)
-    #         stage_edit.setCurrentText(system.stage)
-    #         group_layout.addRow("Название этапа:", stage_edit)
-            
-    #         # Тип таблицы
-    #         table_type_edit = QComboBox()
-    #         table_type_edit.addItems([
-    #             "Круговая",
-    #             "Олимпийская (минус 2)",
-    #             "Олимпийская (с розыгрышем всех мест)",
-    #             "Олимпийская (за 1-3 место)"
-    #         ])
-    #         if hasattr(system, 'type_table'):
-    #             table_type_edit.setCurrentText(system.type_table)
-    #         group_layout.addRow("Тип таблицы:", table_type_edit)
-            
-    #         # Количество групп
-    #         groups_edit = QLineEdit()
-    #         groups_edit.setText(str(system.total_group))
-    #         group_layout.addRow("Количество групп:", groups_edit)
-            
-    #         # Максимум участников
-    #         max_players_edit = QLineEdit()
-    #         max_players_edit.setText(str(system.max_player) if system.max_player else "16")
-    #         group_layout.addRow("Максимум участников:", max_players_edit)
-            
-    #         # Количество партий
-    #         score_flag_edit = QComboBox()
-    #         score_flag_edit.addItems(["3", "5", "7"])
-    #         score_flag_edit.setCurrentText(str(system.score_flag) if system.score_flag else "5")
-    #         group_layout.addRow("Количество партий:", score_flag_edit)
-            
-    #         # Количество проходящих
-    #         stage_exit_edit = QLineEdit()
-    #         stage_exit_edit.setText(str(system.mesta_exit) if system.mesta_exit else "0")
-    #         group_layout.addRow("Проходят в след. этап:", stage_exit_edit)
-            
-    #         layout.addWidget(group)
-            
-    #         btn_layout = QHBoxLayout()
-    #         save_btn = QPushButton("💾 Сохранить изменения")
-    #         save_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 5px;")
-    #         cancel_btn = QPushButton("❌ Отмена")
-    #         cancel_btn.setStyleSheet("background-color: #f44336; color: white; padding: 5px;")
-            
-    #         def save_changes():
-    #             try:
-    #                 # Удаляем связанные данные
-    #                 if total_count > 0:
-    #                     # Удаляем результаты
-    #                     if results_count > 0:
-    #                         deleted = Result.delete().where((Result.system_id == system_id) & (Result.sex == self.current_sex)).execute()
-    #                         print(f"Удалено {deleted} записей результатов")
-                        
-    #                     # Удаляем игры
-    #                     if games_count > 0:
-    #                         deleted = Game_list.delete().where((Game_list.system_id == system_id) & (Game_list.sex == self.current_sex)).execute()
-    #                         print(f"Удалено {deleted} записей игр")
-                        
-    #                     # # Удаляем выборы
-    #                     # if choices_count > 0:
-    #                     #     deleted = Choice.delete().where((Choice.title_id == self.current_title_id) & (Choice.sex == self.current_sex)).execute()
-    #                     #     print(f"Удалено {deleted} записей выборов")
-                    
-    #                 # Обновляем параметры этапа
-    #                 system.stage = stage_edit.currentText()
-    #                 if hasattr(system, 'type_table'):
-    #                     system.type_table = table_type_edit.currentText()
-    #                 system.total_group = int(groups_edit.text()) if groups_edit.text().isdigit() else 1
-    #                 system.max_player = int(max_players_edit.text()) if max_players_edit.text().isdigit() else 16
-    #                 system.score_flag = int(score_flag_edit.currentText())
-    #                 system.mesta_exit = int(stage_exit_edit.text()) if stage_exit_edit.text().isdigit() else 0
-                    
-    #                 system.save()
-                    
-    #                 # Сбрасываем флаг жеребьевки
-    #                 system.choice_flag = 0
-    #                 system.save()
-                    
-    #                 # Обновляем информационное окно
-    #                 self.update_stages_info()
-                    
-    #                 QMessageBox.information(dialog, "Успех", "Изменения сохранены")
-    #                 dialog.accept()
-                    
-    #             except Exception as e:
-    #                 QMessageBox.critical(dialog, "Ошибка", f"Не удалось сохранить изменения: {str(e)}")
-            
-    #         save_btn.clicked.connect(save_changes)
-    #         cancel_btn.clicked.connect(dialog.reject)
-            
-    #         btn_layout.addWidget(save_btn)
-    #         btn_layout.addWidget(cancel_btn)
-    #         layout.addLayout(btn_layout)
-            
-    #         dialog.exec_()
-            
-    #     except Exception as e:
-    #         QMessageBox.critical(self, "Ошибка", f"Ошибка: {str(e)}")
     # =================
     def edit_system_stage(self, system_id):
         """Редактирование выбранного этапа с очисткой связанных данных и пересчетом игр"""

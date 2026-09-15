@@ -2437,19 +2437,52 @@ class MainWindow(QMainWindow):
             self.doubles_score_edits_p2[i] = edit
         
         # Кнопки
+        # btn_layout = QHBoxLayout()
+        # save_btn = QPushButton("💾 Сохранить")
+        # save_btn.clicked.connect(self.save_doubles_result)
+        # clear_btn = QPushButton("🗑️ Очистить")
+        # clear_btn.clicked.connect(self.clear_doubles_result_form)
+        # btn_layout.addWidget(save_btn)
+        # btn_layout.addWidget(clear_btn)
+        # btn_layout.addStretch()
+        # score_layout.addLayout(btn_layout, 3, 0, 1, 8)
+                
         btn_layout = QHBoxLayout()
         save_btn = QPushButton("💾 Сохранить")
         save_btn.clicked.connect(self.save_doubles_result)
         clear_btn = QPushButton("🗑️ Очистить")
         clear_btn.clicked.connect(self.clear_doubles_result_form)
+
+        # НОВОЕ: кнопка "Просмотр" (пока зарезервирована)
+        self.doubles_view_btn = QPushButton("👁️ Просмотр")
+        self.doubles_view_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 6px 12px;
+                font-size: 10px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #1976D2; }
+            QPushButton:disabled { background-color: #cccccc; color: #666; }
+        """)
+        self.doubles_view_btn.setEnabled(False)  # пока зарезервирована
+        # self.doubles_view_btn.clicked.connect(self.view_doubles_result)  # подключим позже
+
         btn_layout.addWidget(save_btn)
         btn_layout.addWidget(clear_btn)
+        btn_layout.addWidget(self.doubles_view_btn)
         btn_layout.addStretch()
-        score_layout.addLayout(btn_layout, 3, 0, 1, 8)
+
+        # score_layout.addLayout(self.doubles_view_btn, 0, 8, 1, 1)
+
+        score_layout.addLayout(btn_layout, 0, 0, 1, 8)
+
+        # form_layout.addWidget(score_group)
         
-        form_layout.addWidget(score_group)
-        
-        return form_widget
+        # return form_widget
 
     def load_doubles_matches_for_results(self):
         """Загрузка пар для выбора в результатах"""
@@ -2459,19 +2492,6 @@ class MainWindow(QMainWindow):
         query = Players_double.select().where(Players_double.title_id == self.current_title_id)
         for double in query:
             self.doubles_match_combo.addItem(f"{double.player_1} / {double.player_2}", double.id)
-
-    # def load_doubles_results(self):
-    #     """Загрузка результатов парных матчей"""
-    #     if not self.current_title_id:
-    #         self.doubles_results_model.setData([])
-    #         return
-    #     # Здесь будет реальная загрузка данных из БД
-    #     # Пока используем тестовые данные
-    #     test_data = [
-    #         {'id': 1, 'pair': 'Иванов/Петров', 'player1': 'Иванов', 'player2': 'Петров', 'score': '3:1', 'winner': 'Иванов'},
-    #         {'id': 2, 'pair': 'Сидоров/Кузнецов', 'player1': 'Сидоров', 'player2': 'Кузнецов', 'score': '2:3', 'winner': 'Кузнецов'},
-    #     ]
-    #     self.doubles_results_model.setData(test_data)
 
     def load_doubles_results(self):
         """Загрузка результатов парных матчей из таблицы Result"""
@@ -21306,162 +21326,6 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             print(f"Ошибка сохранения соревнования: {e}")
-
-#======================= этот вариант был ранее
-
-        # if not self.current_title_id:
-        #     return
-        
-        # try:
-        #     title = Title.get_by_id(self.current_title_id)
-            
-        #     reply = QMessageBox.question(self, "Сохранение соревнования", 
-        #                                 f"Сохранить резервную копию соревнования '{title.name}'?",
-        #                                 QMessageBox.Yes | QMessageBox.No)
-            
-        #     if reply == QMessageBox.Yes:
-        #         # Создаем папку backup_db, если её нет
-        #         backup_dir = "backup_db"
-        #         if not os.path.exists(backup_dir):
-        #             os.makedirs(backup_dir)
-                
-        #         # Формируем имя файла
-        #         short_name = title.short_name_comp if title.short_name_comp else title.name
-        #         import re
-        #         clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
-        #         clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
-                
-        #         from datetime import datetime
-        #         timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-        #         backup_file = os.path.join(backup_dir, f"{clean_name}_{timestamp}.sql")
-                
-        #         # Экспортируем базу данных
-        #         self.export_database_internal(backup_file, None)
-                
-        #         QMessageBox.information(self, "Успех", f"Соревнование сохранено в:\n{backup_file}")
-                
-        # except Exception as e:
-        #     print(f"Ошибка сохранения соревнования: {e}")
-
-    # def export_database_internal(self, file_path, progress=None):
-    #     """Встроенный экспорт базы данных (без mysqldump)"""
-        
-    #     try:
-    #         from models import (
-    #             Title, Coach, Region, City, Patronymic, Player, Players_full,
-    #             R_list_m, R_list_d, R1_list_m, R1_list_d, Referee, Team,
-    #             Players_double, Choice, Result, System, Choice_Team, Game_list,
-    #             Choice_double_player, Delete_player, db
-    #         )
-    #         from datetime import datetime, date
-            
-    #         models = [
-    #             Title, Coach, Region, City, Patronymic, Player, Players_full,
-    #             R_list_m, R_list_d, R1_list_m, R1_list_d, Referee, Team,
-    #             Players_double, Choice, Result, System, Choice_Team, Game_list,
-    #             Choice_double_player, Delete_player
-    #         ]
-            
-    #         with open(file_path, 'w', encoding='utf-8') as f:
-    #             f.write(f"-- Backup created at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-    #             f.write(f"-- Database: {db.database}\n\n")
-                
-    #             for i, model in enumerate(models):
-    #                 if progress and progress.wasCanceled():
-    #                     break
-                    
-    #                 if progress:
-    #                     progress.setValue(i)
-    #                     progress.setLabelText(f"Экспорт таблицы: {model._meta.table_name}")
-                    
-    #                 table_name = model._meta.table_name
-    #                 f.write(f"-- Table structure for table {table_name}\n")
-    #                 f.write(f"DROP TABLE IF EXISTS `{table_name}`;\n")
-                    
-    #                 # Получаем колонки таблицы
-    #                 columns = []
-    #                 for field_name, field in model._meta.fields.items():
-    #                     # Получаем имя колонки (db_column или column или name)
-    #                     if hasattr(field, 'db_column') and field.db_column:
-    #                         col_name = field.db_column
-    #                     elif hasattr(field, 'column'):
-    #                         col_name = field.column
-    #                     else:
-    #                         col_name = field_name
-                        
-    #                     # Получаем тип поля
-    #                     if hasattr(field, 'field_type'):
-    #                         col_type = field.field_type
-    #                     else:
-    #                         col_type = str(type(field).__name__).upper()
-                        
-    #                     col_def = f"`{col_name}` {col_type}"
-                        
-    #                     # Primary Key
-    #                     if field.primary_key:
-    #                         col_def += " PRIMARY KEY AUTO_INCREMENT"
-                        
-    #                     # NOT NULL
-    #                     if not field.null and not field.primary_key:
-    #                         col_def += " NOT NULL"
-                        
-    #                     # DEFAULT
-    #                     if field.default is not None and not callable(field.default):
-    #                         if isinstance(field.default, str):
-    #                             col_def += f" DEFAULT '{field.default}'"
-    #                         else:
-    #                             col_def += f" DEFAULT {field.default}"
-                        
-    #                     columns.append(col_def)
-                    
-    #                 create_sql = f"CREATE TABLE `{table_name}` (\n  " + ",\n  ".join(columns) + "\n);"
-    #                 f.write(f"{create_sql}\n\n")
-                    
-    #                 # Получаем данные
-    #                 try:
-    #                     query = model.select()
-    #                     rows = list(query)
-                        
-    #                     if rows:
-    #                         for row in rows:
-    #                             values = []
-    #                             for field_name, field in model._meta.fields.items():
-    #                                 val = getattr(row, field_name)
-    #                                 if val is None:
-    #                                     values.append('NULL')
-    #                                 elif isinstance(val, str):
-    #                                     val = val.replace("'", "''")
-    #                                     values.append(f"'{val}'")
-    #                                 elif isinstance(val, (datetime, date)):
-    #                                     values.append(f"'{val}'")
-    #                                 elif isinstance(val, bool):
-    #                                     values.append('1' if val else '0')
-    #                                 else:
-    #                                     values.append(str(val))
-                                
-    #                             # Получаем имена колонок
-    #                             col_names = []
-    #                             for field_name, field in model._meta.fields.items():
-    #                                 if hasattr(field, 'db_column') and field.db_column:
-    #                                     col_names.append(f"`{field.db_column}`")
-    #                                 elif hasattr(field, 'column'):
-    #                                     col_names.append(f"`{field.column}`")
-    #                                 else:
-    #                                     col_names.append(f"`{field_name}`")
-                                
-    #                             f.write(f"INSERT INTO `{table_name}` ({','.join(col_names)}) VALUES ({','.join(values)});\n")
-    #                         f.write("\n")
-    #                 except Exception as e:
-    #                     print(f"Ошибка экспорта данных из {table_name}: {e}")
-    #                     f.write(f"-- Ошибка экспорта данных: {e}\n\n")
-            
-    #         if progress:
-    #             progress.setValue(len(models))
-                
-    #     except Exception as e:
-    #         import traceback
-    #         traceback.print_exc()
-    #         raise e
 # ===============================        
     def search_in_choice_table(self):
         """Поиск информации в таблице Choice с выводом полной информации"""

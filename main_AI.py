@@ -1156,7 +1156,7 @@ class MainWindow(QMainWindow):
             0: 550,  # Титул
             1: 180,  # Участники
             2: 350,  # Команды
-            3: 250,  # Пары
+            3: 270,  # Пары
             4: 580,  # Система
             5: 200,  # Результаты - маленькая верхняя часть для формы ввода
             6: 150,  # Рейтинг
@@ -2345,145 +2345,6 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'double_region_edit'):
             self.double_region_edit.clear()
 
-    def create_doubles_results_form(self):
-        """Создание формы для ввода результатов пар"""
-        form_widget = QWidget()
-        form_layout = QVBoxLayout(form_widget)
-        form_layout.setSpacing(5)
-        form_layout.setContentsMargins(0, 0, 0, 0)
-        
-        # Верхняя строка: выбор пары и статусы
-        top_row = QHBoxLayout()
-        
-        top_row.addWidget(QLabel("Пара:"))
-        self.doubles_match_combo = QComboBox()
-        self.doubles_match_combo.setMinimumWidth(300)
-        top_row.addWidget(self.doubles_match_combo)
-        
-        self.load_doubles_matches_btn = QPushButton("🔄")
-        self.load_doubles_matches_btn.setMaximumWidth(30)
-        self.load_doubles_matches_btn.clicked.connect(self.load_doubles_matches_for_results)
-        top_row.addWidget(self.load_doubles_matches_btn)
-        
-        top_row.addStretch()
-        form_layout.addLayout(top_row)
-        
-        # Группа ввода счета
-        score_group = QGroupBox("Ввод результата")
-        score_layout = QGridLayout(score_group)
-        score_layout.setSpacing(3)
-        score_layout.setContentsMargins(5, 10, 5, 5)
-        
-        # Заголовки: статус, игроки, общий счет
-        score_layout.addWidget(QLabel("Статус"), 0, 0)
-        score_layout.addWidget(QLabel("Игрок 1"), 0, 1)
-        score_layout.addWidget(QLabel("Общий счет"), 0, 2)
-        
-        # Заголовки для партий (до 5)
-        self.doubles_score_edits_p1 = []
-        self.doubles_score_edits_p2 = []
-        for i in range(5):
-            label = QLabel(f"П{i+1}")
-            label.setAlignment(Qt.AlignCenter)
-            label.setMaximumWidth(35)
-            score_layout.addWidget(label, 0, 3 + i)
-            self.doubles_score_edits_p1.append(None)
-            self.doubles_score_edits_p2.append(None)
-        
-        # Ряд 1: Игрок 1
-        self.doubles_p1_status = QComboBox()
-        self.doubles_p1_status.addItems(["Играет", "Не явка", "Травма"])
-        self.doubles_p1_status.setMaximumWidth(80)
-        score_layout.addWidget(self.doubles_p1_status, 1, 0)
-        
-        self.doubles_p1_name = QLineEdit()
-        self.doubles_p1_name.setReadOnly(True)
-        self.doubles_p1_name.setMinimumWidth(150)
-        score_layout.addWidget(self.doubles_p1_name, 1, 1)
-        
-        self.doubles_total_score1 = QLineEdit()
-        self.doubles_total_score1.setMaximumWidth(50)
-        score_layout.addWidget(self.doubles_total_score1, 1, 2)
-        
-        for i in range(5):
-            edit = QLineEdit()
-            edit.setMaximumWidth(35)
-            edit.setEnabled(False)
-            edit.textChanged.connect(self.update_doubles_total_score)
-            score_layout.addWidget(edit, 1, 3 + i)
-            self.doubles_score_edits_p1[i] = edit
-        
-        # Ряд 2: Игрок 2
-        self.doubles_p2_status = QComboBox()
-        self.doubles_p2_status.addItems(["Играет", "Не явка", "Травма"])
-        self.doubles_p2_status.setMaximumWidth(80)
-        score_layout.addWidget(self.doubles_p2_status, 2, 0)
-        
-        self.doubles_p2_name = QLineEdit()
-        self.doubles_p2_name.setReadOnly(True)
-        self.doubles_p2_name.setMinimumWidth(150)
-        score_layout.addWidget(self.doubles_p2_name, 2, 1)
-        
-        self.doubles_total_score2 = QLineEdit()
-        self.doubles_total_score2.setMaximumWidth(50)
-        score_layout.addWidget(self.doubles_total_score2, 2, 2)
-        
-        for i in range(5):
-            edit = QLineEdit()
-            edit.setMaximumWidth(35)
-            edit.setEnabled(False)
-            edit.textChanged.connect(self.update_doubles_total_score)
-            score_layout.addWidget(edit, 2, 3 + i)
-            self.doubles_score_edits_p2[i] = edit
-        
-        # Кнопки
-        # btn_layout = QHBoxLayout()
-        # save_btn = QPushButton("💾 Сохранить")
-        # save_btn.clicked.connect(self.save_doubles_result)
-        # clear_btn = QPushButton("🗑️ Очистить")
-        # clear_btn.clicked.connect(self.clear_doubles_result_form)
-        # btn_layout.addWidget(save_btn)
-        # btn_layout.addWidget(clear_btn)
-        # btn_layout.addStretch()
-        # score_layout.addLayout(btn_layout, 3, 0, 1, 8)
-                
-        btn_layout = QHBoxLayout()
-        save_btn = QPushButton("💾 Сохранить")
-        save_btn.clicked.connect(self.save_doubles_result)
-        clear_btn = QPushButton("🗑️ Очистить")
-        clear_btn.clicked.connect(self.clear_doubles_result_form)
-
-        # НОВОЕ: кнопка "Просмотр" (пока зарезервирована)
-        self.doubles_view_btn = QPushButton("👁️ Просмотр")
-        self.doubles_view_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #2196F3;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                padding: 6px 12px;
-                font-size: 10px;
-                font-weight: bold;
-            }
-            QPushButton:hover { background-color: #1976D2; }
-            QPushButton:disabled { background-color: #cccccc; color: #666; }
-        """)
-        self.doubles_view_btn.setEnabled(False)  # пока зарезервирована
-        # self.doubles_view_btn.clicked.connect(self.view_doubles_result)  # подключим позже
-
-        btn_layout.addWidget(save_btn)
-        btn_layout.addWidget(clear_btn)
-        btn_layout.addWidget(self.doubles_view_btn)
-        btn_layout.addStretch()
-
-        # score_layout.addLayout(self.doubles_view_btn, 0, 8, 1, 1)
-
-        score_layout.addLayout(btn_layout, 0, 0, 1, 8)
-
-        # form_layout.addWidget(score_group)
-        
-        # return form_widget
-
     def load_doubles_matches_for_results(self):
         """Загрузка пар для выбора в результатах"""
         self.doubles_match_combo.clear()
@@ -3603,228 +3464,6 @@ class MainWindow(QMainWindow):
         self.update_schedule_stages()
 
         return tab_widget
-# ========= old
-    # def create_doubles_tab(self):
-    #     """Создание вкладки пары"""
-    #     tab_widget = QWidget()
-    #     main_layout = QVBoxLayout(tab_widget)
-    #     main_layout.setSpacing(5)
-    #     main_layout.setContentsMargins(5, 5, 5, 5)
-
-    #     # 1. Создание списка пар
-    #     double_list_group = QGroupBox("🤝 Создание списка пар")
-    #     double_list_group.setStyleSheet("""
-    #         QGroupBox {
-    #             font-weight: bold;
-    #             font-size: 12px;
-    #             border: 2px solid #4CAF50;
-    #             border-radius: 8px;
-    #             margin-top: 10px;
-    #         }
-    #         QGroupBox::title {
-    #             color: #4CAF50;
-    #             subcontrol-origin: margin;
-    #             left: 10px;
-    #             padding: 0 8px 0 8px;
-    #         }
-    #     """)
-    #     double_list_layout = QVBoxLayout(double_list_group)  # используем QVBoxLayout
-    #     double_list_layout.setSpacing(8)
-    #     double_list_layout.setContentsMargins(15, 15, 15, 15)
-
-    #     # ---- Форма ввода пар (две строки) ----
-    #     form_widget = QWidget()
-    #     form_main_layout = QVBoxLayout(form_widget)
-    #     form_main_layout.setSpacing(5)
-    #     form_main_layout.setContentsMargins(0, 0, 0, 0)
-
-    #     # ----- 1-я строка: Игрок 1 и Игрок 2 -----
-    #     row1 = QHBoxLayout()
-    #     row1.setSpacing(10)
-
-    #     row1.addWidget(QLabel("Игрок 1:"))
-    #     self.player1_edit = QLineEdit()
-    #     self.player1_edit.setPlaceholderText("ФИО")
-    #     self.player1_edit.setMaximumWidth(600)
-    #     # QCompleter для игрока 1
-    #     self.player1_completer = QCompleter()
-    #     self.player1_completer.setCaseSensitivity(Qt.CaseInsensitive)
-    #     self.player1_completer.setFilterMode(Qt.MatchStartsWith)
-    #     self.player1_completer.setCompletionMode(QCompleter.PopupCompletion)
-    #     self.player1_edit.setCompleter(self.player1_completer)
-    #     row1.addWidget(self.player1_edit)
-
-    #     row1.addWidget(QLabel("Игрок 2:"))
-    #     self.player2_edit = QLineEdit()
-    #     self.player2_edit.setPlaceholderText("ФИО")
-    #     self.player2_edit.setMaximumWidth(600)
-    #     self.player2_edit.textChanged.connect(lambda: self.update_double_region())
-    #     # QCompleter для игрока 2
-    #     self.player2_completer = QCompleter()
-    #     self.player2_completer.setCaseSensitivity(Qt.CaseInsensitive)
-    #     self.player2_completer.setFilterMode(Qt.MatchStartsWith)
-    #     self.player2_completer.setCompletionMode(QCompleter.PopupCompletion)
-    #     self.player2_edit.setCompleter(self.player2_completer)
-    #     row1.addWidget(self.player2_edit)
-
-    #     # row1.addStretch()
-    #     form_main_layout.addLayout(row1)
-
-    #     # ----- 2-я строка: Регион -----
-    #     row2 = QHBoxLayout()
-    #     row2.setSpacing(10)
-
-    #     row2.addWidget(QLabel("Регион:"))
-    #     self.double_region_edit = QLineEdit()
-    #     self.double_region_edit.setPlaceholderText("автозаполнение")
-    #     self.double_region_edit.setMaximumWidth(800)
-    #     self.double_region_edit.setReadOnly(True)
-    #     row2.addWidget(self.double_region_edit)
-
-    #     # ---- Комбобокс выбора вида пары ----
-    #     # vid_layout = QHBoxLayout()
-    #     row2.addWidget(QLabel("Вид:"))
-    #     self.double_vid_combo = QComboBox()
-    #     self.double_vid_combo.addItems(["мужские", "женские", "смешанные"])
-    #     self.double_vid_combo.setMinimumWidth(180)          # Минимальная ширина
-    #     self.double_vid_combo.setMinimumHeight(25)          # Высота
-    #     self.double_vid_combo.setStyleSheet("""
-    #         QComboBox {
-    #             font-size: 12px;
-    #             padding: 4px 8px;
-    #             border: 1px solid #ccc;
-    #             border-radius: 4px;
-    #             background-color: white;
-    #         }
-    #         QComboBox:hover {
-    #             border: 1px solid #4CAF50;
-    #         }
-    #         QComboBox::drop-down {
-    #             width: 24px;
-    #         }
-    #         QComboBox QAbstractItemView {
-    #             font-size: 12px;
-    #             padding: 4px;
-    #         }
-    #     """)
-    #     self.double_vid_combo.currentIndexChanged.connect(self.on_double_vid_changed)
-    #     row2.addWidget(self.double_vid_combo)
-
-    #     form_main_layout.addLayout(row2)
-
-    #     double_list_layout.addWidget(form_widget)
-
-    #     main_layout.addWidget(double_list_group, 1)  # stretch 1
-
-    #     # ---- Нижняя часть: результаты (изначально скрыта) ----
-    #     # (остальной код без изменений)
-    #     score_widget = QWidget()
-    #     score_layout = QVBoxLayout(score_widget)
-    #     score_layout.setSpacing(5)
-    #     score_layout.setContentsMargins(0, 0, 0, 0)
-
-    #     control_panel = QWidget()
-    #     control_layout = QVBoxLayout(control_panel)
-    #     control_layout.setSpacing(8)
-    #     control_layout.setContentsMargins(0, 0, 0, 0)
-
-    #     # 2. Ввод результатов пар
-    #     score_group = QGroupBox("📝 Результаты парных встреч")
-    #     score_group.setStyleSheet("""
-    #         QGroupBox {
-    #             font-weight: bold;
-    #             font-size: 12px;
-    #             border: 2px solid #2196F3;
-    #             border-radius: 8px;
-    #             margin-top: 10px;
-    #         }
-    #         QGroupBox::title {
-    #             color: #2196F3;
-    #             subcontrol-origin: margin;
-    #             left: 10px;
-    #             padding: 0 8px 0 8px;
-    #         }
-    #     """)
-    #     score_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-    #     score_layout = QGridLayout(score_group)
-    #     score_layout.setContentsMargins(10, 15, 10, 10)
-
-    #     # Заголовки: статус, игроки, общий счет
-    #     score_layout.addWidget(QLabel("Статус"), 0, 0)
-    #     score_layout.addWidget(QLabel("Игрок 1"), 0, 1)
-    #     score_layout.addWidget(QLabel("Общий счет"), 0, 2)
-
-    #     # Заголовки для партий (до 5)
-    #     self.doubles_score_edits_p1 = []
-    #     self.doubles_score_edits_p2 = []
-    #     for i in range(5):
-    #         label = QLabel(f"П{i+1}")
-    #         label.setAlignment(Qt.AlignCenter)
-    #         label.setMaximumWidth(35)
-    #         score_layout.addWidget(label, 0, 3 + i)
-    #         self.doubles_score_edits_p1.append(None)
-    #         self.doubles_score_edits_p2.append(None)
-
-    #     # Ряд 1: Игрок 1
-    #     self.doubles_p1_status = QComboBox()
-    #     self.doubles_p1_status.addItems(["Играет", "Не явка", "Травма"])
-    #     self.doubles_p1_status.setMaximumWidth(80)
-    #     score_layout.addWidget(self.doubles_p1_status, 1, 0)
-
-    #     self.doubles_p1_name = QLineEdit()
-    #     self.doubles_p1_name.setReadOnly(True)
-    #     self.doubles_p1_name.setMinimumWidth(150)
-    #     score_layout.addWidget(self.doubles_p1_name, 1, 1)
-
-    #     self.doubles_total_score1 = QLineEdit()
-    #     self.doubles_total_score1.setMaximumWidth(50)
-    #     score_layout.addWidget(self.doubles_total_score1, 1, 2)
-
-    #     for i in range(5):
-    #         edit = QLineEdit()
-    #         edit.setMaximumWidth(35)
-    #         edit.setEnabled(False)
-    #         edit.textChanged.connect(self.update_doubles_total_score)
-    #         score_layout.addWidget(edit, 1, 3 + i)
-    #         self.doubles_score_edits_p1[i] = edit
-
-    #     # Ряд 2: Игрок 2
-    #     self.doubles_p2_status = QComboBox()
-    #     self.doubles_p2_status.addItems(["Играет", "Не явка", "Травма"])
-    #     self.doubles_p2_status.setMaximumWidth(80)
-    #     score_layout.addWidget(self.doubles_p2_status, 2, 0)
-
-    #     self.doubles_p2_name = QLineEdit()
-    #     self.doubles_p2_name.setReadOnly(True)
-    #     self.doubles_p2_name.setMinimumWidth(150)
-    #     score_layout.addWidget(self.doubles_p2_name, 2, 1)
-
-    #     self.doubles_total_score2 = QLineEdit()
-    #     self.doubles_total_score2.setMaximumWidth(50)
-    #     score_layout.addWidget(self.doubles_total_score2, 2, 2)
-
-    #     for i in range(5):
-    #         edit = QLineEdit()
-    #         edit.setMaximumWidth(35)
-    #         edit.setEnabled(False)
-    #         edit.textChanged.connect(self.update_doubles_total_score)
-    #         score_layout.addWidget(edit, 2, 3 + i)
-    #         self.doubles_score_edits_p2[i] = edit
-
-    #     # Кнопки
-    #     btn_layout = QVBoxLayout()
-    #     save_btn = QPushButton("💾 Сохранить")
-    #     save_btn.clicked.connect(self.save_doubles_result)
-    #     clear_btn = QPushButton("🗑️ Очистить")
-    #     clear_btn.clicked.connect(self.clear_doubles_result_form)
-    #     btn_layout.addWidget(save_btn)
-    #     btn_layout.addWidget(clear_btn)
-    #     btn_layout.addStretch()
-    #     score_layout.addLayout(btn_layout, 1, 8, 2, 1)
-
-    #     main_layout.addWidget(score_group, 2)  # stretch 2 (70%)
-
-    #     return tab_widget
 
     def create_doubles_tab(self):
         """Вкладка Пары: только формы ввода (таблицы в table_container)"""
@@ -3842,8 +3481,6 @@ class MainWindow(QMainWindow):
         form_list_layout.setSpacing(5)
         form_list_layout.setContentsMargins(0, 0, 0, 0)
 
-        # double_list_group = QGroupBox("🤝 Создание списка пар")
-        # ... (ваш код формы списка пар без изменений) ...
         # 1. Создание списка пар
         double_list_group = QGroupBox("🤝 Создание списка пар")
         double_list_group.setStyleSheet("""
@@ -3900,7 +3537,6 @@ class MainWindow(QMainWindow):
         self.player2_edit.setCompleter(self.player2_completer)
         row1.addWidget(self.player2_edit)
 
-        # row1.addStretch()
         form_main_layout.addLayout(row1)
 
         # ----- 2-я строка: Регион -----
@@ -3915,7 +3551,6 @@ class MainWindow(QMainWindow):
         row2.addWidget(self.double_region_edit)
 
         # ---- Комбобокс выбора вида пары ----
-        # vid_layout = QHBoxLayout()
         row2.addWidget(QLabel("Вид:"))
         self.double_vid_combo = QComboBox()
         self.double_vid_combo.addItems(["мужские", "женские", "смешанные"])
@@ -3949,16 +3584,12 @@ class MainWindow(QMainWindow):
 
         main_layout.addWidget(double_list_group, 1)  # stretch 1
 
-        # form_list_layout.addWidget(double_list_group)
-
         # ---- Страница 1: форма ввода результатов ----
         form_results_page = QWidget()
         form_results_layout = QVBoxLayout(form_results_page)
         form_results_layout.setSpacing(5)
         form_results_layout.setContentsMargins(0, 0, 0, 0)
 
-        # score_group = QGroupBox("📝 Ввод результата")
-        # ... (ваш код формы результатов без изменений) ...
         # 2. Ввод результатов пар
         score_group = QGroupBox("📝 Результаты парных встреч")
         score_group.setStyleSheet("""
@@ -3982,7 +3613,7 @@ class MainWindow(QMainWindow):
 
         # Заголовки: статус, игроки, общий счет
         score_layout.addWidget(QLabel("Статус"), 0, 0)
-        score_layout.addWidget(QLabel("Игрок 1"), 0, 1)
+        score_layout.addWidget(QLabel("Пара"), 0, 1)
         score_layout.addWidget(QLabel("Общий счет"), 0, 2)
 
         # Заголовки для партий (до 5)
@@ -4043,19 +3674,33 @@ class MainWindow(QMainWindow):
             self.doubles_score_edits_p2[i] = edit
 
         # Кнопки
-        btn_layout = QVBoxLayout()
         save_btn = QPushButton("💾 Сохранить")
         save_btn.clicked.connect(self.save_doubles_result)
+
         clear_btn = QPushButton("🗑️ Очистить")
         clear_btn.clicked.connect(self.clear_doubles_result_form)
-        btn_layout.addWidget(save_btn)
-        btn_layout.addWidget(clear_btn)
-        btn_layout.addStretch()
-        score_layout.addLayout(btn_layout, 1, 8, 2, 1)
+ 
+        # НОВОЕ: кнопка "Просмотр" (пока зарезервирована)
+        self.doubles_view_btn = QPushButton("👁️ Просмотр")
+        self.doubles_view_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 6px 12px;
+                font-size: 10px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #1976D2; }
+            QPushButton:disabled { background-color: #cccccc; color: #666; }
+        """)
+
+        score_layout.addWidget(save_btn, 1, 8, 1, 1)
+        score_layout.addWidget(clear_btn, 2, 8, 1, 1)
+        score_layout.addWidget(self.doubles_view_btn, 0, 8, 1, 1)
 
         main_layout.addWidget(score_group, 2)  # stretch 2 (70%)
-
-        # form_results_layout.addWidget(score_group)
 
         # Добавляем обе страницы в stack форм
         self.doubles_forms_stack.addWidget(form_list_page)     # 0

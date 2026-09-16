@@ -322,7 +322,8 @@ class DoublesResultsTableModel(QAbstractTableModel):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._data = []
-        self._headers = ['ID', 'Пара', 'Игрок 1', 'Игрок 2', 'Счет', 'Победитель']
+        self._highlight_rows = set()
+        self._headers = ['ID', 'Группа', 'Встреча', 'Пара 1', 'Пара 2', 'Победитель', 'Общий счёт', 'Счёт в матче']
         self.hidden_columns = ['ID']
 
     def setData(self, data):
@@ -331,7 +332,12 @@ class DoublesResultsTableModel(QAbstractTableModel):
             self._data = []
         else:
             self._data = data
+        self._highlight_rows = set()
         self.endResetModel()
+
+    def set_highlight_rows(self, rows):
+        self._highlight_rows = set(rows)
+        self.layoutChanged.emit()
 
     def rowCount(self, parent=QModelIndex()):
         return len(self._data)
@@ -340,32 +346,51 @@ class DoublesResultsTableModel(QAbstractTableModel):
         return len(self._headers)
 
     def data(self, index, role=Qt.DisplayRole):
-        if not index.isValid() or role != Qt.DisplayRole:
+        if not index.isValid():
             return None
-        
+
+        if role == Qt.BackgroundRole:
+            if index.row() in self._highlight_rows:
+                return QColor(255, 255, 0)
+            return None
+
+        if role != Qt.DisplayRole:
+            return None
+
         try:
             item = self._data[index.row()]
             col = index.column()
             if col == 0:
                 return str(item.get('id', ""))
             elif col == 1:
-                return item.get('pair', "")
+                return item.get('group', "")
             elif col == 2:
-                return item.get('player1', "")
+                return item.get('tour', "")
             elif col == 3:
-                return item.get('player2', "")
+                return item.get('pair1', "")
             elif col == 4:
-                return item.get('score', "")
+                return item.get('pair2', "")
             elif col == 5:
                 return item.get('winner', "")
+            elif col == 6:
+                return item.get('score_in_game', "")
+            elif col == 7:
+                return item.get('score_match', "")
             return ""
-        except:
+        except Exception as e:
+            print(f"Ошибка получения данных результата пары: {e}")
             return ""
 
     def headerData(self, section, orientation, role=Qt.DisplayRole):
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
             if section < len(self._headers):
                 return self._headers[section]
+        return None
+
+    def get_id(self, row):
+        """Получить ID результата по индексу строки"""
+        if 0 <= row < len(self._data):
+            return self._data[row].get('id', None)
         return None
 # =======================
 class TitlesTableModel(QAbstractTableModel):

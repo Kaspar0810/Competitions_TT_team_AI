@@ -2360,12 +2360,12 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            # Определяем вид пары (man/woman/mix) по комбобоксу
+            # Определяем вид пары
             vid_map = {"мужские": "man", "женские": "woman", "смешанные": "mix"}
             vid_text = self.double_vid_combo.currentText() if hasattr(self, 'double_vid_combo') else "мужские"
             vid = vid_map.get(vid_text, "man")
 
-            # Получаем все парные этапы для текущего соревнования и пола
+            # Получаем все парные этапы для текущего соревнования и вида
             stages = System.select().where(
                 (System.title_id == self.current_title_id) &
                 (System.sex == vid) &
@@ -2377,7 +2377,6 @@ class MainWindow(QMainWindow):
                 return
 
             results_data = []
-
             for stage in stages:
                 stage_name = stage.stage
 
@@ -2385,34 +2384,39 @@ class MainWindow(QMainWindow):
                 results = Result.select().where(
                     (Result.title_id == self.current_title_id) &
                     (Result.system_id == stage.id)
-                ).order_by(Result.tours)
+                ).order_by(Result.round, Result.tours)
 
                 for res in results:
-                    # Формируем отображаемое название пары
-                    pair_name = res.number_group or stage_name
+                    # Номер встречи (tours) — например, "1-2" или "3"
+                    tour = res.tours or ""
 
-                    # Определяем победителя
-                    winner_text = res.winner if res.winner else ""
-                    score_text = res.score_in_game if res.score_in_game else ""
+                    # Группа — для пар обычно одна группа
+                    group = res.number_group or stage_name
 
                     results_data.append({
                         'id': res.id,
-                        'pair': pair_name,
-                        'player1': res.player1 or "",
-                        'player2': res.player2 or "",
-                        'score': score_text,
-                        'winner': winner_text,
-                        'tour': res.tours or "",
+                        'group': group,
+                        'tour': tour,
+                        'pair1': res.player1 or "",
+                        'pair2': res.player2 or "",
+                        'winner': res.winner or "",
+                        'score_in_game': res.score_in_game or "",     # общий счёт (например, 3:1)
+                        'score_match': res.score_win or "",           # счёт по партиям (например, "5,-7,8,-9,6")
                         'stage': stage_name
                     })
 
-            # Если результатов нет – очищаем модель
-            if not results_data:
-                self.doubles_results_model.setData([])
-                return
+            # Сортировка по этапу, туру
+            def sort_key(x):
+                tour_num = 0
+                if x['tour']:
+                    try:
+                        # Если "1-2" — берём первое число
+                        tour_num = int(x['tour'].split('-')[0])
+                    except:
+                        tour_num = 0
+                return (x['stage'], tour_num)
 
-            # Сортируем по этапу и туру
-            results_data.sort(key=lambda x: (x['stage'], int(x['tour']) if x['tour'].isdigit() else 0))
+            results_data.sort(key=sort_key)
 
             self.doubles_results_model.setData(results_data)
 
@@ -2741,54 +2745,105 @@ class MainWindow(QMainWindow):
         #     import traceback
         #     traceback.print_exc()
 
+    # def on_doubles_result_double_clicked(self, index):
+    #     """Двойной клик по таблице: в режиме 'results' — загрузка матча"""
+    #     if self.doubles_mode != "results":
+    #         return
+
+    #     row = index.row()
+    #     model = self.doubles_table_view.model()
+    #     if not model:
+    #         return
+
+    #     # Получаем ID результата
+    #     result_id = None
+    #     if hasattr(model, 'get_id'):
+    #         result_id = model.get_id(row)
+    #     else:
+    #         try:
+    #             result_id = int(model.data(model.index(row, 0)))
+    #         except:
+    #             pass
+
+    #     if not result_id:
+    #         return
+
+    #     try:
+    #         result = Result.get_by_id(result_id)
+    #         # Заполняем форму
+    #         self.doubles_p1_name.setText(result.player1 or "")
+    #         self.doubles_p2_name.setText(result.player2 or "")
+
+    #         # Разблокируем поля ввода
+    #         for edit in self.doubles_score_edits_p1:
+    #             if edit:
+    #                 edit.setEnabled(True)
+    #         for edit in self.doubles_score_edits_p2:
+    #             if edit:
+    #                 edit.setEnabled(True)
+
+    #         # Загружаем счёт, если есть
+    #         if result.score_in_game and ':' in result.score_in_game:
+    #             parts = result.score_in_game.replace(' ', '').split(':')
+    #             if len(parts) == 2:
+    #                 self.doubles_total_score1.setText(parts[0])
+    #                 self.doubles_total_score2.setText(parts[1])
+
+    #         # Сохраняем текущий ID
+    #         self.current_doubles_result_id = result_id
+    #     except Exception as e:
+    #         QMessageBox.warning(self, "Ошибка", f"Не удалось загрузить матч: {str(e)}")
+
     def on_doubles_result_double_clicked(self, index):
-        """Двойной клик по таблице: в режиме 'results' — загрузка матча"""
-        if self.doubles_mode != "results":
+        """Загрузка парного матча при двойном клике по строке результатов"""
+        if not index.isValid():
             return
 
         row = index.row()
-        model = self.doubles_table_view.model()
+        model = self.doubles_results_table_view.model()
         if not model:
             return
 
-        # Получаем ID результата
-        result_id = None
-        if hasattr(model, 'get_id'):
-            result_id = model.get_id(row)
-        else:
-            try:
-                result_id = int(model.data(model.index(row, 0)))
-            except:
-                pass
-
+        # Получаем ID записи Result
+        result_id = model.get_id(row)
         if not result_id:
             return
 
         try:
             result = Result.get_by_id(result_id)
-            # Заполняем форму
-            self.doubles_p1_name.setText(result.player1 or "")
-            self.doubles_p2_name.setText(result.player2 or "")
+        except:
+            QMessageBox.warning(self, "Ошибка", "Не удалось загрузить матч")
+            return
 
-            # Разблокируем поля ввода
-            for edit in self.doubles_score_edits_p1:
-                if edit:
-                    edit.setEnabled(True)
-            for edit in self.doubles_score_edits_p2:
-                if edit:
-                    edit.setEnabled(True)
+        # Заполняем форму
+        self.doubles_p1_name.setText(result.player1 or "")
+        self.doubles_p2_name.setText(result.player2 or "")
 
-            # Загружаем счёт, если есть
-            if result.score_in_game and ':' in result.score_in_game:
-                parts = result.score_in_game.replace(' ', '').split(':')
-                if len(parts) == 2:
-                    self.doubles_total_score1.setText(parts[0])
-                    self.doubles_total_score2.setText(parts[1])
+        # Разблокируем поля партий
+        for edit in self.doubles_score_edits_p1:
+            if edit:
+                edit.setEnabled(True)
+        for edit in self.doubles_score_edits_p2:
+            if edit:
+                edit.setEnabled(True)
 
-            # Сохраняем текущий ID
-            self.current_doubles_result_id = result_id
-        except Exception as e:
-            QMessageBox.warning(self, "Ошибка", f"Не удалось загрузить матч: {str(e)}")
+        # Загружаем счёт, если матч сыгран
+        if result.score_in_game and ':' in result.score_in_game:
+            parts = result.score_in_game.replace(' ', '').split(':')
+            if len(parts) == 2:
+                self.doubles_total_score1.setText(parts[0])
+                self.doubles_total_score2.setText(parts[1])
+
+        # Статусы по умолчанию
+        self.doubles_p1_status.setCurrentText("Играет")
+        self.doubles_p2_status.setCurrentText("Играет")
+
+        # Сохраняем ID текущего матча
+        self.current_doubles_result_id = result_id
+
+        # Устанавливаем фокус на первое поле ввода
+        if self.doubles_score_edits_p1 and self.doubles_score_edits_p1[0]:
+            self.doubles_score_edits_p1[0].setFocus()
 # ============== Создание вкладок ====
     def create_system_tab(self):
         """Вкладка Система"""

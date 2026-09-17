@@ -2447,9 +2447,81 @@ class MainWindow(QMainWindow):
         self.doubles_p2_status.setCurrentIndex(0)
 
     def update_doubles_total_score(self):
-        """Обновление общего счета для пар"""
-        # Аналогично update_total_score для личных соревнований
-        pass
+        """Обновляет общий счёт пар по введённым партиям и проверяет завершение матча"""
+        try:
+            parties_count = 5
+            wins_p1 = 0
+            wins_p2 = 0
+
+            # Считаем победы в партиях
+            for i in range(parties_count):
+                if i >= len(self.doubles_score_edits_p1) or i >= len(self.doubles_score_edits_p2):
+                    break
+                edit1 = self.doubles_score_edits_p1[i]
+                edit2 = self.doubles_score_edits_p2[i]
+                if not edit1 or not edit2:
+                    continue
+                score1 = edit1.text().strip()
+                score2 = edit2.text().strip()
+                if not score1 or not score2:
+                    continue
+                try:
+                    s1 = int(score1)
+                    s2 = int(score2)
+                    if s1 > s2:
+                        wins_p1 += 1
+                    elif s2 > s1:
+                        wins_p2 += 1
+                except ValueError:
+                    continue
+
+            # Обновляем поля общего счёта
+            if hasattr(self, 'doubles_total_score1'):
+                self.doubles_total_score1.setText(str(wins_p1))
+            if hasattr(self, 'doubles_total_score2'):
+                self.doubles_total_score2.setText(str(wins_p2))
+
+            # Подсветка победителя (кто первым набрал 3 победы)
+            required_wins = 3  # матч до 3 побед из 5 партий
+
+            if wins_p1 >= required_wins:
+                if hasattr(self, 'doubles_total_score1'):
+                    self.doubles_total_score1.setStyleSheet("background-color: #90EE90; font-weight: bold;")
+                if hasattr(self, 'doubles_total_score2'):
+                    self.doubles_total_score2.setStyleSheet("")
+                # Переносим фокус на кнопку "Сохранить"
+                QTimer.singleShot(100, lambda: self._focus_doubles_save_button())
+            elif wins_p2 >= required_wins:
+                if hasattr(self, 'doubles_total_score2'):
+                    self.doubles_total_score2.setStyleSheet("background-color: #90EE90; font-weight: bold;")
+                if hasattr(self, 'doubles_total_score1'):
+                    self.doubles_total_score1.setStyleSheet("")
+                QTimer.singleShot(100, lambda: self._focus_doubles_save_button())
+            else:
+                if hasattr(self, 'doubles_total_score1'):
+                    self.doubles_total_score1.setStyleSheet("")
+                if hasattr(self, 'doubles_total_score2'):
+                    self.doubles_total_score2.setStyleSheet("")
+
+        except Exception as e:
+            print(f"Ошибка обновления общего счёта пар: {e}")
+
+    def _focus_doubles_save_button(self):
+        """Переносит фокус на кнопку 'Сохранить' в форме результатов пар"""
+        if hasattr(self, 'doubles_save_btn') and self.doubles_save_btn:
+            self.doubles_save_btn.setFocus()
+            # Дополнительно подсвечиваем кнопку
+            self.doubles_save_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #FFA500;
+                    color: white;
+                    border: 2px solid #FF6600;
+                    border-radius: 4px;
+                    padding: 6px 12px;
+                    font-size: 10px;
+                    font-weight: bold;
+                }
+            """)
 
     def left_panel_double_tab(self):
         """Смена списков и результатов по выбору радиокнопок"""
@@ -2712,8 +2784,59 @@ class MainWindow(QMainWindow):
         # Обновляем таблицу пар
         self.load_doubles_for_title()
 
+    # def on_doubles_result_double_clicked(self, index):
+    #     """Загрузка парного матча при двойном клике по строке результатов"""
+    #     if not index.isValid():
+    #         return
+
+    #     row = index.row()
+    #     model = self.doubles_results_table_view.model()
+    #     if not model:
+    #         return
+
+    #     # Получаем ID записи Result
+    #     result_id = model.get_id(row)
+    #     if not result_id:
+    #         return
+
+    #     try:
+    #         result = Result.get_by_id(result_id)
+    #     except:
+    #         QMessageBox.warning(self, "Ошибка", "Не удалось загрузить матч")
+    #         return
+
+    #     # Заполняем форму
+    #     self.doubles_p1_name.setText(result.player1 or "")
+    #     self.doubles_p2_name.setText(result.player2 or "")
+
+    #     # Разблокируем поля партий
+    #     for edit in self.doubles_score_edits_p1:
+    #         if edit:
+    #             edit.setEnabled(True)
+    #     for edit in self.doubles_score_edits_p2:
+    #         if edit:
+    #             edit.setEnabled(True)
+
+    #     # Загружаем счёт, если матч сыгран
+    #     if result.score_in_game and ':' in result.score_in_game:
+    #         parts = result.score_in_game.replace(' ', '').split(':')
+    #         if len(parts) == 2:
+    #             self.doubles_total_score1.setText(parts[0])
+    #             self.doubles_total_score2.setText(parts[1])
+
+    #     # Статусы по умолчанию
+    #     self.doubles_p1_status.setCurrentText("Играет")
+    #     self.doubles_p2_status.setCurrentText("Играет")
+
+    #     # Сохраняем ID текущего матча
+    #     self.current_doubles_result_id = result_id
+
+    #     # Устанавливаем фокус на первое поле ввода
+    #     if self.doubles_score_edits_p1 and self.doubles_score_edits_p1[0]:
+    #         self.doubles_score_edits_p1[0].setFocus()
+
     def on_doubles_result_double_clicked(self, index):
-        """Загрузка парного матча при двойном клике по строке результатов"""
+        """Загрузка матча пары при двойном клике"""
         if not index.isValid():
             return
 
@@ -2722,7 +2845,6 @@ class MainWindow(QMainWindow):
         if not model:
             return
 
-        # Получаем ID записи Result
         result_id = model.get_id(row)
         if not result_id:
             return
@@ -2737,7 +2859,7 @@ class MainWindow(QMainWindow):
         self.doubles_p1_name.setText(result.player1 or "")
         self.doubles_p2_name.setText(result.player2 or "")
 
-        # Разблокируем поля партий
+        # Разблокируем поля ввода
         for edit in self.doubles_score_edits_p1:
             if edit:
                 edit.setEnabled(True)
@@ -2745,7 +2867,7 @@ class MainWindow(QMainWindow):
             if edit:
                 edit.setEnabled(True)
 
-        # Загружаем счёт, если матч сыгран
+        # Загружаем счёт, если матч уже сыгран
         if result.score_in_game and ':' in result.score_in_game:
             parts = result.score_in_game.replace(' ', '').split(':')
             if len(parts) == 2:
@@ -2759,9 +2881,55 @@ class MainWindow(QMainWindow):
         # Сохраняем ID текущего матча
         self.current_doubles_result_id = result_id
 
-        # Устанавливаем фокус на первое поле ввода
+        # Ставим фокус на первое поле ввода счёта первой пары
         if self.doubles_score_edits_p1 and self.doubles_score_edits_p1[0]:
-            self.doubles_score_edits_p1[0].setFocus()
+            QTimer.singleShot(100, lambda: self.doubles_score_edits_p1[0].setFocus())
+
+    def move_to_next_doubles_field(self, row, col):
+        """
+        Переход к следующему полю ввода счёта для пар.
+        
+        row: 1 — первая пара, 2 — вторая пара
+        col: индекс партии (0..4)
+        """
+        parties_count = 5  # максимум 5 партий
+
+        # Проверяем статусы: если одна из пар "Не играет", сразу сохраняем
+        status1 = self.doubles_p1_status.currentText()
+        status2 = self.doubles_p2_status.currentText()
+        if status1 != "Играет" or status2 != "Играет":
+            self.save_doubles_result()
+            return
+
+        # Получаем введённые значения
+        if row == 1:
+            score1 = self.doubles_score_edits_p1[col].text().strip()
+            score2 = self.doubles_score_edits_p2[col].text().strip() if col < len(self.doubles_score_edits_p2) else ""
+        else:
+            score1 = self.doubles_score_edits_p1[col].text().strip() if col < len(self.doubles_score_edits_p1) else ""
+            score2 = self.doubles_score_edits_p2[col].text().strip()
+
+        # Валидация
+        if score1 and score2:
+            is_valid, error = self.validate_score(score1, score2)
+            if not is_valid:
+                QMessageBox.warning(self, "Ошибка ввода", f"Партия {col+1}: {error}")
+                return
+
+        # Определяем следующее поле
+        if row == 1:
+            # Переход к полю второй пары в той же партии
+            if col < len(self.doubles_score_edits_p2) and self.doubles_score_edits_p2[col]:
+                self.doubles_score_edits_p2[col].setFocus()
+        else:
+            # Переход к следующей партии (поле первой пары)
+            next_col = col + 1
+            if next_col < parties_count and next_col < len(self.doubles_score_edits_p1):
+                if self.doubles_score_edits_p1[next_col]:
+                    self.doubles_score_edits_p1[next_col].setFocus()
+            else:
+                # Это была последняя партия — сохраняем результат
+                self.save_doubles_result()
 
     def view_doubles_result(self):
         """Просмотр парного матча: загрузка в олимпийскую сетку и открытие PDF"""
@@ -3766,11 +3934,22 @@ class MainWindow(QMainWindow):
         self.doubles_total_score1.setMaximumWidth(50)
         score_layout.addWidget(self.doubles_total_score1, 1, 2)
 
+        # for i in range(5):
+        #     edit = QLineEdit()
+        #     edit.setMaximumWidth(35)
+        #     edit.setEnabled(False)
+        #     edit.textChanged.connect(self.update_doubles_total_score)
+        #     score_layout.addWidget(edit, 1, 3 + i)
+        #     self.doubles_score_edits_p1[i] = edit
+
+        # Для полей первой пары
         for i in range(5):
             edit = QLineEdit()
             edit.setMaximumWidth(35)
             edit.setEnabled(False)
             edit.textChanged.connect(self.update_doubles_total_score)
+            # Подключаем обработчик Enter
+            edit.returnPressed.connect(lambda col=i: self.move_to_next_doubles_field(1, col))
             score_layout.addWidget(edit, 1, 3 + i)
             self.doubles_score_edits_p1[i] = edit
 
@@ -3789,13 +3968,26 @@ class MainWindow(QMainWindow):
         self.doubles_total_score2.setMaximumWidth(50)
         score_layout.addWidget(self.doubles_total_score2, 2, 2)
 
+        # for i in range(5):
+        #     edit = QLineEdit()
+        #     edit.setMaximumWidth(35)
+        #     edit.setEnabled(False)
+        #     edit.textChanged.connect(self.update_doubles_total_score)
+        #     score_layout.addWidget(edit, 2, 3 + i)
+        #     self.doubles_score_edits_p2[i] = edit
+
+    # ===============
+        # Для полей второй пары
         for i in range(5):
             edit = QLineEdit()
             edit.setMaximumWidth(35)
             edit.setEnabled(False)
             edit.textChanged.connect(self.update_doubles_total_score)
+            # Подключаем обработчик Enter
+            edit.returnPressed.connect(lambda col=i: self.move_to_next_doubles_field(2, col))
             score_layout.addWidget(edit, 2, 3 + i)
             self.doubles_score_edits_p2[i] = edit
+    # =================
 
         # Кнопки
         save_btn = QPushButton("💾 Сохранить")

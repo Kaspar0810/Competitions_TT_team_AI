@@ -3990,11 +3990,11 @@ class MainWindow(QMainWindow):
     # =================
 
         # Кнопки
-        save_btn = QPushButton("💾 Сохранить")
-        save_btn.clicked.connect(self.save_doubles_result)
+        self.doubles_save_btn = QPushButton("💾 Сохранить")
+        self.doubles_save_btn.clicked.connect(self.save_doubles_result)
 
-        clear_btn = QPushButton("🗑️ Очистить")
-        clear_btn.clicked.connect(self.clear_doubles_result_form)
+        self.doubles_clear_btn = QPushButton("🗑️ Очистить")
+        self.doubles_clear_btn.clicked.connect(self.clear_doubles_result_form)
  
         # НОВОЕ: кнопка "Просмотр" (пока зарезервирована)
         self.doubles_view_btn = QPushButton("👁️ Просмотр")
@@ -4016,8 +4016,8 @@ class MainWindow(QMainWindow):
         self.doubles_view_btn.clicked.connect(self.view_doubles_result)
         # btn_layout.addWidget(self.doubles_view_btn)
 
-        score_layout.addWidget(save_btn, 1, 8, 1, 1)
-        score_layout.addWidget(clear_btn, 2, 8, 1, 1)
+        score_layout.addWidget(self.doubles_save_btn, 1, 8, 1, 1)
+        score_layout.addWidget(self.doubles_clear_btn, 2, 8, 1, 1)
         score_layout.addWidget(self.doubles_view_btn, 0, 8, 1, 1)
 
         main_layout.addWidget(score_group, 2)  # stretch 2 (70%)

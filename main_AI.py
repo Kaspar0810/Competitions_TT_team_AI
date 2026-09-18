@@ -2428,9 +2428,308 @@ class MainWindow(QMainWindow):
 
     def save_doubles_result(self):
         """Сохранение результата парного матча"""
-        # Здесь будет логика сохранения
-        pass
 
+        # ПРОВЕРКА 1: Существует ли выбранный матч
+        if not hasattr(self, 'current_doubles_result_id') or not self.current_doubles_result_id:
+            QMessageBox.warning(self, "Ошибка", "Нет выбранного матча. Дважды кликните на матч в таблице результатов.")
+            return
+
+        try:
+            match = Result.get_by_id(self.current_doubles_result_id)
+        except Exception:
+            QMessageBox.warning(self, "Ошибка", "Данные матча не найдены в базе данных")
+            return
+
+        # ПРОВЕРКА 2: Заполнены ли имена пар
+        if not self.doubles_p1_name.text() or not self.doubles_p2_name.text():
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите матч двойным кликом из таблицы результатов")
+            return
+
+        try:
+            # Статусы пар
+            status1 = self.doubles_p1_status.currentText()
+            status2 = self.doubles_p2_status.currentText()
+
+            system = System.get_or_none(System.id == match.system_id)
+            if not system:
+                QMessageBox.warning(self, "Ошибка", "Система проведения не найдена")
+                return
+
+            type_table = system.type_table
+            max_pl = system.max_player
+            parties_count = 5
+            required_wins = math.ceil(parties_count / 2)  # обычно 3 из 5
+
+            # Флаги и переменные результата
+            flag_status = 0  # 0 — обычная игра, 1 — техническая победа/неявка
+            winner_name = ""
+            loser_name = ""
+            points_win = 0
+            points_loser = 0
+            score_in_game = ""
+            score_win = ""
+            score_loser_game = ""
+            pl1_win = []
+            pl2_win = []
+
+            # --- Случай 1: обе пары не явились ---
+            if status1 != "Играет" and status2 != "Играет":
+                winner_name = None
+                loser_name = None
+                points_win = 0
+                points_loser = 0
+                score_in_game = "П : П"
+                score_win = "П : П"
+                score_loser_game = "П : П"
+                flag_status = 1
+
+                QMessageBox.warning(self, "Неявка",
+                                    f"Обе пары не явились на матч!\n"
+                                    f"Обоим засчитано техническое поражение.\n"
+                                    f"Счёт: П : П")
+
+            # --- Случай 2: неявка первой пары ---
+            elif status1 != "Играет" and status2 == "Играет":
+                winner_name = match.player2
+                loser_name = match.player1
+                points_win = 2
+                points_loser = 0
+                score_in_game = "В : П"
+                score_win = "В : П"
+                score_loser_game = "П : В"
+                flag_status = 1
+
+                QMessageBox.information(self, "Техническая победа",
+                                        f"Пара {loser_name} не явилась.\n"
+                                        f"Победитель: {winner_name}\n"
+                                        f"Счёт: {score_in_game}")
+
+            # --- Случай 3: неявка второй пары ---
+            elif status2 != "Играет" and status1 == "Играет":
+                winner_name = match.player1
+                loser_name = match.player2
+                points_win = 2
+                points_loser = 0
+                score_in_game = "В : П"
+                score_win = "В : П"
+                score_loser_game = "П : В"
+                flag_status = 1
+
+                QMessageBox.information(self, "Техническая победа",
+                                        f"Пара {loser_name} не явилась.\n"
+                                        f"Победитель: {winner_name}\n"
+                                        f"Счёт: {score_in_game}")
+
+            # --- Случай 4: есть "X" (техническая победа) ---
+            elif match.player1 == "X" or match.player2 == "X":
+                if match.player1 == "X":
+                    winner_name = match.player2
+                    loser_name = match.player1
+                else:
+                    winner_name = match.player1
+                    loser_name = match.player2
+
+                points_win = 2
+                points_loser = 0
+                score_in_game = "В : П"
+                score_win = "В : П"
+                score_loser_game = "П : В"
+                flag_status = 1
+
+                QMessageBox.information(self, "Техническая победа",
+                                        f"Пара {loser_name} не участвует.\n"
+                                        f"Победитель: {winner_name}")
+
+            # --- Случай 5: обычная игра ---
+            else:
+                has_error = False
+                error_messages = []
+
+                for i in range(parties_count):
+                    edit1 = self.doubles_score_edits_p1[i] if i < len(self.doubles_score_edits_p1) else None
+                    edit2 = self.doubles_score_edits_p2[i] if i < len(self.doubles_score_edits_p2) else None
+                    if not edit1 or not edit2:
+                        continue
+
+                    score1 = edit1.text().strip()
+                    score2 = edit2.text().strip()
+
+                    # Проверка на пустые поля
+                    if not score1 or not score2:
+                        has_error = True
+                        error_messages.append(f"Партия {i+1}: не заполнена")
+                        continue
+
+                    # Валидация счёта
+                    is_valid, error = self.validate_score(score1, score2)
+                    if not is_valid:
+                        has_error = True
+                        error_messages.append(f"Партия {i+1}: {error}")
+                        edit1.setStyleSheet("background-color: #FFB6C1;")
+                        edit2.setStyleSheet("background-color: #FFB6C1;")
+                        continue
+
+                    s1 = int(score1)
+                    s2 = int(score2)
+                    if s1 > s2:
+                        pl1_win.append(s2)
+                        pl2_win.append(-s2)
+                        player1_wins = len([x for x in pl1_win if x >= 0])
+                        # Считаем победы правильно:
+                    if s1 > s2:
+                        pass  # учтём ниже
+                    # Подсчёт побед:
+                    if s1 > s2:
+                        pass
+
+                    # Накапливаем победы
+                    # (пересчитаем после цикла через общий счёт)
+
+                if has_error:
+                    QMessageBox.warning(self, "Ошибка ввода", "\n".join(error_messages))
+                    return
+
+                # Пересчитываем победы
+                player1_wins = 0
+                player2_wins = 0
+                for i in range(parties_count):
+                    edit1 = self.doubles_score_edits_p1[i] if i < len(self.doubles_score_edits_p1) else None
+                    edit2 = self.doubles_score_edits_p2[i] if i < len(self.doubles_score_edits_p2) else None
+                    if not edit1 or not edit2:
+                        continue
+                    s1 = edit1.text().strip()
+                    s2 = edit2.text().strip()
+                    if not s1 or not s2:
+                        continue
+                    try:
+                        a = int(s1)
+                        b = int(s2)
+                        if a > b:
+                            player1_wins += 1
+                        elif b > a:
+                            player2_wins += 1
+                    except ValueError:
+                        continue
+
+                if player1_wins == 0 and player2_wins == 0:
+                    QMessageBox.warning(self, "Ошибка", "Ни одна партия не заполнена корректно")
+                    return
+
+                # Определяем победителя
+                if player1_wins > player2_wins:
+                    winner_name = match.player1
+                    loser_name = match.player2
+                    points_win = 2
+                    points_loser = 1
+                    score_in_game = f"{player1_wins} : {player2_wins}"
+                    score_loser_game = f"{player2_wins} : {player1_wins}"
+                    score_win = ','.join([str(x) for x in pl1_win]) if pl1_win else ""
+                else:
+                    winner_name = match.player2
+                    loser_name = match.player1
+                    points_win = 2
+                    points_loser = 1
+                    score_in_game = f"{player2_wins} : {player1_wins}"
+                    score_loser_game = f"{player1_wins} : {player2_wins}"
+                    score_win = ','.join([str(x) for x in pl2_win]) if pl2_win else ""
+
+            # --- Сохранение результата ---
+            match.winner = winner_name
+            match.points_win = points_win
+            match.score_in_game = score_in_game
+            match.score_win = score_win if flag_status == 1 else f"({score_win})"
+            match.loser = loser_name
+            match.points_loser = points_loser
+            match.score_loser = score_loser_game
+            match.save()
+
+            # --- Обновление сетки для олимпийской системы ---
+            if type_table != "Круговая" and winner_name and loser_name:
+                try:
+                    number_game = int(match.tours)
+                except (TypeError, ValueError):
+                    number_game = 0
+
+                if number_game > 0:
+                    snoska = self.number_of_game(number_game, type_table, max_pl)
+                    if snoska and snoska[0] != 0:
+                        with db.atomic():
+                            # Победитель
+                            res_id_win = Result.select().where(
+                                (Result.title_id == self.current_title_id) &
+                                (Result.system_id == system.id) &
+                                (Result.tours == str(snoska[0]))
+                            ).first()
+                            if res_id_win:
+                                if not res_id_win.player1 or res_id_win.player1 == "":
+                                    res_id_win.player1 = winner_name
+                                else:
+                                    res_id_win.player2 = winner_name
+                                res_id_win.save()
+
+                            # Проигравший (если есть куда сносить)
+                            if snoska[1] != 0:
+                                res_id_lose = Result.select().where(
+                                    (Result.title_id == self.current_title_id) &
+                                    (Result.system_id == system.id) &
+                                    (Result.tours == str(snoska[1]))
+                                ).first()
+                                if res_id_lose:
+                                    if not res_id_lose.player1 or res_id_lose.player1 == "":
+                                        res_id_lose.player1 = loser_name
+                                    else:
+                                        res_id_lose.player2 = loser_name
+                                    res_id_lose.save()
+
+            # --- Уведомление ---
+            QMessageBox.information(self, "Успех",
+                                    f"Результат сохранён!\n"
+                                    f"Победитель: {winner_name}\n"
+                                    f"Счёт: {score_in_game}")
+
+            # --- Обновление интерфейса ---
+            # Сбрасываем подсветку кнопки "Сохранить"
+            if hasattr(self, 'doubles_save_btn') and self.doubles_save_btn:
+                self.doubles_save_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: #4CAF50;
+                        color: white;
+                        border: none;
+                        border-radius: 4px;
+                        padding: 6px 12px;
+                        font-size: 10px;
+                        font-weight: bold;
+                    }
+                    QPushButton:hover { background-color: #45a049; }
+                """)
+
+            # Очищаем форму и обновляем таблицу результатов
+            self.clear_doubles_result_form()
+            self.load_doubles_results()
+
+            # Сбрасываем выбранный матч
+            self.current_doubles_result_id = None
+
+            # Автоматический переход к следующему матчу
+            try:
+                model = self.doubles_results_table_view.model()
+                if model and model.rowCount() > 0:
+                    # Ищем следующий несыгранный матч
+                    for row in range(model.rowCount()):
+                        rec = Result.get_by_id(model.get_id(row))
+                        if rec and not rec.winner:
+                            index = model.index(row, 0)
+                            self.doubles_results_table_view.selectRow(row)
+                            self.on_doubles_result_double_clicked(index)
+                            break
+            except Exception:
+                pass
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить результат: {str(e)}")    
+# =============================
     def clear_doubles_result_form(self):
         """Очистка формы ввода результата"""
         self.doubles_p1_name.clear()
@@ -2783,57 +3082,6 @@ class MainWindow(QMainWindow):
 
         # Обновляем таблицу пар
         self.load_doubles_for_title()
-
-    # def on_doubles_result_double_clicked(self, index):
-    #     """Загрузка парного матча при двойном клике по строке результатов"""
-    #     if not index.isValid():
-    #         return
-
-    #     row = index.row()
-    #     model = self.doubles_results_table_view.model()
-    #     if not model:
-    #         return
-
-    #     # Получаем ID записи Result
-    #     result_id = model.get_id(row)
-    #     if not result_id:
-    #         return
-
-    #     try:
-    #         result = Result.get_by_id(result_id)
-    #     except:
-    #         QMessageBox.warning(self, "Ошибка", "Не удалось загрузить матч")
-    #         return
-
-    #     # Заполняем форму
-    #     self.doubles_p1_name.setText(result.player1 or "")
-    #     self.doubles_p2_name.setText(result.player2 or "")
-
-    #     # Разблокируем поля партий
-    #     for edit in self.doubles_score_edits_p1:
-    #         if edit:
-    #             edit.setEnabled(True)
-    #     for edit in self.doubles_score_edits_p2:
-    #         if edit:
-    #             edit.setEnabled(True)
-
-    #     # Загружаем счёт, если матч сыгран
-    #     if result.score_in_game and ':' in result.score_in_game:
-    #         parts = result.score_in_game.replace(' ', '').split(':')
-    #         if len(parts) == 2:
-    #             self.doubles_total_score1.setText(parts[0])
-    #             self.doubles_total_score2.setText(parts[1])
-
-    #     # Статусы по умолчанию
-    #     self.doubles_p1_status.setCurrentText("Играет")
-    #     self.doubles_p2_status.setCurrentText("Играет")
-
-    #     # Сохраняем ID текущего матча
-    #     self.current_doubles_result_id = result_id
-
-    #     # Устанавливаем фокус на первое поле ввода
-    #     if self.doubles_score_edits_p1 and self.doubles_score_edits_p1[0]:
-    #         self.doubles_score_edits_p1[0].setFocus()
 
     def on_doubles_result_double_clicked(self, index):
         """Загрузка матча пары при двойном клике"""

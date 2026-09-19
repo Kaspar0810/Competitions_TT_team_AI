@@ -2545,6 +2545,10 @@ class MainWindow(QMainWindow):
                 has_error = False
                 error_messages = []
 
+                # Пересчитываем победы
+                player1_wins = 0
+                player2_wins = 0
+
                 for i in range(parties_count):
                     edit1 = self.doubles_score_edits_p1[i] if i < len(self.doubles_score_edits_p1) else None
                     edit2 = self.doubles_score_edits_p2[i] if i < len(self.doubles_score_edits_p2) else None
@@ -2569,21 +2573,23 @@ class MainWindow(QMainWindow):
                         edit2.setStyleSheet("background-color: #FFB6C1;")
                         continue
 
+                    # # Пересчитываем победы
+                    # player1_wins = 0
+                    # player2_wins = 0
+
                     s1 = int(score1)
                     s2 = int(score2)
                     if s1 > s2:
                         pl1_win.append(s2)
                         pl2_win.append(-s2)
                         player1_wins = len([x for x in pl1_win if x >= 0])
-                        # Считаем победы правильно:
-                    if s1 > s2:
-                        pass  # учтём ниже
-                    # Подсчёт побед:
-                    if s1 > s2:
-                        pass
+                    else:
+                        pl1_win.append(-s2)
+                        pl2_win.append(s2)
+                        player2_wins = len([x for x in pl2_win if x >= 0])
 
-                    # Накапливаем победы
-                    # (пересчитаем после цикла через общий счёт)
+                    if player1_wins == 3 or player2_wins == 3:
+                        break
 
                 if has_error:
                     QMessageBox.warning(self, "Ошибка ввода", "\n".join(error_messages))
@@ -18279,7 +18285,7 @@ class MainWindow(QMainWindow):
                         match = [0, short_name_win, '', '', short_name_los]
                         dict_setka[num_game] = match
                 elif res.winner != "X":
-                    if stage == "Парный разряд":
+                    if stage in pairs_list:
                         id_pl_win = player.select().where(Players_double.para_full == res.winner).get()
                         short_name_win = id_pl_win.para_shot
                     else:
@@ -18294,7 +18300,7 @@ class MainWindow(QMainWindow):
                     if res.loser == "X":
                         short_name_los = "X"
                     else: 
-                        if stage == "Парный разряд":
+                        if stage in pairs_list:
                             id_pl_los = player.select().where(Players_double.para_full == res.loser).get()
                             short_name_los = id_pl_los.para_shot
                         else:
@@ -18441,7 +18447,7 @@ class MainWindow(QMainWindow):
                         49: -49, 50: -50, 51: -51, 52: -52, 53: -53, 54: -54, 55: -55, 56: -56, 57: -57, 58: -58, 59: -59, 60: -60, 61: -61, 62: -62, 65: -65, 66: -66,
                         69: -69, 70: -70, 71: -71, 72: -72, 73: -73, 74: -74, 75: -75, 77: -77, 78: -78, 79: -79}
                 dict_mesta = [31, 32, 35, 36, 43, 44, 47, 48, 63, 64, 67, 68, 75, 76, 79, 80]
-        elif  vid_setki == 'Олимпийская (1-3 место)':
+        elif  vid_setki == 'Олимпийская (за 1-3 место)':
             if max_pl == 8:
                 dict_winner = {1:5, 2:5, 3:6, 4:6, 5:7, 6:7}
                 dict_loser = {5:8, 6:8}

@@ -18131,12 +18131,15 @@ class MainWindow(QMainWindow):
                     match = dict_setka[i]
                     pl_win = match[1]
                     pl_los = match[4]
+                                        
                     if pl_win != "X":
                         id_win = id_sh_name[pl_win]
-                    if pl_los != "X":
-                        id_los = id_sh_name[pl_los]
-                    else:
+                    if pl_los == "":
                         id_los = ""
+                    elif pl_los != "X":
+                        id_los = id_sh_name[pl_los]
+                    # else:
+                    #     id_los = ""
                     # вариант с двумя крестами ===
                     if pl_win == "X" and pl_los == "X":
                         id_win = ""
@@ -18204,14 +18207,20 @@ class MainWindow(QMainWindow):
                             else: 
                                 col_win = k + 1
                             break   
-
-                    row_los = row_num_los[r]  # строка проигравшего
-                    score = match[2]  # счет во встречи
-                    row_list_los = data[row_los]  # получаем список строки, где ищет номер куда сносится проигравший
-                    col_los = row_list_los.index(r) # номер столбца проигравшего            
-                    data[row_win][col_win] = win
-                    data[row_win + 1][col_win] = score
-                    data[row_los][col_los + 1] = los
+                    
+                    # === если сетка за 1-3 место
+                    if r == "":
+                        score = match[2]  # счет во встречи        
+                        data[row_win][col_win] = win
+                        data[row_win + 1][col_win] = score
+                    else:
+                        row_los = row_num_los[r]  # строка проигравшего
+                        score = match[2]  # счет во встречи
+                        row_list_los = data[row_los]  # получаем список строки, где ищет номер куда сносится проигравший
+                        col_los = row_list_los.index(r) # номер столбца проигравшего            
+                        data[row_win][col_win] = win
+                        data[row_win + 1][col_win] = score
+                        data[row_los][col_los + 1] = los
                 return tds
 # ===============
     # def write_in_setka(self, data, stage, first_mesto, table, posev_data):

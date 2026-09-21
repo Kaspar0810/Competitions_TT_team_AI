@@ -8641,7 +8641,7 @@ class MainWindow(QMainWindow):
             application_status = "предварительная"
         
         try:
-            sex = "woman" if self.sex_combo.currentText() == "Женский" else "man"
+            sex = "woman" if self.current_sex == "woman" else "man"
             razryad = self.razryad_combo.currentText()
             
             # Преобразуем отчество в ID через таблицу Patronymic

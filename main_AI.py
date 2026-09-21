@@ -9305,6 +9305,11 @@ class MainWindow(QMainWindow):
         duplicate_surnames_action.triggered.connect(self.export_duplicate_surnames_to_pdf)
         print_menu.addAction(duplicate_surnames_action)
 
+        # ---- Список пар ----
+        list_pairs_action = QAction("🤝 Список пар", self)
+        list_pairs_action.triggered.connect(self.export_doubles_list_to_pdf)
+        print_menu.addAction(list_pairs_action)
+
         print_menu.addSeparator()    
 
         # ---- Чистые таблицы ----
@@ -17344,6 +17349,115 @@ class MainWindow(QMainWindow):
             traceback.print_exc()
             QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")
 
+    def export_doubles_list_to_pdf(self):
+        """Экспорт списка пар в PDF (сортировка по убыванию общего рейтинга)"""
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+
+        try:
+            from reportlab.platypus import Table
+
+            # Определяем вид пары из комбобокса
+            vid_map = {"мужские": "man", "женские": "woman", "смешанные": "mix"}
+            sex_mark_map = {"man": "M", "woman": "W", "mix": "Mix"}
+            vid_text = self.double_vid_combo.currentText() if hasattr(self, 'double_vid_combo') else "мужские"
+            vid = vid_map.get(vid_text, "man")
+            sex_mark = sex_mark_map.get(vid, "M")
+
+            # Папка для PDF
+            pdf_dir = "table_pdf"
+            if not os.path.exists(pdf_dir):
+                os.makedirs(pdf_dir)
+
+            # Формируем имя файла
+            title = Title.get_by_id(self.current_title_id)
+            short_name = title.short_name_comp if title.short_name_comp else title.name
+            clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
+            clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
+
+            filename = os.path.join(pdf_dir, f"{clean_name}_{sex_mark}_pairs_list.pdf")
+
+            # Получаем пары из Players_double
+            query = Players_double.select().where(
+                (Players_double.title_id == self.current_title_id) &
+                (Players_double.double_vid == vid)
+            ).order_by(Players_double.r_sum.desc())
+
+            if query.count() == 0:
+                QMessageBox.warning(self, "Ошибка", "Нет пар для экспорта")
+                return
+
+            # Создаём документ
+            doc = SimpleDocTemplate(filename, pagesize=A4,
+                                    topMargin=2*cm, bottomMargin=3.0*cm,
+                                    leftMargin=1.0*cm, rightMargin=1.0*cm)
+
+            styles = getSampleStyleSheet()
+            title_style = PS("TitleStyle", fontSize=14, fontName="DejaVuSerif-Bold",
+                            alignment=1, spaceAfter=20, textColor=colors.darkblue)
+
+            elements = []
+
+            # Заголовок
+            sex_label = {"man": "Мужские пары", "woman": "Женские пары", "mix": "Смешанные пары"}[vid]
+            elements.append(Paragraph(f"Список пар — {sex_label}", title_style))
+            elements.append(Paragraph(f"Соревнование: {title.name}", title_style))
+            elements.append(Spacer(1, 0.5*cm))
+
+            # Формируем таблицу
+            headers = ["№", "Пара", "Регион", "Рейтинг"]
+            table_data = [headers]
+
+            for idx, double in enumerate(query, 1):
+                pair_name = double.para_shot or f"{double.player_1} / {double.player_2}"
+                region = double.region_main or ""
+                rank = double.r_sum or 0
+                table_data.append([str(idx), pair_name, region, str(rank)])
+
+            # Ширина колонок
+            col_widths = [1.2*cm, 8.5*cm, 7.0*cm, 2.0*cm]
+
+            table = Table(table_data)
+            table._argW = col_widths
+            table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSerif'),
+                ('FONTSIZE', (0, 0), (-1, -1), 8),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                ('TOPPADDING', (0, 0), (-1, -1), 4),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                # Выравнивание текста в колонке "Пара" по левому краю
+                ('ALIGN', (1, 1), (1, -1), 'LEFT'),
+            ]))
+
+            elements.append(table)
+
+            # Строим документ с использованием func_zagolovok
+            doc.build(elements, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
+
+            QMessageBox.information(self, "Успех", f"Список пар сохранён в PDF:\n{filename}")
+
+            # Предлагаем открыть файл
+            reply = QMessageBox.question(
+                self,
+                "Открыть файл",
+                "Открыть созданный PDF файл?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if reply == QMessageBox.Yes:
+                if sys.platform == 'win32':
+                    os.startfile(filename)
+                else:
+                    os.system(f'open "{filename}"')
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")
 
 # === круговые таблицы ====
     def table_made(self, pv, stage):

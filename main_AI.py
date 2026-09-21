@@ -17406,23 +17406,47 @@ class MainWindow(QMainWindow):
             elements.append(Spacer(1, 0.5*cm))
 
             # Формируем таблицу
-            headers = ["№", "Пара", "Регион", "Рейтинг"]
+            # headers = ["№", "Пара", "Регион", "Рейтинг"]
+            headers = ["№", "Игрок_1", "Регион", "R", "Игрок_2", "Регион", "R", "Регион пары", "R сумма"]
+            # table_data.insert(0, headers)
             table_data = [headers]
 
+            # for idx, double in enumerate(query, 1):
+            #     pair_name = double.para_shot or f"{double.player_1} / {double.player_2}"
+            #     region = double.region_main or ""
+            #     rank = double.r_sum or 0
+            #     table_data.append([str(idx), pair_name, region, str(rank)])
+
             for idx, double in enumerate(query, 1):
-                pair_name = double.para_shot or f"{double.player_1} / {double.player_2}"
-                region = double.region_main or ""
-                rank = double.r_sum or 0
-                table_data.append([str(idx), pair_name, region, str(rank)])
+                txt = double.para_shot
+                mark = txt.find("-")
+                pl_1 = txt[:mark]
+                reg_1 = double.region_1
+                r_1 = double.r_1
+                pl_2 = txt[mark + 1:]
+                reg_2 = double.region_2
+                r_2 = double.r_2
+                reg_main = double.region_main
+                r_sum = double.r_sum
+                table_data.append([str(idx), pl_1, reg_1, str(r_1), pl_2, reg_2, str(r_2), reg_main, r_sum])
+                # pair_name = double.para_shot or f"{double.player_1} / {double.player_2}"
+                # region = double.region_main or ""
+                # rank = double.r_sum or 0
+                # table_data.append([str(idx), pair_name, region, str(rank)])
 
+            # # Ширина колонок
+            # col_widths = [1.2*cm, 8.5*cm, 7.0*cm, 2.0*cm]
             # Ширина колонок
-            col_widths = [1.2*cm, 8.5*cm, 7.0*cm, 2.0*cm]
+            col_widths = [1.0*cm, 2.5*cm, 2.5*cm, 0.8*cm, 2.5*cm, 2.5*cm, 0.8*cm, 4.5*cm, 1.5*cm]
+            rH = 0.45*cm
 
-            table = Table(table_data)
-            table._argW = col_widths
+            # Создаем таблицу
+            table = Table(table_data, colWidths=col_widths, rowHeights=[rH] * (query.count() + 1), repeatRows=1)
+            # table._argW = col_widths
+            # table._argH = row_heights
             table.setStyle(TableStyle([
                 ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSerif'),
-                ('FONTSIZE', (0, 0), (-1, -1), 8),
+                ('FONTSIZE', (0, 0), (-1, -1), 6),
                 ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),

@@ -7308,7 +7308,13 @@ class MainWindow(QMainWindow):
 
             # Показываем список соревнований на вкладке Дополнительно   
             self.right_panel.setVisible(True)
-            
+            # ===== new ===
+            if getattr(self, 'is_editing_mode', False):
+                self.is_editing_mode = False
+                self.editing_player_id = None
+                self._update_edit_button_text(False)
+                self._set_form_editable(True)
+            # =========
         elif index == 5:  # Результаты
             # Используем отдельную таблицу для результатов
             # Проверяем, есть ли table_view в стеке
@@ -7785,85 +7791,148 @@ class MainWindow(QMainWindow):
         if match:
             return int(match.group(1))
         return 0
- 
+# ============ old ==== 
+    # def edit_player(self):
+    #     """Редактирование выбранного участника или сохранение изменений"""
+    #     # Если режим редактирования уже активен, сохраняем изменения
+    #     if self.is_editing_mode:
+    #         self.save_edited_player()
+    #         return
+        
+    #     selection = self.table_view.selectedIndexes()
+    #     if not selection:
+    #         QMessageBox.warning(self, "Ошибка", "Выберите участника для редактирования")
+    #         return
+        
+    #     row = selection[0].row()
+    #     player_id = self.players_model.get_id(row)
+    #     if not player_id:
+    #         return
+        
+    #     try:
+    #         player = Player.get_by_id(player_id)
+            
+    #         self.fio_edit.setText(player.fio or player.player or "")
+            
+    #         patronymic_text = ""
+    #         if player.patronymic_id:
+    #             patronymic = Patronymic.get_or_none(Patronymic.id == player.patronymic_id)
+    #             if patronymic:
+    #                 patronymic_text = patronymic.patronymic
+    #         self.patronymic_edit.setText(patronymic_text)
+            
+    #         self.rank_edit.setText(str(player.rank) if player.rank else "0")
+    #         self.city_edit.setText(player.city or "")
+            
+    #         # Устанавливаем регион в comboBox
+    #         if player.region:
+    #             index = self.region_combo.findText(player.region)
+    #             if index >= 0:
+    #                 self.region_combo.setCurrentIndex(index)
+            
+    #         # Устанавливаем разряд
+    #         index = self.razryad_combo.findText(player.razryad or "б/р")
+    #         if index >= 0:
+    #             self.razryad_combo.setCurrentIndex(index)
+            
+    #         coach_text = ""
+    #         if player.coach_id:
+    #             coach = Coach.get_or_none(Coach.id == player.coach_id)
+    #             if coach:
+    #                 coach_text = coach.coach
+    #         self.coach_edit.setText(coach_text)
+            
+    #         # Устанавливаем дату рождения
+    #         if player.bday:
+    #             if isinstance(player.bday, date):
+    #                 self.birth_date_edit.setText(player.bday.strftime("%d.%m.%Y"))
+            
+    #         sex_index = 0 if player.sex == "man" else 1
+    #         self.sex_combo.setCurrentIndex(sex_index)
+            
+    #         self.editing_player_id = player_id
+            
+    #         # --- Переключаем режим редактирования ---
+    #         self.is_editing_mode = True
+    #         self._update_edit_button_text(True)
+            
+    #         # Делаем поля доступными для редактирования
+    #         self._set_form_editable(True)
+            
+    #         # Устанавливаем фокус на поле ФИО
+    #         self.fio_edit.setFocus()
+    #         self.fio_edit.selectAll()
+            
+    #         QMessageBox.information(self, "Редактирование", 
+    #             f"Редактирование: {player.fio}\n"
+    #             f"Внесите изменения и нажмите кнопку 'Сохранить' на левой панели")
+            
+    #     except Exception as e:
+    #         QMessageBox.critical(self, "Ошибка", f"Ошибка: {str(e)}")
+
     def edit_player(self):
         """Редактирование выбранного участника или сохранение изменений"""
-        # Если режим редактирования уже активен, сохраняем изменения
-        if self.is_editing_mode:
+        # Если уже в режиме редактирования — сохраняем
+        if getattr(self, 'is_editing_mode', False):
             self.save_edited_player()
             return
-        
+
         selection = self.table_view.selectedIndexes()
         if not selection:
             QMessageBox.warning(self, "Ошибка", "Выберите участника для редактирования")
             return
-        
+
         row = selection[0].row()
         player_id = self.players_model.get_id(row)
         if not player_id:
             return
-        
+
         try:
             player = Player.get_by_id(player_id)
-            
+
+            # Заполняем форму
             self.fio_edit.setText(player.fio or player.player or "")
-            
             patronymic_text = ""
             if player.patronymic_id:
-                patronymic = Patronymic.get_or_none(Patronymic.id == player.patronymic_id)
-                if patronymic:
-                    patronymic_text = patronymic.patronymic
+                pat = Patronymic.get_or_none(Patronymic.id == player.patronymic_id)
+                if pat:
+                    patronymic_text = pat.patronymic
             self.patronymic_edit.setText(patronymic_text)
-            
             self.rank_edit.setText(str(player.rank) if player.rank else "0")
             self.city_edit.setText(player.city or "")
-            
-            # Устанавливаем регион в comboBox
             if player.region:
-                index = self.region_combo.findText(player.region)
-                if index >= 0:
-                    self.region_combo.setCurrentIndex(index)
-            
-            # Устанавливаем разряд
-            index = self.razryad_combo.findText(player.razryad or "б/р")
-            if index >= 0:
-                self.razryad_combo.setCurrentIndex(index)
-            
+                idx = self.region_combo.findText(player.region)
+                if idx >= 0:
+                    self.region_combo.setCurrentIndex(idx)
+            idx = self.razryad_combo.findText(player.razryad or "б/р")
+            if idx >= 0:
+                self.razryad_combo.setCurrentIndex(idx)
             coach_text = ""
             if player.coach_id:
                 coach = Coach.get_or_none(Coach.id == player.coach_id)
                 if coach:
                     coach_text = coach.coach
             self.coach_edit.setText(coach_text)
-            
-            # Устанавливаем дату рождения
-            if player.bday:
-                if isinstance(player.bday, date):
-                    self.birth_date_edit.setText(player.bday.strftime("%d.%m.%Y"))
-            
-            sex_index = 0 if player.sex == "man" else 1
-            self.sex_combo.setCurrentIndex(sex_index)
-            
+            if player.bday and isinstance(player.bday, date):
+                self.birth_date_edit.setText(player.bday.strftime("%d.%m.%Y"))
+            self.sex_combo.setCurrentIndex(0 if player.sex == "man" else 1)
+
+            # Входим в режим редактирования
             self.editing_player_id = player_id
-            
-            # --- Переключаем режим редактирования ---
             self.is_editing_mode = True
             self._update_edit_button_text(True)
-            
-            # Делаем поля доступными для редактирования
             self._set_form_editable(True)
-            
-            # Устанавливаем фокус на поле ФИО
+
             self.fio_edit.setFocus()
             self.fio_edit.selectAll()
-            
-            QMessageBox.information(self, "Редактирование", 
-                f"Редактирование: {player.fio}\n"
-                f"Внесите изменения и нажмите кнопку 'Сохранить' на левой панели")
-            
+
+            QMessageBox.information(self, "Редактирование",
+                                    f"Редактирование: {player.fio}\n"
+                                    f"Внесите изменения и нажмите 'Сохранить изменения'")
+
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка: {str(e)}")
-
+# ===================
     def save_edited_player(self):
         """Сохранение отредактированного участника"""
         if not hasattr(self, 'editing_player_id') or not self.editing_player_id:
@@ -8021,6 +8090,22 @@ class MainWindow(QMainWindow):
 
             # Перезагружаем таблицу
             self.load_participants_for_title()
+
+            # ===== 2209==
+            # --- СБРОС РЕЖИМА РЕДАКТИРОВАНИЯ ---
+            self.is_editing_mode = False
+            self._update_edit_button_text(False)
+            self._set_form_editable(True)  # форма снова доступна для ввода
+            self.editing_player_id = None
+
+            # Очищаем форму и сбрасываем заголовок
+            self.clear_participant_form()
+
+            # Перезагружаем таблицу
+            self.load_participants_for_title()
+
+            QMessageBox.information(self, "Успех", "Данные участника обновлены")
+            # ==================
             
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить изменения: {str(e)}")
@@ -11314,6 +11399,11 @@ class MainWindow(QMainWindow):
                                     "Очистить все поля формы?",
                                     QMessageBox.Yes | QMessageBox.No)
         if reply == QMessageBox.Yes:
+        # Сбрасываем режим редактирования
+            self.is_editing_mode = False
+            self.editing_player_id = None
+            self._update_edit_button_text(False)
+
             self.fio_edit.clear()
             self.patronymic_edit.clear()
             # self.birth_date.setDate(QDate.currentDate().addYears(-18))

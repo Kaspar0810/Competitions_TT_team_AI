@@ -22417,66 +22417,147 @@ class MainWindow(QMainWindow):
 
     def ReturnCode():
         pass
+# ====== new save wiyh comment ===
+# import os
+# import re
+# import subprocess
+# from datetime import datetime
+
+# from PyQt5.QtWidgets import (
+#     QMessageBox, QDialog, QVBoxLayout, QHBoxLayout,
+#     QLabel, QLineEdit, QPushButton
+# )
+
+
+
 
     def save_current_competition(self):
-        """Сохранение текущего соревнования"""
-
-# ====================== это вариант из первой программы 
-        """нажата кнопка -выход- и резервное копирование db"""
+        """Сохранение текущего соревнования с возможностью комментария"""
         if not self.current_title_id:
-                    return
+            return None
+
         try:
             title = Title.get_by_id(self.current_title_id)
-            remark_flag = 0
-            flag = 0
-            if flag == 0:
-                result = QMessageBox.question(self, "Backup DB", "Вы действительно хотите сохранить текущие соревнования?",
-                                            QMessageBox.Ok, QMessageBox.No)
-            else:
-                result = QMessageBox.Ok
-                remark_flag = 1
 
-            if result == QMessageBox.Ok:
-            # Создаем папку backup_db, если её нет
-                backup_dir = "backup_db"
-                if not os.path.exists(backup_dir):
-                    os.makedirs(backup_dir)
-                
-                # Формируем имя файла
-                short_name = title.short_name_comp if title.short_name_comp else title.name
-                import re
-                clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
-                clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
-                
-                from datetime import datetime
-                timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+            # 1. Спрашиваем — сохранять ли
+            result = QMessageBox.question(
+                self, "Backup DB",
+                "Вы действительно хотите сохранить текущие соревнования?",
+                QMessageBox.Ok | QMessageBox.No
+            )
+            if result != QMessageBox.Ok:
+                return None
 
-                user = "root"
-                password = "db_pass"
-                database = "mysql_db"
-                current_date = str(datetime.now().strftime('%d_%m_%Y'))
+            # 2. Создаём папку резервных копий
+            backup_dir = "backup_db"
+            if not os.path.exists(backup_dir):
+                os.makedirs(backup_dir)
 
-                if remark_flag == 1:
-                    comment, ok = QInputDialog.getText(self, "Коментарий", "Введите коментарий для копии DB.")
-                    comment = comment.replace(" ", "_")
-                    backup_file = os.path.join(backup_dir, f"{clean_name}_{timestamp}_{comment}.sql")
-                else:
-                    backup_file = os.path.join(backup_dir, f"{clean_name}_{timestamp}.sql")   
-                try: 
-                    p = subprocess.Popen('mysqldump -u' + user + ' -p' + password + ' --databases ' + database + ' > ' + backup_file, shell=True)
-                    p.communicate()
-                    # Check for errors
-                    if p.returncode != 0:
-                        raise self.ReturnCode
-                    QMessageBox.information(self, "Успех", f"Соревнование сохранено в:\n{backup_file}")           
-                    return backup_file
-                except:
-                    print('Backup failed for ', db)
-            else:
-                return
-            
+            # 3. Формируем «безопасное» базовое имя
+            short_name = title.short_name_comp if title.short_name_comp else title.name
+            clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))[:50]
+
+            # 4. Диалог с комментарием и предпросмотром
+            dlg = CommentDialog(self, clean_name, ext=".sql", backup_dir=backup_dir)
+            if dlg.exec_() != QDialog.Accepted:
+                return None                       # пользователь нажал «Отмена»
+
+            backup_file = dlg.get_filepath()
+
+            # 5. Параметры подключения к БД
+            user = "root"
+            password = "db_pass"
+            database = "mysql_db"
+
+            # 6. Сам дамп
+            try:
+                with open(backup_file, "w", encoding="utf-8") as f:
+                    p = subprocess.Popen(
+                        ["mysqldump", f"-u{user}", f"-p{password}", "--databases", database],
+                        stdout=f,
+                        stderr=subprocess.PIPE
+                    )
+                    _, err = p.communicate()
+
+                if p.returncode != 0:
+                    raise RuntimeError(err.decode(errors="ignore"))
+
+                QMessageBox.information(
+                    self, "Успех",
+                    f"Соревнование сохранено в:\n{backup_file}"
+                )
+                return backup_file
+
+            except Exception as e:
+                QMessageBox.critical(
+                    self, "Ошибка",
+                    f"Не удалось сохранить базу:\n{e}"
+                )
+                print(f"Backup failed: {e}")
+                return None
+
         except Exception as e:
             print(f"Ошибка сохранения соревнования: {e}")
+            return None
+
+# ===============================
+    # def save_current_competition(self):
+    #     """Сохранение текущего соревнования"""
+    #     """нажата кнопка -выход- и резервное копирование db"""
+    #     if not self.current_title_id:
+    #                 return
+    #     try:
+    #         title = Title.get_by_id(self.current_title_id)
+    #         remark_flag = 0
+    #         flag = 0
+    #         if flag == 0:
+    #             result = QMessageBox.question(self, "Backup DB", "Вы действительно хотите сохранить текущие соревнования?",
+    #                                         QMessageBox.Ok, QMessageBox.No)
+    #         else:
+    #             result = QMessageBox.Ok
+    #             remark_flag = 1
+
+    #         if result == QMessageBox.Ok:
+    #         # Создаем папку backup_db, если её нет
+    #             backup_dir = "backup_db"
+    #             if not os.path.exists(backup_dir):
+    #                 os.makedirs(backup_dir)
+                
+    #             # Формируем имя файла
+    #             short_name = title.short_name_comp if title.short_name_comp else title.name
+    #             import re
+    #             clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
+    #             clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
+                
+    #             from datetime import datetime
+    #             timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+
+    #             user = "root"
+    #             password = "db_pass"
+    #             database = "mysql_db"
+    #             current_date = str(datetime.now().strftime('%d_%m_%Y'))
+
+    #             if remark_flag == 1:
+    #                 comment, ok = QInputDialog.getText(self, "Коментарий", "Введите коментарий для копии DB.")
+    #                 comment = comment.replace(" ", "_")
+    #                 backup_file = os.path.join(backup_dir, f"{clean_name}_{timestamp}_{comment}.sql")
+    #             else:
+    #                 backup_file = os.path.join(backup_dir, f"{clean_name}_{timestamp}.sql")   
+    #             try: 
+    #                 p = subprocess.Popen('mysqldump -u' + user + ' -p' + password + ' --databases ' + database + ' > ' + backup_file, shell=True)
+    #                 p.communicate()
+    #                 # Check for errors
+    #                 if p.returncode != 0:
+    #                     raise self.ReturnCode
+    #                 QMessageBox.information(self, "Успех", f"Соревнование сохранено в:\n{backup_file}")           
+    #                 return backup_file
+    #             except:
+    #                 print('Backup failed for ', db)
+    #         else:
+    #             return
+            
+    #     except Exception as e:
+    #         print(f"Ошибка сохранения соревнования: {e}")
 # ===============================        
     def search_in_choice_table(self):
         """Поиск информации в таблице Choice с выводом полной информации"""
@@ -30166,6 +30247,68 @@ class RatingFileDialog(QDialog):
         )
         return list(similar)
 
+
+class CommentDialog(QDialog):
+    """Диалог ввода комментария с предпросмотром имени файла"""
+
+    def __init__(self, parent, base_name, ext=".sql", backup_dir="backup_db"):
+        super().__init__(parent)
+        self.setWindowTitle("Комментарий к резервной копии")
+        self.base_name = base_name
+        self.ext = ext
+        self.backup_dir = backup_dir
+        self.timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+
+        layout = QVBoxLayout(self)
+
+        layout.addWidget(QLabel("Комментарий к имени файла:"))
+        self.comment_edit = QLineEdit()
+        self.comment_edit.setPlaceholderText("например: перед_финалом")
+        self.comment_edit.textChanged.connect(self.update_preview)
+        layout.addWidget(self.comment_edit)
+
+        layout.addWidget(QLabel("Итоговое имя файла:"))
+        self.preview_label = QLabel()
+        self.preview_label.setStyleSheet("color: #0055aa;")
+        self.preview_label.setWordWrap(True)
+        layout.addWidget(self.preview_label)
+
+        btn_layout = QHBoxLayout()
+        self.save_btn   = QPushButton("Сохранить")
+        self.skip_btn   = QPushButton("Без комментария")
+        self.cancel_btn = QPushButton("Отмена")
+        self.save_btn.clicked.connect(self.accept)
+        self.skip_btn.clicked.connect(self.on_skip)
+        self.cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(self.save_btn)
+        btn_layout.addWidget(self.skip_btn)
+        btn_layout.addWidget(self.cancel_btn)
+        layout.addLayout(btn_layout)
+
+        self.comment_edit.setFocus()
+        self.update_preview()
+
+    @staticmethod
+    def _sanitize(text: str) -> str:
+        """Убираем недопустимые символы и пробелы"""
+        text = re.sub(r'[\\/*?:"<>|]', "", text or "")
+        return text.strip().replace(" ", "_")
+
+    def _build_filename(self) -> str:
+        comment = self._sanitize(self.comment_edit.text())
+        if comment:
+            return f"{self.base_name}_{self.timestamp}_{comment}{self.ext}"
+        return f"{self.base_name}_{self.timestamp}{self.ext}"
+
+    def update_preview(self):
+        self.preview_label.setText(self._build_filename())
+
+    def on_skip(self):
+        self.comment_edit.clear()
+        self.accept()
+
+    def get_filepath(self) -> str:
+        return os.path.join(self.backup_dir, self._build_filename())
 
 def main():  
     # Сначала проверяем БД

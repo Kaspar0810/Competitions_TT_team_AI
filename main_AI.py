@@ -124,7 +124,7 @@ class MainWindow(QMainWindow):
                 "buttons": [
                     ["➕ Добавить", "✏️ Редактировать"],
                     ["🗑️ Удалить", "🔍 Поиск"],
-                    ["📤 Экспорт", "🗑️ Очистить"]
+                    ["📤 Экспорт в XLSX", "🗑️ Очистить"]
                 ],
                 "filters": ["Сортировка", "Фильтры", "Заявки"]},
             2: {"title": "Команды", "description": "Управление командами",
@@ -8214,51 +8214,171 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Отмена", "Редактирование отменено")
 
     def export_players(self):
-        """Экспорт списка участников в файл"""
+        """Экспорт списка участников в файл Excel (.xlsx)"""
         if not self.current_title_id:
             QMessageBox.warning(self, "Ошибка", "Нет выбранного соревнования")
             return
-        
-        from PyQt5.QtWidgets import QFileDialog
-        
-        # Диалог выбора файла
-        file_path, _ = QFileDialog.getSaveFileName(
-            self, 
-            "Сохранить список участников", 
-            f"participants_{self.current_title_id}.csv",
-            "CSV files (*.csv);;All files (*.*)"
-        )
-        
-        if not file_path:
-            return
-        
-        try:
-            import csv
-            
-            # Получаем данные из таблицы
-            data = []
-            for row in range(self.players_model.rowCount()):
-                row_data = []
-                for col in range(1, self.players_model.columnCount()):  # Пропускаем ID
-                    index = self.players_model.index(row, col)
-                    value = self.players_model.data(index)
-                    row_data.append(value)
-                data.append(row_data)
-            
-            # Заголовки
-            headers = ['ФИО', 'Отчество', 'Дата рождения', 'Рейтинг', 'Город', 'Регион', 'Разряд', 'Тренер']
-            
-            # Сохраняем в CSV
-            with open(file_path, 'w', newline='', encoding='utf-8-sig') as csvfile:
-                writer = csv.writer(csvfile)
-                writer.writerow(headers)
-                writer.writerows(data)
-            
-            QMessageBox.information(self, "Успех", f"Список участников сохранён в файл:\n{file_path}")
-            
-        except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Не удалось экспортировать данные: {str(e)}")
 
+        try:
+            # Диалог выбора файла
+            title = Title.get_by_id(self.current_title_id)
+            short_name = title.short_name_comp if title.short_name_comp else title.name
+            import re
+            clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
+            clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
+
+            default_filename = f"{clean_name}_participants.xlsx"
+
+            file_path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Сохранить список участников",
+                default_filename,
+                "Excel files (*.xlsx);;All files (*.*)"
+            )
+
+            if not file_path:
+                return
+
+            # Убеждаемся, что расширение .xlsx
+            if not file_path.lower().endswith('.xlsx'):
+                file_path += '.xlsx'
+
+            # Создаём новую книгу Excel
+            wb = op.Workbook()
+            ws = wb.active
+            ws.title = "Участники"
+
+            # Заголовки (как в таблице)
+            headers = [
+                "№", "ФИО", "Отчество", "Дата рождения",
+                "Рейтинг", "Город", "Регион", "Разряд", "Тренер", "Пол"
+            ]
+            ws.append(headers)
+
+            # Стиль для заголовков
+            from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+            header_font = Font(bold=True, color="FFFFFF", size=11)
+            header_fill = PatternFill(start_color="2196F3", end_color="2196F3", fill_type="solid")
+            header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            thin_border = Border(
+                left=Side(style='thin'),
+                right=Side(style='thin'),
+                top=Side(style='thin'),
+                bottom=Side(style='thin')
+            )
+
+            for col_idx, header in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=col_idx)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = header_alignment
+                cell.border = thin_border
+
+            # Заполняем данными
+            row_num = 2
+            for player in Player.select().where(Player.title_id == self.current_title_id):
+                if player.player == "X":
+                    continue
+
+                # ФИО (без отчества)
+                fio = player.player or ""
+                if not fio and player.fio:
+                    fio = player.fio.split()[0] if player.fio.split() else ""
+
+                # Отчество
+                patronymic_text = ""
+                if player.patronymic_id:
+                    pat = Patronymic.get_or_none(Patronymic.id == player.patronymic_id)
+                    if pat:
+                        patronymic_text = pat.patronymic
+
+                # Дата рождения
+                birth_date = ""
+                if player.bday:
+                    if isinstance(player.bday, date):
+                        birth_date = player.bday.strftime("%d.%m.%Y")
+                    else:
+                        birth_date = str(player.bday)
+
+                # Тренер
+                coach_text = ""
+                if player.coach_id:
+                    coach = Coach.get_or_none(Coach.id == player.coach_id)
+                    if coach:
+                        coach_text = coach.coach
+
+                # Пол
+                sex_text = "Мужской" if player.sex == "man" else "Женский"
+
+                ws.append([
+                    row_num - 1,                       # №
+                    fio or "",                         # ФИО
+                    patronymic_text,                   # Отчество
+                    birth_date,                        # Дата рождения
+                    player.rank or 0,                  # Рейтинг
+                    player.city or "",                 # Город
+                    player.region or "",               # Регион
+                    player.razryad or "",              # Разряд
+                    coach_text,                        # Тренер
+                    sex_text                           # Пол
+                ])
+
+                # Применяем границы к строке
+                for col_idx in range(1, len(headers) + 1):
+                    cell = ws.cell(row=row_num, column=col_idx)
+                    cell.border = thin_border
+                    cell.alignment = Alignment(vertical="center", wrap_text=False)
+
+                row_num += 1
+
+            # Автоширина колонок
+            for col in ws.columns:
+                max_length = 0
+                col_letter = col[0].column_letter
+                for cell in col:
+                    try:
+                        if cell.value:
+                            max_length = max(max_length, len(str(cell.value)))
+                    except:
+                        pass
+                ws.column_dimensions[col_letter].width = min(max_length + 3, 50)
+
+            # Сохраняем файл
+            wb.save(file_path)
+
+            QMessageBox.information(
+                self,
+                "Успех",
+                f"Список участников сохранён в Excel:\n{file_path}\n"
+                f"Всего записей: {row_num - 2}"
+            )
+
+            # Предлагаем открыть файл
+            reply = QMessageBox.question(
+                self,
+                "Открыть файл",
+                "Открыть созданный файл Excel?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if reply == QMessageBox.Yes:
+                if sys.platform == 'win32':
+                    os.startfile(file_path)
+                else:
+                    os.system(f'open "{file_path}"')
+
+        except ImportError:
+            QMessageBox.critical(
+                self,
+                "Ошибка",
+                "Не установлен модуль openpyxl.\n"
+                "Установите его командой: pip install openpyxl"
+            )
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "Ошибка", f"Не удалось экспортировать данные: {str(e)}")
+# =========================
     def search_players(self):
         """Поиск участников по ФИО или городу"""
         if not self.current_title_id:
@@ -12321,7 +12441,7 @@ class MainWindow(QMainWindow):
         sort_layout = QHBoxLayout()
         sort_layout.setSpacing(10)
         
-        btn_sort_alpha = QPushButton("🔤 По алфавиту (А-Я)")
+        btn_sort_alpha = QPushButton("🔤 По алфавиту")
         btn_sort_alpha.setStyleSheet("""
             QPushButton {
                 background-color: #FF9800;
@@ -12337,7 +12457,7 @@ class MainWindow(QMainWindow):
         btn_sort_alpha.clicked.connect(self.filter_by_alphabet)
         sort_layout.addWidget(btn_sort_alpha)
         
-        btn_sort_rating = QPushButton("📊 По убыванию рейтинга")
+        btn_sort_rating = QPushButton("📊 По рейтингу")
         btn_sort_rating.setStyleSheet("""
             QPushButton {
                 background-color: #FF9800;

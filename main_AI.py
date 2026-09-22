@@ -9833,7 +9833,7 @@ class MainWindow(QMainWindow):
                          "Версия 3.0\n\n"
                          "Работа с базой данных MySQL\n"
                          "© 2026")
-    
+ 
     def closeEvent(self, event):
         """Событие закрытия окна - сохранение базы данных"""
         try:
@@ -30166,7 +30166,6 @@ class RatingFileDialog(QDialog):
         )
         return list(similar)
 
-#=========================
 
 def main():  
     # Сначала проверяем БД

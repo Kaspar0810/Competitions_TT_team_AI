@@ -19590,6 +19590,7 @@ class MainWindow(QMainWindow):
             first_mesto = self.get_final_start_place(fin)
             last_mesto = max_pl if fin == "1-й финал" else first_mesto + max_pl - 1
             fin_title = f'Финальные соревнования.({first_mesto}-{last_mesto} место)' # титул на таблице
+
         for i in range(0, 40):
             # column_count[9] = i  # нумерация 10 столбца для удобного просмотра таблицы
             list_tmp = column_count.copy()
@@ -19733,16 +19734,16 @@ class MainWindow(QMainWindow):
         if tds is not None:
             short_name = t_id.short_name_comp
             if fin == "Одна таблица":
-                name_table_final = f"{short_name}_one_table.pdf"
+                name_table_final = f"{short_name}_{sex}_one_table.pdf"
             elif fin in pairs_list :
-                name_table_final = f"{short_name}_double_{f}.pdf"
+                name_table_final = f"{short_name}_{sex}_double_{f}.pdf"
             elif fin == "Суперфинал":
-                name_table_final = f"{short_name}_{f}.pdf"
+                name_table_final = f"{short_name}_{sex}_{f}.pdf"
             elif fin != "Суперфинал":
-                name_table_final = f"{short_name}_{f}-final.pdf"                   
+                name_table_final = f"{short_name}_{sex}_{f}-final.pdf"                   
         else:
             short_name = "clear_8_full_net"  # имя для чистой сетки
-            name_table_final = f"{short_name}_{sex}.pdf"
+            name_table_final = f"{short_name}.pdf"
 
         # Создаем PDF
         filename = os.path.join(pdf_dir, name_table_final)
@@ -19755,6 +19756,7 @@ class MainWindow(QMainWindow):
     def setka_8_made(self, fin, posev_data):
         """сетка на 8 с розыгрышем 1-3 место в pdf"""
         from reportlab.platypus import Table
+        table = "setka_8"
 
         pairs_list = ["Мужские пары", "Женские пары", "Смешанные пары"]
 
@@ -19764,8 +19766,7 @@ class MainWindow(QMainWindow):
         pdf_dir = "table_pdf"
         if not os.path.exists(pdf_dir):
             os.makedirs(pdf_dir)
-
-        table = "setka_8"
+  
         elements = []
         data = []
         style = []
@@ -19898,17 +19899,16 @@ class MainWindow(QMainWindow):
         if tds is not None:
             short_name = t_id.short_name_comp
             if fin == "Одна таблица":
-                name_table_final = f"{short_name}_one_table.pdf"
+                name_table_final = f"{short_name}_{sex}_one_table.pdf"
             elif fin in pairs_list:
-                name_table_final = f"{short_name}_double_{f}.pdf"
+                name_table_final = f"{short_name}_{sex}_double_{f}.pdf"
             elif fin == "Суперфинал":
-                name_table_final = f"{short_name}_{f}.pdf"
+                name_table_final = f"{short_name}_{sex}_{f}.pdf"
             elif fin != "Суперфинал":
-                name_table_final = f"{short_name}_{f}-final.pdf"       
-            
+                name_table_final = f"{short_name}_{sex}_{f}-final.pdf"                   
         else:
-            short_name = "clear_8_full_net"  # имя для чистой сетки
-            name_table_final = f"{short_name}_{sex}.pdf"
+            short_name = "clear_8_net"  # имя для чистой сетки
+            name_table_final = f"{short_name}.pdf"
         
         # Создаем PDF
         filename = os.path.join(pdf_dir, name_table_final)
@@ -19924,6 +19924,8 @@ class MainWindow(QMainWindow):
         table = "setka_16_full"
 
         sex = "M" if self.current_sex == "man" else "W" 
+
+        pairs_list = ["Мужские пары", "Женские пары", "Смешанные пары"]
 
         # Папка для сохранения
         pdf_dir = "table_pdf"
@@ -19947,14 +19949,14 @@ class MainWindow(QMainWindow):
             (System.stage == fin)).get()
         max_pl = finals.max_player # максимальное число игроков в сетке
 
-        if fin == "Парный разряд":
+        if fin in pairs_list:
             first_mesto = 1
             last_mesto = 3
-            fin_title = ""
+            fin_title = f'Финальные соревнования.(с 1 по 3 место)' # титул на таблице
         elif fin == "Чистая сетка":
             first_mesto = 1
             last_mesto = first_mesto + max_pl - 1
-            fin_title = ""
+            fin_title = ""    
         else:
             first_mesto = self.get_final_start_place(fin)
             last_mesto = max_pl if fin == "1-й финал" else first_mesto + max_pl - 1
@@ -20118,16 +20120,15 @@ class MainWindow(QMainWindow):
 
         t_id = Title.get(Title.id == self.current_title_id)
         if tds is not None:
-            if tds is not None:
-                short_name = t_id.short_name_comp
+            short_name = t_id.short_name_comp
             if fin == "Одна таблица":
                 name_table_final = f"{short_name}_{sex}_one_table.pdf"
-            elif fin == "Парный разряд" :
+            elif fin in pairs_list :
                 name_table_final = f"{short_name}_{sex}_double_{f}.pdf"
             elif fin == "Суперфинал":
                 name_table_final = f"{short_name}_{sex}_{f}.pdf"
             elif fin != "Суперфинал":
-                name_table_final = f"{short_name}_{sex}_{f}-final.pdf"
+                name_table_final = f"{short_name}_{sex}_{f}-final.pdf"                   
         else:
             short_name = "clear_16_full_net"  # имя для чистой сетки
             name_table_final = f"{short_name}.pdf"
@@ -20145,6 +20146,8 @@ class MainWindow(QMainWindow):
         from reportlab.platypus import Table
 
         table = "setka_32_full"
+
+        pairs_list = ["Мужские пары", "Женские пары", "Смешанные пары"]
 
         sex = "M" if self.current_sex == "man" else "W"
 
@@ -20169,14 +20172,14 @@ class MainWindow(QMainWindow):
             ).get()
         max_pl = finals.max_player # максимальное число игроков в сетке
 
-        if fin == "Парный разряд":
+        if fin in pairs_list:
             first_mesto = 1
             last_mesto = 3
-            fin_title = ""
+            fin_title = f'Финальные соревнования.(с 1 по 3 место)' # титул на таблице
         elif fin == "Чистая сетка":
             first_mesto = 1
             last_mesto = first_mesto + max_pl - 1
-            fin_title = ""
+            fin_title = ""    
         else:
             first_mesto = self.get_final_start_place(fin)
             last_mesto = max_pl if fin == "1-й финал" else first_mesto + max_pl - 1
@@ -20391,18 +20394,18 @@ class MainWindow(QMainWindow):
             pv = A4
         else:
             pv = landscape(A4)
+
         t_id = Title.get(Title.id == self.current_title_id)
         if tds is not None:
-            if tds is not None:
-                short_name = t_id.short_name_comp
+            short_name = t_id.short_name_comp
             if fin == "Одна таблица":
                 name_table_final = f"{short_name}_{sex}_one_table.pdf"
-            elif fin == "Парный разряд" :
+            elif fin in pairs_list :
                 name_table_final = f"{short_name}_{sex}_double_{f}.pdf"
             elif fin == "Суперфинал":
                 name_table_final = f"{short_name}_{sex}_{f}.pdf"
             elif fin != "Суперфинал":
-                name_table_final = f"{short_name}_{sex}_{f}-final.pdf"
+                name_table_final = f"{short_name}_{sex}_{f}-final.pdf"                   
         else:
             short_name = "clear_32_full_net"  # имя для чистой сетки
             name_table_final = f"{short_name}.pdf"
@@ -20415,11 +20418,15 @@ class MainWindow(QMainWindow):
 
         return name_table_final
 
-    def setka_32_2_made(self, fin):
+    def setka_32_2_made(self, fin, posev_data):
         """сетка на 32 (-2) с розыгрышем всех мест"""
         from reportlab.platypus import Table
 
+        pairs_list = ["Мужские пары", "Женские пары", "Смешанные пары"]
+
         table = "setka_32_2"
+
+        sex = "M" if self.current_sex == "man" else "W"
 
         # Папка для сохранения
         pdf_dir = "table_pdf"
@@ -20448,9 +20455,18 @@ class MainWindow(QMainWindow):
             list_tmp = column_count.copy()
             data.append(list_tmp)
 
-        first_mesto = self.get_final_start_place(fin)
-        last_mesto = max_pl if fin == "1-й финал" else first_mesto + max_pl - 1
-        fin_title = f'Финальные соревнования.({first_mesto}-{last_mesto} место)' # титул на таблице
+        if fin in pairs_list:
+            first_mesto = 1
+            last_mesto = 3
+            fin_title = f'Финальные соревнования.(с 1 по 3 место)' # титул на таблице
+        elif fin == "Чистая сетка":
+            first_mesto = 1
+            last_mesto = first_mesto + max_pl - 1
+            fin_title = ""    
+        else:
+            first_mesto = self.get_final_start_place(fin)
+            last_mesto = max_pl if fin == "1-й финал" else first_mesto + max_pl - 1
+            fin_title = f'Финальные соревнования.({first_mesto}-{last_mesto} место)' # титул на таблице
 
         # ========= нумерация встреч сетки ==========
         y = 0
@@ -20535,10 +20551,11 @@ class MainWindow(QMainWindow):
 
         #========= расписание ===========
         style_color_schedule = self.schedule_data(data, fin)
-        # ============================
-        # =================================
-        # ===== добавить данные игроков и счета в data ==================
-        tds = self.write_in_setka(data, fin, first_mesto, table)
+        # ============= данные игроков и встреч и размещение по сетке =============
+        if fin != "Чистая сетка":
+            tds = self.write_in_setka(data, fin, first_mesto, table, posev_data)
+        else:
+            tds = None
         # ==============
         cw = ((0.2 * cm, 3.5 * cm, 0.35 * cm, 2.4 * cm, 0.35 * cm, 2.4 * cm, 0.35 * cm, 2.4 * cm, 0.35 * cm, 2.4 * cm, 0.35 * cm,
             2.4 * cm, 0.35 * cm, 2.6 * cm, 0.35 * cm))
@@ -20677,22 +20694,23 @@ class MainWindow(QMainWindow):
             pv = A4
         else:
             pv = landscape(A4)
+
         t_id = Title.get(Title.id == self.current_title_id)
+
         if tds is not None:
-            if tds is not None:
-                short_name = t_id.short_name_comp
+            short_name = t_id.short_name_comp
             if fin == "Одна таблица":
-                name_table_final = f"{short_name}_one_table.pdf"
-            elif fin == "Парный разряд" :
-                name_table_final = f"{short_name}_double_{f}.pdf"
+                name_table_final = f"{short_name}_{sex}_one_table.pdf"
+            elif fin in pairs_list :
+                name_table_final = f"{short_name}_{sex}_double_{f}.pdf"
             elif fin == "Суперфинал":
-                name_table_final = f"{short_name}_{f}.pdf"
+                name_table_final = f"{short_name}_{sex}_{f}.pdf"
             elif fin != "Суперфинал":
-                name_table_final = f"{short_name}_{f}-final.pdf"
+                name_table_final = f"{short_name}_{sex}_{f}-final.pdf"                   
         else:
             short_name = "clear_32_2_net"  # имя для чистой сетки
-
             name_table_final = f"{short_name}.pdf"
+
 
         doc = SimpleDocTemplate(name_table_final, pagesize=pv, rightMargin=1*cm, leftMargin=1*cm, topMargin=3.4*cm, bottomMargin=1.0*cm)
 

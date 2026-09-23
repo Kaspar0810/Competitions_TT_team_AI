@@ -18294,7 +18294,7 @@ class MainWindow(QMainWindow):
 
         return posev_data
 # ========= копия write_in_setka ====
-    def write_in_setka(self, data, stage, first_mesto, table, posev_data):
+    def _write_in_setka(self, data, stage, first_mesto, table, posev_data):
             """функция заполнения сетки результатами встреч data поступает чистая только номера в сетке, дальше идет заполнение игроками и счетом"""
             "row_num_win - словарь, ключ - номер игры, значение - список(номер строки 1-ого игрока, номер строки 2-ого игрока) и записвает итоговые места в db"
 
@@ -18570,6 +18570,154 @@ class MainWindow(QMainWindow):
                         data[row_win + 1][col_win] = score
                         data[row_los][col_los + 1] = los
                 return tds
+# ========= вариант AI
+
+    def write_in_setka(self, data, stage, first_mesto, table, posev_data):
+        """
+        Заполняет олимпийскую сетку данными из таблицы Result.
+
+        data        : список списков (сама сетка).
+                    > 0 — номер матча,
+                    < 0 — ячейка, куда идёт проигравший матча N.
+        stage       : этап соревнования (для фильтра Result).
+        first_mesto : начальное место в финале (если нужен — используйте при фильтрации).
+        table       : вид олимпийской сетки.
+        posev_data  : dict {id_игрока: ФИО} с жеребьёвки.
+
+        Возвращает изменённый data (in-place).
+        """
+        pairs_list = ["Мужские пары", "Женские пары", "Смешанные пары"]
+        
+        if stage in pairs_list:
+            player = Players_double.select().where(Players_double.title_id == self.current_title_id)
+        else:  
+            player = Player.select().where((Player.title_id == self.current_title_id) & (Player.sex == self.current_sex)) 
+        # ---------- 1. Загружаем результаты ----------
+        query = Result.select().where((Result.title_id == self.current_title_id) & (Result.sex == self.current_sex)) 
+        if stage is not None:
+            query = query.where(Result.number_group == stage)
+    
+        results_by_match = {r.tours: r for r in query}
+
+        # ---------- 2. Индексируем ячейки с отрицательными числами ----------
+        # { -N: [(row, col), ...] }  — куда класть проигравшего матча N
+        loser_cells = {}
+        for row_idx, row in enumerate(data):
+            for col_idx, cell in enumerate(row):
+                if col_idx == 0:
+                    continue
+                try:
+                    n = int(cell)
+                except (TypeError, ValueError):
+                    continue
+                if n < 0:
+                    loser_cells.setdefault(n, []).append((row_idx, col_idx))
+
+        # ---------- 3. Основной проход по номерам матчей ----------
+        for row_idx, row in enumerate(data):
+            for col_idx, cell in enumerate(row):
+                if col_idx == 0:
+                    continue
+                try:
+                    match_num = int(cell)
+                except (TypeError, ValueError):
+                    continue
+                if match_num <= 0:
+                    continue  # это не номер матча
+
+                result = results_by_match.get(str(match_num))
+                if result is None:
+                    continue  # матч ещё не сыгран
+
+                winner_name, loser_name, score_str = self._parse_result(result, posev_data)
+
+                # 3.1. Победитель — в ту же строку, столбец + 1
+                if col_idx + 1 < len(row):
+                    data[row_idx][col_idx + 1] = winner_name
+
+                # 3.2. Счёт — под победителем (следующая строка, тот же столбец)
+                if (row_idx + 1 < len(data)
+                        and col_idx + 1 < len(data[row_idx + 1])):
+                    data[row_idx + 1][col_idx + 1] = score_str
+
+                # 3.3. Проигравший — в ячейку с -match_num
+                for l_row, l_col in loser_cells.get(-match_num, []):
+                    if l_col + 1 < len(data[l_row]):
+                        data[l_row][l_col + 1] = loser_name
+
+        return data
+
+
+    # ------------------------------------------------------------------ #
+    #                       Вспомогательный метод                         #
+    # ------------------------------------------------------------------ #
+    def _parse_result(self, result, posev_data):
+        """
+        Достаёт ФИО победителя/проигравшего и строку со счётом.
+
+        posev_data: {player_id: {"id": ..., "name_city": ..., "name": "ФИО"}}
+        """
+
+        def get_player_id(player):
+            """Достаём id игрока — из объекта Player или из числа."""
+            if player is None:
+                return None
+            if isinstance(player, int):
+                return player
+            # объект Player (peewee / sqlalchemy / dataclass)
+            return getattr(player, "id", None)
+
+        def fio(player):
+            pid = get_player_id(player)
+            if pid is None:
+                return ""
+            info = posev_data.get(pid)
+            if not info:
+                return str(player)  # на случай, если игрока нет в словаре
+            return info.get("name") or info.get("name_city") or str(player)
+
+        p1, p2 = result.player1, result.player2
+        sets = result.score_win or () 
+        score = result.score_in_game         
+
+        if result.winner == p1:
+            winner_name = fio(p1)
+            loser_name  = fio(p2)
+            score_str = f"{score} {sets}"
+        else:
+            winner_name = fio(p2)
+            loser_name  = fio(p1)
+            score_str = f"{score} {sets}"
+
+        return winner_name, loser_name, score_str
+
+    # def _parse_result(self, result, posev_data):
+    #     """
+    #     Достаёт ФИО победителя/проигравшего и строку со счётом.
+    #     Подстройте имена полей под свою модель Result.
+    #     """
+    #     def fio(player):
+    #         if player is None:
+    #             return ""
+    #         # Один из вариантов — раскомментируйте подходящий:
+    #         # return posev_data.get(player.id, str(player))
+    #         # return f"{player.last_name} {player.first_name}"
+    #         return posev_data.get(player, str(player))
+
+    #     p1, p2 = result.player1, result.player2
+    #     sets = result.score_win or () 
+    #     score = result.score_in_game                       # список партий: [5, 7, 8]
+
+    #     if result.winner == p1:
+    #         winner_name = fio(p1)
+    #         loser_name  = fio(p2)
+    #         score_str = f"{score} {sets}"
+    #     else:
+    #         winner_name = fio(p2)
+    #         loser_name  = fio(p1)
+    #         score_str = f"{score} {sets}"
+
+    #     return winner_name, loser_name, score_str
 # ===============
     # def write_in_setka(self, data, stage, first_mesto, table, posev_data):
     #     """функция заполнения сетки результатами встреч data поступает чистая только номера в сетке, дальше идет заполнение игроками и счетом"""
@@ -18953,22 +19101,19 @@ class MainWindow(QMainWindow):
                     tmp_match.append(f'{res.score_in_game}')
                 else:
                     tmp_match.append(f'{res.score_in_game} {res.score_win}')
-
                 # ======= вариант с 1-3 местом ===
-                if snoska[1] == 0: # значит сетка только за 1-3 места
-                    # tmp_match.append("")
-                    # tmp_match.append("")
+                if snoska[0] == 0 and snoska[1] == 0: # значит сетка полная матч за места
                     tmp_match.append(snoska[2])
                     tmp_match.append(short_name_los)
-                    match = tmp_match.copy() # список [номер куда идет победитель, ФИО побед, счет, номер куда идет проигравший, ФИО проигр]
-                    tmp_match.clear()
-                    dict_setka[num_game] = match        
+                elif snoska[0] != 0 and snoska[1] == 0: # значит сетка за 1-3 места
+                    tmp_match.append("")
+                    tmp_match.append("")      
                 else:
                     tmp_match.append(snoska[2])
                     tmp_match.append(short_name_los)
-                    match = tmp_match.copy() # список [номер куда идет победитель, ФИО побед, счет, номер куда идет проигравший, ФИО проигр]
-                    tmp_match.clear()
-                    dict_setka[num_game] = match
+                match = tmp_match.copy() # список [номер куда идет победитель, ФИО побед, счет, номер куда идет проигравший, ФИО проигр]
+                tmp_match.clear()
+                dict_setka[num_game] = match
 
         return dict_setka
 
@@ -19196,7 +19341,7 @@ class MainWindow(QMainWindow):
                     game_loser = dict_loser[number_game]
                 else:
                     game_loser = 0 
-
+                snoska = [game_winner, game_loser, (number_game * -1)]
             # game_winner = dict_winner[number_game]  # номер игры победителя
             # snoska.append(game_winner)
             # if flag_full == 0: # значит полная сетка
@@ -20262,7 +20407,7 @@ class MainWindow(QMainWindow):
         elements.append(t)
         pv = A4
         # добавил возможность парной сетки на 8
-        if final == "Парный разряд":
+        if final in pairs_list:
             f = self.vid_double_game()
         elif final == "Одна таблица":
           pass

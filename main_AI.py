@@ -18617,8 +18617,6 @@ class MainWindow(QMainWindow):
         loser_cells = {}
         for row_idx, row in enumerate(data):
             for col_idx, cell in enumerate(row):
-                if col_idx == 0:
-                    continue
                 try:
                     n = int(cell)
                 except (TypeError, ValueError):
@@ -18639,7 +18637,8 @@ class MainWindow(QMainWindow):
                     continue  # это не номер матча
 
                 result = results_by_match.get(str(match_num))
-                if result is None:
+
+                if result.winner is None:
                     continue  # матч ещё не сыгран
 
                 winner_name, loser_name, score_str = self._parse_result(result, posev_data)
@@ -18668,26 +18667,36 @@ class MainWindow(QMainWindow):
         def fio(player):
             if player is None:
                 return ""
-            # Один из вариантов — раскомментируйте подходящий:
-            # return posev_data.get(player.id, str(player))
-            # return f"{player.last_name} {player.first_name}"
+
             return posev_data.get(player, str(player))
 
         p1, p2 = result.player1, result.player2
-        sets = result.score_win or () 
-        score = result.score_in_game                       # список партий: [5, 7, 8]
+        if p1 == "" and p2 == "":
+            sets = ""
+            score = ""
+        else:
+            sets = result.score_win if result.score_win != 'В : П' else "" 
+            score = result.score_in_game                       # список партий: [5, 7, 8]
 
         if result.winner == p1:
-            winner_name = fio(p1)
-            loser_name  = fio(p2)
+            winner_name_full = fio(p1)
+            mark = winner_name_full.find("/")
+            winner_name = winner_name_full[:mark]
+            loser_name_full  = fio(p2)
+            mark = loser_name_full.find("/")
+            loser_name = loser_name_full[:mark]
             score_str = f"{score} {sets}"
         else:
-            winner_name = fio(p2)
-            loser_name  = fio(p1)
+            winner_name_full = fio(p2)
+            mark = winner_name_full.find("/")
+            winner_name = winner_name_full[:mark]
+            loser_name_full  = fio(p1)
+            mark = loser_name_full.find("/")
+            loser_name = loser_name_full[:mark]
             score_str = f"{score} {sets}"
 
         return winner_name, loser_name, score_str
-# ===============
+# =============== вариант старый =========
     # def write_in_setka(self, data, stage, first_mesto, table, posev_data):
     #     """функция заполнения сетки результатами встреч data поступает чистая только номера в сетке, дальше идет заполнение игроками и счетом"""
     #     "row_num_win - словарь, ключ - номер игры, значение - список(номер строки 1-ого игрока, номер строки 2-ого игрока) и записвает итоговые места в db"
@@ -18993,137 +19002,137 @@ class MainWindow(QMainWindow):
     #             data[row_los][col_los + 1] = los
     #         return tds
 
-    def score_in_setka(self, stage, place_3rd):
-        """ выставляет счет победителя и сносит на свои места в сетке"""
-        dict_setka = {}
-        match = []
-        tmp_match = []
-        pairs_list = ["Мужские пары", "Женские пары", "Смешанные пары"]
+    # def score_in_setka(self, stage, place_3rd):
+    #     """ выставляет счет победителя и сносит на свои места в сетке"""
+    #     dict_setka = {}
+    #     match = []
+    #     tmp_match = []
+    #     pairs_list = ["Мужские пары", "Женские пары", "Смешанные пары"]
 
-        titles = Title.select().where(Title.id == self.current_title_id).get()
-        vid_turnira = titles.vid_turnira
-        system = System.select().where(
-            (System.title_id == self.current_title_id) &
-            (System.stage == stage) &
-            (System.sex == self.current_sex)
-            ).get()
-        max_pl = system.max_player
-        vid_setki = system.type_table
-        # получение id последнего соревнования
-        if stage in pairs_list:
-            player = Players_double.select().where(Players_double.title_id == self.current_title_id)
-        else:
-            if vid_turnira == "личные":
-                player = Player.select().where((Player.title_id == self.current_title_id) & (Player.sex == self.current_sex))
-            else:
-                teams = Team.select().where((Team.title_id == self.current_title_id) & (Team.team_sex == self.current_sex))
-        result = Result.select().where((Result.title_id == self.current_title_id) & (Result.number_group == stage))
-        for res in result:
-            num_game = int(res.tours)
+    #     titles = Title.select().where(Title.id == self.current_title_id).get()
+    #     vid_turnira = titles.vid_turnira
+    #     system = System.select().where(
+    #         (System.title_id == self.current_title_id) &
+    #         (System.stage == stage) &
+    #         (System.sex == self.current_sex)
+    #         ).get()
+    #     max_pl = system.max_player
+    #     vid_setki = system.type_table
+    #     # получение id последнего соревнования
+    #     if stage in pairs_list:
+    #         player = Players_double.select().where(Players_double.title_id == self.current_title_id)
+    #     else:
+    #         if vid_turnira == "личные":
+    #             player = Player.select().where((Player.title_id == self.current_title_id) & (Player.sex == self.current_sex))
+    #         else:
+    #             teams = Team.select().where((Team.title_id == self.current_title_id) & (Team.team_sex == self.current_sex))
+    #     result = Result.select().where((Result.title_id == self.current_title_id) & (Result.number_group == stage))
+    #     for res in result:
+    #         num_game = int(res.tours)
             
-            if res.winner is not None and res.winner != "": # значит встреча сыграна
-                if num_game == place_3rd: # если два 3-х места
-                    if res.player1 != "" and res.player2 != "":
-                        res = result.select().where(Result.tours == place_3rd).get()
-                        id_pl1 = player.select().where(Player.fio_city == res.player1).get()
-                        id_pl2 = player.select().where(Player.fio_city == res.player2).get()
-                        short_name_win = id_pl1.fio
-                        short_name_los = id_pl2.fio
-                        match = [0, short_name_win, '', '', short_name_los]
-                        dict_setka[num_game] = match
-                elif res.winner != "X":
-                    if stage in pairs_list:
-                        id_pl_win = player.select().where(Players_double.para_full == res.winner).get()
-                        short_name_win = id_pl_win.para_shot
-                    else:
-                        if vid_turnira == "личные":
-                            id_pl_win = player.select().where(Player.fio_city == res.winner).get()
-                            short_name_win = id_pl_win.player if id_pl_win.fio is None else id_pl_win.fio
-                        else:
-                            id_pl_win = teams.select().where(Team.team_full == res.winner).get()
-                            short_name_win = id_pl_win.team_name
-                        # временный вариант со старой базой
+    #         if res.winner is not None and res.winner != "": # значит встреча сыграна
+    #             if num_game == place_3rd: # если два 3-х места
+    #                 if res.player1 != "" and res.player2 != "":
+    #                     res = result.select().where(Result.tours == place_3rd).get()
+    #                     id_pl1 = player.select().where(Player.fio_city == res.player1).get()
+    #                     id_pl2 = player.select().where(Player.fio_city == res.player2).get()
+    #                     short_name_win = id_pl1.fio
+    #                     short_name_los = id_pl2.fio
+    #                     match = [0, short_name_win, '', '', short_name_los]
+    #                     dict_setka[num_game] = match
+    #             elif res.winner != "X":
+    #                 if stage in pairs_list:
+    #                     id_pl_win = player.select().where(Players_double.para_full == res.winner).get()
+    #                     short_name_win = id_pl_win.para_shot
+    #                 else:
+    #                     if vid_turnira == "личные":
+    #                         id_pl_win = player.select().where(Player.fio_city == res.winner).get()
+    #                         short_name_win = id_pl_win.player if id_pl_win.fio is None else id_pl_win.fio
+    #                     else:
+    #                         id_pl_win = teams.select().where(Team.team_full == res.winner).get()
+    #                         short_name_win = id_pl_win.team_name
+    #                     # временный вариант со старой базой
                     
-                    if res.loser == "X":
-                        short_name_los = "X"
-                    else: 
-                        if stage in pairs_list:
-                            id_pl_los = player.select().where(Players_double.para_full == res.loser).get()
-                            short_name_los = id_pl_los.para_shot
-                        else:
-                            if vid_turnira == "личные":
-                                id_pl_los = player.select().where(Player.fio_city == res.loser).get()
-                                short_name_los = id_pl_los.player if id_pl_los.fio is None else id_pl_los.fio
-                            else:
-                                id_pl_los = teams.select().where(Team.team_full == res.loser).get()
-                                short_name_los = id_pl_los.team_name
-                            # временный вариант со старой базой
+    #                 if res.loser == "X":
+    #                     short_name_los = "X"
+    #                 else: 
+    #                     if stage in pairs_list:
+    #                         id_pl_los = player.select().where(Players_double.para_full == res.loser).get()
+    #                         short_name_los = id_pl_los.para_shot
+    #                     else:
+    #                         if vid_turnira == "личные":
+    #                             id_pl_los = player.select().where(Player.fio_city == res.loser).get()
+    #                             short_name_los = id_pl_los.player if id_pl_los.fio is None else id_pl_los.fio
+    #                         else:
+    #                             id_pl_los = teams.select().where(Team.team_full == res.loser).get()
+    #                             short_name_los = id_pl_los.team_name
+    #                         # временный вариант со старой базой
                         
-                else:
-                    short_name_win = "X"
-                    short_name_los = "X"
+    #             else:
+    #                 short_name_win = "X"
+    #                 short_name_los = "X"
 
-                snoska = self.number_of_game(num_game, vid_setki, max_pl) # список (номер встречи победителя, номер встречи проигравшего и минус куда идет проигравший в сетке)
-                tmp_match.append(snoska[0]) # номер на сетке куда идет победитель
-                tmp_match.append(short_name_win)
-                if res.score_win == "В : П": # если счет в партиии
-                    tmp_match.append(f'{res.score_in_game}')
-                else:
-                    tmp_match.append(f'{res.score_in_game} {res.score_win}')
-                # ======= вариант с 1-3 местом ===
-                if snoska[0] == 0 and snoska[1] == 0: # значит сетка полная матч за места
-                    tmp_match.append(snoska[2])
-                    tmp_match.append(short_name_los)
-                elif snoska[0] != 0 and snoska[1] == 0: # значит сетка за 1-3 места
-                    tmp_match.append("")
-                    tmp_match.append("")      
-                else:
-                    tmp_match.append(snoska[2])
-                    tmp_match.append(short_name_los)
-                match = tmp_match.copy() # список [номер куда идет победитель, ФИО побед, счет, номер куда идет проигравший, ФИО проигр]
-                tmp_match.clear()
-                dict_setka[num_game] = match
+    #             snoska = self.number_of_game(num_game, vid_setki, max_pl) # список (номер встречи победителя, номер встречи проигравшего и минус куда идет проигравший в сетке)
+    #             tmp_match.append(snoska[0]) # номер на сетке куда идет победитель
+    #             tmp_match.append(short_name_win)
+    #             if res.score_win == "В : П": # если счет в партиии
+    #                 tmp_match.append(f'{res.score_in_game}')
+    #             else:
+    #                 tmp_match.append(f'{res.score_in_game} {res.score_win}')
+    #             # ======= вариант с 1-3 местом ===
+    #             if snoska[0] == 0 and snoska[1] == 0: # значит сетка полная матч за места
+    #                 tmp_match.append(snoska[2])
+    #                 tmp_match.append(short_name_los)
+    #             elif snoska[0] != 0 and snoska[1] == 0: # значит сетка за 1-3 места
+    #                 tmp_match.append("")
+    #                 tmp_match.append("")      
+    #             else:
+    #                 tmp_match.append(snoska[2])
+    #                 tmp_match.append(short_name_los)
+    #             match = tmp_match.copy() # список [номер куда идет победитель, ФИО побед, счет, номер куда идет проигравший, ФИО проигр]
+    #             tmp_match.clear()
+    #             dict_setka[num_game] = match
 
-        return dict_setka
+    #     return dict_setka
 
-    def setka_data(self, fin, posev_data):
-        """данные сетки"""
-        tds = []
-        fam_name_city = []
-        fam_name = []
-        fam_name_shot = {}
+    # def setka_data(self, fin, posev_data):
+    #     """данные сетки"""
+    #     tds = []
+    #     fam_name_city = []
+    #     fam_name = []
+    #     fam_name_shot = {}
     
-        stage =  fin
-        system = System.select().where((System.title_id == self.current_title_id) & (System.stage == stage)).get()  # находит system id последнего
+    #     stage =  fin
+    #     system = System.select().where((System.title_id == self.current_title_id) & (System.stage == stage)).get()  # находит system id последнего
 
-        # ==== командный вариант ===
-        titles = Title.select().where(Title.id == self.current_title_id).get()
-        vid_turnira = titles.vid_turnira
-        # ==============================
-        mp = system.max_player
-        mp = self.full_net_player(mp)
-        # ======= мой вариант ==============
-        for i in range(1, mp * 2 + 1, 2):
-            player_data = posev_data[((i + 1) // 2)]            
-            pl_id = player_data['player_id']
-            family_city = player_data['name_city']
-            fam_name_shot[player_data['name']] = pl_id
+    #     # ==== командный вариант ===
+    #     titles = Title.select().where(Title.id == self.current_title_id).get()
+    #     vid_turnira = titles.vid_turnira
+    #     # ==============================
+    #     mp = system.max_player
+    #     mp = self.full_net_player(mp)
+    #     # ======= мой вариант ==============
+    #     for i in range(1, mp * 2 + 1, 2):
+    #         player_data = posev_data[((i + 1) // 2)]            
+    #         pl_id = player_data['player_id']
+    #         family_city = player_data['name_city']
+    #         fam_name_shot[player_data['name']] = pl_id
             
-            # на верху фамилия, внизу город
-            if family_city != 'X':
-                znak = family_city.find("/")
-                f = family_city[:znak]
-                c = family_city[znak + 1:]
-                family = f"{f}\n{c}" # фио и на другой строке город
-            else:
-                family = 'X' 
-            tds.append(family)
-            fam_name_city.append(family_city)
-            fam_name.append(fam_name_shot)
-        all_list = [tds, fam_name_city, fam_name]
+    #         # на верху фамилия, внизу город
+    #         if family_city != 'X':
+    #             znak = family_city.find("/")
+    #             f = family_city[:znak]
+    #             c = family_city[znak + 1:]
+    #             family = f"{f}\n{c}" # фио и на другой строке город
+    #         else:
+    #             family = 'X' 
+    #         tds.append(family)
+    #         fam_name_city.append(family_city)
+    #         fam_name.append(fam_name_shot)
+    #     all_list = [tds, fam_name_city, fam_name]
         
-        return all_list
-
+    #     return all_list
+# ==========================================================
     def setka_player_after_choice(self, stage):
         """список игроков сетки после жеребьевки"""
         p_data = {}
@@ -20257,14 +20266,14 @@ class MainWindow(QMainWindow):
         self.draw_num_lost(row_n=55, row_step=2, col_n=6, number_of_game=25, player=2, data=data) # номера минус проигравшие встречи -1 -16
         self.draw_num_lost(row_n=65, row_step=2, col_n=6, number_of_game=29, player=2, data=data) # номера минус проигравшие встречи -1 -16
     
-        data[8][8] = str(15)  # создание номеров встреч 15
+        # data[8][8] = str(15)  # создание номеров встреч 15
         data[25][8] = str(-15)
         data[29][8] = str(16)  # создание номеров встреч 16
         data[31][8] = str(-16)
         data[37][8] = str(-19)
         data[39][8] = str(20)
         data[41][8] = str(-20)
-        data[44][8] = str(27)  # создание номеров встреч 27
+        # data[44][8] = str(27)  # создание номеров встреч 27
         data[52][8] = str(-27)
         data[55][8] = str(28)  # создание номеров встреч 28
         data[57][8] = str(-28)
@@ -20349,6 +20358,7 @@ class MainWindow(QMainWindow):
         for i in range(0, 12, 2):
                 fn = ('VALIGN', (i, 0), (i, -1), 'TOP')
                 style.append(fn)
+        # временное отображение сетки       
         # fn = ('INNERGRID', (0, 0), (-1, -1), 0.01, colors.grey)  # временное отображение сетки
         # style.append(fn)
         ts = style   # стиль таблицы (список оформления строк и шрифта)

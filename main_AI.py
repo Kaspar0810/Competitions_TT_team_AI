@@ -18601,7 +18601,12 @@ class MainWindow(QMainWindow):
             if pos != "":
                 if int(pos) in posev_data:
                     info = posev_data[int(pos)]
-                    data[ind][1] = info.get("name_city")
+                    if stage in pairs_list:
+                        fio_city =  info.get("name_city")
+                        fio_city = fio_city.replace("/", "\n")
+                        data[ind][1] = fio_city                 
+                    else:    
+                        data[ind][1] = info.get("name_city")
                     ind += 1
             else:
                 ind += 1
@@ -18664,6 +18669,7 @@ class MainWindow(QMainWindow):
         Достаёт ФИО победителя/проигравшего и строку со счётом.
         Подстройте имена полей под свою модель Result.
         """
+
         def fio(player):
             if player is None:
                 return ""
@@ -18671,12 +18677,13 @@ class MainWindow(QMainWindow):
             return posev_data.get(player, str(player))
 
         p1, p2 = result.player1, result.player2
+
         if p1 == "" and p2 == "":
             sets = ""
             score = ""
         else:
             sets = result.score_win if result.score_win != 'В : П' else "" 
-            score = result.score_in_game                       # список партий: [5, 7, 8]
+            score = result.score_in_game                       
 
         if result.winner == p1:
             winner_name_full = fio(p1)

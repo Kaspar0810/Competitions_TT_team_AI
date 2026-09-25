@@ -6221,9 +6221,9 @@ class MainWindow(QMainWindow):
             match.loser = loser_name
             match.points_loser = points_loser
             match.score_loser = score_loser_game
-            match.schedule_date = None
-            match.schedule_time = None
-            match.schedule_table = ""
+            # match.schedule_date = None
+            # match.schedule_time = None
+            # match.schedule_table = ""
             match.save()
             
             # Обновляем сетку (для олимпийской системы)
@@ -18591,7 +18591,29 @@ class MainWindow(QMainWindow):
         if stage in pairs_list:
             player = Players_double.select().where(Players_double.title_id == self.current_title_id)
         else:  
-            player = Player.select().where((Player.title_id == self.current_title_id) & (Player.sex == self.current_sex)) 
+            player = Player.select().where((Player.title_id == self.current_title_id) & (Player.sex == self.current_sex))
+    # ==== словарь или список номер встреч за места
+        place_list = []
+        if table == "setka_8_full":
+            place_list = [7, 8, 11, 12]
+        elif table == "setka_8":
+            place_list = [7, 8]
+        elif table == "setka_8_2":
+            pass
+        elif table == "setka_16_full":
+            place_list = [15, 16, 19, 20, 27, 28, 31, 32]
+        elif table == "setka_16":
+            place_list = [15, 16]
+        elif table == "setka_16_2":
+            pass
+        elif table == "setka_32_full":
+            place_list = [31, 32, 35, 36, 43, 44, 47, 48,
+                           63, 64, 67, 68, 75, 76, 79, 80]
+        elif table == "setka_32":
+            place_list = [31, 32]
+        elif table == "setka_32_2":
+            pass
+    # =================== 
     # ---------- 0. Заполняем нулевой столбец игроками первого посева ----------
         ind = 0
         for row in data:
@@ -18618,7 +18640,6 @@ class MainWindow(QMainWindow):
         results_by_match = {r.tours: r for r in query}
 
         # ---------- 2. Индексируем ячейки с отрицательными числами ----------
-        # { -N: [(row, col), ...] }  — куда класть проигравшего матча N
         loser_cells = {}
         for row_idx, row in enumerate(data):
             for col_idx, cell in enumerate(row):
@@ -18662,7 +18683,54 @@ class MainWindow(QMainWindow):
                     if l_col + 1 < len(data[l_row]):
                         data[l_row][l_col + 1] = loser_name
 
+                # если встреча за место, то записывает DB ====
+                if match_num in place_list:
+                    players = [winner_name, loser_name,]
+                    result_match = self.build_place_matches(first_mesto, place_list, match_num)
+                    k = 0
+                    for name in players:
+                        player_id = next((info["player_id"] for info in posev_data.values() if info["name"] == name),None)
+                        players_info = {'player_id': player_id, 'place': result_match[k]} 
+                        # 1. Обновляем Choice - поле mesto_final
+                        choice = Choice.get_or_none(
+                            (Choice.title_id == self.current_title_id) &
+                            (Choice.player_choice == player_id)
+                        )
+                        if choice:
+                            # Обновляем поле mesto_final
+                            choice.mesto_final = players_info['place']
+                            choice.save()
+                        
+                        # 2. Обновляем Player - поле mesto
+                        player = Player.get_or_none(Player.id == player_id)
+                        if player:
+                            player.mesto = players_info['place']
+                            player.save()
+
+                        k += 1  
+
         return data
+
+    def build_place_matches(self, first_mesto, match_numbers, match_num):
+        """
+        descending=True  -> меньшее место у большего номера встречи
+                            (обычная олимпийская нумерация снизу вверх).
+        descending=False -> меньшее место у меньшего номера встречи.
+        """
+        if not match_numbers:
+            return {}
+
+        sorted_matches = sorted(match_numbers)
+        result = {}
+        mesto = first_mesto
+
+        for match_net_for_place in sorted_matches:
+            result[match_net_for_place] = [mesto, mesto + 1]
+            mesto += 2
+
+        match_place = result[match_num]
+
+        return match_place
 
     def _parse_result(self, result, posev_data):
         """
@@ -24275,7 +24343,6 @@ class MainWindow(QMainWindow):
             no_finals_action.setEnabled(False)
             self.finals_results_menu.addAction(no_finals_action)
 
-
     def update_semifinals_results_menu(self, stage_names):
         """Обновление подменю полуфиналов в меню результатов"""
         self.semifinals_results_menu.clear()
@@ -24661,7 +24728,7 @@ class MainWindow(QMainWindow):
             player['ratio_points'] = ""
         
         return players
-# ========новый вариант с записью мест в choice player работает 1706 ========= 
+# ======== новый вариант с записью мест в choice player работает 1706 ========= 
     def calculate_round_robin_standings(self, players_info, results_group, final_stage=None):
         """
         Расчет мест в круговой таблице (только для групп с полными данными)
@@ -24809,7 +24876,7 @@ class MainWindow(QMainWindow):
             self._save_places_to_db(players_info, final_stage)
         
         return players_info
-# эта функция для записи в DB
+# ========== эта функция для записи в DB
     def _save_places_to_db(self, players_info, final_stage):
         """
         Сохраняет места игроков в таблицы Choice (mesto_final) и Player (mesto)
@@ -24863,7 +24930,6 @@ class MainWindow(QMainWindow):
                     choice.mesto_final = info['place']
                     choice.save()
                     updated_choice += 1
-                    # print(f"Choice: игрок {choice.family} -> место {info['place']}")
                 
                 # 2. Обновляем Player - поле mesto
                 player = Player.get_or_none(Player.id == player_id)
@@ -24871,7 +24937,6 @@ class MainWindow(QMainWindow):
                     player.mesto = info['place']
                     player.save()
                     updated_player += 1
-                    # print(f"Player: игрок {player.fio} -> место {info['place']}")
             
             print(f"Сохранены места для {updated_choice} записей Choice и {updated_player} записей Player")
             

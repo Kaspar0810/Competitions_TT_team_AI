@@ -6016,6 +6016,7 @@ class MainWindow(QMainWindow):
     def save_match_result_compact(self):
         """Сохранение результата матча с правильным форматом и обработкой неявок"""
         group_list = ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]
+        stage = self.current_stage
 
         # ПРОВЕРКА 1: Существует ли выбранный матч
         if not hasattr(self, 'current_matches') or not self.current_matches:
@@ -6256,7 +6257,7 @@ class MainWindow(QMainWindow):
                             else:
                                 res_id_lose.player2 = loser_name
                             res_id_lose.save()
-            
+    
             # Показываем сообщение
             QMessageBox.information(self, "Успех", 
                                 f"Результат сохранен!\n"
@@ -6302,7 +6303,8 @@ class MainWindow(QMainWindow):
                     (Result.winner.is_null(False))
                 ).count() 
                 if total_matches > 0 and played_matches == total_matches:
-                    self.calculate_and_save_round_robin_final_places(current_stage)
+                    players_info = self.build_players_info_for_final(stage)
+                    self._save_places_to_db(players_info, stage)
 
         except Exception as e:
             import traceback
@@ -18593,27 +18595,7 @@ class MainWindow(QMainWindow):
         else:  
             player = Player.select().where((Player.title_id == self.current_title_id) & (Player.sex == self.current_sex))
     # ==== словарь или список номер встреч за места
-        place_list = []
-        if table == "setka_8_full":
-            place_list = [7, 8, 11, 12]
-        elif table == "setka_8":
-            place_list = [7, 8]
-        elif table == "setka_8_2":
-            pass
-        elif table == "setka_16_full":
-            place_list = [15, 16, 19, 20, 27, 28, 31, 32]
-        elif table == "setka_16":
-            place_list = [15, 16]
-        elif table == "setka_16_2":
-            pass
-        elif table == "setka_32_full":
-            place_list = [31, 32, 35, 36, 43, 44, 47, 48,
-                           63, 64, 67, 68, 75, 76, 79, 80]
-        elif table == "setka_32":
-            place_list = [31, 32]
-        elif table == "setka_32_2":
-            pass
-    # =================== 
+        place_list = self.number_match_net_for_place(table)  
     # ---------- 0. Заполняем нулевой столбец игроками первого посева ----------
         ind = 0
         for row in data:
@@ -18686,9 +18668,10 @@ class MainWindow(QMainWindow):
                 # если встреча за место, то записывает DB ====
                 if match_num in place_list:
                     players = [winner_name, loser_name,]
-                    result_match = self.build_place_matches(first_mesto, place_list, match_num)
+                    result = self.build_place_matches(first_mesto, place_list)
+                    result_match = result[match_num]
                     k = 0
-                    for name in players:
+                    for name in players:                        
                         player_id = next((info["player_id"] for info in posev_data.values() if info["name"] == name),None)
                         players_info = {'player_id': player_id, 'place': result_match[k]} 
                         # 1. Обновляем Choice - поле mesto_final
@@ -18711,16 +18694,17 @@ class MainWindow(QMainWindow):
 
         return data
 
-    def build_place_matches(self, first_mesto, match_numbers, match_num):
+    # def build_place_matches(self, first_mesto, place_list, match_num):
+    def build_place_matches(self, first_mesto, place_list):
         """
         descending=True  -> меньшее место у большего номера встречи
                             (обычная олимпийская нумерация снизу вверх).
         descending=False -> меньшее место у меньшего номера встречи.
         """
-        if not match_numbers:
+        if not place_list:
             return {}
 
-        sorted_matches = sorted(match_numbers)
+        sorted_matches = sorted(place_list)
         result = {}
         mesto = first_mesto
 
@@ -18728,9 +18712,10 @@ class MainWindow(QMainWindow):
             result[match_net_for_place] = [mesto, mesto + 1]
             mesto += 2
 
-        match_place = result[match_num]
+        # match_place = result[match_num]
 
-        return match_place
+        # return match_place
+        return result
 
     def _parse_result(self, result, posev_data):
         """
@@ -18771,6 +18756,32 @@ class MainWindow(QMainWindow):
             score_str = f"{score} {sets}"
 
         return winner_name, loser_name, score_str
+
+    def number_match_net_for_place(self, table):
+        """список номерв встреч за места в зависимости от сетки"""
+        place_list = []
+
+        if table == "setka_8_full":
+            place_list = [7, 8, 11, 12]
+        elif table == "setka_8":
+            place_list = [7, 8]
+        elif table == "setka_8_2":
+            pass
+        elif table == "setka_16_full":
+            place_list = [15, 16, 19, 20, 27, 28, 31, 32]
+        elif table == "setka_16":
+            place_list = [15, 16]
+        elif table == "setka_16_2":
+            pass
+        elif table == "setka_32_full":
+            place_list = [31, 32, 35, 36, 43, 44, 47, 48,
+                           63, 64, 67, 68, 75, 76, 79, 80]
+        elif table == "setka_32":
+            place_list = [31, 32]
+        elif table == "setka_32_2":
+            pass
+        
+        return place_list
 # =============== вариант старый =========
     # def write_in_setka(self, data, stage, first_mesto, table, posev_data):
     #     """функция заполнения сетки результатами встреч data поступает чистая только номера в сетке, дальше идет заполнение игроками и счетом"""
@@ -24877,74 +24888,184 @@ class MainWindow(QMainWindow):
         
         return players_info
 # ========== эта функция для записи в DB
+    # def _save_places_to_db(self, players_info, final_stage):
+    #     """
+    #     Сохраняет места игроков в таблицы Choice (mesto_final) и Player (mesto)
+        
+    #     Параметры:
+    #         players_info: dict {индекс игрока: {'player_id': int, 'place': int, ...}}
+    #         final_stage: название финала
+    #     """
+    #     from models import Choice, Player
+        
+    #     if not players_info:
+    #         return
+        
+    #     try:
+    #         # Получаем систему для финала
+    #         system = System.get_or_none(
+    #             (System.title_id == self.current_title_id) &
+    #             (System.sex == self.current_sex) &
+    #             (System.stage == final_stage)
+    #         )
+    #         if not system:
+    #             print(f"Система {final_stage} не найдена")
+    #             return
+            
+    #         updated_choice = 0
+    #         updated_player = 0
+            
+    #         for idx, info in players_info.items():
+    #             if 'place' not in info or info['place'] == 0:
+    #                 continue
+                
+    #             # Получаем ID игрока из Game_list
+    #             game_player = Game_list.get_or_none(
+    #                 (Game_list.title_id == self.current_title_id) &
+    #                 (Game_list.system_id == system.id) &
+    #                 (Game_list.rank_num_player == idx)
+    #             )
+                
+    #             if not game_player:
+    #                 continue
+                
+    #             player_id = game_player.player_group.id
+                
+    #             # 1. Обновляем Choice - поле mesto_final
+    #             choice = Choice.get_or_none(
+    #                 (Choice.title_id == self.current_title_id) &
+    #                 (Choice.player_choice == player_id)
+    #             )
+    #             if choice:
+    #                 # Обновляем поле mesto_final
+    #                 choice.mesto_final = info['place']
+    #                 choice.save()
+    #                 updated_choice += 1
+                
+    #             # 2. Обновляем Player - поле mesto
+    #             player = Player.get_or_none(Player.id == player_id)
+    #             if player:
+    #                 player.mesto = info['place']
+    #                 player.save()
+    #                 updated_player += 1
+            
+    #         print(f"Сохранены места для {updated_choice} записей Choice и {updated_player} записей Player")
+            
+    #     except Exception as e:
+    #         print(f"Ошибка сохранения мест: {e}")
+    #         import traceback
+    #         traceback.print_exc()
+
     def _save_places_to_db(self, players_info, final_stage):
         """
-        Сохраняет места игроков в таблицы Choice (mesto_final) и Player (mesto)
-        
-        Параметры:
-            players_info: dict {индекс игрока: {'player_id': int, 'place': int, ...}}
-            final_stage: название финала
+        Сохраняет места игроков в Player.mesto и Choice.mesto_final / Choice.final.
+
+        players_info: {player_id: {'place': int, 'name': str}}
+        final_stage : название финала (например, "2-й финал")
         """
-        from models import Choice, Player
-        
         if not players_info:
             return
-        
+
         try:
-            # Получаем систему для финала
-            system = System.get_or_none(
-                (System.title_id == self.current_title_id) &
-                (System.sex == self.current_sex) &
-                (System.stage == final_stage)
-            )
-            if not system:
-                print(f"Система {final_stage} не найдена")
-                return
-            
             updated_choice = 0
             updated_player = 0
-            
-            for idx, info in players_info.items():
-                if 'place' not in info or info['place'] == 0:
-                    continue
-                
-                # Получаем ID игрока из Game_list
-                game_player = Game_list.get_or_none(
-                    (Game_list.title_id == self.current_title_id) &
-                    (Game_list.system_id == system.id) &
-                    (Game_list.rank_num_player == idx)
-                )
-                
-                if not game_player:
-                    continue
-                
-                player_id = game_player.player_group.id
-                
-                # 1. Обновляем Choice - поле mesto_final
-                choice = Choice.get_or_none(
-                    (Choice.title_id == self.current_title_id) &
-                    (Choice.player_choice == player_id)
-                )
-                if choice:
-                    # Обновляем поле mesto_final
-                    choice.mesto_final = info['place']
-                    choice.save()
-                    updated_choice += 1
-                
-                # 2. Обновляем Player - поле mesto
-                player = Player.get_or_none(Player.id == player_id)
-                if player:
-                    player.mesto = info['place']
-                    player.save()
-                    updated_player += 1
-            
-            print(f"Сохранены места для {updated_choice} записей Choice и {updated_player} записей Player")
-            
+
+            with db.atomic():
+                for player_id, info in players_info.items():
+                    place = info.get('place')
+                    if not place:
+                        continue
+
+                    # 1. Player.mesto
+                    player = Player.get_or_none(Player.id == player_id)
+                    if player:
+                        player.mesto = place
+                        player.save()
+                        updated_player += 1
+
+                    # 2. Choice.mesto_final и Choice.final
+                    choice = Choice.get_or_none(
+                        (Choice.title_id == self.current_title_id) &
+                        (Choice.player_choice == player_id)
+                    )
+                    if choice:
+                        choice.mesto_final = place
+                        choice.final = final_stage
+                        choice.save()
+                        updated_choice += 1
+
+            print(f"Сохранены места: Choice={updated_choice}, Player={updated_player}")
+
         except Exception as e:
             print(f"Ошибка сохранения мест: {e}")
             import traceback
             traceback.print_exc()
 
+    def build_players_info_for_final(self, stage):
+        """
+        Формирует players_info по сыгранному финалу.
+        Возвращает: {player_id: {'place': int, 'name': str}}
+        """
+        system = System.get_or_none(
+            (System.title_id == self.current_title_id) &
+            (System.sex == self.current_sex) &
+            (System.stage == stage)
+            )
+        
+        table_type = system.type_table
+        max_player = system.max_player
+
+        if table_type == "Олимпийская (с розыгрышем всех мест)":
+            table = f"setka_{max_player}_full"
+        elif table_type == "Олимпийская (за 1-3 место)":
+            table = f"setka_{max_player}"
+        elif table_type == "Олимпийская (минус 2)":
+            table = f"setka_{max_player}_2"
+
+
+        # получаем первое место в финале
+        first_mesto = self.get_final_start_place(stage)
+
+        # список номеров матчей за места
+        place_list = self.number_match_net_for_place(table) 
+
+        # {номер_встречи: (место_победителя, место_проигравшего)}
+        place_map = self.build_place_matches(first_mesto, place_list)
+        if not place_map:
+            return {}
+
+        players_info = {}
+
+        for match_num, (place_win, place_lose) in place_map.items():
+            m = Result.get_or_none(
+                (Result.title_id == self.current_title_id) &
+                (Result.system_id == system.id) &
+                (Result.number_group == stage) &
+                (Result.tours == match_num)
+            )
+            if not m or not m.winner:
+                continue
+
+            for name, place in ((m.winner, place_win), (m.loser, place_lose)):
+                if not name or name == "X":
+                    continue
+
+                # на случай, если в Result лежит fio_city
+                player = Player.get_or_none(
+                    (Player.title_id == self.current_title_id) &
+                    (Player.fio_city == name)
+                )
+                if not player:
+                    print(f"[build_players_info] игрок не найден: {name}")
+                    continue
+
+                players_info[player.id] = {
+                    'place': place,
+                    'name': player.fio,
+                }
+
+        return players_info
+# ===============================
     def calculate_and_save_round_robin_final_places(self, final_stage):
         """
         Рассчитывает места в круговом финале и сохраняет их в базу данных.

@@ -8957,18 +8957,18 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось добавить участника: {str(e)}")
 
-    def normalize_region(self, region_name):
-        """
-        Заменяет 'область' на 'обл.' и другие типичные сокращения в названии региона.
-        """
-        if not region_name:
-            return region_name
-        # Заменяем 'область' на 'обл.' (с учётом пробелов и регистра)
-        region_name = region_name.replace(' область', ' обл.').replace('область', 'обл.')
-        # Дополнительные сокращения (опционально)
-        region_name = region_name.replace(' край', ' кр.').replace('край', 'кр.')
-        region_name = region_name.replace('г.', '').replace('г.', '')
-        return region_name
+    # def normalize_region(self, region_name):
+    #     """
+    #     Заменяет 'область' на 'обл.' и другие типичные сокращения в названии региона.
+    #     """
+    #     if not region_name:
+    #         return region_name
+    #     # Заменяем 'область' на 'обл.' (с учётом пробелов и регистра)
+    #     region_name = region_name.replace(' область', ' обл.').replace('область', 'обл.')
+    #     # Дополнительные сокращения (опционально)
+    #     region_name = region_name.replace(' край', ' кр.').replace('край', 'кр.')
+    #     region_name = region_name.replace('г.', '').replace('г.', '')
+    #     return region_name
 
     def delete_player_from_table(self):
         """Удаление выбранного участника с записью в таблицу Delete_player"""
@@ -17310,15 +17310,13 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Ошибка", "Нет участников в соревновании")
                 return
 
-            # Собираем регионы и считаем количество участников
-            regions_list = []
+        # Собираем нормализованные регионы (дедупликация после нормализации)
+            regions_set = set()
             for player in players:
-                region = player.region.strip() if player.region else "Не указан"
-                if region not in regions_list:
-                    regions_list.append(region)
+                regions_set.add(self.normalize_region(player.region))
 
-            # Сортируем по убыванию количества участников, затем по алфавиту
-            regions_list.sort()
+            # Сортировка: сначала по категории, затем по алфавиту внутри категории
+            regions_list = sorted(regions_set, key=lambda r: (self.region_category(r), r))
 
             # Создаём папку, если её нет
             pdf_dir = "table_pdf"
@@ -17395,7 +17393,103 @@ class MainWindow(QMainWindow):
             import traceback
             traceback.print_exc()
             QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")
+#================
+    def normalize_region(self, region: str) -> str:
+        """
+        Приводит название региона к единому виду:
+        - 'Республика X'      -> 'респ. X'
+        - 'X край'            -> 'X кр.'
+        - 'Москва'            -> 'г. Москва'
+        - 'Санкт-Петербург',
+            'С.-Петербург',
+            'СПб'               -> 'г. Санкт-Петербург'
+        - лишние пробелы схлопываются.
+        """
+        if not region:
+            return "Не указан"
 
+        s = re.sub(r"\s+", " ", region.strip())
+
+        # --- Москва ---
+        if re.fullmatch(r"г\.?\s*Москва", s, re.IGNORECASE):
+            return "г. Москва"
+        
+        if re.fullmatch(r"Москва", s, re.IGNORECASE):
+            return "г. Москва"
+
+        # --- Санкт-Петербург (все варианты написания) ---
+        spb_patterns = (
+            r"г\.?\s*Санкт[- ]?Петербург",
+            r"г\.?\s*С\.?-?Петербург",
+            r"г\.?\s*СПб",
+            r"Санкт[- ]?Петербург",
+            r"С\.?-?Петербург",
+            r"СПб",
+        )
+        if any(re.fullmatch(p, s, re.IGNORECASE) for p in spb_patterns):
+            return "г. Санкт-Петербург"
+
+        # --- Республика X → Респ. X ---
+        s = re.sub(r"^респ.\s+", "Респ. ", s, flags=re.IGNORECASE)
+
+        # --- Республика X → Респ. X ---
+        s = re.sub(r"^Республика\s+", "Респ. ", s, flags=re.IGNORECASE)
+
+        # --- X кр. → X край ---
+        s = re.sub(r"\s+кр.$", " край", s, flags=re.IGNORECASE)
+
+        # --- 'X Республика' -> 'X Респ.'  (Чувашская Республика -> Чувашская Респ.) ---
+        s = re.sub(r"\s+Республика$", " Респ.", s, flags=re.IGNORECASE)
+        # --- 'X респ.' -> 'X Респ.'  (Чувашская Республика -> Чувашская Респ.) ---
+        s = re.sub(r"\s+респ.$", " Респ.", s, flags=re.IGNORECASE)
+
+        # --- X область → X обл.. ---
+        s = re.sub(r"\s+область$", " обл.", s, flags=re.IGNORECASE)
+
+        return s
+
+    def region_category(self, region: str) -> int:
+        """
+        Возвращает номер категории для сортировки:
+            1 — республики
+            2 — края
+            3 — области
+            4 — города
+            5 — автономная область
+            6 — автономные округа
+            7 — прочее (на случай нестандартных записей)
+        Порядок проверок важен: 'автономная область' содержит слово 'область',
+        а 'автономный округ' — слово 'округ'.
+        """
+        if not region:
+            return 7
+
+        s = region.lower()
+
+        # Сначала — специфичные составные названия
+        if "автономная область" in s:
+            return 5
+        if "автономный округ" in s or "автономного округа" in s:
+            return 6
+
+        # Республики — по префиксу/суффиксу
+        if s.startswith("респ.") or s.endswith("респ.") or s.startswith("республика"):
+            return 1
+
+        # Края
+        if s.endswith("кр.") or s.endswith("край"):
+            return 2
+
+        # Области (после проверки автономной)
+        if s.endswith("обл.") or s.endswith("область"):
+            return 3
+
+        # Города
+        if s.startswith("г."):
+            return 4
+
+        return 7
+# ==============
     def print_podium_list(self):
         """Создание PDF со списком призеров (1-3 места)"""
         if not self.current_title_id:

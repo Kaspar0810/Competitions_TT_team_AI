@@ -18665,17 +18665,31 @@ class MainWindow(QMainWindow):
 
                 # 3.1. Победитель — в ту же строку, столбец + 1
                 if col_idx + 1 < len(row):
-                    data[row_idx][col_idx + 1] = winner_name
-
+                    if table == "setka_32_2" and match_num == 60:
+                        data[row_idx][col_idx - 1] = winner_name
+                    elif table == "setka_16_2" and match_num == 28:
+                        data[row_idx][col_idx - 1] = winner_name
+                    else:
+                        data[row_idx][col_idx + 1] = winner_name
                 # 3.2. Счёт — под победителем (следующая строка, тот же столбец)
                 if (row_idx + 1 < len(data)
                         and col_idx + 1 < len(data[row_idx + 1])):
-                    data[row_idx + 1][col_idx + 1] = score_str
+                    if table == "setka_32_2" and match_num == 60:
+                        data[row_idx + 1][col_idx - 1] = score_str
+                    elif table == "setka_16_2" and match_num == 28:
+                        data[row_idx + 1][col_idx - 1] = score_str
+                    else:
+                        data[row_idx + 1][col_idx + 1] = score_str
 
                 # 3.3. Проигравший — в ячейку с -match_num
                 for l_row, l_col in loser_cells.get(-match_num, []):
                     if l_col + 1 < len(data[l_row]):
-                        data[l_row][l_col + 1] = loser_name
+                        if table == "setka_32_2" and match_num == 60:
+                            data[l_row][l_col - 1] = loser_name
+                        elif table == "setka_16_2" and match_num == 28:
+                            data[l_row][l_col - 1] = loser_name
+                        else:
+                            data[l_row][l_col + 1] = loser_name
 
                 # если встреча за место, то записывает DB ====
                 if match_num in place_list:
@@ -18775,20 +18789,21 @@ class MainWindow(QMainWindow):
         elif table == "setka_8":
             place_list = [7, 8]
         elif table == "setka_8_2":
-            pass
+            place_list = [7, 12, 13, 14]
         elif table == "setka_16_full":
             place_list = [15, 16, 19, 20, 27, 28, 31, 32]
         elif table == "setka_16":
             place_list = [15, 16]
         elif table == "setka_16_2":
-            pass
+            place_list =[15, 28, 29, 30, 33, 34, 37, 38]
         elif table == "setka_32_full":
             place_list = [31, 32, 35, 36, 43, 44, 47, 48,
                            63, 64, 67, 68, 75, 76, 79, 80]
         elif table == "setka_32":
             place_list = [31, 32]
         elif table == "setka_32_2":
-            pass
+            place_list = [31, 60, 61, 62, 65, 66, 69, 70,
+                            77, 78, 81, 82, 89, 90, 93, 94]
         
         return place_list
 # =============== вариант старый =========

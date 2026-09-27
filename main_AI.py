@@ -16884,8 +16884,20 @@ class MainWindow(QMainWindow):
                 pdf_path = self.setka_16_full_made(final, posev_data)
             elif max_pl == 32:
                pdf_path = self.setka_32_full_made(final, posev_data) 
-        else:
-            pass        
+        elif type_net_str == "Олимпийская (за 1-3 место)":
+            if max_pl == 8:
+                pdf_path = self.setka_8_made(final, posev_data)
+            elif max_pl == 16:
+                pdf_path = self.setka_16_made(final, posev_data)
+            elif max_pl == 32:
+                pdf_path = self.setka_32_made(final, posev_data) 
+        elif type_net_str == "Олимпийская (минус 2)":
+            if max_pl == 8:
+                pdf_path = self.setka_8_2_made(final, posev_data)
+            elif max_pl == 16:
+                pdf_path = self.setka_16_2_made(final, posev_data)
+            elif max_pl == 32:
+                pdf_path = self.setka_32_2_made(final, posev_data)       
         return pdf_path
 
     def export_participants_to_pdf(self):
@@ -18712,9 +18724,6 @@ class MainWindow(QMainWindow):
             result[match_net_for_place] = [mesto, mesto + 1]
             mesto += 2
 
-        # match_place = result[match_num]
-
-        # return match_place
         return result
 
     def _parse_result(self, result, posev_data):
@@ -20098,6 +20107,7 @@ class MainWindow(QMainWindow):
             pv = A4
         else:
             pv = landscape(A4)
+
         t_id = Title.get(Title.id == self.current_title_id)
         if tds is not None:
             short_name = t_id.short_name_comp
@@ -20155,10 +20165,15 @@ class MainWindow(QMainWindow):
             first_mesto = 1
             last_mesto = 3
             fin_title = f'Финальные соревнования.(с 1 по 3 место)' # титул на таблице
+        elif fin == "Чистая сетка":
+            first_mesto = 1
+            last_mesto = first_mesto + max_pl - 1
+            fin_title = ""    
         else:
-            first_mesto = self.mesto_in_final(fin)
+            first_mesto = self.get_final_start_place(fin)
             last_mesto = max_pl if fin == "1-й финал" else first_mesto + max_pl - 1
             fin_title = f'Финальные соревнования.({first_mesto}-{last_mesto} место)' # титул на таблице
+        
         for i in range(0, 40):
             # column_count[9] = i  # нумерация 10 столбца для удобного просмотра таблицы
             list_tmp = column_count.copy()
@@ -20286,14 +20301,14 @@ class MainWindow(QMainWindow):
 
         return name_table_final
 
-    def setka_16_full_made(self, fin, posev_data):
-        """сетка на 16 в pdf"""
+    def setka_8_2_made(self, fin, posev_data):
+        """сетка на 8 минус 2 в pdf"""
         from reportlab.platypus import Table
-        table = "setka_16_full"
-
-        sex = "M" if self.current_sex == "man" else "W" 
+        table = "setka_8_2"
 
         pairs_list = ["Мужские пары", "Женские пары", "Смешанные пары"]
+
+        sex = "M" if self.current_sex == "man" else "W"
 
         # Папка для сохранения
         pdf_dir = "table_pdf"
@@ -20304,7 +20319,7 @@ class MainWindow(QMainWindow):
         data = []
         style = []
         column = ['']
-        column_count = column * 11
+        column_count = column * 10
         # добавить в аргументы функции
         final = fin
         titles = Title.select().where(Title.id == self.current_title_id).get()
@@ -20330,6 +20345,178 @@ class MainWindow(QMainWindow):
             last_mesto = max_pl if fin == "1-й финал" else first_mesto + max_pl - 1
             fin_title = f'Финальные соревнования.({first_mesto}-{last_mesto} место)' # титул на таблице
 
+        for i in range(0, 40):
+            # column_count[9] = i  # нумерация 10 столбца для удобного просмотра таблицы
+            list_tmp = column_count.copy()
+            data.append(list_tmp)
+        # ========= места ==========
+        y = 0
+        for i in range(0, 16, 2):
+            y += 1
+            data[i][0] = str(y)  # рисует начальные номера таблицы 1-16
+        # ========= нумерация встреч сетки ==========
+        self.draw_num(row_n=1, row_step=2, col_n=2, number_of_columns=3, number_of_game=1, player=8, data=data) # рисует номера встреч 1-32
+        self.draw_num_2(row_n=17, row_step=2, col_n=2, number_of_columns=2, number_of_game=8, player=4, data=data) # рисует номера встреч 33-47 
+        self.draw_num_lost_2(row_n=15, row_step=2, col_n=2, revers_number=1, number_of_game=5, player=2, data=data) # номера минус проигравшие встречи -17-24
+        self.draw_num_lost(row_n=17, row_step=2, col_n=0, number_of_game=1, player=4, data=data) # номера минус проигравшие встречи -1 -16
+        self.draw_num_lost(row_n=25, row_step=2, col_n=4, number_of_game=10, player=2, data=data) # номера минус проигравшие встречи -1 -16
+        self.draw_num_lost(row_n=31, row_step=2, col_n=4, number_of_game=8, player=2, data=data) # номера минус проигравшие встречи -1 -16
+        
+        data[13][6] = str(-7)
+        data[18][6] = str(12)  # создание номеров встреч 12
+        data[25][6] = str(13)
+        data[31][6] = str(14)
+        data[22][6] = str(-12)
+        data[28][6] = str(-13)
+        data[34][6] = str(-14)  # создание номеров встреч 27
+        #========= расписание ===========
+        style_color_schedule = self.schedule_data(data, fin)
+        # ============= данные игроков и встреч и размещение по сетке =============
+        if fin != "Чистая сетка":
+            tds = self.write_in_setka(data, fin, first_mesto, table, posev_data)
+        else:
+            tds = None
+        #===============
+        cw = ((0.3 * cm, 4.6 * cm, 0.4 * cm, 3.0 * cm, 0.4 * cm, 3.0 * cm, 0.4 * cm, 4.8 * cm, 1.0 * cm, 0.2 * cm))
+        # основа сетки на чем чертить таблицу (ширина столбцов и рядов, их кол-во)
+        self.color_mesta(data, first_mesto, table, fin) # раскрашивает места участников красным цветом
+        t = Table(data, cw, 40 * [0.6 * cm])
+        # =========  цикл создания стиля таблицы ================
+        # ==== рисует основной столбец сетки 
+        style = self.draw_setka(1, 1, 8, style) # рисует кусок сетки(номер столбца, номер строки на 16 человека)
+        style = self.draw_setka_2(1, 17, 4, style) # рисует кусок сетки(номер столбца, номер строки на 16 человека)
+        style = self.draw_setka(5, 25, 2, style) # рисует кусок сетки(номер столбца, номер строки на 2 человека)
+        style = self.draw_setka(5, 31, 2, style) # рисует кусок сетки(номер столбца, номер строки на 2 человека)
+        # ======= встречи за места =====
+        for q in range(0, 7, 6):
+            fn = ('LINEABOVE', (7, q + 8), (8, q + 8),
+                1, colors.darkblue)  # за 1-2 место
+            style.append(fn)
+        for q in range(0, 5, 4):
+            fn = ('LINEABOVE', (7, q + 19), (8, q + 19),
+                1, colors.darkblue)  # за 3-4 место
+            style.append(fn)
+        for q in range(0, 4, 3):
+            fn = ('LINEABOVE', (7, q + 26), (8, q + 26),
+                1, colors.darkblue)  # за 5-6 место
+            style.append(fn)
+            fn = ('LINEABOVE', (7, q + 32), (8, q + 32),
+                1, colors.darkblue)  # за 7-8 место
+            style.append(fn)
+
+        for i in range(1, 6, 2):
+            fn = ('TEXTCOLOR', (i, 0), (i, 39), colors.black)  # цвет шрифта игроков
+            style.append(fn)
+            fn = ('TEXTCOLOR', (i + 1, 0), (i + 1, 39), colors.green)  # цвет шрифта номеров встреч
+            style.append(fn)
+            # выравнивание фамилий игроков по левому краю
+            fn = ('ALIGN', (i, 0), (i, 39), 'LEFT') 
+            style.append(fn)
+            # центрирование номеров встреч
+            fn = ('ALIGN', (i + 1, 0), (i + 1, 39), 'CENTER')
+            style.append(fn)
+        # fn = ('INNERGRID', (0, 0), (-1, -1), 0.01, colors.grey)  # временное отображение сетки
+        # style.append(fn)
+
+        ts = style   # стиль таблицы (список оформления строк и шрифта)
+        t.setStyle(TableStyle([('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
+                            ('FONTNAME', (0, 0), (-1, -1), "DejaVuSerif"),
+                            ('FONTSIZE', (0, 0), (-1, -1), 7),
+                            ('FONTNAME', (1, 0), (1, 15), "DejaVuSerif-Bold"),
+                            #    ('FONTSIZE', (1, 0), (1, 15), 7),
+                            # 10 столбец с 0 по 68 ряд (цвет места)
+                            ('TEXTCOLOR', (8, 0), (8, 39), colors.red),
+                            # столбец с фамилиями за места выравнивает слева
+                            ('ALIGN', (7, 0), (7, 39), 'LEFT'), 
+                            # столбец с местами выравнивает справа
+                            ('ALIGN', (8, 0), (8, 39), 'RIGHT'),
+                            # цвет шрифта игроков 1 ого тура
+                            ('TEXTCOLOR', (0, 0), (0, 39), colors.blue),
+                            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
+                            ] + ts))
+    # === надпись финала
+        h2 = PS("normal", fontSize=12, fontName="DejaVuSerif-Italic",
+                leftIndent=50, textColor=Color(1, 0, 1, 1))  # стиль параграфа (номера таблиц)
+        elements.append(Paragraph(f"{fin_title}. Одиночный разряд. {gamer}", h2))
+    # ====
+        elements.append(t)
+        pv = A4
+        znak = final.rfind("-")
+        f = final[:znak]
+
+        if pv == A4:
+            pv = A4
+        else:
+            pv = landscape(A4)
+
+        t_id = Title.get(Title.id == self.current_title_id)
+        if tds is not None:
+            short_name = t_id.short_name_comp
+            if fin == "Одна таблица":
+                name_table_final = f"{short_name}_{sex}_one_table.pdf"
+            elif fin in pairs_list :
+                name_table_final = f"{short_name}_{sex}_double_{f}.pdf"
+            elif fin == "Суперфинал":
+                name_table_final = f"{short_name}_{sex}_{f}.pdf"
+            elif fin != "Суперфинал":
+                name_table_final = f"{short_name}_{sex}_{f}-final.pdf"                   
+        else:
+            name_table_final = "clear_8_2_net.pdf"
+
+        # Создаем PDF
+        filename = os.path.join(pdf_dir, name_table_final)
+                
+        doc = SimpleDocTemplate(filename, pagesize=pv, rightMargin=1*cm, leftMargin=1*cm, topMargin=3*cm, bottomMargin=1*cm)
+        doc.build(elements, onFirstPage=self.func_zagolovok)
+
+        return name_table_final
+
+    def setka_16_full_made(self, fin, posev_data):
+        """сетка на 16 в pdf"""
+        from reportlab.platypus import Table
+        table = "setka_16_full"
+
+        sex = "M" if self.current_sex == "man" else "W" 
+
+        pairs_list = ["Мужские пары", "Женские пары", "Смешанные пары"]
+
+        # Папка для сохранения
+        pdf_dir = "table_pdf"
+        if not os.path.exists(pdf_dir):
+            os.makedirs(pdf_dir)
+
+        elements = []
+        data = []
+        style = []
+        column = ['']
+        column_count = column * 11
+
+        # добавить в аргументы функции
+        final = fin
+        titles = Title.select().where(Title.id == self.current_title_id).get()
+        vid_turnira = titles.vid_turnira
+        gamer = titles.gamer
+ 
+        finals = System.select().where(
+            (System.title_id == self.current_title_id) &
+            (System.sex == self.current_sex) &
+            (System.stage == fin)).get()
+        max_pl = finals.max_player # максимальное число игроков в сетке
+
+        if fin in pairs_list:
+            first_mesto = 1
+            last_mesto = 3
+            fin_title = f'Финальные соревнования.(с 1 по 3 место)' # титул на таблице
+        elif fin == "Чистая сетка":
+            first_mesto = 1
+            last_mesto = first_mesto + max_pl - 1
+            fin_title = ""    
+        else:
+            first_mesto = self.get_final_start_place(fin)
+            last_mesto = max_pl if fin == "1-й финал" else first_mesto + max_pl - 1
+            fin_title = f'Финальные соревнования.({first_mesto}-{last_mesto} место)' # титул на таблице
+
+        # создание основы сетки
         for i in range(0, 69):
             # column_count[10] = i  # нумерация 10 столбца для удобного просмотра таблицы
             list_tmp = column_count.copy()
@@ -20506,7 +20693,372 @@ class MainWindow(QMainWindow):
         filename = os.path.join(pdf_dir, name_table_final)
 
         doc = SimpleDocTemplate(filename, pagesize=pv, rightMargin=1*cm, leftMargin=1*cm, topMargin=3*cm, bottomMargin=1*cm)
+        doc.build(elements, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
+
+        return name_table_final
+
+    def setka_16_made(self, fin, posev_data):
+        """сетка на 16  1-3 места в pdf"""
+        from reportlab.platypus import Table
+        table = "setka_16"
+
+        sex = "M" if self.current_sex == "man" else "W" 
+        
+        pairs_list = ["Мужские пары", "Женские пары", "Смешанные пары"]
+
+        # Папка для сохранения
+        pdf_dir = "table_pdf"
+        if not os.path.exists(pdf_dir):
+            os.makedirs(pdf_dir)
+
+        elements = []
+        data = []
+        style = []
+        column = ['']
+        column_count = column * 11
+
+        # добавить в аргументы функции
+        final = fin
+        titles = Title.select().where(Title.id == self.current_title_id).get()
+        vid_turnira = titles.vid_turnira
+        gamer = titles.gamer
+ 
+        finals = System.select().where(
+            (System.title_id == self.current_title_id) &
+            (System.sex == self.current_sex) &
+            (System.stage == fin)).get()
+        max_pl = finals.max_player # максимальное число игроков в сетке
+
+        if fin in pairs_list:
+            first_mesto = 1
+            last_mesto = 3
+            fin_title = f'Финальные соревнования.(с 1 по 3 место)' # титул на таблице
+        elif fin == "Чистая сетка":
+            first_mesto = 1
+            last_mesto = first_mesto + max_pl - 1
+            fin_title = ""    
+        else:
+            first_mesto = self.get_final_start_place(fin)
+            last_mesto = max_pl if fin == "1-й финал" else first_mesto + max_pl - 1
+            fin_title = f'Финальные соревнования.({first_mesto}-{last_mesto} место)' # титул на таблице
+
+        # создание основы сетки
+        for i in range(0, 69):
+            # column_count[10] = i  # нумерация 10 столбца для удобного просмотра таблицы
+            list_tmp = column_count.copy()
+            data.append(list_tmp) # пустая основа сетки 
+        # ========= места ==========
+        y = 0
+        for i in range(0, 32, 2):
+            y += 1
+            data[i][0] = str(y)  # рисует начальные номера таблицы 1-16
+        # ========= нумерация встреч сетки ==========
+        self.draw_num(row_n=1, row_step=2, col_n=2, number_of_columns=4, number_of_game=1, player=16, data=data) # рисует номера встреч 1-32
+        
+        data[25][8] = str(-15)
+        data[29][8] = str(16)  # создание номеров встреч 16
+        data[31][8] = str(-16)
+    
+        #========= расписание ===========
+        style_color_schedule = self.schedule_data(data, fin)
+        # ============= данные игроков и встреч и размещение по сетке =============
+        if fin != "Чистая сетка":
+            tds = self.write_in_setka(data, fin, first_mesto, table, posev_data)
+        else:
+            tds = None
+        #===============
+        cw = ((0.3 * cm, 4.6 * cm, 0.4 * cm, 2.6 * cm, 0.4 * cm, 2.6 * cm, 0.4 * cm, 2.6 * cm,
+            0.4 * cm, 4.4 * cm, 1.3 * cm))
+        # основа сетки на чем чертить таблицу (ширина столбцов и рядов, их кол-во)
+        self.color_mesta(data, first_mesto, table, fin) # раскрашивает места участников красным цветом
+        t = Table(data, cw, 69 * [0.35 * cm])
+        # =========  цикл создания стиля таблицы ================
+        # ==== рисует основной столбец сетки 
+        style = self.draw_setka(1, 1, 16, style) # рисует кусок сетки(номер столбца, номер строки на 16 человека)
+        style = self.draw_setka(7, 29, 2, style) # рисует кусок сетки(номер столбца, номер строки на 32 человека)
+    
+        # ======= встречи за места =====
+        for q in range(0, 11, 10):
+            fn = ('LINEABOVE', (9, q + 16), (10, q + 16),
+                1, colors.darkblue)  # за 1-2 место
+            style.append(fn)
+        for q in range(0, 3, 2):
+            fn = ('LINEABOVE', (9, q + 30), (10, q + 30),
+                1, colors.darkblue)  # за 3-4 место
+            style.append(fn)
+    
+        for i in range(1, 8, 2):
+            fn = ('TEXTCOLOR', (i, 0), (i, 68), colors.black)  # цвет шрифта игроков
+            style.append(fn)
+            fn = ('TEXTCOLOR', (i + 1, 0), (i + 1, 68), colors.green)  # цвет шрифта номеров встреч
+            style.append(fn)
+            # выравнивание фамилий игроков по левому краю
+            fn = ('ALIGN', (i, 0), (i, 68), 'LEFT') 
+            style.append(fn)
+            # центрирование номеров встреч
+            fn = ('ALIGN', (i + 1, 0), (i + 1, 68), 'CENTER')
+            style.append(fn)
+        # fn = ('INNERGRID', (0, 0), (-1, -1), 0.01, colors.grey)  # временное отображение сетки
+        # style.append(fn)
+
+        ts = style   # стиль таблицы (список оформления строк и шрифта)
+        t.setStyle(TableStyle([('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
+                            ('FONTNAME', (0, 0), (-1, -1), "DejaVuSerif"),
+                            ('FONTSIZE', (0, 0), (-1, -1), 7),
+                            ('FONTNAME', (1, 0), (1, 32), "DejaVuSerif-Bold"),
+                            ('FONTSIZE', (1, 0), (1, 32), 7),
+                            # 10 столбец с 0 по 68 ряд (цвет места)
+                            ('TEXTCOLOR', (10, 0), (10, 68), colors.red),
+                            #    ('ALIGN', (10, 0), (10, 68), 'RIGHT'),
+                            ('ALIGN', (9, 0), (9, 68), 'LEFT'),
+                            # цвет шрифта игроков 1 ого тура
+                            ('TEXTCOLOR', (0, 0), (0, 68), colors.blue),
+                            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
+                            ] + ts))
+    # === надпись финала
+        h2 = PS("normal", fontSize=10, fontName="DejaVuSerif-Italic",
+                leftIndent=50, textColor=Color(1, 0, 1, 1))  # стиль параграфа (номера таблиц)
+        elements.append(Paragraph(f"{fin_title}. Одиночный разряд. {gamer}", h2))
+    # ====
+        elements.append(t)
+        pv = A4
+        znak = final.rfind("-")
+        f = final[:znak]
+
+        if pv == A4:
+            pv = A4
+        else:
+            pv = landscape(A4)
+
+        t_id = Title.get(Title.id == self.current_title_id)
+        if tds is not None:
+            short_name = t_id.short_name_comp
+            if fin == "Одна таблица":
+                name_table_final = f"{short_name}_{sex}_one_table.pdf"
+            elif fin in pairs_list :
+                name_table_final = f"{short_name}_{sex}_double_{f}.pdf"
+            elif fin == "Суперфинал":
+                name_table_final = f"{short_name}_{sex}_{f}.pdf"
+            elif fin != "Суперфинал":
+                name_table_final = f"{short_name}_{sex}_{f}-final.pdf"                   
+        else:
+            short_name = "clear_16_net"  # имя для чистой сетки
+            name_table_final = f"{short_name}.pdf"
+
+        # Создаем PDF
+        filename = os.path.join(pdf_dir, name_table_final)
+
+        doc = SimpleDocTemplate(filename, pagesize=pv, rightMargin=1*cm, leftMargin=1*cm, topMargin=3*cm, bottomMargin=1*cm)
         doc.build(elements, onFirstPage=self.func_zagolovok)
+
+        return name_table_final
+
+    def setka_16_2_made(self, fin, posev_data):
+        """сетка на 16_2 в pdf"""
+        from reportlab.platypus import Table
+        table = "setka_16_2"
+
+        sex = "M" if self.current_sex == "man" else "W" 
+                
+        pairs_list = ["Мужские пары", "Женские пары", "Смешанные пары"]
+
+        # Папка для сохранения
+        pdf_dir = "table_pdf"
+        if not os.path.exists(pdf_dir):
+            os.makedirs(pdf_dir)
+
+        elements = []
+        data = []
+        style = []
+        column = ['']
+        column_count = column * 11
+
+        # добавить в аргументы функции
+        final = fin
+        titles = Title.select().where(Title.id == self.current_title_id).get()
+        vid_turnira = titles.vid_turnira
+        gamer = titles.gamer
+    
+        finals = System.select().where(
+            (System.title_id == self.current_title_id) &
+            (System.sex == self.current_sex) &
+            (System.stage == fin)).get()
+        max_pl = finals.max_player # максимальное число игроков в сетке
+
+        if fin in pairs_list:
+            first_mesto = 1
+            last_mesto = 3
+            fin_title = f'Финальные соревнования.(с 1 по 3 место)' # титул на таблице
+        elif fin == "Чистая сетка":
+            first_mesto = 1
+            last_mesto = first_mesto + max_pl - 1
+            fin_title = ""    
+        else:
+            first_mesto = self.get_final_start_place(fin)
+            last_mesto = max_pl if fin == "1-й финал" else first_mesto + max_pl - 1
+            fin_title = f'Финальные соревнования.({first_mesto}-{last_mesto} место)' # титул на таблице
+
+        for i in range(0, 86):
+            # column_count[10] = i  # нумерация 10 столбца для удобного просмотра таблицы
+            list_tmp = column_count.copy()
+            data.append(list_tmp)
+        # ========= места ==========
+        y = 0
+        for i in range(2, 34, 2):
+            y += 1
+            data[i][0] = str(y)  # рисует начальные номера таблицы 1-16
+        # ========= нумерация встреч сетки ==========
+        self.draw_num(row_n=3, row_step=2, col_n=2, number_of_columns=4, number_of_game=1, player=16, data=data) # рисует номера встреч 1-32
+        self.draw_num_lost_2(row_n=45, row_step=1, col_n=0, revers_number=0, number_of_game=1, player=8, data=data) # номера минус проигравшие встречи -17-24
+        self.draw_num_lost_2(row_n=44, row_step=2, col_n=2, revers_number=1, number_of_game=9, player=4, data=data) # номера минус проигравшие встречи -17-24
+        self.draw_num_lost_2(row_n=43, row_step=4, col_n=6, revers_number=0, number_of_game=13, player=2, data=data) # номера минус проигравшие встречи -17-24
+        self.draw_num(row_n=62, row_step=2, col_n=2, number_of_columns=2, number_of_game=31, player=4, data=data) # рисует номера встреч 1-32
+        self.draw_num(row_n=74, row_step=2, col_n=2, number_of_columns=2, number_of_game=35, player=4, data=data) # рисует номера встреч 1-32
+
+        self.draw_num(row_n=46, row_step=2, col_n=2, number_of_columns=1, number_of_game=16, player=8, data=data) # рисует номера встреч 1-32
+        self.draw_num(row_n=45, row_step=2, col_n=4, number_of_columns=2, number_of_game=20, player=8, data=data) # рисует номера встреч 1-32
+        self.draw_num(row_n=44, row_step=4, col_n=8, number_of_columns=1, number_of_game=26, player=4, data=data) # рисует номера встреч 1-32
+        self.draw_num_lost(row_n=62, row_step=2, col_n=0, number_of_game=20, player=4, data=data) # номера минус проигравшие встречи -20 -23
+        self.draw_num_lost(row_n=74, row_step=2, col_n=0, number_of_game=16, player=4, data=data) # номера минус проигравшие встречи -1 -16
+        self.draw_num_lost(row_n=61, row_step=2, col_n=6, number_of_game=26, player=2, data=data) # номера минус проигравшие встречи -1 -16
+        self.draw_num_lost(row_n=67, row_step=2, col_n=6, number_of_game=24, player=2, data=data) # номера минус проигравшие встречи -1 -16
+        self.draw_num_lost(row_n=73, row_step=2, col_n=6, number_of_game=31, player=2, data=data) # номера минус проигравшие встречи -1 -16
+        self.draw_num_lost(row_n=79, row_step=2, col_n=6, number_of_game=35, player=2, data=data) # номера минус проигравшие встречи -1 -16
+    
+        data[46][10] = str(28)  # создание номеров встреч 15
+        data[34][8] = str(-15)
+        data[57][8] = str(-28)
+        data[70][4] = str(-33)
+        data[82][4] = str(-37)
+        data[61][8] = str(29)  # создание номеров встреч 27
+        data[64][8] = str(-29)
+        data[67][8] = str(30)  # создание номеров встреч 28
+        data[70][8] = str(-30)
+        data[73][8] = str(34)  # создание номеров встреч 32
+        data[76][8] = str(-34)
+        data[79][8] = str(38)  # создание номеров встреч 32
+        data[82][8] = str(-38)
+
+        #========= расписание ===========
+        style_color_schedule = self.schedule_data(data, fin)
+        # ============= данные игроков и встреч и размещение по сетке =============
+        if fin != "Чистая сетка":
+            tds = self.write_in_setka(data, fin, first_mesto, table, posev_data)
+        else:
+            tds = None
+        #===============
+        cw = ((0.3 * cm, 4.6 * cm, 0.4 * cm, 2.6 * cm, 0.4 * cm, 2.6 * cm, 0.4 * cm, 2.6 * cm,
+            0.4 * cm, 4.4 * cm, 0.4 * cm))
+        # основа сетки на чем чертить таблицу (ширина столбцов и рядов, их кол-во)
+        style_color = self.color_mesta(data, first_mesto, table, fin) # раскрашивает места участников красным цветом
+        t = Table(data, cw, 86 * [0.55 * cm])
+        # =========  цикл создания стиля таблицы ================
+        # ==== рисует основной столбец сетки 
+        style = self.draw_setka(1, 3, 16, style) # рисует кусок сетки(номер столбца, номер строки на 16 человека)
+        style = self.draw_setka(1, 62, 4, style) # рисует кусок сетки(номер столбца, номер строки на 32 человека)
+        style = self.draw_setka(1, 74, 4, style) # рисует кусок сетки(номер столбца, номер строки на 32 человека)
+        style = self.draw_setka_2(1, 46, 8, style) # рисует кусок сетки(номер столбца, номер строки на 8 человека)
+        style = self.draw_setka_made(9, 46, 2, 8, 1, style) # рисует кусок сетки(номер столбца, колво уч, шаг между линиями)
+        style = self.draw_setka(7, 61, 2, style) # рисует кусок сетки(номер столбца, номер строки на 32 человека)
+        style = self.draw_setka(7, 67, 2, style) # рисует кусок сетки(номер столбца, номер строки на 32 человека)
+        style = self.draw_setka(7, 73, 2, style) # рисует кусок сетки(номер столбца, номер строки на 32 человека)
+        style = self.draw_setka(7, 79, 2, style) # рисует кусок сетки(номер столбца, номер строки на 32 человека)
+        # ======= встречи за места =====
+        for q in range(0, 18, 17):
+            fn = ('LINEABOVE', (9, q + 18), (10, q + 18),
+                1, colors.darkblue)  # за 1-2 место
+            style.append(fn)
+        for q in range(0, 9, 8):
+            fn = ('LINEABOVE', (9, q + 50), (10, q + 50),
+                1, colors.darkblue)  # за 3-4 место
+            style.append(fn)
+    
+        for q in range(0, 4, 3):
+            fn = ('LINEABOVE', (9, q + 62), (10, q + 62),
+                1, colors.darkblue)  # за 5-6 место
+            style.append(fn)
+            fn = ('LINEABOVE', (9, q + 68), (10, q + 68),
+                1, colors.darkblue)  # за 5-6 место
+            style.append(fn)
+            fn = ('LINEABOVE', (9, q + 74), (10, q + 74),
+                1, colors.darkblue)  # за 5-6 место
+            style.append(fn)
+            fn = ('LINEABOVE', (9, q + 80), (10, q + 80),
+                1, colors.darkblue)  # за 5-6 место
+            style.append(fn)
+
+        for q in range(0, 7, 6):
+            fn = ('LINEABOVE', (5, q + 65), (6, q + 65),
+                1, colors.darkblue)  # за 7-8 место
+            style.append(fn)
+            fn = ('LINEABOVE', (5, q + 77), (6, q + 77),
+                1, colors.darkblue)  # за 9-10 место
+            style.append(fn)
+
+        for i in range(1, 10, 2):
+            fn = ('TEXTCOLOR', (i, 0), (i, 85), colors.black)  # цвет шрифта игроков
+            style.append(fn)
+            fn = ('TEXTCOLOR', (i + 1, 0), (i + 1, 85), colors.green)  # цвет шрифта номеров встреч
+            style.append(fn)
+            # выравнивание фамилий игроков по левому краю
+            fn = ('ALIGN', (i, 0), (i, 85), 'LEFT') 
+            style.append(fn)
+            # центрирование номеров встреч
+            fn = ('ALIGN', (i + 1, 0), (i + 1, 85), 'CENTER')
+            style.append(fn)
+    
+        # fn = ('INNERGRID', (0, 0), (-1, -1), 0.01, colors.grey)  # временное отображение сетки
+        # style.append(fn)
+
+        ts = style   # стиль таблицы (список оформления строк и шрифта)
+
+        for b in style_color: # цикл окрашивания мест красным цветом
+            ts.append(b)
+
+        t.setStyle(TableStyle([('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
+                            ('FONTNAME', (0, 0), (-1, -1), "DejaVuSerif"),
+                            ('FONTSIZE', (0, 0), (-1, -1), 7),
+                            ('FONTNAME', (1, 0), (1, 32), "DejaVuSerif-Bold"),
+                            ('FONTSIZE', (1, 0), (1, 32), 7)] + ts 
+                            + [
+                            # цвет шрифта игроков 1 ого тура
+                            ('TEXTCOLOR', (0, 0), (0, 40), colors.blue),
+                            ('TEXTCOLOR', (0, 41), (0, 85), colors.green),
+                            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')]))
+    # === надпись финала
+        h2 = PS("normal", fontSize=10, fontName="DejaVuSerif-Italic",
+                leftIndent=50, textColor=Color(1, 0, 1, 1))  # стиль параграфа (номера таблиц)
+        elements.append(Paragraph(f"{fin_title}. Одиночный разряд. {gamer}", h2))
+    # ====
+        elements.append(t)
+        pv = A4
+        znak = final.rfind("-")
+        f = final[:znak]
+
+        if pv == A4:
+            pv = A4
+        else:
+            pv = landscape(A4)
+
+        t_id = Title.get(Title.id == self.current_title_id)
+        if tds is not None:
+            short_name = t_id.short_name_comp
+            if fin == "Одна таблица":
+                name_table_final = f"{short_name}_{sex}_one_table.pdf"
+            elif fin in pairs_list :
+                name_table_final = f"{short_name}_{sex}_double_{f}.pdf"
+            elif fin == "Суперфинал":
+                name_table_final = f"{short_name}_{sex}_{f}.pdf"
+            elif fin != "Суперфинал":
+                name_table_final = f"{short_name}_{sex}_{f}-final.pdf"                   
+        else:
+            name_table_final = "clear_16_2_net.pdf"
+
+        # Создаем PDF
+        filename = os.path.join(pdf_dir, name_table_final)
+
+        doc = SimpleDocTemplate(filename, pagesize=pv, rightMargin=1*cm, leftMargin=1*cm, topMargin=3*cm, bottomMargin=2*cm)
+        doc.build(elements, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
 
         return name_table_final
 
@@ -20787,13 +21339,171 @@ class MainWindow(QMainWindow):
 
         return name_table_final
 
+    def setka_32_made(self, fin, posev_data):
+        """сетка на 32 с розыгрышем 1-3 места"""
+        from reportlab.platypus import Table
+
+        table = "setka_32"
+
+        pairs_list = ["Мужские пары", "Женские пары", "Смешанные пары"]
+        
+        sex = "M" if self.current_sex == "man" else "W"
+
+        # Папка для сохранения
+        pdf_dir = "table_pdf"
+        if not os.path.exists(pdf_dir):
+            os.makedirs(pdf_dir)
+
+        elements = []
+        style = []
+        data = []
+        column = ['']
+        column_count = column * 13
+
+        final = fin
+        titles = Title.select().where(Title.id == self.current_title_id).get()
+        gamer = titles.gamer
+
+        finals = System.select().where(
+            (System.title_id == self.current_title_id) &
+            (System.stage == fin) &
+            (System.sex == self.current_sex)
+            ).get()
+        max_pl = finals.max_player # максимальное число игроков в сетке
+
+        if fin in pairs_list:
+            first_mesto = 1
+            last_mesto = 3
+            fin_title = f'Финальные соревнования.(с 1 по 3 место)' # титул на таблице
+        elif fin == "Чистая сетка":
+            first_mesto = 1
+            last_mesto = first_mesto + max_pl - 1
+            fin_title = ""    
+        else:
+            first_mesto = self.get_final_start_place(fin)
+            last_mesto = max_pl if fin == "1-й финал" else first_mesto + max_pl - 1
+            fin_title = f'Финальные соревнования.({first_mesto}-{last_mesto} место)' # титул на таблице
+
+        strok = 69
+        for i in range(0, strok):
+            # column_count[12] = i  # нумерация 10 столбца для удобного просмотра таблицы
+            list_tmp = column_count.copy()
+            data.append(list_tmp)
+        # ========= нумерация встреч сетки ==========
+        y = 0
+        for i in range(1, 65, 2):
+            y += 1
+            data[i + 1][0] = str(y)  # рисует начальные номера таблицы 1-32
+        number_of_game = self.draw_num(row_n=3, row_step=2, col_n=2, number_of_columns=5, number_of_game=1, player=32, data=data) # рисует номера встреч 1-32
+        data[60][8] = str((number_of_game - 3) * -1)  # номера проигравших 29
+        data[62][8] = str((number_of_game - 2) * -1)  # номера проигравших 30
+        data[55][10] = str((number_of_game - 1) * -1)  # номер проигравшего финал (-31)
+        data[61][10] = str(number_of_game)  # создание номеров встреч 32
+        data[66][10] = str((number_of_game) * -1)  # номер проигравшего финал (-32)
+
+        #========= расписание ===========
+        self.schedule_data(data, fin)
+        # ============= данные игроков и встреч и размещение по сетке =============
+        if fin != "Чистая сетка":
+            tds = self.write_in_setka(data, fin, first_mesto, table, posev_data)
+        else:
+            tds = None
+
+        cw = ((0.2 * cm, 3.8 * cm, 0.35 * cm, 2.7 * cm, 0.35 * cm, 2.7 * cm, 0.35 * cm, 2.7 * cm, 0.35 * cm,
+            2.5 * cm, 0.35 * cm, 3.0 * cm, 0.3 * cm))
+        # основа сетки на чем чертить таблицу (ширина столбцов и рядов, их кол-во)
+        style_color = self.color_mesta(data, first_mesto, table, fin) # раскрашивает места участников красным цветом
+        t = Table(data, cw, strok * [0.35 * cm])
+        # =========  цикл создания стиля таблицы =======
+        # ========= 1 страница =========
+        style = self.draw_setka(1, 3, 32, style) # рисует кусок сетки(номер столбца, номер строки на 32 человека)
+    
+        for l in range(34, 57, 22):
+            fn = ('LINEABOVE', (11, l), (13, l), 1, colors.darkblue)  # рисует линии встреч за 1-2 места
+            style.append(fn)
+        for l in range(62, 68, 5):
+            fn = ('LINEABOVE', (11, l), (13, l), 1, colors.darkblue)  # рисует линии встреч за 3-4 места
+            style.append(fn)
+        for l in range(61, 64, 2):
+            fn = ('LINEABOVE', (9, l), (10, l), 1, colors.darkblue)  # рисует линии встреч за -29 -30
+            style.append(fn)
+        fn = ('BOX', (10, 61), (10, 62), 1, colors.darkblue)
+        style.append(fn) 
+        fn = ('SPAN', (10, 61), (10, 62))  # встреча 32
+        style.append(fn)       
+        fn = ('BACKGROUND', (10, 61), (10, 62), colors.lightyellow)  # встречи 32 за 3-4 место
+        style.append(fn)
+
+        for i in range(0, 11, 2):
+            fn = ('TEXTCOLOR', (i + 1, 0), (i + 1, strok), colors.black)  # цвет шрифта игроков
+            style.append(fn)
+            fn = ('TEXTCOLOR', (i, 0), (i, strok), colors.green)  # цвет шрифта номеров встреч
+            style.append(fn)
+            # выравнивание фамилий игроков по левому краю
+            fn = ('ALIGN', (i + 1, 0), (i + 1, strok), 'LEFT')
+            style.append(fn)
+            # центрирование номеров встреч
+            fn = ('ALIGN', (i, 0), (i, strok), 'CENTER')
+            style.append(fn)
+        # fn = ('INNERGRID', (0, 0), (-1, -1), 0.01, colors.grey)  # временное отображение сетки
+        # style.append(fn)
+        ts = style   # стиль таблицы (список оформления строк и шрифта)
+        for b in style_color:
+            ts.append(b)
+
+        t.setStyle(TableStyle([('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
+                            ('FONTNAME', (0, 0), (-1, -1), "DejaVuSerif"),
+                            ('FONTSIZE', (0, 0), (-1, -1), 7),
+                            ('FONTNAME', (1, 0), (1, 32), "DejaVuSerif-Bold"),
+                            ('FONTSIZE', (1, 0), (1, 32), 7)] + ts 
+                            + [
+                            # цвет шрифта игроков 1 ого тура
+                            ('TEXTCOLOR', (0, 0), (0, 68), colors.blue),
+                            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')])) 
+    # === надпись финала
+        h2 = PS("normal", fontSize=10, fontName="DejaVuSerif-Italic",
+                leftIndent=50, textColor=Color(1, 0, 1, 1))  # стиль параграфа (номера таблиц)
+        elements.append(Paragraph(f"{fin_title}. Одиночный разряд. {gamer}", h2))
+    # ====                         
+        elements.append(t)
+        pv = A4
+        znak = final.rfind("-")
+        f = final[:znak]
+
+        if pv == A4:
+            pv = A4
+        else:
+            pv = landscape(A4)
+
+        t_id = Title.get(Title.id == self.current_title_id)
+        if tds is not None:
+            short_name = t_id.short_name_comp
+            if fin == "Одна таблица":
+                name_table_final = f"{short_name}_{sex}_one_table.pdf"
+            elif fin in pairs_list :
+                name_table_final = f"{short_name}_{sex}_double_{f}.pdf"
+            elif fin == "Суперфинал":
+                name_table_final = f"{short_name}_{sex}_{f}.pdf"
+            elif fin != "Суперфинал":
+                name_table_final = f"{short_name}_{sex}_{f}-final.pdf"                   
+        else:
+            short_name = "clear_32_net"  # имя для чистой сетки
+            name_table_final = f"{short_name}.pdf"
+
+        # Создаем PDF
+        filename = os.path.join(pdf_dir, name_table_final)
+
+        doc = SimpleDocTemplate(filename, pagesize=pv, rightMargin=1*cm, leftMargin=1*cm, topMargin=3*cm, bottomMargin=1*cm)
+        doc.build(elements, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
+
+        return name_table_final     
+
     def setka_32_2_made(self, fin, posev_data):
         """сетка на 32 (-2) с розыгрышем всех мест"""
         from reportlab.platypus import Table
-
-        pairs_list = ["Мужские пары", "Женские пары", "Смешанные пары"]
-
         table = "setka_32_2"
+
+        pairs_list = ["Мужские пары", "Женские пары", "Смешанные пары"]     
 
         sex = "M" if self.current_sex == "man" else "W"
 
@@ -20808,6 +21518,7 @@ class MainWindow(QMainWindow):
         column = ['']
         column_count = column * 15
         final = fin
+
         titles = Title.select().where(Title.id == self.current_title_id).get()
         gamer = titles.gamer
 
@@ -20843,7 +21554,7 @@ class MainWindow(QMainWindow):
             y += 1
             data[i + 1][0] = str(y)  # рисует начальные номера таблицы 1-32
         number_of_game = self.draw_num(row_n=3, row_step=2, col_n=2, number_of_columns=5, number_of_game=1, player=32, data=data) # рисует номера встреч 1-32 
-        data[18][10] = str(number_of_game - 1)  # создание номеров встреч (31)
+        # data[18][10] = str(number_of_game - 1)  # создание номеров встреч (31)
         data[55][10] = str((number_of_game - 1) * -1)  # номер проигравшего финал (-31)
     # ======= 2-я страница ===========
         self.draw_num_lost(row_n=74, row_step=2, col_n=0, number_of_game=1, player=16, data=data) # номера минус проигравшие встречи -1 -16
@@ -20908,15 +21619,6 @@ class MainWindow(QMainWindow):
         data[205][10] = str(number_of_game * -1)  # создание номеров встреч -94
         data[205][10] = str(number_of_game * -1)  # создание номеров встреч -94
         data[205][10] = str(number_of_game * -1)  # создание номеров встреч -94
-
-        # ============= данные игроков и встреч и размещение по сетке =============
-        # ======= создать словарь  ключ - номер встречи, значение - номер ряда
-        dict_num_game = {}
-        for d in range(2, 15, 2):
-            for r in range(0, 69):
-                key = data[r][d]
-                if key != "":
-                    dict_num_game[key] = r
 
         #========= расписание ===========
         style_color_schedule = self.schedule_data(data, fin)
@@ -21077,12 +21779,12 @@ class MainWindow(QMainWindow):
             elif fin != "Суперфинал":
                 name_table_final = f"{short_name}_{sex}_{f}-final.pdf"                   
         else:
-            short_name = "clear_32_2_net"  # имя для чистой сетки
-            name_table_final = f"{short_name}.pdf"
+            name_table_final = "clear_32_2_net.pdf"
 
+        # Создаем PDF
+        filename = os.path.join(pdf_dir, name_table_final)
 
-        doc = SimpleDocTemplate(name_table_final, pagesize=pv, rightMargin=1*cm, leftMargin=1*cm, topMargin=3.4*cm, bottomMargin=1.0*cm)
-
+        doc = SimpleDocTemplate(filename, pagesize=pv, rightMargin=1*cm, leftMargin=1*cm, topMargin=3.4*cm, bottomMargin=1.0*cm)
         doc.build(elements, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
 
         return name_table_final
@@ -21305,7 +22007,7 @@ class MainWindow(QMainWindow):
             posev_data = self.player_choice_in_setka(temp_system.stage)
 
             # Выбираем функцию построения в зависимости от размера
-            if net_type == "прогрессивная":
+            if net_type == "Прогрессивная":
                 if players == 8:
                     filename = self.setka_8_full_made(temp_system.stage, posev_data)
                 elif players == 16:
@@ -21319,6 +22021,13 @@ class MainWindow(QMainWindow):
                     filename = self.setka_16_2_made(temp_system.stage, posev_data)
                 elif players == 32:
                     filename = self.setka_32_2_made(temp_system.stage, posev_data)
+            elif net_type == "Выбывание":
+                if players == 8:
+                    filename = self.setka_8_made(temp_system.stage, posev_data)
+                elif players == 16:
+                    filename = self.setka_16_made(temp_system.stage, posev_data)
+                elif players == 32:
+                    filename = self.setka_32_made(temp_system.stage, posev_data)
             else:
                 QMessageBox.warning(self, "Ошибка", f"Неподдерживаемый размер сетки: {players}")
                 return
@@ -21328,10 +22037,10 @@ class MainWindow(QMainWindow):
             temp_system.delete_instance()
 
             if filename:
-                # full_path = os.path.join("table_pdf", filename)
-                QMessageBox.information(self, "Успех", f"Сетка сохранена:\n{filename}")
+                full_path = os.path.join("table_pdf", filename)
+                QMessageBox.information(self, "Успех", f"Сетка сохранена:\n{full_path}")
                 if sys.platform == 'win32':
-                    os.startfile(filename)
+                    os.startfile(full_path)
                 else:
                     os.system(f'open "{filename}"')
 
@@ -22164,6 +22873,28 @@ class MainWindow(QMainWindow):
                     b += 1    
         return style_color   
 
+    def draw_setka_made(self, col, row, num, step, tur, style):
+        """рисование сетки встреч игроков
+        col - начальный столбец, row - начальный ряд, num - кол-во игроков"""
+        style_set = []  
+    
+        col_fin = (col + 1) + (2 * (tur - 1)) # последний столбец
+        row_fin = row + (num - 1) * step # последняя строка 
+        for i in range (col, col_fin + 1, 2): # номер столбца 
+            for k in range(row, row_fin + 1, step): # номер строки
+                fn = ('LINEABOVE', (i, k), (i + 1, k), 1, colors.darkblue)  # рисует линии встреч
+                style_set.append(fn)  
+        for m in range(col + 1, col_fin + 1, 2):
+            for q in range(row, row_fin, step):  # встречи 33-34
+                fn = ('SPAN', (m, q), (m, q + step - 1 ))             
+                style_set.append(fn)
+                fn = ('BACKGROUND', (m, q), (m, q + step - 1 ), colors.lightyellow)  
+                style_set.append(fn) 
+                fn = ('BOX', (m, q), (m, q + step - 1), 1, colors.darkblue)
+                style_set.append(fn) 
+        for fn in style_set:
+            style.append(fn)
+        return style
     
     # def vid_double_game(self):
     #     """Определяет кто играет в парных играх"""

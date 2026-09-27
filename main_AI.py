@@ -27582,8 +27582,12 @@ class MainWindow(QMainWindow):
             else:
                 QMessageBox.warning(self, "Ошибка", "Не удалось создать бегунки")
 
-    def print_full_runners_with_filters(self, stage_name, subgroup):
+    def print_full_runners_with_filters(self, stage_name, subgroup, only_unplayed=True):
         """Печать полных бегунков с учётом текущих фильтров расписания"""
+        from begunok_full import BegunokPDF
+        import os
+        import re
+
         try:
             # Название соревнования
             title = Title.get_or_none(Title.id == self.current_title_id)
@@ -27633,11 +27637,26 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Ошибка", "Нет данных для печати бегунков (возможно, все строки скрыты фильтрами)")
                 return
             
-            # Создаём PDF с полными бегунками
-            from begunok_full import BegunokPDF
-            import os
-            import re
+            # --- NEW: отсеиваем уже сыгранные матчи ---
+            if only_unplayed:
+                played_set = self._build_played_matches_set()
+                before = len(matches_data)
+                matches_data = [
+                    m for m in matches_data
+                    if self._match_key(m['player1'], m['player2'], m['tour'])
+                    not in played_set
+                ]
+                print(f"[runners] отфильтровано сыгранных: "
+                    f"{before - len(matches_data)} из {before}")
 
+                if not matches_data:
+                    QMessageBox.information(
+                        self, "Нет несыгранных встреч",
+                        "Все встречи по текущему фильтру уже сыграны — "
+                        "печатать нечего."
+                    )
+                    return
+            
             # Папка для сохранения
             pdf_dir = "runners"
             if not os.path.exists(pdf_dir):
@@ -27691,50 +27710,82 @@ class MainWindow(QMainWindow):
             traceback.print_exc()
             QMessageBox.critical(self, "Ошибка", f"Не удалось создать бегунки: {str(e)}")
 
+    def _build_played_matches_set(self):
+        """
+        Один запрос к Result — возвращает set ключей сыгранных матчей.
+        Ключ строится из ФИО обоих игроков и номера встречи.
+        """
+        played = set()
+        rows = (Result
+                .select()
+                .where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.winner.is_null(False))
+                ))
+
+        for r in rows:
+            played.add(self._match_key(r.player1, r.player2, r.tours))
+
+        return played
+
+
+    def _match_key(self, player1, player2, tour):
+        """
+        Нормализует пару игроков + номер встречи в один ключ.
+        Порядок игроков сохраняем, чтобы не путать матчи.
+        """
+        def norm(s):
+            if not s:
+                return ""
+            # Убираем город в скобках, если он есть: "Иванов И. (Москва)" -> "Иванов И."
+            return str(s).split("(")[0].strip()
+
+        return (norm(player1), norm(player2), str(tour or "").strip())
+
     def _parse_player_for_runner_full(self, player_full):
-            """
-            Парсинг строки игрока для бегунка
-            Формат: "Фамилия Имя Отчество/Город"
-            Возвращает словарь с именем, рангом и городом
-            """
-            result = {'name': "X", 'rank': "", 'city': ""}
-            
-            if not player_full:
-                return result
-            
-            # Разделяем ФИО и город
-            znak = player_full.find('/')
-            if znak == -1:
-                fio_part = player_full
-                city = ""
-            else:
-                fio_part = player_full[:znak]
-                city = player_full[znak + 1:]
-            
-            # Разделяем ФИО на части
-            fio_parts = fio_part.split()
-            if len(fio_parts) >= 2:
-                # Фамилия и инициалы
-                surname = fio_parts[0]
-                formatted_name = f"{surname}\n{fio_parts[1]} {fio_parts[2]}" if fio_parts[2] else f"{surname}\n{fio_parts[1]}"
-            else:
-                formatted_name = fio_part
-            
-            # Получаем рейтинг игрока
-            try:
-                player = Player.get_or_none(Player.fio_city == player_full)
-                if not player:
-                    # Пробуем найти по ФИО
-                    player = Player.get_or_none(Player.fio == fio_part)
-                if player:
-                    result['rank'] = str(player.rank) if player.rank else ""
-            except:
-                result['rank'] = ""
-            
-            result['name'] = formatted_name
-            result['city'] = city
-            
+        """
+        Парсинг строки игрока для бегунка
+        Формат: "Фамилия Имя Отчество/Город"
+        Возвращает словарь с именем, рангом и городом
+        """
+        result = {'name': "X", 'rank': "", 'city': ""}
+        
+        if not player_full:
             return result
+        
+        # Разделяем ФИО и город
+        znak = player_full.find('/')
+        if znak == -1:
+            fio_part = player_full
+            city = ""
+        else:
+            fio_part = player_full[:znak]
+            city = player_full[znak + 1:]
+        
+        # Разделяем ФИО на части
+        fio_parts = fio_part.split()
+        if len(fio_parts) >= 2:
+            # Фамилия и инициалы
+            surname = fio_parts[0]
+            formatted_name = f"{surname}\n{fio_parts[1]} {fio_parts[2]}" if fio_parts[2] else f"{surname}\n{fio_parts[1]}"
+        else:
+            formatted_name = fio_part
+        
+        # Получаем рейтинг игрока
+        try:
+            player = Player.get_or_none(Player.fio_city == player_full)
+            if not player:
+                # Пробуем найти по ФИО
+                player = Player.get_or_none(Player.fio == fio_part)
+            if player:
+                result['rank'] = str(player.rank) if player.rank else ""
+        except:
+            result['rank'] = ""
+        
+        result['name'] = formatted_name
+        result['city'] = city
+        
+        return result
 # ======= полные соревнования
     def export_competition_full_pdf(self):
         """Экспорт полного файла соревнования в PDF (сохраняется в competition_pdf)"""

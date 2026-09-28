@@ -21999,24 +21999,43 @@ class MainWindow(QMainWindow):
         try:
             temp_system = System.create(
                 title_id=self.current_title_id,
+                total_athletes=players_per_group*groups,
                 stage="Чистые групповые таблицы",
                 total_group=groups,
                 max_player=players_per_group,
                 type_table="Круговая",
                 sex=self.current_sex if self.current_sex else "man",
                 score_flag=5,
+                page_vid="книжная",
                 label_string=f"Чистые групповые таблицы: {groups} групп по {players_per_group} участников",
-                kol_game_string=f"{groups * ((players_per_group * (players_per_group - 1)) // 2)} игр"
+                kol_game_string=f"{groups * ((players_per_group * (players_per_group - 1)) // 2)} игр",
+                choice_flag=1,
+                visible_game=1,
+                stage_exit="",
+                no_game="",
+                mesta_exit=0
             )
 
-            x_player = Player.get_or_create(
+            x_player = Player.create(
                 player="X",
                 fio="X",
                 fio_city="X",
+                bday="2000-10-10",  # Невалидная дата, но допустимая для БД
+                rank=0,
+                city="",
+                region="",
+                razryad="",
                 title_id=self.current_title_id,
-                sex=self.current_sex if self.current_sex else "man",
-                rank=0
-            )[0]
+                sex="man",
+                total_game_player=0,
+                total_win_game=0,
+                coefficient_victories=0.0,
+                application="",
+                comment="",
+                pay_rejting="",
+                patronymic_id=159,  # Ссылка на несуществующее отчество (или создаем)
+                coach_id=1,
+                mesto=0)
 
             for g in range(1, groups + 1):
                 group_name = f"{g} группа"

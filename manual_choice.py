@@ -205,17 +205,10 @@ class ChoiceGroupManual(QDialog):
         
     def _initUI(self):
         self.setWindowTitle('Ручная жеребьевка спортсменов')
-# =======old
-        # self.setGeometry(10, 10, 1700, 800)
+        self.setGeometry(10, 10, 1700, 800)
         
-        # main_layout = QVBoxLayout(self)
-# =====new
-        # Стартовый размер — не фиксируем максимум, чтобы работал fullscreen
-        self.resize(1600, 850)
-        self.setMinimumSize(1100, 700)
-
         main_layout = QVBoxLayout(self)
-#===============        
+     
         title_label = QLabel("Ручная жеребьевка спортсменов")
         title_label.setStyleSheet("font-size: 14px; font-weight: bold; margin: 10px;")
         title_label.setAlignment(Qt.AlignCenter)
@@ -402,9 +395,16 @@ class ChoiceGroupManual(QDialog):
 # ========================================
     def initUI(self):
         self.setWindowTitle('Ручная жеребьевка спортсменов')
-        # Уменьшаем размер окна под 1366x768
-        self.setGeometry(50, 50, 1600, 850)  # Изменено с 1300x700
-        self.setMaximumSize(1600, 850)
+        # # Уменьшаем размер окна под 1366x768
+        # self.setGeometry(50, 50, 1600, 850)  # Изменено с 1300x700
+        # self.setMaximumSize(1600, 850)
+
+        # =====new
+        # Стартовый размер — не фиксируем максимум, чтобы работал fullscreen
+        self.resize(1600, 850)
+        self.setMinimumSize(1100, 700)
+        self.setMaximumSize(3840, 2160)   # 4K — с запасом
+#===============  
         
         main_layout = QVBoxLayout(self)
         main_layout.setSpacing(5)  # Уменьшаем отступы
@@ -700,7 +700,8 @@ class ChoiceGroupManual(QDialog):
             group_frame = QFrame()
             group_frame.setFrameStyle(QFrame.Box)
             group_frame.setMinimumWidth(260)  # Уменьшено с 300
-            group_frame.setMaximumWidth(320)  # Уменьшено с 400
+            # group_frame.setMaximumWidth(320)  # Уменьшено с 400
+            group_frame.setMaximumWidth(400)  # Уменьшено с 400
             group_layout = QVBoxLayout(group_frame)
             group_layout.setSpacing(3)
             

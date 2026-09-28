@@ -103,17 +103,35 @@ class ChoiceGroupManual(QDialog):
         self.max_rows_per_group = 0
         self.existing_data = existing_data
         self.initUI()
+# ========= new
+        # F11 — переключение полного экрана
+        QShortcut(QKeySequence("F11"), self, activated=self.toggle_fullscreen)
+        # Esc — выход из полного экрана (по желанию)
+        QShortcut(QKeySequence("Esc"), self, activated=self._on_escape)
+# ==============
         self.load_athletes()
         self.calculate_max_rows()
         self.init_groups()
-        
+        #=======new
+        self.is_fullscreen = False          # <-- NEW
+        self._saved_geometry = None         # <-- NEW
+        #=================
         if self.existing_data:
             self.load_existing_draw()
         else:
             self.calculate_initial_group()
         
         self.setModal(True)
-        
+
+
+# ========= new
+    def _on_escape(self):
+        """Esc: если в fullscreen — выходим из него, иначе — закрываем диалог."""
+        if self.is_fullscreen:
+            self.toggle_fullscreen()
+        else:
+            self.reject()
+# =========       
     def load_existing_draw(self):
         """Загрузка существующей жеребьевки из базы данных"""
         # Инициализируем группы
@@ -187,10 +205,17 @@ class ChoiceGroupManual(QDialog):
         
     def _initUI(self):
         self.setWindowTitle('Ручная жеребьевка спортсменов')
-        self.setGeometry(10, 10, 1700, 800)
+# =======old
+        # self.setGeometry(10, 10, 1700, 800)
         
+        # main_layout = QVBoxLayout(self)
+# =====new
+        # Стартовый размер — не фиксируем максимум, чтобы работал fullscreen
+        self.resize(1600, 850)
+        self.setMinimumSize(1100, 700)
+
         main_layout = QVBoxLayout(self)
-        
+#===============        
         title_label = QLabel("Ручная жеребьевка спортсменов")
         title_label.setStyleSheet("font-size: 14px; font-weight: bold; margin: 10px;")
         title_label.setAlignment(Qt.AlignCenter)
@@ -511,7 +536,14 @@ class ChoiceGroupManual(QDialog):
         self.btn_edit.clicked.connect(self.open_editor)
         self.btn_edit.setStyleSheet("background-color: #FF9800; color: white; font-weight: bold;")
         btn_layout.addWidget(self.btn_edit, 1, 1, 1, 1)
-
+# ============ new
+        # --- NEW: кнопка полного экрана ---
+        self.btn_fullscreen = QPushButton("⛶ Полный экран (F11)")
+        self.btn_fullscreen.setFixedHeight(25)
+        self.btn_fullscreen.setToolTip("Развернуть окно на весь экран (F11)")
+        self.btn_fullscreen.clicked.connect(self.toggle_fullscreen)
+        btn_layout.addWidget(self.btn_fullscreen, 2, 0, 1, 2)   # растянуть на 2 колонки
+# ============
         control_layout.addLayout(btn_layout)
         
         # Кнопки OK и Cancel
@@ -663,23 +695,6 @@ class ChoiceGroupManual(QDialog):
         self.group_headers.clear()
         
         cols = min(4, self.num_groups)
-# =====================================        
-        # for g in range(self.num_groups):
-        #     group_frame = QFrame()
-        #     group_frame.setFrameStyle(QFrame.Box)
-        #     group_frame.setMinimumWidth(300)
-        #     group_frame.setMaximumWidth(400)
-        #     group_layout = QVBoxLayout(group_frame)
-        #     group_layout.setSpacing(5)
-            
-        #     header = QLabel(f"Группа {g+1}")
-        #     header.setStyleSheet("font-weight: bold; background-color: #4CAF50; color: white; padding: 5px;")
-        #     header.setAlignment(Qt.AlignCenter)
-        #     group_layout.addWidget(header)
-            
-        #     table = QTableWidget()
-        #     table.setColumnCount(2)
-        #     table.setHorizontalHeaderLabels(["№", "Участник (регион) рейтинг"])
 
         for g in range(self.num_groups):
             group_frame = QFrame()
@@ -697,7 +712,7 @@ class ChoiceGroupManual(QDialog):
             table = QTableWidget()
             table.setColumnCount(2)
             table.setHorizontalHeaderLabels(["№", "Участник"])
-# =======================================================            
+           
             table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
             table.setColumnWidth(0, 40)
             table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
@@ -1506,6 +1521,37 @@ class ChoiceGroupManual(QDialog):
                         'group': gr
                     })
         return results
+
+# ======== new
+    def toggle_fullscreen(self):
+        """Переключение между полноэкранным и обычным режимом."""
+        if self.is_fullscreen:
+            # Выход из полного экрана
+            if self._saved_geometry is not None:
+                self.setGeometry(self._saved_geometry)
+            self.showNormal()
+            self.is_fullscreen = False
+            self.btn_fullscreen.setText("⛶ Полный экран (F11)")
+        else:
+            # Запоминаем геометрию и разворачиваем
+            self._saved_geometry = self.geometry()
+            self.showFullScreen()
+            self.is_fullscreen = True
+            self.btn_fullscreen.setText("⤡ Выйти из полного экрана (F11)")
+
+        # После смены режима пересчитываем размеры таблиц групп,
+        # чтобы содержимое заняло всё пространство
+        self._refresh_group_view()
+
+
+    def _refresh_group_view(self):
+        """Перестраивает таблицы групп под текущий размер окна."""
+        try:
+            self.update_groups_display()
+            self.update_round_display()
+        except Exception as e:
+            print(f"[toggle_fullscreen] refresh failed: {e}")
+# ===========
 
 def load_existing_draw_from_db(id_title, current_sex):
     """Загрузка существующей жеребьевки из базы данных через Peewee"""

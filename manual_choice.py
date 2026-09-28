@@ -118,7 +118,7 @@ class ChoiceGroupManual(QDialog):
         """Загрузка существующей жеребьевки из базы данных"""
         # Инициализируем группы
         self.groups = [[] for _ in range(self.num_groups)]
-        
+
         # Заполняем группы данными из базы
         for item in self.existing_data:
             player_id = item.player_choice_id
@@ -1507,9 +1507,9 @@ class ChoiceGroupManual(QDialog):
                     })
         return results
 
-def load_existing_draw_from_db(id_title):
+def load_existing_draw_from_db(id_title, current_sex):
     """Загрузка существующей жеребьевки из базы данных через Peewee"""
-    choices = Choice.select().where(Choice.title_id == id_title)
+    choices = Choice.select().where((Choice.title_id == id_title) & (Choice.sex == current_sex))
     try:
         results = choices.select().order_by(Choice.group, Choice.posev_group)
         return list(results) if results.exists() else None
@@ -1560,7 +1560,7 @@ def choice_group_manual(self, athletes, num_groups, stage, parent=None):
 
     if check_flag is True:
         # Проверяем, есть ли уже жеребьевка в базе данных
-        existing_data = load_existing_draw_from_db(self.current_title_id)
+        existing_data = load_existing_draw_from_db(self.current_title_id, self.current_sex)
     
     if existing_data:
         # Создаем диалог выбора действия

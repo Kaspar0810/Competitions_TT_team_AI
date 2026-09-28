@@ -21927,25 +21927,44 @@ class MainWindow(QMainWindow):
             # Создаём временную систему
             temp_system = System.create(
                 title_id=self.current_title_id,
-                stage="Чистая таблица",
+                total_athletes=players,
+                stage="Чистая круговая таблица",
                 total_group=1,
                 max_player=players,
                 type_table="Круговая",
                 sex=self.current_sex if self.current_sex else "man",
                 score_flag=5,
-                label_string=f"Чистая круговая таблица на {players} участников",
-                kol_game_string=f"{(players * (players - 1)) // 2} игр"
+                page_vid="книжная",
+                label_string=f"Чистая круговая таблица:{players} участников",
+                kol_game_string=f"{((players* (players - 1)) // 2)} игр",
+                choice_flag=1,
+                visible_game=1,
+                stage_exit="",
+                no_game="",
+                mesta_exit=0
             )
 
-            # Создаём фиктивных игроков X
-            x_player = Player.get_or_create(
+            x_player = Player.create(
                 player="X",
                 fio="X",
                 fio_city="X",
+                bday="2000-10-10",  # Невалидная дата, но допустимая для БД
+                rank=0,
+                city="",
+                region="",
+                razryad="",
                 title_id=self.current_title_id,
-                sex=self.current_sex if self.current_sex else "man",
-                rank=0
-            )[0]
+                sex="man",
+                total_game_player=0,
+                total_win_game=0,
+                coefficient_victories=0.0,
+                application="",
+                comment="",
+                pay_rejting="",
+                patronymic_id=159,  # Ссылка на несуществующее отчество (или создаем)
+                coach_id=1,
+                mesto=0
+            )
 
             # Заполняем Game_list
             for i in range(1, players + 1):

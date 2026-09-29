@@ -22443,15 +22443,16 @@ class MainWindow(QMainWindow):
 
         if page == 1:
             # Финал (63): рамка + заливка
-            style.append(('BOX', (11, 61), (11, 62), 1, colors.darkblue))
-            style.append(('SPAN', (11, 61), (11, 62)))
-            style.append(('BACKGROUND', (11, 61), (11, 62), colors.lightyellow))
+            style.append(('BOX', (10, 60), (10, 61), 1, colors.darkblue))
+            style.append(('SPAN', (10, 60), (10, 61)))
+            style.append(('BACKGROUND', (10, 60), (10, 61), colors.lightyellow))
             # линия −63 (проигравший финала) НЕ рисуем — вы просили убрать
         else:
-            # Матч за 3-е (64): рамка + заливка
-            style.append(('BOX', (11, 61), (11, 62), 1, colors.darkblue))
-            style.append(('SPAN', (11, 61), (11, 62)))
-            style.append(('BACKGROUND', (11, 61), (11, 62), colors.lightyellow))
+            pass
+            # # Матч за 3-е (64): рамка + заливка
+            # style.append(('BOX', (11, 61), (11, 62), 1, colors.darkblue))
+            # style.append(('SPAN', (11, 61), (11, 62)))
+            # style.append(('BACKGROUND', (11, 61), (11, 62), colors.lightyellow))
 
         # Цвета/выравнивание
         for i in range(0, 11, 2):
@@ -22479,7 +22480,8 @@ class MainWindow(QMainWindow):
         # --- Матч 32: без нижней линии (убираем её из draw_setka) ---
         # draw_setka уже нарисовал линию под матчем 32 в ячейке (10, 61-62).
         # Перекрываем её линией того же цвета, что фон, — визуально убираем.
-        style.append(('LINEBELOW', (10, 62), (10, 62), 1, colors.white))
+        style.append(('LINEBELOW', (9, 59), (10, 59), 1, colors.darkblue))
+        style.append(('LINEBELOW', (9, 61), (10, 61), 1, colors.darkblue))
 
         # --- Блок финала 63 ---
         # Линия, куда идёт победитель матча 61 (над строкой 61)
@@ -22491,17 +22493,17 @@ class MainWindow(QMainWindow):
         # Объединение ячеек финала: (10, 61) — (10, 62) — верхний победитель,
         # (10, 66) — (10, 67) — нижний победитель. Но у нас в 32-й версии
         # финальный блок был объединён как SPAN (10, 61) — (10, 62).
-        # Для 64-й сделаем так:
-        style.append(('SPAN', (11, 55), (11, 56)))     # номер 63 над линиями
-        style.append(('BACKGROUND', (11, 55), (12, 56), colors.lightyellow))
+        # # Для 64-й сделаем так:
+        style.append(('SPAN', (10, 60), (10, 61)))     # номер 63 над линиями
+        style.append(('BACKGROUND', (10, 60),(10, 61),colors.lightyellow))
 
         # Победитель (1-е место) — над финальной линией
-        style.append(('TEXTCOLOR', (11, 60), (12, 60), colors.red))
-        style.append(('ALIGN', (11, 60), (12, 60), 'CENTER'))
+        style.append(('TEXTCOLOR', (11, 57), (11, 57), colors.red))
+        style.append(('ALIGN', (11, 57), (11, 57), 'CENTER'))
 
         # Проигравший (2-е место) — под линией
-        style.append(('TEXTCOLOR', (11, 62), (12, 62), colors.red))
-        style.append(('ALIGN', (11, 62), (12, 62), 'CENTER'))
+        style.append(('TEXTCOLOR', (11, 63), (12, 63), colors.red))
+        style.append(('ALIGN', (11, 63), (11, 63), 'CENTER'))
 
         # Цвета/выравнивание по колонкам (как было)
         for i in range(0, 11, 2):

@@ -22250,13 +22250,28 @@ class MainWindow(QMainWindow):
 
         # ============ ОБЩИЙ МАССИВ ============
         # Лист 1 (69 строк) + Лист 2 (69 строк) = 138
+        # column = [""]     
+        # column_count = column * 13
+        # for i in range(0, 138):
+        #     column_count[12] = i  # нумерация 10 столбца для удобного просмотра таблицы
+        #     list_tmp = column_count.copy()
+        #     data_full.append(list_tmp)
+
         strok_full = 69 + 69
         column_count = [''] * 13
         data_full = [column_count.copy() for _ in range(strok_full)]
 
-        # Начальные номера 1-64
+        for i in range(0, 138):
+            data_full[i][12] = i  # нумерация 10 столбца для удобного просмотра таблицы
+
+        # Начальные номера 1-32
         y = 0
-        for i in range(1, 129, 2):
+        for i in range(1, 65, 2):
+            y += 1
+            data_full[i + 1][0] = str(y)
+        # Начальные номера 33-64
+        y = 32
+        for i in range(70, 134, 2):
             y += 1
             data_full[i + 1][0] = str(y)
 
@@ -22288,7 +22303,8 @@ class MainWindow(QMainWindow):
 
         style1 = self.draw_setka(1, 3, 32, [])
         style1 = self._style_setka_64_page1(strok=69, style=style1)
-
+        fn = ('INNERGRID', (0, 0), (-1, -1), 0.01, colors.grey)  # временное отображение сетки
+        style1.append(fn)
         t1.setStyle(TableStyle([
             ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
             ('FONTNAME', (0, 0), (-1, -1), "DejaVuSerif"),
@@ -22313,7 +22329,8 @@ class MainWindow(QMainWindow):
 
         style2 = self.draw_setka(1, 3, 32, [])
         style2 = self._style_setka_64_page2(strok=69, style=style2)
-
+        fn = ('INNERGRID', (0, 0), (-1, -1), 0.01, colors.grey)  # временное отображение сетки
+        style2.append(fn)
         t2.setStyle(TableStyle([
             ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
             ('FONTNAME', (0, 0), (-1, -1), "DejaVuSerif"),

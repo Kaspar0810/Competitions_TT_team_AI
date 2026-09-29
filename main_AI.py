@@ -17802,193 +17802,472 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")
 
 # === круговые таблицы ====
-    def table_made(self, pv, stage):
-        """создание таблиц kg - количество групп(таблиц), g2 - наибольшое кол-во участников в группе
-        pv - ориентация страницы, е - если участников четно группам, т - их количество"""
-        from reportlab.platypus import Table, SimpleDocTemplate, Paragraph, Spacer
-        from reportlab.lib.pagesizes import A4, landscape
-        from reportlab.lib import colors
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle as PS
-        from reportlab.lib.units import cm
-        import os
+    # def table_made(self, pv, stage):
+    #     """создание таблиц kg - количество групп(таблиц), g2 - наибольшое кол-во участников в группе
+    #     pv - ориентация страницы, е - если участников четно группам, т - их количество"""
+    #     from reportlab.platypus import Table, SimpleDocTemplate, Paragraph, Spacer
+    #     from reportlab.lib.pagesizes import A4, landscape
+    #     from reportlab.lib import colors
+    #     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle as PS
+    #     from reportlab.lib.units import cm
+    #     import os
         
-        if not self.current_title_id:
-            return
+    #     if not self.current_title_id:
+    #         return
 
-        # Папка для сохранения
-        pdf_dir = "table_pdf"
-        if not os.path.exists(pdf_dir):
-            os.makedirs(pdf_dir)
+    #     # Папка для сохранения
+    #     pdf_dir = "table_pdf"
+    #     if not os.path.exists(pdf_dir):
+    #         os.makedirs(pdf_dir)
 
-        stage_list_sf = ["Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]
+    #     stage_list_sf = ["Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]
         
-        # Получаем system_id для этапа
-        system = System.get_or_none(
-            (System.title_id == self.current_title_id) &
-            (System.sex == self.current_sex) &
-            (System.stage == stage)
-        )
-        # определяем пол для титула на PDF
-        title = Title.get_by_id(self.current_title_id)
+    #     # Получаем system_id для этапа
+    #     system = System.get_or_none(
+    #         (System.title_id == self.current_title_id) &
+    #         (System.sex == self.current_sex) &
+    #         (System.stage == stage)
+    #     )
+    #     # определяем пол для титула на PDF
+    #     title = Title.get_by_id(self.current_title_id)
 
-        title_sex = self.sex_for_title(stage)
+    #     title_sex = self.sex_for_title(stage)
       
-        if not system:
-            QMessageBox.warning(self, "Ошибка", f"Этап '{stage}' не найден в системе")
-            return
+    #     if not system:
+    #         QMessageBox.warning(self, "Ошибка", f"Этап '{stage}' не найден в системе")
+    #         return
          
-        # Определяем параметры таблиц
-        if stage == "Чистые групповые таблицы":
-            kg = system.total_group  # кол-во групп
-            max_pl = system.max_player
-            if max_pl <= 3:
-                pv = "альбомная" 
-        elif stage in stage_list_sf:  # если этап полуфинал
-            kg = system.total_group  # кол-во групп
-            max_pl = system.max_player
-        elif stage == "Квалификация":
-            kg = system.total_group  # кол-во групп
-            max_pl = system.max_player
-            if max_pl <= 3:
-                pv = "альбомная"
-        else:  # игры в финале по кругу или одна круговая таблица
-            kg = 1
-            max_pl = system.max_player
-            pv = "альбомная"
+    #     # Определяем параметры таблиц
+    #     if stage == "Чистые групповые таблицы":
+    #         kg = system.total_group  # кол-во групп
+    #         max_pl = system.max_player
+    #         if max_pl <= 3:
+    #             pv = "альбомная" 
+    #     elif stage in stage_list_sf:  # если этап полуфинал
+    #         kg = system.total_group  # кол-во групп
+    #         max_pl = system.max_player
+    #     elif stage == "Квалификация":
+    #         kg = system.total_group  # кол-во групп
+    #         max_pl = system.max_player
+    #         if max_pl <= 3:
+    #             pv = "альбомная"
+    #     else:  # игры в финале по кругу или одна круговая таблица
+    #         kg = 1
+    #         max_pl = system.max_player
+    #         pv = "альбомная"
 
-        family_col = 0
-        # Определяем ориентацию страницы
-        if pv == "альбомная":
-            page_size = landscape(A4)
-            if max_pl <= 3:
-                family_col = 5.0
-                wcells = 5.5 / max_pl if max_pl > 0 else 1
-            elif max_pl > 3 and max_pl <= 8:
-                family_col = 5.0
-                wcells = 20.0 / max_pl if max_pl > 0 else 1
-            else:
-                family_col = 4.6
-                wcells = 20.0 / max_pl if max_pl > 0 else 1
-            center_stage = 210
-        else:
-            page_size = A4
-            family_col = 5.0
-            center_stage = 140
-            wcells = 10.0 / max_pl if max_pl > 0 else 1
-            wcells = round(wcells, 2)
+    #     family_col = 0
+    #     # Определяем ориентацию страницы
+    #     if pv == "альбомная":
+    #         page_size = landscape(A4)
+    #         if max_pl <= 3:
+    #             family_col = 5.0
+    #             wcells = 5.5 / max_pl if max_pl > 0 else 1
+    #         elif max_pl > 3 and max_pl <= 8:
+    #             family_col = 5.0
+    #             wcells = 20.0 / max_pl if max_pl > 0 else 1
+    #         else:
+    #             family_col = 4.6
+    #             wcells = 20.0 / max_pl if max_pl > 0 else 1
+    #         center_stage = 210
+    #     else:
+    #         page_size = A4
+    #         family_col = 5.0
+    #         center_stage = 140
+    #         wcells = 10.0 / max_pl if max_pl > 0 else 1
+    #         wcells = round(wcells, 2)
         
-        # Ширина столбцов
-        col = ((wcells * cm,) * max_pl)
+    #     # Ширина столбцов
+    #     col = ((wcells * cm,) * max_pl)
         
-        # кол-во столбцов в таблице и их ширина
-        cW = ((0.4 * cm, family_col * cm) + col + (0.8 * cm, 1 * cm, 1 * cm))
+    #     # кол-во столбцов в таблице и их ширина
+    #     cW = ((0.4 * cm, family_col * cm) + col + (0.8 * cm, 1 * cm, 1 * cm))
         
-        # Высота строки
-        if kg == 1:
-            if max_pl > 16:
-                rH = (0.42 * cm)
-            else:
-                rH = (0.47 * cm)
-        else:
-            rH = (0.29 * cm)
+    #     # Высота строки
+    #     if kg == 1:
+    #         if max_pl > 16:
+    #             rH = (0.42 * cm)
+    #         else:
+    #             rH = (0.47 * cm)
+    #     else:
+    #         rH = (0.29 * cm)
         
-        # Заголовки столбцов
-        num_columns = [str(i + 1) for i in range(max_pl)]
-        zagolovok = (['№', 'Участники/ Город'] + num_columns + ['Очки', 'Соот', 'Место'])
+    #     # Заголовки столбцов
+    #     num_columns = [str(i + 1) for i in range(max_pl)]
+    #     zagolovok = (['№', 'Участники/ Город'] + num_columns + ['Очки', 'Соот', 'Место'])
         
-        # Стили для таблицы
-        tblstyle = []
-        for q in range(1, max_pl + 1):
-            # город участника курсивом
-            tblstyle.append(('FONTNAME', (1, q * 2), (1, q * 2), "DejaVuSerif-Italic"))
-            # участник жирным
-            tblstyle.append(('FONTNAME', (1, q * 2 - 1), (1, q * 2 - 1), "DejaVuSerif-Bold"))
-            # выравнивание
-            tblstyle.append(('ALIGN', (1, q * 2 - 1), (1, q * 2 - 1), 'LEFT'))
-            # объединение ячеек 1 столбца
-            tblstyle.append(('SPAN', (0, q * 2 - 1), (0, q * 2)))
-            # объединение ячеек "Очки"
-            tblstyle.append(('SPAN', (max_pl + 2, q * 2 - 1), (max_pl + 2, q * 2)))
-            # объединение ячеек "Соот"
-            tblstyle.append(('SPAN', (max_pl + 3, q * 2 - 1), (max_pl + 3, q * 2)))
-            # объединение ячеек "Место"
-            tblstyle.append(('SPAN', (max_pl + 4, q * 2 - 1), (max_pl + 4, q * 2)))
-            # объединение диагональных клеток
-            tblstyle.append(('SPAN', (q + 1, q * 2 - 1), (q + 1, q * 2)))
-            # заливка диагональных клеток
-            tblstyle.append(('BACKGROUND', (q + 1, q * 2 - 1), (q + 1, q * 2), colors.lightgreen))
+    #     # Стили для таблицы
+    #     tblstyle = []
+    #     for q in range(1, max_pl + 1):
+    #         # город участника курсивом
+    #         tblstyle.append(('FONTNAME', (1, q * 2), (1, q * 2), "DejaVuSerif-Italic"))
+    #         # участник жирным
+    #         tblstyle.append(('FONTNAME', (1, q * 2 - 1), (1, q * 2 - 1), "DejaVuSerif-Bold"))
+    #         # выравнивание
+    #         tblstyle.append(('ALIGN', (1, q * 2 - 1), (1, q * 2 - 1), 'LEFT'))
+    #         # объединение ячеек 1 столбца
+    #         tblstyle.append(('SPAN', (0, q * 2 - 1), (0, q * 2)))
+    #         # объединение ячеек "Очки"
+    #         tblstyle.append(('SPAN', (max_pl + 2, q * 2 - 1), (max_pl + 2, q * 2)))
+    #         # объединение ячеек "Соот"
+    #         tblstyle.append(('SPAN', (max_pl + 3, q * 2 - 1), (max_pl + 3, q * 2)))
+    #         # объединение ячеек "Место"
+    #         tblstyle.append(('SPAN', (max_pl + 4, q * 2 - 1), (max_pl + 4, q * 2)))
+    #         # объединение диагональных клеток
+    #         tblstyle.append(('SPAN', (q + 1, q * 2 - 1), (q + 1, q * 2)))
+    #         # заливка диагональных клеток
+    #         tblstyle.append(('BACKGROUND', (q + 1, q * 2 - 1), (q + 1, q * 2), colors.lightgreen))
         
-        # Стили для линий сетки
-        ts_grid = []
-        for p in range(0, max_pl * 2 + 1):
-            if p % 2 == 0:
-                ts_grid.append(('LINEBELOW', (1, p + 2), (-1, p + 2), 0.25, colors.black))
-            else:
-                ts_grid.append(('LINEBELOW', (2, p), (-1, p), 0.25, colors.grey, None, (1, 1)))
+    #     # Стили для линий сетки
+    #     ts_grid = []
+    #     for p in range(0, max_pl * 2 + 1):
+    #         if p % 2 == 0:
+    #             ts_grid.append(('LINEBELOW', (1, p + 2), (-1, p + 2), 0.25, colors.black))
+    #         else:
+    #             ts_grid.append(('LINEBELOW', (2, p), (-1, p), 0.25, colors.grey, None, (1, 1)))
         
-        # Полный стиль таблицы
-        ts = TableStyle([
-            ('FONTNAME', (0, 0), (-1, -1), "DejaVuSerif"),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('FONTSIZE', (0, 0), (-1, -1), 6),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (max_pl + 5, 0), "DejaVuSerif-Bold"),
-            ('VALIGN', (0, 0), (max_pl + 5, 0), 'MIDDLE'),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
-            ('BACKGROUND', (0, 0), (max_pl + 5, 0), colors.yellow),
-            ('TEXTCOLOR', (0, 0), (-1, -1), colors.darkblue),
-            ('LINEABOVE', (0, 0), (-1, 1), 1, colors.black),
-            ('INNERGRID', (0, 0), (1, -1), 0.25, colors.black),
-            ('LINEAFTER', (1, 0), (-1, -1), 0.25, colors.black),
-            ('BOX', (0, 0), (-1, -1), 2, colors.black)
-        ] + tblstyle + ts_grid)
+    #     # Полный стиль таблицы
+    #     ts = TableStyle([
+    #         ('FONTNAME', (0, 0), (-1, -1), "DejaVuSerif"),
+    #         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    #         ('FONTSIZE', (0, 0), (-1, -1), 6),
+    #         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+    #         ('FONTNAME', (0, 0), (max_pl + 5, 0), "DejaVuSerif-Bold"),
+    #         ('VALIGN', (0, 0), (max_pl + 5, 0), 'MIDDLE'),
+    #         ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+    #         ('BACKGROUND', (0, 0), (max_pl + 5, 0), colors.yellow),
+    #         ('TEXTCOLOR', (0, 0), (-1, -1), colors.darkblue),
+    #         ('LINEABOVE', (0, 0), (-1, 1), 1, colors.black),
+    #         ('INNERGRID', (0, 0), (1, -1), 0.25, colors.black),
+    #         ('LINEAFTER', (1, 0), (-1, -1), 0.25, colors.black),
+    #         ('BOX', (0, 0), (-1, -1), 2, colors.black)
+    #     ] + tblstyle + ts_grid)
         
-        # Получаем данные для таблиц
-        dict_table = self.get_table_data(stage, kg, ts, zagolovok, cW, rH, max_pl)
+    #     # Получаем данные для таблиц
+    #     dict_table = self.get_table_data(stage, kg, ts, zagolovok, cW, rH, max_pl)
         
-        # Стили для заголовков
-        h1 = PS("normal", fontSize=12, fontName="DejaVuSerif-Italic",
-                leftIndent=center_stage, spacebefore=10, textColor="green")
+    #     # Стили для заголовков
+    #     h1 = PS("normal", fontSize=12, fontName="DejaVuSerif-Italic",
+    #             leftIndent=center_stage, spacebefore=10, textColor="green")
         
-        h2 = PS("normal", fontSize=11, fontName="DejaVuSerif-Italic",
-                leftIndent=200, spacebefore=20, textColor="brown")
+    #     h2 = PS("normal", fontSize=11, fontName="DejaVuSerif-Italic",
+    #             leftIndent=200, spacebefore=20, textColor="brown")
         
-        # Создаем элементы документа
-        elements = []
+    #     # Создаем элементы документа
+    #     elements = []
         
-        if kg == 1:  # одна таблица
-            data = [[dict_table[0]]]
-            shell_table = Table(data, colWidths=[28 * cm])
-            elements.append(shell_table)
-        else:
-            if pv == "альбомная":  # альбомная страница - таблицы в ряд
-                for k in range(0, kg, 2):
-                    if k + 1 < kg:
-                        data_1 = [[dict_table[k]]]
-                        data_2 = [[dict_table[k + 1]]]
-                        tbl_1 = Table(data_1, colWidths=["*", "*"])
-                        tbl_2 = Table(data_2, colWidths=["*", "*"])
-                        tbl_1.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP')]))
-                        tbl_2.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP')]))
+    #     if kg == 1:  # одна таблица
+    #         data = [[dict_table[0]]]
+    #         shell_table = Table(data, colWidths=[28 * cm])
+    #         elements.append(shell_table)
+    #     else:
+    #         if pv == "альбомная":  # альбомная страница - таблицы в ряд
+    #             for k in range(0, kg, 2):
+    #                 if k + 1 < kg:
+    #                     data_1 = [[dict_table[k]]]
+    #                     data_2 = [[dict_table[k + 1]]]
+    #                     tbl_1 = Table(data_1, colWidths=["*", "*"])
+    #                     tbl_2 = Table(data_2, colWidths=["*", "*"])
+    #                     tbl_1.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP')]))
+    #                     tbl_2.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP')]))
                         
-                        gr_1 = f'группа {k + 1}'
-                        gr_2 = f'группа {k + 2}'
+    #                     gr_1 = f'группа {k + 1}'
+    #                     gr_2 = f'группа {k + 2}'
                         
-                        # Компоновка двух таблиц в строку
-                        col1 = [Paragraph(gr_1, h2), tbl_1]
-                        col2 = [Paragraph(gr_2, h2), tbl_2]
-                        combined = Table([[col1, col2]], colWidths=[14 * cm, 14 * cm], hAlign='CENTER')
-                        combined.setStyle(TableStyle([
-                            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                            ('LEFTPADDING', (0, 0), (-1, -1), 5),
-                            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
-                        ]))
-                        elements.append(combined)
-                    else:
-                        # Нечетное количество групп - последняя таблица одна
+    #                     # Компоновка двух таблиц в строку
+    #                     col1 = [Paragraph(gr_1, h2), tbl_1]
+    #                     col2 = [Paragraph(gr_2, h2), tbl_2]
+    #                     combined = Table([[col1, col2]], colWidths=[14 * cm, 14 * cm], hAlign='CENTER')
+    #                     combined.setStyle(TableStyle([
+    #                         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    #                         ('LEFTPADDING', (0, 0), (-1, -1), 5),
+    #                         ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+    #                     ]))
+    #                     elements.append(combined)
+    #                 else:
+    #                     # Нечетное количество групп - последняя таблица одна
+    #                     data_1 = [[dict_table[k]]]
+    #                     tbl_1 = Table(data_1, colWidths=["*", "*"])
+    #                     tbl_1.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP')]))
+    #                     gr_1 = f'группа {k + 1}'
+    #                     col1 = [Paragraph(gr_1, h2), tbl_1]
+    #                     combined = Table([[col1]], colWidths=["*", "*"], hAlign='LEFT')
+    #                     combined.setStyle(TableStyle([
+    #                         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    #                         ('LEFTPADDING', (0, 0), (-1, -1), 5),
+    #                         ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+    #                     ]))
+    #                     elements.append(combined)
+    #         else:  # книжная страница - таблицы в столбец
+    #             for k in range(kg):
+    #                 data_1 = [[dict_table[k]]]
+    #                 tbl_1 = Table(data_1, colWidths=["*", "*"])
+    #                 tbl_1.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'LEFT')]))
+    #                 gr_1 = f'группа {k + 1}'
+    #                 col1 = [Paragraph(gr_1, h2), tbl_1]
+    #                 combined = Table([[col1]], colWidths=["*", "*"], hAlign='LEFT')
+    #                 combined.setStyle(TableStyle([
+    #                     ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    #                     ('LEFTPADDING', (0, 0), (-1, -1), 5),
+    #                     ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+    #                 ]))
+    #                 elements.append(combined)
+        
+    #     # Формируем имя файла
+    #     short_name = title.short_name_comp if title.short_name_comp else title.name
+    #     import re
+    #     clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
+    #     clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
+        
+    #     sex = "M" if self.current_sex == "man" else "W"
+
+    #     if stage == "Одна таблица":
+    #         title_text = f"Финальные соревнования. Одиночный разряд. {title_sex}."
+    #         name_table = f"{clean_name}_{sex}_one_table.pdf"
+    #     elif stage == "Чистая таблица":
+    #         title_text = f"Финальные соревнования. Одиночный разряд. {title_sex}."
+    #         name_table = f"{clean_name}_{sex}_clear_table.pdf"
+    #     elif stage == "Чистые групповые таблицы":
+    #         title_text = f"Квалификационные соревнования. {title_sex}."
+    #         name_table = f"{clean_name}_{sex}_clear_group.pdf"
+    #     elif stage == "Квалификация":
+    #         title_text = f"Квалификационные соревнования. {title_sex}."
+    #         name_table = f"{clean_name}_{sex}_table_group.pdf"
+    #     elif stage in ["Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]:
+    #         number_str = stage[:stage.rfind("-")]
+    #         number_fin = number_str.replace("Квалификация. ", "")
+    #         title_text = f"{stage}. {title_sex}."
+    #         name_table = f"{clean_name}_{sex}_{number_fin}-semifinal.pdf"
+    #     else:
+    #         # Финал
+    #         number_fin = stage[:stage.rfind("-")] if "-" in stage else stage
+    #         # Получаем начальное место для финала
+    #         first_mesto = self.get_final_start_place(stage)
+    #         last_mesto = first_mesto + max_pl - 1 if max_pl > 0 else first_mesto
+    #         title_text = f'Финальные соревнования.({first_mesto}-{last_mesto} место). Одиночный разряд. {title_sex}.'
+    #         name_table = f"{clean_name}_{sex}_{number_fin}-final.pdf"
+        
+    #     # Создаем PDF
+    #     filename = os.path.join(pdf_dir, name_table)
+
+    #     doc = SimpleDocTemplate(filename, pagesize=page_size)
+    #     doc.topMargin = 1.8 * cm
+    #     doc.leftMargin = 1 * cm
+        
+    #     # Добавляем заголовок
+    #     elements.insert(0, Paragraph(title_text, h1))
+        
+    #     # Строим документ
+    #     doc.build(elements, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
+        
+    #     return name_table
+
+
+# ======= proba ===
+    def table_made(self, pv, stage):
+            """создание таблиц kg - количество групп(таблиц), g2 - наибольшое кол-во участников в группе
+            pv - ориентация страницы, е - если участников четно группам, т - их количество"""
+            from reportlab.platypus import Table, SimpleDocTemplate, Paragraph, Spacer
+            from reportlab.lib.pagesizes import A4, landscape
+            from reportlab.lib import colors
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle as PS
+            from reportlab.lib.units import cm
+            import os
+            
+            if not self.current_title_id:
+                return
+
+            # Папка для сохранения
+            pdf_dir = "table_pdf"
+            if not os.path.exists(pdf_dir):
+                os.makedirs(pdf_dir)
+
+            stage_list_sf = ["Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]
+            
+            # Получаем system_id для этапа
+            system = System.get_or_none(
+                (System.title_id == self.current_title_id) &
+                (System.sex == self.current_sex) &
+                (System.stage == stage)
+            )
+            # определяем пол для титула на PDF
+            title = Title.get_by_id(self.current_title_id)
+
+            title_sex = self.sex_for_title(stage)
+        
+            if not system:
+                QMessageBox.warning(self, "Ошибка", f"Этап '{stage}' не найден в системе")
+                return
+            
+            # Определяем параметры таблиц
+            if stage == "Чистые групповые таблицы":
+                kg = system.total_group  # кол-во групп
+                max_pl = system.max_player
+                if max_pl <= 3:
+                    pv = "альбомная" 
+            elif stage in stage_list_sf:  # если этап полуфинал
+                kg = system.total_group  # кол-во групп
+                max_pl = system.max_player
+            elif stage == "Квалификация":
+                kg = system.total_group  # кол-во групп
+                max_pl = system.max_player
+                if max_pl <= 3:
+                    pv = "альбомная"
+            else:  # игры в финале по кругу или одна круговая таблица
+                kg = 1
+                max_pl = system.max_player
+                pv = "альбомная"
+
+            family_col = 0
+            # Определяем ориентацию страницы
+            if pv == "альбомная":
+                page_size = landscape(A4)
+                if max_pl <= 3:
+                    family_col = 5.0
+                    wcells = 5.5 / max_pl if max_pl > 0 else 1
+                elif max_pl > 3 and max_pl <= 8:
+                    family_col = 5.0
+                    wcells = 20.0 / max_pl if max_pl > 0 else 1
+                else:
+                    family_col = 4.6
+                    wcells = 20.0 / max_pl if max_pl > 0 else 1
+                center_stage = 210
+            else:
+                page_size = A4
+                family_col = 5.0
+                center_stage = 140
+                wcells = 10.0 / max_pl if max_pl > 0 else 1
+                wcells = round(wcells, 2)
+            
+            # Ширина столбцов
+            col = ((wcells * cm,) * max_pl)
+            
+            # кол-во столбцов в таблице и их ширина
+            cW = ((0.4 * cm, family_col * cm, 0.5 * cm) + col + (0.7 * cm, 0.9 * cm, 0.9 * cm))
+            
+            # Высота строки
+            if kg == 1:
+                if max_pl > 16:
+                    rH = (0.42 * cm)
+                else:
+                    rH = (0.47 * cm)
+            else:
+                rH = (0.29 * cm)
+            
+            # Заголовки столбцов
+            num_columns = [str(i + 1) for i in range(max_pl)]
+            zagolovok = (['№', 'Участники/ Город', 'R'] + num_columns + ['Очки', 'Соот', 'Место'])
+            
+            # Стили для таблицы
+            tblstyle = []
+            for q in range(1, max_pl + 1):
+                # город участника курсивом
+                tblstyle.append(('FONTNAME', (1, q * 2), (1, q * 2), "DejaVuSerif-Italic"))
+                # участник жирным
+                tblstyle.append(('FONTNAME', (1, q * 2 - 1), (1, q * 2 - 1), "DejaVuSerif-Bold"))
+                # выравнивание ФИО
+                tblstyle.append(('ALIGN', (1, q * 2 - 1), (1, q * 2 - 1), 'LEFT'))
+
+                # объединение "№"
+                tblstyle.append(('SPAN', (0, q * 2 - 1), (0, q * 2)))
+
+                # объединение "R" (новый столбец)
+                tblstyle.append(('SPAN', (2, q * 2 - 1), (2, q * 2)))
+
+                # "Очки", "Соот", "Место" — сдвиг +1
+                tblstyle.append(('SPAN', (max_pl + 3, q * 2 - 1), (max_pl + 3, q * 2)))
+                tblstyle.append(('SPAN', (max_pl + 4, q * 2 - 1), (max_pl + 4, q * 2)))
+                tblstyle.append(('SPAN', (max_pl + 5, q * 2 - 1), (max_pl + 5, q * 2)))
+
+                # диагональные клетки — сдвиг +1
+                tblstyle.append(('SPAN', (q + 2, q * 2 - 1), (q + 2, q * 2)))
+                tblstyle.append(('BACKGROUND', (q + 2, q * 2 - 1), (q + 2, q * 2), colors.lightgreen))
+            
+            # Стили для линий сетки
+            ts_grid = []
+            for p in range(0, max_pl * 2 + 1):
+                if p % 2 == 0:
+                    ts_grid.append(('LINEBELOW', (1, p + 2), (-1, p + 2), 0.25, colors.black))
+                else:
+                    ts_grid.append(('LINEBELOW', (2, p), (-1, p), 0.25, colors.grey, None, (1, 1)))
+            
+            # Полный стиль таблицы
+            ts = TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), "DejaVuSerif"),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('FONTSIZE', (0, 0), (-1, -1), 6),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (max_pl + 6, 0), "DejaVuSerif-Bold"),
+                ('VALIGN', (0, 0), (max_pl + 6, 0), 'MIDDLE'),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+                ('BACKGROUND', (0, 0), (max_pl + 6, 0), colors.yellow),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.darkblue),
+                ('LINEABOVE', (0, 0), (-1, 1), 1, colors.black),
+                ('INNERGRID', (0, 0), (1, -1), 0.25, colors.black),
+                ('LINEAFTER', (1, 0), (-1, -1), 0.25, colors.black),
+                ('BOX', (0, 0), (-1, -1), 2, colors.black)
+            ] + tblstyle + ts_grid)
+            
+            # Получаем данные для таблиц
+            dict_table = self.get_table_data(stage, kg, ts, zagolovok, cW, rH, max_pl)
+            
+            # Стили для заголовков
+            h1 = PS("normal", fontSize=12, fontName="DejaVuSerif-Italic",
+                    leftIndent=center_stage, spacebefore=10, textColor="green")
+            
+            h2 = PS("normal", fontSize=11, fontName="DejaVuSerif-Italic",
+                    leftIndent=200, spacebefore=20, textColor="brown")
+            
+            # Создаем элементы документа
+            elements = []
+            
+            if kg == 1:  # одна таблица
+                data = [[dict_table[0]]]
+                shell_table = Table(data, colWidths=[28 * cm])
+                elements.append(shell_table)
+            else:
+                if pv == "альбомная":  # альбомная страница - таблицы в ряд
+                    for k in range(0, kg, 2):
+                        if k + 1 < kg:
+                            data_1 = [[dict_table[k]]]
+                            data_2 = [[dict_table[k + 1]]]
+                            tbl_1 = Table(data_1, colWidths=["*", "*"])
+                            tbl_2 = Table(data_2, colWidths=["*", "*"])
+                            tbl_1.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP')]))
+                            tbl_2.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP')]))
+                            
+                            gr_1 = f'группа {k + 1}'
+                            gr_2 = f'группа {k + 2}'
+                            
+                            # Компоновка двух таблиц в строку
+                            col1 = [Paragraph(gr_1, h2), tbl_1]
+                            col2 = [Paragraph(gr_2, h2), tbl_2]
+                            combined = Table([[col1, col2]], colWidths=[14 * cm, 14 * cm], hAlign='CENTER')
+                            combined.setStyle(TableStyle([
+                                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                                ('LEFTPADDING', (0, 0), (-1, -1), 5),
+                                ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+                            ]))
+                            elements.append(combined)
+                        else:
+                            # Нечетное количество групп - последняя таблица одна
+                            data_1 = [[dict_table[k]]]
+                            tbl_1 = Table(data_1, colWidths=["*", "*"])
+                            tbl_1.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP')]))
+                            gr_1 = f'группа {k + 1}'
+                            col1 = [Paragraph(gr_1, h2), tbl_1]
+                            combined = Table([[col1]], colWidths=["*", "*"], hAlign='LEFT')
+                            combined.setStyle(TableStyle([
+                                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                                ('LEFTPADDING', (0, 0), (-1, -1), 5),
+                                ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+                            ]))
+                            elements.append(combined)
+                else:  # книжная страница - таблицы в столбец
+                    for k in range(kg):
                         data_1 = [[dict_table[k]]]
                         tbl_1 = Table(data_1, colWidths=["*", "*"])
-                        tbl_1.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP')]))
+                        tbl_1.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'LEFT')]))
                         gr_1 = f'группа {k + 1}'
                         col1 = [Paragraph(gr_1, h2), tbl_1]
                         combined = Table([[col1]], colWidths=["*", "*"], hAlign='LEFT')
@@ -17998,69 +18277,57 @@ class MainWindow(QMainWindow):
                             ('RIGHTPADDING', (0, 0), (-1, -1), 5),
                         ]))
                         elements.append(combined)
-            else:  # книжная страница - таблицы в столбец
-                for k in range(kg):
-                    data_1 = [[dict_table[k]]]
-                    tbl_1 = Table(data_1, colWidths=["*", "*"])
-                    tbl_1.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'LEFT')]))
-                    gr_1 = f'группа {k + 1}'
-                    col1 = [Paragraph(gr_1, h2), tbl_1]
-                    combined = Table([[col1]], colWidths=["*", "*"], hAlign='LEFT')
-                    combined.setStyle(TableStyle([
-                        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                        ('LEFTPADDING', (0, 0), (-1, -1), 5),
-                        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
-                    ]))
-                    elements.append(combined)
-        
-        # Формируем имя файла
-        short_name = title.short_name_comp if title.short_name_comp else title.name
-        import re
-        clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
-        clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
-        
-        sex = "M" if self.current_sex == "man" else "W"
+            
+            # Формируем имя файла
+            short_name = title.short_name_comp if title.short_name_comp else title.name
+            import re
+            clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
+            clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
+            
+            sex = "M" if self.current_sex == "man" else "W"
 
-        if stage == "Одна таблица":
-            title_text = f"Финальные соревнования. Одиночный разряд. {title_sex}."
-            name_table = f"{clean_name}_{sex}_one_table.pdf"
-        elif stage == "Чистая таблица":
-            title_text = f"Финальные соревнования. Одиночный разряд. {title_sex}."
-            name_table = f"{clean_name}_{sex}_clear_table.pdf"
-        elif stage == "Чистые групповые таблицы":
-            title_text = f"Квалификационные соревнования. {title_sex}."
-            name_table = f"{clean_name}_{sex}_clear_group.pdf"
-        elif stage == "Квалификация":
-            title_text = f"Квалификационные соревнования. {title_sex}."
-            name_table = f"{clean_name}_{sex}_table_group.pdf"
-        elif stage in ["Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]:
-            number_str = stage[:stage.rfind("-")]
-            number_fin = number_str.replace("Квалификация. ", "")
-            title_text = f"{stage}. {title_sex}."
-            name_table = f"{clean_name}_{sex}_{number_fin}-semifinal.pdf"
-        else:
-            # Финал
-            number_fin = stage[:stage.rfind("-")] if "-" in stage else stage
-            # Получаем начальное место для финала
-            first_mesto = self.get_final_start_place(stage)
-            last_mesto = first_mesto + max_pl - 1 if max_pl > 0 else first_mesto
-            title_text = f'Финальные соревнования.({first_mesto}-{last_mesto} место). Одиночный разряд. {title_sex}.'
-            name_table = f"{clean_name}_{sex}_{number_fin}-final.pdf"
-        
-        # Создаем PDF
-        filename = os.path.join(pdf_dir, name_table)
+            if stage == "Одна таблица":
+                title_text = f"Финальные соревнования. Одиночный разряд. {title_sex}."
+                name_table = f"{clean_name}_{sex}_one_table.pdf"
+            elif stage == "Чистая таблица":
+                title_text = f"Финальные соревнования. Одиночный разряд. {title_sex}."
+                name_table = f"{clean_name}_{sex}_clear_table.pdf"
+            elif stage == "Чистые групповые таблицы":
+                title_text = f"Квалификационные соревнования. {title_sex}."
+                name_table = f"{clean_name}_{sex}_clear_group.pdf"
+            elif stage == "Квалификация":
+                title_text = f"Квалификационные соревнования. {title_sex}."
+                name_table = f"{clean_name}_{sex}_table_group.pdf"
+            elif stage in ["Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]:
+                number_str = stage[:stage.rfind("-")]
+                number_fin = number_str.replace("Квалификация. ", "")
+                title_text = f"{stage}. {title_sex}."
+                name_table = f"{clean_name}_{sex}_{number_fin}-semifinal.pdf"
+            else:
+                # Финал
+                number_fin = stage[:stage.rfind("-")] if "-" in stage else stage
+                # Получаем начальное место для финала
+                first_mesto = self.get_final_start_place(stage)
+                last_mesto = first_mesto + max_pl - 1 if max_pl > 0 else first_mesto
+                title_text = f'Финальные соревнования.({first_mesto}-{last_mesto} место). Одиночный разряд. {title_sex}.'
+                name_table = f"{clean_name}_{sex}_{number_fin}-final.pdf"
+            
+            # Создаем PDF
+            filename = os.path.join(pdf_dir, name_table)
 
-        doc = SimpleDocTemplate(filename, pagesize=page_size)
-        doc.topMargin = 1.8 * cm
-        doc.leftMargin = 1 * cm
-        
-        # Добавляем заголовок
-        elements.insert(0, Paragraph(title_text, h1))
-        
-        # Строим документ
-        doc.build(elements, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
-        
-        return name_table
+            doc = SimpleDocTemplate(filename, pagesize=page_size)
+            doc.topMargin = 1.8 * cm
+            doc.leftMargin = 1 * cm
+            
+            # Добавляем заголовок
+            elements.insert(0, Paragraph(title_text, h1))
+            
+            # Строим документ
+            doc.build(elements, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
+            
+            return name_table
+
+# ====================
 
     def get_table_data(self, stage, kg, ts, zagolovok, cW, rH, max_pl):
         """Получение данных для таблиц из таблиц Game_list и Result
@@ -18129,35 +18396,69 @@ class MainWindow(QMainWindow):
                         id_pl = player.id if player.id else ""
                         fio = player.fio if player.fio else ""
                         city = player.city if player.city else ""
+                        # ===== old
+                        # players_info[position] = {
+                        #     'pl_id': id_pl,
+                        #     'fio': fio,
+                        #     'city': city,
+                        #     'wins': 0,
+                        #     'losses': 0,
+                        #     'total_points': 0,
+                        #     'scores': {},
+                        #     'matches': {},
+                        #     'place': 0,
+                        #     'ratio_points': 0
+                        # }
+                        # row_top = [str(position), fio]
+                        # row_bottom = ["", city]
+                        #==============
                         players_info[position] = {
                             'pl_id': id_pl,
                             'fio': fio,
                             'city': city,
+                            'rank': player.rank if player.rank is not None else "",
                             'wins': 0,
                             'losses': 0,
                             'total_points': 0,
                             'scores': {},
                             'matches': {},
                             'place': 0,
-                            'ratio_points': 0
+                            'ratio_points': 0,
                         }
-                        row_top = [str(position), fio]
-                        row_bottom = ["", city]
+                        rank = player.rank if player.rank is not None else ""
+                        row_top = [str(position), fio, str(rank)]
+                        row_bottom = ["", city, ""]
                     else:
                         # Пустая строка для отсутствующего игрока
+                        # ===old======
+                        # players_info[position] = {
+                        #     'fio': '',
+                        #     'city': '',
+                        #     'wins': 0,
+                        #     'losses': 0,
+                        #     'total_points': 0,
+                        #     'scores': {},
+                        #     'matches': {},
+                        #     'place': 0,
+                        #     'ratio_points': 0
+                        # }
+                        # row_top = [str(position), ""]
+                        # row_bottom = ["", ""]
+                        # ==========
                         players_info[position] = {
                             'fio': '',
                             'city': '',
+                            'rank': '',
                             'wins': 0,
                             'losses': 0,
                             'total_points': 0,
                             'scores': {},
                             'matches': {},
                             'place': 0,
-                            'ratio_points': 0
+                            'ratio_points': 0,
                         }
-                        row_top = [str(position), ""]
-                        row_bottom = ["", ""]
+                        row_top = [str(position), "", ""]
+                        row_bottom = ["", "", ""]
 
                     # Заполняем пустыми ячейками для всех соперников
                     for _ in range(max_players_in_stage):
@@ -18283,12 +18584,17 @@ class MainWindow(QMainWindow):
                         row_bottom_winner = 2 + (winner_idx - 1) * 2
                         row_top_loser = 1 + (loser_idx - 1) * 2
                         row_bottom_loser = 2 + (loser_idx - 1) * 2
-                        
-                        data[row_top_winner][loser_idx + 1] = str(winner_points)
-                        data[row_bottom_winner][loser_idx + 1] = winner_score
-                        data[row_top_loser][winner_idx + 1] = str(loser_points)
-                        data[row_bottom_loser][winner_idx + 1] = loser_score
-                
+                        # ==== old ===
+                        # data[row_top_winner][loser_idx + 1] = str(winner_points)
+                        # data[row_bottom_winner][loser_idx + 1] = winner_score
+                        # data[row_top_loser][winner_idx + 1] = str(loser_points)
+                        # data[row_bottom_loser][winner_idx + 1] = loser_score
+                        # ======
+                        data[row_top_winner][loser_idx + 2] = str(winner_points)
+                        data[row_bottom_winner][loser_idx + 2] = winner_score
+                        data[row_top_loser][winner_idx + 2] = str(loser_points)
+                        data[row_bottom_loser][winner_idx + 2] = loser_score
+
                 # Определяем места ТОЛЬКО если все матчи в этой группе сыграны
                 if all_matches_in_group_played:
                     players_info = self.calculate_round_robin_standings(players_info, results_group)                    
@@ -18297,22 +18603,30 @@ class MainWindow(QMainWindow):
                     row_top_idx = 1 + (position - 1) * 2
                     if info['fio']:  # реальный участник
                         # Очки
-                        data[row_top_idx][max_pl + 2] = str(info['total_points'])
+                        # data[row_top_idx][max_pl + 2] = str(info['total_points'])
+                        data[row_top_idx][max_pl + 3] = str(info['total_points'])
                         # Соотношение
                         if all_matches_in_group_played and info.get('ratio_points', ''):
-                            data[row_top_idx][max_pl + 3] = str(info['ratio_points'])
+                            # data[row_top_idx][max_pl + 3] = str(info['ratio_points'])
+                            data[row_top_idx][max_pl + 4] = str(info['ratio_points'])
                         else:
-                            data[row_top_idx][max_pl + 3] = ""
+                            # data[row_top_idx][max_pl + 3] = ""
+                            data[row_top_idx][max_pl + 4] = ""
                         # Место
                         if all_matches_in_group_played and info.get('place', 0) > 0:
-                            data[row_top_idx][max_pl + 4] = str(info['place'])
+                            # data[row_top_idx][max_pl + 4] = str(info['place'])
+                            data[row_top_idx][max_pl + 5] = str(info['place'])
                         else:
-                            data[row_top_idx][max_pl + 4] = ""
+                            # data[row_top_idx][max_pl + 4] = ""
+                            data[row_top_idx][max_pl + 5] = ""
                     else:
                         # Пустая строка — ничего не пишем (ячейки и так пустые, но для надёжности)
-                        data[row_top_idx][max_pl + 2] = ""
+                        # data[row_top_idx][max_pl + 2] = ""
+                        # data[row_top_idx][max_pl + 3] = ""
+                        # data[row_top_idx][max_pl + 4] = ""
                         data[row_top_idx][max_pl + 3] = ""
                         data[row_top_idx][max_pl + 4] = ""
+                        data[row_top_idx][max_pl + 5] = ""
 
                 # Если все матчи сыграны, рассчитываем места только для реальных игроков
                 player_place = {}

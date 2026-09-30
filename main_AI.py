@@ -22258,7 +22258,7 @@ class MainWindow(QMainWindow):
         # ================== КАРКАС ==================
         strok = 131      # подстроите под реальный размер
         for i in range(strok):
-            column_count[12] = i
+            # column_count[12] = i
             data.append(column_count.copy())
 
         # ================== НУМЕРАЦИЯ НАЧАЛЬНЫХ ПАР ==================
@@ -22272,44 +22272,23 @@ class MainWindow(QMainWindow):
         # --- Верхняя половина: строки 0-68 ---
         self.draw_num(
             row_n=3, row_step=2, col_n=2, number_of_columns=5,
-            number_of_game=1, player=32, data=data
+            number_of_game=1, player=64, data=data
         )
         # Проигравшие верхней половины
-        # data[60][8] = "-29"    # проигравший 1/4 верхней половины
-        # data[62][8] = "-30"    # проигравший 1/4 верхней половины
-        # data[55][10] = "-31"   # проигравший 1/2 верхней половины (для справки, можно скрыть)
-        # data[61][10] = "61"    # полуфинал верхней половины
-        # data[66][10] = "-61"   # проигравший полуфинала верхней половины
-
-        # --- Нижняя половина: строки 72-140 ---
-        self.draw_num(
-            row_n=67, row_step=2, col_n=2, number_of_columns=5,
-            number_of_game=17, player=32, data=data
-        )
-        # # Проигравшие нижней половины
-        # data[132][8] = "-45"
-        # data[134][8] = "-46"
-        # data[127][10] = "-47"
-        # data[133][10] = "62"    # полуфинал нижней половины
-        # data[138][10] = "-62"
-
-        # ================== ФИНАЛ (63) на верхней половине ==================
-        # # Встреча 63 — финал. Верхняя строка — победитель 61, нижняя — победитель 62.
-        # data[59][10] = ""        # победитель 61 придёт сюда (write_in_setka)
-        # data[65][10] = ""        # победитель 62 придёт сюда
-        # # Номер матча 63 — по центру между ними
-        # data[62][10] = "63"
-        # # 1-е и 2-е место — рядом, но текст поставит write_in_setka через place_matches
-        # data[57][11] = ""        # 1-е место (запишет write_in_setka)
-        # data[67][11] = ""        # 2-е место
-
+        data[59][8] = "A"    # проигравший 1/4 верхней половины
+        data[61][8] = "B"    # проигравший 1/4 верхней половины
+        data[60][10] = "63"    # проигравший 1/4 верхней половины
+        data[124][10] = "-61"    # проигравший 1/4 верхней половины
+        data[128][10] = "-62"    # проигравший 1/4 верхней половины
+        data[64][10] = "-63"    # проигравший 1/4 верхней половины
+      
+        # 1-е и 2-е место — рядом, но текст поставит write_in_setka через place_matches
+        data[56][11] = "1 место"        # 1-е место (запишет write_in_setka)
+        data[62][11] = "2 место"        # 2-е место
         # ================== МАТЧ ЗА 3-е (64) на нижней половине ==================
         # Встреча 64 — проигравшие финалов (61 и 62) разыгрывают 3-е место.
-        # data[125][10] = ""       # проигравший 61
-        # data[131][10] = ""       # проигравший 62
-        # data[128][10] = "64"
-        # data[123][11] = ""       # 3-е место (запишет write_in_setka)
-        # data[133][11] = ""       # 4-е место
+        data[122][11] = "3 место"       # 3-е место (запишет write_in_setka)
+        data[126][11] = "3 место"       # 4-е место
 
         # ================== ИГРОКИ И РЕЗУЛЬТАТЫ ==================
         if fin != "Чистая сетка":
@@ -22330,63 +22309,55 @@ class MainWindow(QMainWindow):
 
         # ================== СТИЛЬ ==================
         # 1) сетка верхней половины (1-32)
-        style = self.draw_setka(1, 3, 32, style)
-        # 2) сетка нижней половины (33-64) — та же геометрия, начало со строки 75
-        style = self.draw_setka(1, 67, 32, style)
+        style = self.draw_setka(1, 3, 64, style)
 
-        # style.append(('LINEBELOW', (9, 59), (10, 59), 1, colors.darkblue))
-        # style.append(('LINEBELOW', (9, 61), (10, 61), 1, colors.darkblue))
-        # style.append(('BOX', (10, 60), (10, 61), 1, colors.darkblue))
-        # style.append(('SPAN', (10, 60), (10, 61)))
-        # style.append(('BACKGROUND', (10, 60), (10, 61), colors.lightyellow))
+        style.append(('LINEBELOW', (9, 59), (10, 59), 1, colors.darkblue))
+        style.append(('LINEBELOW', (9, 61), (10, 61), 1, colors.darkblue))
+        style.append(('BOX', (10, 60), (10, 61), 1, colors.darkblue))
+        style.append(('SPAN', (10, 60), (10, 61)))
+        style.append(('BACKGROUND', (10, 60), (10, 61), colors.lightyellow))
 
         # 3) линии финала и матча за 3-е
-        # # финал: две линии — куда идут победители 61 и 62
-        # style.append(('LINEABOVE', (10, 59), (12, 59), 1, colors.darkblue))
-        # style.append(('LINEABOVE', (10, 65), (12, 65), 1, colors.darkblue))
-        # # рамка финала и заливка
-        # style.append(('SPAN', (10, 59), (10, 65)))
-        # style.append(('BACKGROUND', (10, 59), (10, 65), colors.lightyellow))
-        # # номер 63 — по центру
-        # style.append(('ALIGN', (10, 62), (10, 62), 'CENTER'))
+        # финал: две линии — куда идут победители 61 и 62
+        style.append(('LINEABOVE', (10, 61), (11, 61), 1, colors.darkblue))
+        style.append(('LINEABOVE', (10, 65), (11, 65), 1, colors.darkblue))
 
         # за 3-е: две линии
-        style.append(('LINEABOVE', (10, 125), (12, 125), 1, colors.darkblue))
-        style.append(('LINEABOVE', (10, 131), (12, 131), 1, colors.darkblue))
-        style.append(('SPAN', (10, 125), (10, 131)))
-        style.append(('BACKGROUND', (10, 125), (10, 131), colors.lightyellow))
-        style.append(('ALIGN', (10, 128), (10, 128), 'CENTER'))
+        style.append(('LINEABOVE', (11, 125), (11, 125), 1, colors.darkblue))
+        style.append(('LINEABOVE', (11, 129), (11, 129), 1, colors.darkblue))
 
-        # 4) красный текст для мест 1, 2, 3
-        style.append(('TEXTCOLOR', (11, 57), (11, 57), colors.red))    # 1-е место
-        style.append(('ALIGN', (11, 57), (11, 57), 'CENTER'))
-        style.append(('TEXTCOLOR', (11, 67), (11, 67), colors.red))    # 2-е место
-        style.append(('ALIGN', (11, 67), (11, 67), 'CENTER'))
-        style.append(('TEXTCOLOR', (11, 123), (11, 123), colors.red))  # 3-е место
-        style.append(('ALIGN', (11, 123), (11, 123), 'CENTER'))
-
-        # 5) убрать нижнюю линию под матчем 32 верхней половины
-        style.append(('LINEBELOW', (10, 62), (10, 62), 1, colors.white))
-
-        # 6) цвета и выравнивание
+        # 4) цвета и выравнивание
         for i in range(0, 11, 2):
             style.append(('TEXTCOLOR', (i + 1, 0), (i + 1, strok - 1), colors.black))
             style.append(('TEXTCOLOR', (i, 0), (i, strok - 1), colors.brown))
             style.append(('ALIGN', (i + 1, 0), (i + 1, strok - 1), 'LEFT'))
             style.append(('ALIGN', (i, 0), (i, strok - 1), 'CENTER'))
             style.append(('VALIGN', (i, 0), (i, strok - 1), 'MIDDLE'))
-        fn = ('INNERGRID', (0, 0), (-1, -1), 0.01, colors.grey)  # временное отображение сетки
-        style.append(fn)
+        # fn = ('INNERGRID', (0, 0), (-1, -1), 0.01, colors.grey)  # временное отображение сетки
+        # style.append(fn)
+
+        # 5) красный текст для мест 1, 2, 3
+        style.append(('TEXTCOLOR', (11, 56), (11, 56), colors.red))    # 1-е место
+        style.append(('ALIGN', (11, 56), (11, 56), 'CENTER'))
+        style.append(('TEXTCOLOR', (11, 62), (11, 62), colors.red))    # 2-е место
+        style.append(('ALIGN', (11, 62), (11, 62), 'CENTER'))
+        style.append(('TEXTCOLOR', (11, 122), (11, 122), colors.red))  # 3-е место
+        style.append(('ALIGN', (11, 122), (11, 122), 'CENTER'))
+        style.append(('TEXTCOLOR', (11, 126), (11, 126), colors.red))  # 3-е место
+        style.append(('ALIGN', (11, 126), (11, 126), 'CENTER')) 
+
         t.setStyle(TableStyle([
             ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
             ('FONTNAME', (0, 0), (-1, -1), "DejaVuSerif"),
             ('FONTSIZE', (0, 0), (-1, -1), 6),
             ('FONTNAME', (1, 0), (1, 64), "DejaVuSerif-Bold"),
             ('FONTSIZE', (1, 0), (1, 64), 6),
-            ('LEADING', (1, 0), (1, 64), 6),
-            ('TEXTCOLOR', (0, 0), (0, 68), colors.blue),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ] + style))
+            ('LEADING', (1, 0), (1, 64), 6)] +
+            style +
+            [('TEXTCOLOR', (0, 0), (0, 129), colors.blue),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP')
+        ])) 
+
 
         # ================== СБОРКА ==================
         h2 = PS("normal", fontSize=10, fontName="DejaVuSerif-Italic",
@@ -22421,277 +22392,6 @@ class MainWindow(QMainWindow):
                 onLaterPages=self.func_zagolovok)
 
         return name_table_final
-
-
-    # def setka_64_made(self, fin, posev_data):
-    #     from reportlab.platypus import Table, PageBreak
-    #     from reportlab.lib.pagesizes import A4
-
-    #     table = "setka_64"
-    #     pairs_list = ["Мужские пары", "Женские пары", "Смешанные пары"]
-    #     sex = "M" if self.current_sex == "man" else "W"
-
-    #     pdf_dir = "table_pdf"
-    #     if not os.path.exists(pdf_dir):
-    #         os.makedirs(pdf_dir)
-
-    #     elements = []
-    #     final = fin
-    #     titles = Title.select().where(Title.id == self.current_title_id).get()
-    #     gamer = titles.gamer
-
-    #     finals = System.select().where(
-    #         (System.title_id == self.current_title_id) &
-    #         (System.stage == fin) &
-    #         (System.sex == self.current_sex)
-    #     ).get()
-    #     max_pl = finals.max_player
-
-    #     if fin in pairs_list:
-    #         first_mesto, last_mesto = 1, 3
-    #         fin_title = 'Финальные соревнования.(с 1 по 3 место)'
-    #     elif fin == "Чистая сетка":
-    #         first_mesto = 1
-    #         last_mesto = first_mesto + max_pl - 1
-    #         fin_title = ""
-    #     else:
-    #         first_mesto = self.get_final_start_place(fin)
-    #         last_mesto = max_pl if fin == "1-й финал" else first_mesto + max_pl - 1
-    #         fin_title = f'Финальные соревнования.({first_mesto}-{last_mesto} место)'
-
-    #     strok_full = 69 + 69
-    #     column_count = [''] * 13
-    #     data_full = [column_count.copy() for _ in range(strok_full)]
-
-    #     for i in range(0, 138):
-    #         data_full[i][12] = i  # нумерация 10 столбца для удобного просмотра таблицы
-
-    #     # Начальные номера 1-32
-    #     y = 0
-    #     for i in range(1, 65, 2):
-    #         y += 1
-    #         data_full[i + 1][0] = str(y)
-    #     # Начальные номера 33-64
-    #     y = 32
-    #     for i in range(70, 134, 2):
-    #         y += 1
-    #         data_full[i + 1][0] = str(y)
-
-    #     # Номера матчей
-    #     self.draw_num_64_split(data_full)
-
-    #     # self.schedule_data(data_full, fin)
-
-    #     # ============ ЗАПОЛНЕНИЕ ============
-    #     if fin != "Чистая сетка":
-    #         tds = self.write_in_setka(
-    #             data_full, fin, first_mesto, table, posev_data
-    #         )
-    #     else:
-    #         tds = None
-
-    #     # ============ ШИРИНА КОЛОНОК ============
-    #     cw = (0.2 * cm, 3.8 * cm,
-    #         0.35 * cm, 2.7 * cm,
-    #         0.35 * cm, 2.7 * cm,
-    #         0.35 * cm, 2.7 * cm,
-    #         0.35 * cm, 2.5 * cm,
-    #         0.35 * cm, 3.0 * cm,
-    #         0.3 * cm)
-
-    #     # ============ ЛИСТ 1 ============
-    #     data_page1 = data_full[0:69]
-    #     t1 = Table(data_page1, cw, 69 * [0.35 * cm])
-
-    #     style1 = self.draw_setka(1, 3, 32, [])
-    #     style1 = self._style_setka_64_page1(strok=69, style=style1)
-    #     fn = ('INNERGRID', (0, 0), (-1, -1), 0.01, colors.grey)  # временное отображение сетки
-    #     style1.append(fn)
-    #     t1.setStyle(TableStyle([
-    #         ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
-    #         ('FONTNAME', (0, 0), (-1, -1), "DejaVuSerif"),
-    #         ('FONTSIZE', (0, 0), (-1, -1), 7),
-    #         ('FONTNAME', (1, 0), (1, 32), "DejaVuSerif-Bold"),
-    #         ('FONTSIZE', (1, 0), (1, 32), 7),
-    #         ('TEXTCOLOR', (0, 0), (0, 68), colors.blue),
-    #         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-    #     ] + style1))
-
-    #     h2 = PS("normal", fontSize=10, fontName="DejaVuSerif-Italic",
-    #             leftIndent=50, textColor=Color(1, 0, 1, 1))
-    #     elements.append(Paragraph(
-    #         f"{fin_title}. Одиночный разряд. {gamer}. (1-32, финал)", h2
-    #     ))
-    #     elements.append(t1)
-    #     elements.append(PageBreak())
-
-    #     # ============ ЛИСТ 2 ============
-    #     data_page2 = data_full[69:138]
-    #     t2 = Table(data_page2, cw, 69 * [0.35 * cm])
-
-    #     style2 = self.draw_setka(1, 3, 32, [])
-    #     style2 = self._style_setka_64_page2(strok=69, style=style2)
-    #     fn = ('INNERGRID', (0, 0), (-1, -1), 0.01, colors.grey)  # временное отображение сетки
-    #     style2.append(fn)
-    #     t2.setStyle(TableStyle([
-    #         ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
-    #         ('FONTNAME', (0, 0), (-1, -1), "DejaVuSerif"),
-    #         ('FONTSIZE', (0, 0), (-1, -1), 7),
-    #         ('FONTNAME', (1, 0), (1, 32), "DejaVuSerif-Bold"),
-    #         ('FONTSIZE', (1, 0), (1, 32), 7),
-    #         ('TEXTCOLOR', (0, 0), (0, 68), colors.blue),
-    #         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-    #     ] + style2))
-
-    #     elements.append(Paragraph(
-    #         f"{fin_title}. Одиночный разряд. {gamer}. (33-64, за 3-е место)", h2
-    #     ))
-    #     elements.append(t2)
-
-    #     # ============ СОХРАНЕНИЕ ============
-    #     znak = final.rfind("-")
-    #     f = final[:znak] if znak != -1 else final
-    #     t_id = Title.get(Title.id == self.current_title_id)
-    #     short_name = t_id.short_name_comp or t_id.name
-
-    #     if fin == "Чистая сетка":
-    #         name_table_final = "clear_64_net.pdf"
-    #     elif fin in pairs_list:
-    #         name_table_final = f"{short_name}_{sex}_double_{f}_64.pdf"
-    #     elif fin == "Суперфинал":
-    #         name_table_final = f"{short_name}_{sex}_{f}_64.pdf"
-    #     else:
-    #         name_table_final = f"{short_name}_{sex}_{f}-final_64.pdf"
-
-    #     filename = os.path.join(pdf_dir, name_table_final)
-    #     doc = SimpleDocTemplate(filename, pagesize=A4,
-    #                             rightMargin=1 * cm, leftMargin=1 * cm,
-    #                             topMargin=3 * cm, bottomMargin=1 * cm)
-    #     doc.build(elements,
-    #             onFirstPage=self.func_zagolovok,
-    #             onLaterPages=self.func_zagolovok)
-
-    #     return name_table_final
-
-    # def draw_num_64_split(self, data_full):
-    #     """
-    #     data_full: 138 строк × 13 колонок.
-    #     Лист 1: строки 0..68
-    #     Лист 2: строки 69..137
-    #     Нумерация сквозная:
-    #     тур 1: 1-16 (лист1), 17-32 (лист2)
-    #     тур 2: 33-40 (лист1), 41-48 (лист2)
-    #     тур 3: 49-52 (лист1), 53-56 (лист2)
-    #     тур 4: 57-58 (лист1), 59-60 (лист2)
-    #     тур 5: 61 (лист1), 62 (лист2)
-    #     тур 6: 63 (лист1, финал)
-    #     """
-    #     OFFSET = 69  # смещение листа 2 в общем массиве
-
-    #     # ---------- ЛИСТ 1 ----------
-    #     # (столбец, стартовая_строка, шаг, кол-во, стартовый_номер)
-    #     tours_p1 = [
-    #         (2, 3,   4, 16, 1),    # тур 1: 1-16
-    #         (4, 5,   8, 8,  33),   # тур 2: 33-40
-    #         (6, 9,  16, 4,  49),   # тур 3: 49-52
-    #         (8, 17, 32, 2,  57),   # тур 4: 57-58
-    #         (10, 33, 64, 1, 61),   # тур 5: 61 (верхний полуфинал)
-    #     ]
-    #     for col, row0, step, count, start in tours_p1:
-    #         for j in range(count):
-    #             data_full[row0 + j * step][col] = str(start + j)
-
-    #     # ---------- ЛИСТ 2 ----------
-    #     tours_p2 = [
-    #         (2, 3,   4, 16, 17),   # тур 1: 17-32
-    #         (4, 5,   8, 8,  41),   # тур 2: 41-48
-    #         (6, 9,  16, 4,  53),   # тур 3: 53-56
-    #         (8, 17, 32, 2,  59),   # тур 4: 59-60
-    #         (10, 33, 64, 1, 62),   # тур 5: 62 (нижний полуфинал)
-    #     ]
-    #     for col, row0, step, count, start in tours_p2:
-    #         for j in range(count):
-    #             local = row0 + j * step
-    #             data_full[OFFSET + local][col] = str(start + j)
-
-    #     # ---------- ФИНАЛ на листе 1 ----------
-    #     # Строка 61, колонка 10 — это ячейка матча 61 (полуфинал 1).
-    #     # В 32-й версии финал лежал ниже. Здесь делаем блок:
-    #     data_full[60][10] = "63"   
-    #     data_full[59][8] = "A"    
-    #     data_full[61][8] = "B"  
-    #     data_full[65][10] = "-63" 
-    #     data_full[57][11] = "1 место"
-    #     data_full[63][11] = "2 место"
-
-    #     # ---------- МАТЧ ЗА 3-е на листе 2 ----------
-    #     # По аналогии: две линии с проигравшими 61 и 62.
-    #     # Номер матча за 3-е — 64. Он не входит в основную нумерацию,
-    #     # т.к. в 64-й сетке финал — 63, а за 3-е — отдельный матч.
-    #     data_full[129][10] = "-61"
-    #     data_full[134][10] = "-62"
-    #     data_full[126][11] = "3 место"
-    #     data_full[132][11] = "3 место"
-
-    #     return data_full
-    
-    # def _style_setka_64_page1(self, strok, style):
-    #     """Стили верхней половины (лист 1) + блок финала 63."""
-    #     # --- Матч 32: без нижней линии (убираем её из draw_setka) ---
-    #     # draw_setka уже нарисовал линию под матчем 32 в ячейке (10, 61-62).
-    #     style.append(('LINEBELOW', (9, 59), (10, 59), 1, colors.darkblue))
-    #     style.append(('LINEBELOW', (9, 61), (10, 61), 1, colors.darkblue))
-    #     style.append(('BOX', (10, 60), (10, 61), 1, colors.darkblue))
-    #     style.append(('SPAN', (10, 60), (10, 61)))
-    #     style.append(('BACKGROUND', (10, 60), (10, 61), colors.lightyellow))
-
-    #     # --- Блок финала 63 ---
-    #     # Линия, куда идёт победитель матча 61 (над строкой 61)
-    #     style.append(('LINEABOVE', (11, 61), (13, 61), 1, colors.darkblue))
-
-    #     # Линия, куда идёт победитель матча 62 (над строкой 66, через 2 строки)
-    #     style.append(('LINEABOVE', (11, 66), (13, 66), 1, colors.darkblue))
-
-    #     # Цвета/выравнивание по колонкам (как было)
-    #     for i in range(0, 11, 2):
-    #         style.append(('TEXTCOLOR', (i + 1, 0), (i + 1, strok), colors.black))
-    #         style.append(('TEXTCOLOR', (i, 0), (i, strok), colors.green))
-    #         style.append(('ALIGN', (i + 1, 0), (i + 1, strok), 'LEFT'))
-    #         style.append(('ALIGN', (i, 0), (i, strok), 'CENTER'))
-
-    #     # Победитель (1-е место) — над финальной линией
-    #     style.append(('TEXTCOLOR', (11, 57), (11, 57), colors.red))
-    #     style.append(('ALIGN', (11, 57), (11, 57), 'CENTER'))
-
-    #     # Проигравший (2-е место) — под линией
-    #     style.append(('TEXTCOLOR', (11, 63), (11, 63), colors.red))
-    #     style.append(('ALIGN', (11, 63), (11, 63), 'CENTER'))    
-
-    #     return style
-
-    # def _style_setka_64_page2(self, strok, style):
-    #     """Стили нижней половины (лист 2) + блок матча за 3-е (64)."""
-
-    #     # --- Блок матча за 3-е (64) ---
-    #     # Две линии с проигравшими финала — они НЕ разыгрывают 3-е место.
-    #     # 3-е место — над линиями красным текстом.
-    #     style.append(('LINEABOVE', (11, 61), (13, 61), 1, colors.darkblue))
-    #     style.append(('LINEABOVE', (11, 66), (13, 66), 1, colors.darkblue))
-
-    #     for i in range(0, 11, 2):
-    #         style.append(('TEXTCOLOR', (i + 1, 0), (i + 1, strok), colors.black))
-    #         style.append(('TEXTCOLOR', (i, 0), (i, strok), colors.green))
-    #         style.append(('ALIGN', (i + 1, 0), (i + 1, strok), 'LEFT'))
-    #         style.append(('ALIGN', (i, 0), (i, strok), 'CENTER'))
-
-    #     # 3-е место — над верхней линией, красный текст
-    #     style.append(('TEXTCOLOR', (11, 126), (11, 126), colors.red))
-    #     style.append(('ALIGN', (11, 126), (11, 126), 'CENTER'))
-    #     # 3-е место — над верхней линией, красный текст
-    #     style.append(('TEXTCOLOR', (11, 132), (11, 132), colors.red))
-    #     style.append(('ALIGN', (11, 132), (11, 132), 'CENTER'))
-
-    #     return style
 # ========== печать чистых таблиц ====
     def print_clean_olympic_progressive(self):
         players = self._get_olympic_players_count("Прогрессивная сетка")
@@ -23554,6 +23254,8 @@ class MainWindow(QMainWindow):
         elif num == 16:
             cf = 4
         elif num == 32:
+            cf = 5
+        elif num == 64:
             cf = 5
         row_b = row
         col_fin = col + cf * 2 # последний столбец

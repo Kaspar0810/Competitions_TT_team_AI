@@ -1397,7 +1397,7 @@ class MainWindow(QMainWindow):
 
     def open_update_rating_dialog(self):
         """Открывает диалог загрузки рейтингов и обновляет рейтинг участников"""
-        from import_initial_data import RatingFileDialog  # или откуда у вас диалог
+        # from import_initial_data import RatingFileDialog  # или откуда у вас диалог
 
         try:
             dialog = RatingFileDialog(self)
@@ -1495,13 +1495,7 @@ class MainWindow(QMainWindow):
     def _sync_rank_to_related_tables(self):
         """Синхронизирует рейтинг из Player в связанные таблицы"""
         try:
-            # Players_full
             players = Player.select().where(Player.title_id == self.current_title_id)
-            for p in players:
-                Players_full.update(rank=p.rank).where(
-                    (Players_full.player == p.fio) &
-                    (Players_full.bday == p.bday)
-                ).execute()
 
             # Choice
             for p in players:

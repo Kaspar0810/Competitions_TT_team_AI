@@ -31274,6 +31274,7 @@ class MainWindow(QMainWindow):
         }
 
     def export_chessboard_pdf(self):
+        """Шахматка: время × столы. Альбомная A4, растянута на всю страницу."""
         from reportlab.platypus import (SimpleDocTemplate, Table, TableStyle,
                                         Paragraph, PageBreak)
         from reportlab.lib.pagesizes import A4, landscape
@@ -31292,7 +31293,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Соревнование не найдено")
             return
 
-        # 1) Диалог параметров — даты берёт из Title, времена — из Result
+        # --- Диалог ---
         dlg = ChessboardDialog(self, title_obj=title_obj)
         if dlg.exec_() != QDialog.Accepted:
             return
@@ -31301,10 +31302,9 @@ class MainWindow(QMainWindow):
         date_    = params["date"]
         t_from   = params["time_from"]
         t_to     = params["time_to"]
-        tbl_from = params["table_from"]
-        tbl_to   = params["table_to"]
+        tables_set = params["tables"]
 
-        # 2) Матчи на выбранную дату в диапазоне времени
+        # --- Матчи за день в диапазоне времени ---
         matches = list(
             Result
             .select()
@@ -31326,30 +31326,26 @@ class MainWindow(QMainWindow):
             )
             return
 
-        # 3) Уникальные времена (только те, что реально есть в Result)
+        # --- Уникальные времена ---
         times_set = sorted({m.schedule_time for m in matches if m.schedule_time})
 
-        # 4) Столы: диапазон от пользователя
-        tables_set = list(range(tbl_from, tbl_to + 1))
-
-        # 5) Карта (время, стол) -> матч
+        # --- Карта (время, стол) -> матч ---
         by_cell = {}
         for m in matches:
             try:
-                table_num = int(str(m.schedule_table).strip())
-            except (TypeError, ValueError):
+                table_num = int(re.sub(r"\D", "", str(m.schedule_table)) or 0)
+            except ValueError:
                 continue
             if table_num not in tables_set:
                 continue
             by_cell[(m.schedule_time, table_num)] = m
 
-        # 5) Папка и имя файла
+        # --- Папка и имя файла ---
         pdf_dir = "table_pdf"
         if not os.path.exists(pdf_dir):
             os.makedirs(pdf_dir)
 
-        t_id = Title.get(Title.id == self.current_title_id)
-        short_name = t_id.short_name_comp or t_id.name
+        short_name = title_obj.short_name_comp or title_obj.name
         clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))[:50]
 
         filename = os.path.join(
@@ -31358,62 +31354,83 @@ class MainWindow(QMainWindow):
             f"_{t_from.strftime('%H%M')}-{t_to.strftime('%H%M')}.pdf"
         )
 
-        # 6) Разбивка столов по страницам
-        # Сколько столов влезает на альбомную A4: ширина ~ 27 см полезной,
-        # под стол ~ 1.8 см + столбец времени ~ 2 см.
+        # --- Разбивка столов по страницам ---
         MAX_TABLES_PER_PAGE = 16
         pages = [tables_set[i:i + MAX_TABLES_PER_PAGE]
                 for i in range(0, len(tables_set), MAX_TABLES_PER_PAGE)]
 
-        # 7) Стили
-        styles = getSampleStyleSheet()
+        # --- Стили ---
         title_style = PS("ChessTitle", fontSize=12,
                         fontName="DejaVuSerif-Bold", alignment=1,
-                        spaceAfter=10, textColor=colors.darkblue)
-        cell_stage_style = PS("ChessStage", fontSize=7,
-                            fontName="DejaVuSerif-Bold", alignment=0,
-                            textColor=colors.darkblue, leading=8)
-        cell_player_style = PS("ChessPlayer", fontSize=6.5,
-                            fontName="DejaVuSerif", alignment=0,
-                            textColor=colors.black, leading=7)
+                        spaceAfter=4, spaceBefore=0,
+                        textColor=colors.darkblue)
+        cell_style = PS("ChessCell", fontSize=6.5,
+                        fontName="DejaVuSerif", alignment=0,
+                        textColor=colors.black, leading=7.5)
+        
+        stage_style = PS("ChessStage", fontSize=6.5,
+                 fontName="DejaVuSerif-Bold", alignment=0,
+                 textColor=colors.darkblue, leading=7.5)
+        
+        players_style = PS("ChessPlayers", fontSize=6.5,
+                        fontName="DejaVuSerif", alignment=0,
+                        textColor=colors.black, leading=7.5)
+#====================
+        # --- Геометрия страницы ---
+        page_w, page_h = landscape(A4)           # 29.7 × 21 см
+        margin_l = margin_r = 1.0 * cm
+        margin_t = 1.2 * cm
+        margin_b = 0.8 * cm
+
+        time_col_w = 1.6 * cm
+        avail_w = page_w - margin_l - margin_r - time_col_w
+
+        ROW_H_HEADER = 1.0 * cm
+        ROW_H_DATA   = 2.5 * cm
 
         elements = []
 
-        # 8) Формируем страницы
         for page_idx, tables_page in enumerate(pages):
+            # --- Ширина колонок: делим всю доступную ширину поровну ---
+            n = len(tables_page)
+            col_w_each = avail_w / n
+            col_widths = [time_col_w] + [col_w_each] * n
+
+            # --- Заголовок страницы ---
             title_text = (f"Шахматка на {date_.strftime('%d.%m.%Y')} "
                         f"с {t_from.strftime('%H:%M')} до {t_to.strftime('%H:%M')}")
             if len(pages) > 1:
                 title_text += f" (часть {page_idx + 1} из {len(pages)})"
-
             elements.append(Paragraph(title_text, title_style))
 
-            # Заголовок: [Время] [Стол 1] [Стол 2] ... [Стол N]
+            # --- Данные ---
             header = ["Время"] + [f"Стол {t}" for t in tables_page]
             table_data = [header]
 
-            # Строки по времени
             for t in times_set:
                 row = [t.strftime("%H:%M")]
-                for tbl in tables_page:
-                    m = by_cell.get((t, tbl))
+                for tbl_num in tables_page:
+                    m = by_cell.get((t, tbl_num))
                     if m is None:
-                        row.append("нет встречи")
+                        row.append(Paragraph("нет встречи", cell_style))
                     else:
                         stage_short = self._chess_stage_short(m)
                         p1 = self._chess_player_line(m.player1)
                         p2 = self._chess_player_line(m.player2)
-                        # Многострочный текст через Paragraph
-                        text = (
-                            f'<b>{stage_short}</b><br/>'
-                            f'{p1}<br/>{p2}'
-                        )
-                        row.append(Paragraph(text, cell_player_style))
+                        row.append(self._make_chess_cell(
+                            stage_short, p1, p2, stage_style, players_style
+                        ))
                 table_data.append(row)
 
-            # Ширина: [2.2 см время] + по 1.7 см на стол
-            col_widths = [2.2 * cm] + [1.7 * cm] * len(tables_page)
-            tbl = Table(table_data, colWidths=col_widths, repeatRows=1)
+            # --- Высоты строк: 1 см шапка + 3 см каждая встреча ---
+            row_heights = [ROW_H_HEADER] + [ROW_H_DATA] * len(times_set)
+
+            tbl = Table(
+                table_data,
+                colWidths=col_widths,
+                rowHeights=row_heights,
+                repeatRows=1,       # шапка повторяется на каждой новой странице
+            )
 
             tbl.setStyle(TableStyle([
                 ('FONTNAME', (0, 0), (-1, 0), 'DejaVuSerif-Bold'),
@@ -31423,25 +31440,26 @@ class MainWindow(QMainWindow):
                 ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                 ('FONTNAME', (0, 1), (0, -1), 'DejaVuSerif-Bold'),
-                ('FONTSIZE', (0, 1), (0, -1), 8),
+                ('FONTSIZE', (0, 1), (0, -1), 9),
                 ('BACKGROUND', (0, 1), (0, -1), colors.whitesmoke),
+                ('ALIGN', (0, 1), (0, -1), 'CENTER'),
                 ('GRID', (0, 0), (-1, -1), 0.4, colors.grey),
                 ('BOX', (0, 0), (-1, -1), 1, colors.black),
-                ('TOPPADDING', (0, 0), (-1, -1), 3),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-                ('LEFTPADDING', (0, 0), (-1, -1), 3),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 3),
+                ('TOPPADDING', (0, 0), (-1, -1), 1),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+                ('LEFTPADDING', (0, 0), (-1, -1), 2),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 2),
             ]))
 
             elements.append(tbl)
             if page_idx < len(pages) - 1:
                 elements.append(PageBreak())
 
-        # 9) Сборка PDF
+        # --- Сборка ---
         doc = SimpleDocTemplate(
             filename, pagesize=landscape(A4),
-            rightMargin=1 * cm, leftMargin=1 * cm,
-            topMargin=1.5 * cm, bottomMargin=1 * cm,
+            rightMargin=margin_r, leftMargin=margin_l,
+            topMargin=margin_t, bottomMargin=margin_b,
         )
         doc.build(elements,
                 onFirstPage=self.func_zagolovok,
@@ -31461,72 +31479,95 @@ class MainWindow(QMainWindow):
 
     def _chess_stage_short(self, match):
         """
-        Возвращает сокращённое название этапа для ячейки шахматки.
-        Например:
-        'Квалификация'          -> 'квал. 3 гр.'
-        'Квалификация. 1-й полуфинал' -> 'квал. 1-й 1/2'
-        '1-й финал'             -> '1-й фин. 2-4'
+        'Квалификация' + '3 группа' → 'квал. 3 гр.'
+        'Квалификация. 1-й полуфинал' → 'квал. 1-й 1/2'
+        '2-й финал' + '2-4' → '2-й фин. 2-4'_ch
         """
         stage = (match.system_stage or "").strip()
         group = (match.number_group or "").strip()
+        tour = (match.tours or "").strip()
+        if stage == "Квалификация":
+           stage_short = f"Квал./ {group}/ встреча:{tour}" 
+        elif stage == "Квалификация. 1-й полуфинал":
+            stage_short = f"1-ПФ/ {group}/ встреча:{tour}"
+        elif stage == "Квалификация. 2-й полуфинал":
+            stage_short = f"2-ПФ/ {group}/ встреча:{tour}"
+        elif stage == "финальный":    
+            stage_short = f"{group}/ матч:{tour}"
 
-        # Сокращение этапа
-        stage_short = stage
-        stage_short = stage_short.replace("Квалификация.", "квал.")
-        stage_short = stage_short.replace("Квалификация", "квал.")
-        stage_short = stage_short.replace("полуфинал", "1/2")
-        stage_short = stage_short.replace("финал", "фин.")
-
-        # Сокращение группы
-        group_short = ""
-        if group:
-            # "3 группа" -> "3 гр."
-            m = re.match(r"(\d+)\s*группа", group)
-            if m:
-                group_short = f"{m.group(1)} гр."
-            else:
-                group_short = group
-
-        # Собираем: "квал. 3 гр."
-        if group_short:
-            return f"{stage_short} {group_short}".strip()
         return stage_short
     
     def _chess_player_line(self, player_str):
         """
-        Приводит строку игрока к формату 'Фамилия И./Город'.
-        На входе может быть:
-        'Иванов Иван'        -> 'Иванов И./'
-        'Иванов Иван (Москва)' -> 'Иванов И./Москва'
-        'Иванов И. (Москва)' -> 'Иванов И./Москва'
-        '' / None            -> ''
+        'КУЗНЕЦОВ Артем Алексеевич/Воронеж' → 'Кузнецов А.А./Воронеж'
+        'ШЕЛОМЕНЦЕВ Лука Дмитриевич/Нижний Новгород' →
+            'Шеломенцев Л.Д./Нижний Новгород'
+        'Иванов Иван' → 'Иванов И.'
         """
         if not player_str:
             return ""
 
         s = str(player_str).strip()
 
-        # Город в скобках
+        # Отделяем город (после последнего '/')
         city = ""
-        m = re.search(r"\(([^)]+)\)", s)
-        if m:
-            city = m.group(1).strip()
-            s = re.sub(r"\s*\([^)]+\)", "", s).strip()
+        if "/" in s:
+            s, city = s.rsplit("/", 1)
+            s = s.strip()
+            city = city.strip()
 
-        # Разбиваем на фамилию и имя
+        # Разбиваем на части: ФАМИЛИЯ Имя Отчество
         parts = s.split()
-        if len(parts) >= 2:
-            # 'Иванов Иван' -> 'Иванов И.'
-            family = parts[0]
-            name_initial = parts[1][0] + "."
-            short = f"{family} {name_initial}"
+        if not parts:
+            return s
+
+        # Фамилия — приводим к «Первая заглавная + остальные строчные»
+        family_raw = parts[0]
+        if family_raw.isupper():
+            family = family_raw.capitalize()
         else:
-            short = s
+            family = family_raw
+
+        # Инициалы: имя → 'И.', отчество → 'О.'
+        initials = ""
+        for p in parts[1:]:
+            if p:
+                initials += p[0].upper() + "."
+
+        if initials:
+            short = f"{family} {initials}"
+        else:
+            short = family
 
         if city:
             return f"{short}/{city}"
-        return short    
+        return short
 
+    def _make_chess_cell(self, stage_short, player1_line, player2_line,
+                        stage_style, players_style):
+        """
+        Возвращает вложенную Table: этап/группа сверху, линия, два игрока снизу.
+        """
+        from reportlab.platypus import Table, TableStyle
+        from reportlab.lib import colors
+
+        top = Paragraph(stage_short, stage_style)
+        players = Paragraph(f"{player1_line}<br/>{player2_line}", players_style)
+
+        inner = Table(
+            [[top], [players]],
+            colWidths=["100%"],
+        )
+        inner.setStyle(TableStyle([
+            ('LEFTPADDING',   (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING',  (0, 0), (-1, -1), 0),
+            ('TOPPADDING',    (0, 0), (-1, -1), 1),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+            ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+            # --- ЛИНИЯ между этапом и игроками ---
+            ('LINEBELOW', (0, 0), (0, 0), 0.4, colors.grey),
+        ]))
+        return inner
 #============
 class GskManagementDialog(QDialog):
     def __init__(self, parent=None, title_id=None):
@@ -32419,9 +32460,14 @@ from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
 from PyQt5.QtCore import QDate, QTime, Qt
 from datetime import date, datetime, time as dtime, timedelta
 
+from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
+                             QComboBox, QLineEdit, QDialogButtonBox, QMessageBox)
+from PyQt5.QtCore import QDate
+from datetime import datetime, timedelta
+
 
 class ChessboardDialog(QDialog):
-    """Диалог параметров шахматки: дата, время с/по, диапазон столов."""
+    """Диалог параметров шахматки."""
 
     def __init__(self, parent=None, title_obj=None):
         super().__init__(parent)
@@ -32431,7 +32477,7 @@ class ChessboardDialog(QDialog):
 
         layout = QVBoxLayout(self)
 
-        # ====================== ДАТА ======================
+        # --- ДАТА ---
         date_row = QHBoxLayout()
         date_row.addWidget(QLabel("Дата расписания:"))
         self.date_combo = QComboBox()
@@ -32439,34 +32485,27 @@ class ChessboardDialog(QDialog):
         date_row.addWidget(self.date_combo)
         layout.addLayout(date_row)
 
-        # ====================== ВРЕМЯ С ======================
+        # --- ВРЕМЯ С ---
         from_row = QHBoxLayout()
         from_row.addWidget(QLabel("Время с:"))
         self.time_from_combo = QComboBox()
         from_row.addWidget(self.time_from_combo)
         layout.addLayout(from_row)
 
-        # ====================== ВРЕМЯ ПО ======================
+        # --- ВРЕМЯ ПО ---
         to_row = QHBoxLayout()
         to_row.addWidget(QLabel("Время по:"))
         self.time_to_combo = QComboBox()
         to_row.addWidget(self.time_to_combo)
         layout.addLayout(to_row)
 
-        # ====================== СТОЛЫ С..ПО ======================
+        # --- СТОЛЫ (текстовое поле) ---
         tables_row = QHBoxLayout()
-        tables_row.addWidget(QLabel("Столы с:"))
-        self.table_from_spin = QSpinBox()
-        self.table_from_spin.setMinimum(1)
-        self.table_from_spin.setMaximum(200)
-        self.table_from_spin.setValue(1)
-        tables_row.addWidget(self.table_from_spin)
-
-        tables_row.addWidget(QLabel("по:"))
-        self.table_to_spin = QSpinBox()
-        self.table_to_spin.setMinimum(1)
-        self.table_to_spin.setMaximum(200)
-        tables_row.addWidget(self.table_to_spin)
+        tables_row.addWidget(QLabel("Столы (например 1-6, 8-10):"))
+        self.tables_edit = QLineEdit()
+        self.tables_edit.setPlaceholderText("1-6")
+        self.tables_edit.setText("1-6")
+        tables_row.addWidget(self.tables_edit)
         layout.addLayout(tables_row)
 
         # Кнопки
@@ -32475,34 +32514,20 @@ class ChessboardDialog(QDialog):
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
-        # При смене даты — пересобираем времена и столы
         self.date_combo.currentIndexChanged.connect(self._reload_times)
-        self.date_combo.currentIndexChanged.connect(self._reload_tables)
-
-        # Первичная загрузка
         self._reload_times()
-        self._reload_tables()
 
-    # ------------------------------------------------------------------ #
-    #                          ДАТЫ                                      #
     # ------------------------------------------------------------------ #
     def _fill_dates(self):
-        """Даты со 2-го дня соревнования (data_start + 1) по data_end."""
-        if not self.title_obj:
-            # fallback: сегодня
+        if not self.title_obj or not self.title_obj.data_start \
+                or not self.title_obj.data_end:
             self.date_combo.addItem(QDate.currentDate().toString("dd.MM.yyyy"),
                                     QDate.currentDate().toPyDate())
             return
 
-        start = self.title_obj.data_start
+        # 1-й день — приезд, пропускаем
+        first = self.title_obj.data_start + timedelta(days=1)
         end = self.title_obj.data_end
-
-        if not start or not end:
-            self.date_combo.addItem("Нет дат в соревновании", None)
-            return
-
-        # Первый день — день приезда, не учитываем
-        first = start + timedelta(days=1)
 
         cur = first
         while cur <= end:
@@ -32510,16 +32535,12 @@ class ChessboardDialog(QDialog):
             cur += timedelta(days=1)
 
         if self.date_combo.count() == 0:
-            self.date_combo.addItem("Нет доступных дней", None)
+            self.date_combo.addItem("Нет дней", None)
 
     def _current_date(self):
         return self.date_combo.currentData()
 
-    # ------------------------------------------------------------------ #
-    #                          ВРЕМЕНА                                   #
-    # ------------------------------------------------------------------ #
     def _reload_times(self):
-        """Пересобирает список времён из Result для выбранной даты."""
         self.time_from_combo.clear()
         self.time_to_combo.clear()
 
@@ -32527,15 +32548,13 @@ class ChessboardDialog(QDialog):
         if d is None:
             return
 
-        # Уникальные времена из Result на эту дату
         rows = (Result
                 .select(Result.schedule_time)
                 .where(
                     (Result.title_id == self.title_obj.id) &
                     (Result.schedule_date == d) &
                     (Result.schedule_time.is_null(False))
-                )
-                .order_by(Result.schedule_time))
+                ))
 
         times = sorted({r.schedule_time for r in rows if r.schedule_time})
         if not times:
@@ -32548,58 +32567,36 @@ class ChessboardDialog(QDialog):
             self.time_from_combo.addItem(label, t)
             self.time_to_combo.addItem(label, t)
 
-        # По умолчанию: с первого до последнего
         self.time_from_combo.setCurrentIndex(0)
         self.time_to_combo.setCurrentIndex(len(times) - 1)
 
-    # ------------------------------------------------------------------ #
-    #                          СТОЛЫ                                     #
-    # ------------------------------------------------------------------ #
-    def _reload_tables(self):
-        """Ставит границы столов по данным Result на выбранный день."""
-        d = self._current_date()
-        if d is None:
-            return
-
-        rows = (Result
-                .select(Result.schedule_table)
-                .where(
-                    (Result.title_id == self.title_obj.id) &
-                    (Result.schedule_date == d)
-                ))
-
-        nums = []
-        for r in rows:
-            if r.schedule_table is None:
+    @staticmethod
+    def _parse_tables(text):
+        """'1-6' -> [1..6]; '7-10' -> [7..10]; '1-3,5-8' -> [1,2,3,5,6,7,8]"""
+        result = []
+        for part in text.split(","):
+            part = part.strip()
+            if not part:
                 continue
-            try:
-                nums.append(int(str(r.schedule_table).strip()))
-            except ValueError:
-                continue
+            if "-" in part:
+                a, b = part.split("-", 1)
+                try:
+                    a, b = int(a.strip()), int(b.strip())
+                    result.extend(range(min(a, b), max(a, b) + 1))
+                except ValueError:
+                    continue
+            else:
+                try:
+                    result.append(int(part))
+                except ValueError:
+                    continue
+        return sorted(set(result))
 
-        if not nums:
-            return
-
-        min_t = min(nums)
-        max_t = max(nums)
-
-        self.table_from_spin.setMinimum(1)
-        self.table_from_spin.setMaximum(max_t)
-        self.table_from_spin.setValue(min_t)
-
-        self.table_to_spin.setMinimum(1)
-        self.table_to_spin.setMaximum(max_t)
-        self.table_to_spin.setValue(max_t)
-
-    # ------------------------------------------------------------------ #
-    #                          ПРОВЕРКА И ВЫХОД                          #
-    # ------------------------------------------------------------------ #
     def _on_accept(self):
         d = self._current_date()
         t_from = self.time_from_combo.currentData()
         t_to = self.time_to_combo.currentData()
-        tbl_from = self.table_from_spin.value()
-        tbl_to = self.table_to_spin.value()
+        tables = self._parse_tables(self.tables_edit.text())
 
         if d is None:
             QMessageBox.warning(self, "Ошибка", "Выберите дату")
@@ -32608,24 +32605,24 @@ class ChessboardDialog(QDialog):
             QMessageBox.warning(self, "Ошибка", "Нет времён для этой даты")
             return
         if t_to < t_from:
-            QMessageBox.warning(self, "Ошибка",
-                                "Время «по» должно быть позже «с»")
+            QMessageBox.warning(self, "Ошибка", "Время «по» должно быть позже «с»")
             return
-        if tbl_to < tbl_from:
+        if not tables:
             QMessageBox.warning(self, "Ошибка",
-                                "«Стол по» должен быть больше «Стол с»")
+                                "Введите столы, например: 1-6")
             return
 
         self.accept()
 
     def get_params(self):
         return {
-            "date":       self._current_date(),
-            "time_from":  self.time_from_combo.currentData(),
-            "time_to":    self.time_to_combo.currentData(),
-            "table_from": self.table_from_spin.value(),
-            "table_to":   self.table_to_spin.value(),
+            "date":      self._current_date(),
+            "time_from": self.time_from_combo.currentData(),
+            "time_to":   self.time_to_combo.currentData(),
+            "tables":    self._parse_tables(self.tables_edit.text()),
         }
+
+
     # def get_params(self):
     #     return {
     #         "date": self.date_edit.date().toPyDate(),

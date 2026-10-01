@@ -31274,7 +31274,6 @@ class MainWindow(QMainWindow):
         }
 
     def export_chessboard_pdf(self):
-        """Шахматка: время × столы, альбомная A4, одна или несколько страниц."""
         from reportlab.platypus import (SimpleDocTemplate, Table, TableStyle,
                                         Paragraph, PageBreak)
         from reportlab.lib.pagesizes import A4, landscape
@@ -31288,34 +31287,36 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
             return
 
-        # 1) Спрашиваем параметры
-        dlg = ChessboardDialog(self)
+        title_obj = Title.get_or_none(Title.id == self.current_title_id)
+        if not title_obj:
+            QMessageBox.warning(self, "Ошибка", "Соревнование не найдено")
+            return
+
+        # 1) Диалог параметров — даты берёт из Title, времена — из Result
+        dlg = ChessboardDialog(self, title_obj=title_obj)
         if dlg.exec_() != QDialog.Accepted:
             return
+
         params = dlg.get_params()
-        date_ = params["date"]
-        t_from = params["time_from"]
-        t_to = params["time_to"]
-        tables_total = params["tables"]
+        date_    = params["date"]
+        t_from   = params["time_from"]
+        t_to     = params["time_to"]
+        tbl_from = params["table_from"]
+        tbl_to   = params["table_to"]
 
-        if t_to <= t_from:
-            QMessageBox.warning(self, "Ошибка", "Время «по» должно быть позже «с»")
-            return
-
-        # 2) Собираем матчи за выбранный день
-        matches = (Result
-                .select()
-                .where(
-                    (Result.title_id == self.current_title_id) &
-                    (Result.schedule_date == date_)
-                )
-                .order_by(Result.schedule_time, Result.schedule_table))
-
-        # Оставляем только те, что попадают в диапазон времени
-        matches = [
-            m for m in matches
-            if m.schedule_time and t_from <= m.schedule_time <= t_to
-        ]
+        # 2) Матчи на выбранную дату в диапазоне времени
+        matches = list(
+            Result
+            .select()
+            .where(
+                (Result.title_id == self.current_title_id) &
+                (Result.schedule_date == date_) &
+                (Result.schedule_time >= t_from) &
+                (Result.schedule_time <= t_to) &
+                (Result.schedule_table.is_null(False))
+            )
+            .order_by(Result.schedule_time, Result.schedule_table)
+        )
 
         if not matches:
             QMessageBox.information(
@@ -31325,21 +31326,20 @@ class MainWindow(QMainWindow):
             )
             return
 
-        # 3) Определяем все времена и столы
+        # 3) Уникальные времена (только те, что реально есть в Result)
         times_set = sorted({m.schedule_time for m in matches if m.schedule_time})
-        tables_set = sorted({int(m.schedule_table) for m in matches
-                            if m.schedule_table and str(m.schedule_table).isdigit()})
 
-        # Если пользователь указал больше столов, чем есть в данных —
-        # всё равно рисуем все запрошенные, но пустые («нет встречи»)
-        tables_set = list(range(1, tables_total + 1))
+        # 4) Столы: диапазон от пользователя
+        tables_set = list(range(tbl_from, tbl_to + 1))
 
-        # 4) Строим карту: (время, стол) -> матч
+        # 5) Карта (время, стол) -> матч
         by_cell = {}
         for m in matches:
             try:
-                table_num = int(m.schedule_table)
+                table_num = int(str(m.schedule_table).strip())
             except (TypeError, ValueError):
+                continue
+            if table_num not in tables_set:
                 continue
             by_cell[(m.schedule_time, table_num)] = m
 
@@ -32414,64 +32414,218 @@ class CommentDialog(QDialog):
 
 
 
-class ChessboardDialog(QDialog):
-    """Диалог параметров шахматки: дата, время с/по, кол-во столов."""
+from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
+                             QComboBox, QSpinBox, QDialogButtonBox, QMessageBox)
+from PyQt5.QtCore import QDate, QTime, Qt
+from datetime import date, datetime, time as dtime, timedelta
 
-    def __init__(self, parent=None, default_date=None,
-                 default_from=None, default_to=None, default_tables=6):
+
+class ChessboardDialog(QDialog):
+    """Диалог параметров шахматки: дата, время с/по, диапазон столов."""
+
+    def __init__(self, parent=None, title_obj=None):
         super().__init__(parent)
         self.setWindowTitle("Шахматка — параметры")
         self.setModal(True)
+        self.title_obj = title_obj
 
         layout = QVBoxLayout(self)
 
-        # Дата
+        # ====================== ДАТА ======================
         date_row = QHBoxLayout()
         date_row.addWidget(QLabel("Дата расписания:"))
-        self.date_edit = QDateEdit()
-        self.date_edit.setCalendarPopup(True)
-        self.date_edit.setDisplayFormat("dd.MM.yyyy")
-        if default_date:
-            self.date_edit.setDate(default_date)
-        else:
-            self.date_edit.setDate(QDate.currentDate())
-        date_row.addWidget(self.date_edit)
+        self.date_combo = QComboBox()
+        self._fill_dates()
+        date_row.addWidget(self.date_combo)
         layout.addLayout(date_row)
 
-        # Время с
+        # ====================== ВРЕМЯ С ======================
         from_row = QHBoxLayout()
         from_row.addWidget(QLabel("Время с:"))
-        self.time_from = QTimeEdit()
-        self.time_from.setDisplayFormat("HH:mm")
-        self.time_from.setTime(default_from or QTime(9, 0))
-        from_row.addWidget(self.time_from)
+        self.time_from_combo = QComboBox()
+        from_row.addWidget(self.time_from_combo)
         layout.addLayout(from_row)
 
-        # Время по
+        # ====================== ВРЕМЯ ПО ======================
         to_row = QHBoxLayout()
         to_row.addWidget(QLabel("Время по:"))
-        self.time_to = QTimeEdit()
-        self.time_to.setDisplayFormat("HH:mm")
-        self.time_to.setTime(default_to or QTime(12, 0))
-        to_row.addWidget(self.time_to)
+        self.time_to_combo = QComboBox()
+        to_row.addWidget(self.time_to_combo)
         layout.addLayout(to_row)
 
-        # Количество столов
+        # ====================== СТОЛЫ С..ПО ======================
         tables_row = QHBoxLayout()
-        tables_row.addWidget(QLabel("Количество столов:"))
-        self.tables_spin = QSpinBox()
-        self.tables_spin.setMinimum(1)
-        self.tables_spin.setMaximum(100)
-        self.tables_spin.setValue(default_tables)
-        tables_row.addWidget(self.tables_spin)
+        tables_row.addWidget(QLabel("Столы с:"))
+        self.table_from_spin = QSpinBox()
+        self.table_from_spin.setMinimum(1)
+        self.table_from_spin.setMaximum(200)
+        self.table_from_spin.setValue(1)
+        tables_row.addWidget(self.table_from_spin)
+
+        tables_row.addWidget(QLabel("по:"))
+        self.table_to_spin = QSpinBox()
+        self.table_to_spin.setMinimum(1)
+        self.table_to_spin.setMaximum(200)
+        tables_row.addWidget(self.table_to_spin)
         layout.addLayout(tables_row)
 
-        # Кнопки OK / Отмена
+        # Кнопки
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        buttons.accepted.connect(self.accept)
+        buttons.accepted.connect(self._on_accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
+        # При смене даты — пересобираем времена и столы
+        self.date_combo.currentIndexChanged.connect(self._reload_times)
+        self.date_combo.currentIndexChanged.connect(self._reload_tables)
+
+        # Первичная загрузка
+        self._reload_times()
+        self._reload_tables()
+
+    # ------------------------------------------------------------------ #
+    #                          ДАТЫ                                      #
+    # ------------------------------------------------------------------ #
+    def _fill_dates(self):
+        """Даты со 2-го дня соревнования (data_start + 1) по data_end."""
+        if not self.title_obj:
+            # fallback: сегодня
+            self.date_combo.addItem(QDate.currentDate().toString("dd.MM.yyyy"),
+                                    QDate.currentDate().toPyDate())
+            return
+
+        start = self.title_obj.data_start
+        end = self.title_obj.data_end
+
+        if not start or not end:
+            self.date_combo.addItem("Нет дат в соревновании", None)
+            return
+
+        # Первый день — день приезда, не учитываем
+        first = start + timedelta(days=1)
+
+        cur = first
+        while cur <= end:
+            self.date_combo.addItem(cur.strftime("%d.%m.%Y (%a)"), cur)
+            cur += timedelta(days=1)
+
+        if self.date_combo.count() == 0:
+            self.date_combo.addItem("Нет доступных дней", None)
+
+    def _current_date(self):
+        return self.date_combo.currentData()
+
+    # ------------------------------------------------------------------ #
+    #                          ВРЕМЕНА                                   #
+    # ------------------------------------------------------------------ #
+    def _reload_times(self):
+        """Пересобирает список времён из Result для выбранной даты."""
+        self.time_from_combo.clear()
+        self.time_to_combo.clear()
+
+        d = self._current_date()
+        if d is None:
+            return
+
+        # Уникальные времена из Result на эту дату
+        rows = (Result
+                .select(Result.schedule_time)
+                .where(
+                    (Result.title_id == self.title_obj.id) &
+                    (Result.schedule_date == d) &
+                    (Result.schedule_time.is_null(False))
+                )
+                .order_by(Result.schedule_time))
+
+        times = sorted({r.schedule_time for r in rows if r.schedule_time})
+        if not times:
+            self.time_from_combo.addItem("—", None)
+            self.time_to_combo.addItem("—", None)
+            return
+
+        for t in times:
+            label = t.strftime("%H:%M")
+            self.time_from_combo.addItem(label, t)
+            self.time_to_combo.addItem(label, t)
+
+        # По умолчанию: с первого до последнего
+        self.time_from_combo.setCurrentIndex(0)
+        self.time_to_combo.setCurrentIndex(len(times) - 1)
+
+    # ------------------------------------------------------------------ #
+    #                          СТОЛЫ                                     #
+    # ------------------------------------------------------------------ #
+    def _reload_tables(self):
+        """Ставит границы столов по данным Result на выбранный день."""
+        d = self._current_date()
+        if d is None:
+            return
+
+        rows = (Result
+                .select(Result.schedule_table)
+                .where(
+                    (Result.title_id == self.title_obj.id) &
+                    (Result.schedule_date == d)
+                ))
+
+        nums = []
+        for r in rows:
+            if r.schedule_table is None:
+                continue
+            try:
+                nums.append(int(str(r.schedule_table).strip()))
+            except ValueError:
+                continue
+
+        if not nums:
+            return
+
+        min_t = min(nums)
+        max_t = max(nums)
+
+        self.table_from_spin.setMinimum(1)
+        self.table_from_spin.setMaximum(max_t)
+        self.table_from_spin.setValue(min_t)
+
+        self.table_to_spin.setMinimum(1)
+        self.table_to_spin.setMaximum(max_t)
+        self.table_to_spin.setValue(max_t)
+
+    # ------------------------------------------------------------------ #
+    #                          ПРОВЕРКА И ВЫХОД                          #
+    # ------------------------------------------------------------------ #
+    def _on_accept(self):
+        d = self._current_date()
+        t_from = self.time_from_combo.currentData()
+        t_to = self.time_to_combo.currentData()
+        tbl_from = self.table_from_spin.value()
+        tbl_to = self.table_to_spin.value()
+
+        if d is None:
+            QMessageBox.warning(self, "Ошибка", "Выберите дату")
+            return
+        if t_from is None or t_to is None:
+            QMessageBox.warning(self, "Ошибка", "Нет времён для этой даты")
+            return
+        if t_to < t_from:
+            QMessageBox.warning(self, "Ошибка",
+                                "Время «по» должно быть позже «с»")
+            return
+        if tbl_to < tbl_from:
+            QMessageBox.warning(self, "Ошибка",
+                                "«Стол по» должен быть больше «Стол с»")
+            return
+
+        self.accept()
+
+    def get_params(self):
+        return {
+            "date":       self._current_date(),
+            "time_from":  self.time_from_combo.currentData(),
+            "time_to":    self.time_to_combo.currentData(),
+            "table_from": self.table_from_spin.value(),
+            "table_to":   self.table_to_spin.value(),
+        }
     # def get_params(self):
     #     return {
     #         "date": self.date_edit.date().toPyDate(),

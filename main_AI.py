@@ -1445,7 +1445,7 @@ class MainWindow(QMainWindow):
             if player.sex == "man":
                 # Сначала ищем в текущем (R_list_m), потом в январском (R1_list_m)
                 rec = R_list_m.get_or_none(
-                    (R_list_m.r_fname == player.fio) &
+                    (R_list_m.r_fname == player.player) &
                     (R_list_m.r_bithday == player.bday)
                 )
                 if not rec:
@@ -1454,29 +1454,29 @@ class MainWindow(QMainWindow):
                     found_rank = rec.r_list
                 else:
                     rec = R1_list_m.get_or_none(
-                        (R1_list_m.r1_fname == player.fio) &
+                        (R1_list_m.r1_fname == player.player) &
                         (R1_list_m.r1_bithday == player.bday)
                     )
                     if not rec:
-                        rec = R1_list_m.get_or_none(R1_list_m.r1_fname == player.fio)
+                        rec = R1_list_m.get_or_none(R1_list_m.r1_fname == player.player)
                     if rec:
                         found_rank = rec.r1_list
             else:
                 rec = R_list_d.get_or_none(
-                    (R_list_d.r_fname == player.fio) &
+                    (R_list_d.r_fname == player.player) &
                     (R_list_d.r_bithday == player.bday)
                 )
                 if not rec:
-                    rec = R_list_d.get_or_none(R_list_d.r_fname == player.fio)
+                    rec = R_list_d.get_or_none(R_list_d.r_fname == player.player)
                 if rec:
                     found_rank = rec.r_list
                 else:
                     rec = R1_list_d.get_or_none(
-                        (R1_list_d.r1_fname == player.fio) &
+                        (R1_list_d.r1_fname == player.player) &
                         (R1_list_d.r1_bithday == player.bday)
                     )
                     if not rec:
-                        rec = R1_list_d.get_or_none(R1_list_d.r1_fname == player.fio)
+                        rec = R1_list_d.get_or_none(R1_list_d.r1_fname == player.player)
                     if rec:
                         found_rank = rec.r1_list
 
@@ -1496,6 +1496,13 @@ class MainWindow(QMainWindow):
         """Синхронизирует рейтинг из Player в связанные таблицы"""
         try:
             players = Player.select().where(Player.title_id == self.current_title_id)
+
+            # # Playes
+            # for p in players:
+            #     Player.update(rank=p.rank).where(
+            #         (Player.title_id == self.current_title_id) &
+            #         (Player.id == p.id)
+            #     ).execute()
 
             # Choice
             for p in players:

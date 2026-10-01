@@ -36,13 +36,18 @@ from reportlab.pdfgen.canvas import Canvas
 import tempfile
 import pymysql
 
+from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
+                             QDateEdit, QTimeEdit, QSpinBox, QDialogButtonBox)
+from PyQt5.QtCore import QDate, QTime
+
+
 from models import connect_db, close_db
 from models import *
 from models_qt import (
     PlayersTableModel, TeamsTableModel, ResultsTableModel, DoublesResultsTableModel,
     DoublePlayersTableModel, TitlesTableModel, CoachesTableModel, RatingTableModel
 )
-
+from models import Referee, GskMember, Title
 
 import datetime
 from PyQt5.QtWidgets import QMessageBox
@@ -54,6 +59,8 @@ import re
 import random
 import BackupManagementDialog
 import edit_stage
+
+
 
 import subprocess
 import openpyxl as op
@@ -9518,7 +9525,14 @@ class MainWindow(QMainWindow):
         list_pairs_action.triggered.connect(self.export_doubles_list_to_pdf)
         print_menu.addAction(list_pairs_action)
 
-        print_menu.addSeparator()    
+        print_menu.addSeparator() 
+        
+        # --- ШАХМАТКА ---
+        act_chess = QAction("Шахматка", self)
+        act_chess.triggered.connect(self.export_chessboard_pdf)
+        print_menu.addAction(act_chess)
+
+        print_menu.addSeparator()
 
         # ---- Чистые таблицы ----
         clean_tables_menu = print_menu.addMenu("📋 Чистые таблицы")
@@ -17394,7 +17408,7 @@ class MainWindow(QMainWindow):
             import traceback
             traceback.print_exc()
             QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")
-#================
+
     def normalize_region(self, region: str) -> str:
         """
         Приводит название региона к единому виду:
@@ -17490,7 +17504,7 @@ class MainWindow(QMainWindow):
             return 4
 
         return 7
-# ==============
+
     def print_podium_list(self):
         """Создание PDF со списком призеров (1-3 места)"""
         if not self.current_title_id:
@@ -17801,6 +17815,8 @@ class MainWindow(QMainWindow):
             import traceback
             traceback.print_exc()
             QMessageBox.critical(self, "Ошибка", f"Не удалось создать PDF: {str(e)}")
+
+
 
 # === круговые таблицы ====
     # def table_made(self, pv, stage):
@@ -24198,19 +24214,6 @@ class MainWindow(QMainWindow):
 
     def ReturnCode():
         pass
-# ====== new save wiyh comment ===
-# import os
-# import re
-# import subprocess
-# from datetime import datetime
-
-# from PyQt5.QtWidgets import (
-#     QMessageBox, QDialog, QVBoxLayout, QHBoxLayout,
-#     QLabel, QLineEdit, QPushButton
-# )
-
-
-
 
     def save_current_competition(self):
         """Сохранение текущего соревнования с возможностью комментария"""
@@ -24280,65 +24283,6 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Ошибка сохранения соревнования: {e}")
             return None
-
-# ===============================
-    # def save_current_competition(self):
-    #     """Сохранение текущего соревнования"""
-    #     """нажата кнопка -выход- и резервное копирование db"""
-    #     if not self.current_title_id:
-    #                 return
-    #     try:
-    #         title = Title.get_by_id(self.current_title_id)
-    #         remark_flag = 0
-    #         flag = 0
-    #         if flag == 0:
-    #             result = QMessageBox.question(self, "Backup DB", "Вы действительно хотите сохранить текущие соревнования?",
-    #                                         QMessageBox.Ok, QMessageBox.No)
-    #         else:
-    #             result = QMessageBox.Ok
-    #             remark_flag = 1
-
-    #         if result == QMessageBox.Ok:
-    #         # Создаем папку backup_db, если её нет
-    #             backup_dir = "backup_db"
-    #             if not os.path.exists(backup_dir):
-    #                 os.makedirs(backup_dir)
-                
-    #             # Формируем имя файла
-    #             short_name = title.short_name_comp if title.short_name_comp else title.name
-    #             import re
-    #             clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))
-    #             clean_name = clean_name[:50] if len(clean_name) > 50 else clean_name
-                
-    #             from datetime import datetime
-    #             timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-
-    #             user = "root"
-    #             password = "db_pass"
-    #             database = "mysql_db"
-    #             current_date = str(datetime.now().strftime('%d_%m_%Y'))
-
-    #             if remark_flag == 1:
-    #                 comment, ok = QInputDialog.getText(self, "Коментарий", "Введите коментарий для копии DB.")
-    #                 comment = comment.replace(" ", "_")
-    #                 backup_file = os.path.join(backup_dir, f"{clean_name}_{timestamp}_{comment}.sql")
-    #             else:
-    #                 backup_file = os.path.join(backup_dir, f"{clean_name}_{timestamp}.sql")   
-    #             try: 
-    #                 p = subprocess.Popen('mysqldump -u' + user + ' -p' + password + ' --databases ' + database + ' > ' + backup_file, shell=True)
-    #                 p.communicate()
-    #                 # Check for errors
-    #                 if p.returncode != 0:
-    #                     raise self.ReturnCode
-    #                 QMessageBox.information(self, "Успех", f"Соревнование сохранено в:\n{backup_file}")           
-    #                 return backup_file
-    #             except:
-    #                 print('Backup failed for ', db)
-    #         else:
-    #             return
-            
-    #     except Exception as e:
-    #         print(f"Ошибка сохранения соревнования: {e}")
 # ===============================        
     def search_in_choice_table(self):
         """Поиск информации в таблице Choice с выводом полной информации"""
@@ -25674,47 +25618,6 @@ class MainWindow(QMainWindow):
                     
         except Exception as e:
             print(f"Ошибка обновления меню результатов: {e}")
-# ========== 3007
-    # def update_results_menu(self):
-    #     """Обновление меню результатов - активирует только те пункты, которые есть в системе для текущего пола"""
-    #     if not self.current_title_id:
-    #         for action in self.results_menu_actions.values():
-    #             action.setEnabled(False)
-    #         return
-        
-    #     try:
-    #         # Получаем все этапы из системы для текущего пола
-    #         sex_filter = self.current_sex if self.current_sex else "man"
-    #         stages = System.select().where(
-    #             (System.title_id == self.current_title_id) &
-    #             (System.sex == sex_filter)
-    #         )
-    #         stage_names = [s.stage for s in stages]
-            
-    #         # Активируем/деактивируем пункты меню в зависимости от наличия в системе
-    #         for stage_name, action in self.results_menu_actions.items():
-    #             action.setEnabled(stage_name in stage_names)
-            
-    #         # Обновляем подменю финалов
-    #         self.update_finals_results_menu(stage_names)
-            
-    #         # Также обновляем меню финалов для жеребьевки
-    #         for action in self.menuBar().actions():
-    #             if action.text() == "Соревнования":
-    #                 competitions_menu = action.menu()
-    #                 for sub_action in competitions_menu.actions():
-    #                     if sub_action.text() == "🎲 Жеребьевка":
-    #                         drawing_menu = sub_action.menu()
-    #                         for final_sub_action in drawing_menu.actions():
-    #                             if final_sub_action.text() == "Финалы":
-    #                                 finals_menu = final_sub_action.menu()
-    #                                 self.update_finals_menu(finals_menu)
-    #                                 break
-    #                         break
-    #                 break
-                    
-    #     except Exception as e:
-    #         print(f"Ошибка обновления меню результатов: {e}")
 
     def update_finals_results_menu(self, stage_names):
         """Обновление подменю финалов в меню результатов"""
@@ -31361,9 +31264,270 @@ class MainWindow(QMainWindow):
             import traceback
             traceback.print_exc()
             QMessageBox.critical(self, "Ошибка", f"Не удалось собрать PDF: {str(e)}")
-#============
-from models import Referee, GskMember, Title
 
+    def get_params(self):
+        return {
+            "date": self.date_edit.date().toPyDate(),
+            "time_from": self.time_from.time().toPyTime(),
+            "time_to": self.time_to.time().toPyTime(),
+            "tables": self.tables_spin.value(),
+        }
+
+    def export_chessboard_pdf(self):
+        """Шахматка: время × столы, альбомная A4, одна или несколько страниц."""
+        from reportlab.platypus import (SimpleDocTemplate, Table, TableStyle,
+                                        Paragraph, PageBreak)
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib import colors
+        from reportlab.lib.styles import ParagraphStyle as PS
+        from reportlab.lib.units import cm
+        import os
+        import re
+
+        if not self.current_title_id:
+            QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+            return
+
+        # 1) Спрашиваем параметры
+        dlg = ChessboardDialog(self)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+        params = dlg.get_params()
+        date_ = params["date"]
+        t_from = params["time_from"]
+        t_to = params["time_to"]
+        tables_total = params["tables"]
+
+        if t_to <= t_from:
+            QMessageBox.warning(self, "Ошибка", "Время «по» должно быть позже «с»")
+            return
+
+        # 2) Собираем матчи за выбранный день
+        matches = (Result
+                .select()
+                .where(
+                    (Result.title_id == self.current_title_id) &
+                    (Result.schedule_date == date_)
+                )
+                .order_by(Result.schedule_time, Result.schedule_table))
+
+        # Оставляем только те, что попадают в диапазон времени
+        matches = [
+            m for m in matches
+            if m.schedule_time and t_from <= m.schedule_time <= t_to
+        ]
+
+        if not matches:
+            QMessageBox.information(
+                self, "Нет данных",
+                f"На {date_.strftime('%d.%m.%Y')} с {t_from.strftime('%H:%M')} "
+                f"до {t_to.strftime('%H:%M')} встреч не найдено."
+            )
+            return
+
+        # 3) Определяем все времена и столы
+        times_set = sorted({m.schedule_time for m in matches if m.schedule_time})
+        tables_set = sorted({int(m.schedule_table) for m in matches
+                            if m.schedule_table and str(m.schedule_table).isdigit()})
+
+        # Если пользователь указал больше столов, чем есть в данных —
+        # всё равно рисуем все запрошенные, но пустые («нет встречи»)
+        tables_set = list(range(1, tables_total + 1))
+
+        # 4) Строим карту: (время, стол) -> матч
+        by_cell = {}
+        for m in matches:
+            try:
+                table_num = int(m.schedule_table)
+            except (TypeError, ValueError):
+                continue
+            by_cell[(m.schedule_time, table_num)] = m
+
+        # 5) Папка и имя файла
+        pdf_dir = "table_pdf"
+        if not os.path.exists(pdf_dir):
+            os.makedirs(pdf_dir)
+
+        t_id = Title.get(Title.id == self.current_title_id)
+        short_name = t_id.short_name_comp or t_id.name
+        clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))[:50]
+
+        filename = os.path.join(
+            pdf_dir,
+            f"{clean_name}_chess_{date_.strftime('%Y_%m_%d')}"
+            f"_{t_from.strftime('%H%M')}-{t_to.strftime('%H%M')}.pdf"
+        )
+
+        # 6) Разбивка столов по страницам
+        # Сколько столов влезает на альбомную A4: ширина ~ 27 см полезной,
+        # под стол ~ 1.8 см + столбец времени ~ 2 см.
+        MAX_TABLES_PER_PAGE = 16
+        pages = [tables_set[i:i + MAX_TABLES_PER_PAGE]
+                for i in range(0, len(tables_set), MAX_TABLES_PER_PAGE)]
+
+        # 7) Стили
+        styles = getSampleStyleSheet()
+        title_style = PS("ChessTitle", fontSize=12,
+                        fontName="DejaVuSerif-Bold", alignment=1,
+                        spaceAfter=10, textColor=colors.darkblue)
+        cell_stage_style = PS("ChessStage", fontSize=7,
+                            fontName="DejaVuSerif-Bold", alignment=0,
+                            textColor=colors.darkblue, leading=8)
+        cell_player_style = PS("ChessPlayer", fontSize=6.5,
+                            fontName="DejaVuSerif", alignment=0,
+                            textColor=colors.black, leading=7)
+
+        elements = []
+
+        # 8) Формируем страницы
+        for page_idx, tables_page in enumerate(pages):
+            title_text = (f"Шахматка на {date_.strftime('%d.%m.%Y')} "
+                        f"с {t_from.strftime('%H:%M')} до {t_to.strftime('%H:%M')}")
+            if len(pages) > 1:
+                title_text += f" (часть {page_idx + 1} из {len(pages)})"
+
+            elements.append(Paragraph(title_text, title_style))
+
+            # Заголовок: [Время] [Стол 1] [Стол 2] ... [Стол N]
+            header = ["Время"] + [f"Стол {t}" for t in tables_page]
+            table_data = [header]
+
+            # Строки по времени
+            for t in times_set:
+                row = [t.strftime("%H:%M")]
+                for tbl in tables_page:
+                    m = by_cell.get((t, tbl))
+                    if m is None:
+                        row.append("нет встречи")
+                    else:
+                        stage_short = self._chess_stage_short(m)
+                        p1 = self._chess_player_line(m.player1)
+                        p2 = self._chess_player_line(m.player2)
+                        # Многострочный текст через Paragraph
+                        text = (
+                            f'<b>{stage_short}</b><br/>'
+                            f'{p1}<br/>{p2}'
+                        )
+                        row.append(Paragraph(text, cell_player_style))
+                table_data.append(row)
+
+            # Ширина: [2.2 см время] + по 1.7 см на стол
+            col_widths = [2.2 * cm] + [1.7 * cm] * len(tables_page)
+            tbl = Table(table_data, colWidths=col_widths, repeatRows=1)
+
+            tbl.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, 0), 'DejaVuSerif-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 8),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightyellow),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.darkblue),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('FONTNAME', (0, 1), (0, -1), 'DejaVuSerif-Bold'),
+                ('FONTSIZE', (0, 1), (0, -1), 8),
+                ('BACKGROUND', (0, 1), (0, -1), colors.whitesmoke),
+                ('GRID', (0, 0), (-1, -1), 0.4, colors.grey),
+                ('BOX', (0, 0), (-1, -1), 1, colors.black),
+                ('TOPPADDING', (0, 0), (-1, -1), 3),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+                ('LEFTPADDING', (0, 0), (-1, -1), 3),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 3),
+            ]))
+
+            elements.append(tbl)
+            if page_idx < len(pages) - 1:
+                elements.append(PageBreak())
+
+        # 9) Сборка PDF
+        doc = SimpleDocTemplate(
+            filename, pagesize=landscape(A4),
+            rightMargin=1 * cm, leftMargin=1 * cm,
+            topMargin=1.5 * cm, bottomMargin=1 * cm,
+        )
+        doc.build(elements,
+                onFirstPage=self.func_zagolovok,
+                onLaterPages=self.func_zagolovok)
+
+        QMessageBox.information(self, "Успех",
+                                f"Шахматка сохранена в:\n{filename}")
+
+        reply = QMessageBox.question(self, "Открыть файл",
+                                    "Открыть созданный PDF?",
+                                    QMessageBox.Yes | QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            if sys.platform == 'win32':
+                os.startfile(filename)
+            else:
+                os.system(f'open "{filename}"')
+
+    def _chess_stage_short(self, match):
+        """
+        Возвращает сокращённое название этапа для ячейки шахматки.
+        Например:
+        'Квалификация'          -> 'квал. 3 гр.'
+        'Квалификация. 1-й полуфинал' -> 'квал. 1-й 1/2'
+        '1-й финал'             -> '1-й фин. 2-4'
+        """
+        stage = (match.system_stage or "").strip()
+        group = (match.number_group or "").strip()
+
+        # Сокращение этапа
+        stage_short = stage
+        stage_short = stage_short.replace("Квалификация.", "квал.")
+        stage_short = stage_short.replace("Квалификация", "квал.")
+        stage_short = stage_short.replace("полуфинал", "1/2")
+        stage_short = stage_short.replace("финал", "фин.")
+
+        # Сокращение группы
+        group_short = ""
+        if group:
+            # "3 группа" -> "3 гр."
+            m = re.match(r"(\d+)\s*группа", group)
+            if m:
+                group_short = f"{m.group(1)} гр."
+            else:
+                group_short = group
+
+        # Собираем: "квал. 3 гр."
+        if group_short:
+            return f"{stage_short} {group_short}".strip()
+        return stage_short
+    
+    def _chess_player_line(self, player_str):
+        """
+        Приводит строку игрока к формату 'Фамилия И./Город'.
+        На входе может быть:
+        'Иванов Иван'        -> 'Иванов И./'
+        'Иванов Иван (Москва)' -> 'Иванов И./Москва'
+        'Иванов И. (Москва)' -> 'Иванов И./Москва'
+        '' / None            -> ''
+        """
+        if not player_str:
+            return ""
+
+        s = str(player_str).strip()
+
+        # Город в скобках
+        city = ""
+        m = re.search(r"\(([^)]+)\)", s)
+        if m:
+            city = m.group(1).strip()
+            s = re.sub(r"\s*\([^)]+\)", "", s).strip()
+
+        # Разбиваем на фамилию и имя
+        parts = s.split()
+        if len(parts) >= 2:
+            # 'Иванов Иван' -> 'Иванов И.'
+            family = parts[0]
+            name_initial = parts[1][0] + "."
+            short = f"{family} {name_initial}"
+        else:
+            short = s
+
+        if city:
+            return f"{short}/{city}"
+        return short    
+
+#============
 class GskManagementDialog(QDialog):
     def __init__(self, parent=None, title_id=None):
         super().__init__(parent)
@@ -32186,7 +32350,6 @@ class RatingFileDialog(QDialog):
         )
         return list(similar)
 
-
 class CommentDialog(QDialog):
     """Диалог ввода комментария с предпросмотром имени файла"""
 
@@ -32248,6 +32411,330 @@ class CommentDialog(QDialog):
 
     def get_filepath(self) -> str:
         return os.path.join(self.backup_dir, self._build_filename())
+
+
+
+class ChessboardDialog(QDialog):
+    """Диалог параметров шахматки: дата, время с/по, кол-во столов."""
+
+    def __init__(self, parent=None, default_date=None,
+                 default_from=None, default_to=None, default_tables=6):
+        super().__init__(parent)
+        self.setWindowTitle("Шахматка — параметры")
+        self.setModal(True)
+
+        layout = QVBoxLayout(self)
+
+        # Дата
+        date_row = QHBoxLayout()
+        date_row.addWidget(QLabel("Дата расписания:"))
+        self.date_edit = QDateEdit()
+        self.date_edit.setCalendarPopup(True)
+        self.date_edit.setDisplayFormat("dd.MM.yyyy")
+        if default_date:
+            self.date_edit.setDate(default_date)
+        else:
+            self.date_edit.setDate(QDate.currentDate())
+        date_row.addWidget(self.date_edit)
+        layout.addLayout(date_row)
+
+        # Время с
+        from_row = QHBoxLayout()
+        from_row.addWidget(QLabel("Время с:"))
+        self.time_from = QTimeEdit()
+        self.time_from.setDisplayFormat("HH:mm")
+        self.time_from.setTime(default_from or QTime(9, 0))
+        from_row.addWidget(self.time_from)
+        layout.addLayout(from_row)
+
+        # Время по
+        to_row = QHBoxLayout()
+        to_row.addWidget(QLabel("Время по:"))
+        self.time_to = QTimeEdit()
+        self.time_to.setDisplayFormat("HH:mm")
+        self.time_to.setTime(default_to or QTime(12, 0))
+        to_row.addWidget(self.time_to)
+        layout.addLayout(to_row)
+
+        # Количество столов
+        tables_row = QHBoxLayout()
+        tables_row.addWidget(QLabel("Количество столов:"))
+        self.tables_spin = QSpinBox()
+        self.tables_spin.setMinimum(1)
+        self.tables_spin.setMaximum(100)
+        self.tables_spin.setValue(default_tables)
+        tables_row.addWidget(self.tables_spin)
+        layout.addLayout(tables_row)
+
+        # Кнопки OK / Отмена
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    # def get_params(self):
+    #     return {
+    #         "date": self.date_edit.date().toPyDate(),
+    #         "time_from": self.time_from.time().toPyTime(),
+    #         "time_to": self.time_to.time().toPyTime(),
+    #         "tables": self.tables_spin.value(),
+    #     }
+
+    # def export_chessboard_pdf(self):
+    #     """Шахматка: время × столы, альбомная A4, одна или несколько страниц."""
+    #     from reportlab.platypus import (SimpleDocTemplate, Table, TableStyle,
+    #                                     Paragraph, PageBreak)
+    #     from reportlab.lib.pagesizes import A4, landscape
+    #     from reportlab.lib import colors
+    #     from reportlab.lib.styles import ParagraphStyle as PS
+    #     from reportlab.lib.units import cm
+    #     import os
+    #     import re
+
+    #     if not self.current_title_id:
+    #         QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
+    #         return
+
+    #     # 1) Спрашиваем параметры
+    #     dlg = ChessboardDialog(self)
+    #     if dlg.exec_() != QDialog.Accepted:
+    #         return
+    #     params = dlg.get_params()
+    #     date_ = params["date"]
+    #     t_from = params["time_from"]
+    #     t_to = params["time_to"]
+    #     tables_total = params["tables"]
+
+    #     if t_to <= t_from:
+    #         QMessageBox.warning(self, "Ошибка", "Время «по» должно быть позже «с»")
+    #         return
+
+    #     # 2) Собираем матчи за выбранный день
+    #     matches = (Result
+    #             .select()
+    #             .where(
+    #                 (Result.title_id == self.current_title_id) &
+    #                 (Result.schedule_date == date_)
+    #             )
+    #             .order_by(Result.schedule_time, Result.schedule_table))
+
+    #     # Оставляем только те, что попадают в диапазон времени
+    #     matches = [
+    #         m for m in matches
+    #         if m.schedule_time and t_from <= m.schedule_time <= t_to
+    #     ]
+
+    #     if not matches:
+    #         QMessageBox.information(
+    #             self, "Нет данных",
+    #             f"На {date_.strftime('%d.%m.%Y')} с {t_from.strftime('%H:%M')} "
+    #             f"до {t_to.strftime('%H:%M')} встреч не найдено."
+    #         )
+    #         return
+
+    #     # 3) Определяем все времена и столы
+    #     times_set = sorted({m.schedule_time for m in matches if m.schedule_time})
+    #     tables_set = sorted({int(m.schedule_table) for m in matches
+    #                         if m.schedule_table and str(m.schedule_table).isdigit()})
+
+    #     # Если пользователь указал больше столов, чем есть в данных —
+    #     # всё равно рисуем все запрошенные, но пустые («нет встречи»)
+    #     tables_set = list(range(1, tables_total + 1))
+
+    #     # 4) Строим карту: (время, стол) -> матч
+    #     by_cell = {}
+    #     for m in matches:
+    #         try:
+    #             table_num = int(m.schedule_table)
+    #         except (TypeError, ValueError):
+    #             continue
+    #         by_cell[(m.schedule_time, table_num)] = m
+
+    #     # 5) Папка и имя файла
+    #     pdf_dir = "table_pdf"
+    #     if not os.path.exists(pdf_dir):
+    #         os.makedirs(pdf_dir)
+
+    #     t_id = Title.get(Title.id == self.current_title_id)
+    #     short_name = t_id.short_name_comp or t_id.name
+    #     clean_name = re.sub(r'[\\/*?:"<>|]', "", str(short_name))[:50]
+
+    #     filename = os.path.join(
+    #         pdf_dir,
+    #         f"{clean_name}_chess_{date_.strftime('%Y_%m_%d')}"
+    #         f"_{t_from.strftime('%H%M')}-{t_to.strftime('%H%M')}.pdf"
+    #     )
+
+    #     # 6) Разбивка столов по страницам
+    #     # Сколько столов влезает на альбомную A4: ширина ~ 27 см полезной,
+    #     # под стол ~ 1.8 см + столбец времени ~ 2 см.
+    #     MAX_TABLES_PER_PAGE = 16
+    #     pages = [tables_set[i:i + MAX_TABLES_PER_PAGE]
+    #             for i in range(0, len(tables_set), MAX_TABLES_PER_PAGE)]
+
+    #     # 7) Стили
+    #     styles = getSampleStyleSheet()
+    #     title_style = PS("ChessTitle", fontSize=12,
+    #                     fontName="DejaVuSerif-Bold", alignment=1,
+    #                     spaceAfter=10, textColor=colors.darkblue)
+    #     cell_stage_style = PS("ChessStage", fontSize=7,
+    #                         fontName="DejaVuSerif-Bold", alignment=0,
+    #                         textColor=colors.darkblue, leading=8)
+    #     cell_player_style = PS("ChessPlayer", fontSize=6.5,
+    #                         fontName="DejaVuSerif", alignment=0,
+    #                         textColor=colors.black, leading=7)
+
+    #     elements = []
+
+    #     # 8) Формируем страницы
+    #     for page_idx, tables_page in enumerate(pages):
+    #         title_text = (f"Шахматка на {date_.strftime('%d.%m.%Y')} "
+    #                     f"с {t_from.strftime('%H:%M')} до {t_to.strftime('%H:%M')}")
+    #         if len(pages) > 1:
+    #             title_text += f" (часть {page_idx + 1} из {len(pages)})"
+
+    #         elements.append(Paragraph(title_text, title_style))
+
+    #         # Заголовок: [Время] [Стол 1] [Стол 2] ... [Стол N]
+    #         header = ["Время"] + [f"Стол {t}" for t in tables_page]
+    #         table_data = [header]
+
+    #         # Строки по времени
+    #         for t in times_set:
+    #             row = [t.strftime("%H:%M")]
+    #             for tbl in tables_page:
+    #                 m = by_cell.get((t, tbl))
+    #                 if m is None:
+    #                     row.append("нет встречи")
+    #                 else:
+    #                     stage_short = self._chess_stage_short(m)
+    #                     p1 = self._chess_player_line(m.player1)
+    #                     p2 = self._chess_player_line(m.player2)
+    #                     # Многострочный текст через Paragraph
+    #                     text = (
+    #                         f'<b>{stage_short}</b><br/>'
+    #                         f'{p1}<br/>{p2}'
+    #                     )
+    #                     row.append(Paragraph(text, cell_player_style))
+    #             table_data.append(row)
+
+    #         # Ширина: [2.2 см время] + по 1.7 см на стол
+    #         col_widths = [2.2 * cm] + [1.7 * cm] * len(tables_page)
+    #         tbl = Table(table_data, colWidths=col_widths, repeatRows=1)
+
+    #         tbl.setStyle(TableStyle([
+    #             ('FONTNAME', (0, 0), (-1, 0), 'DejaVuSerif-Bold'),
+    #             ('FONTSIZE', (0, 0), (-1, 0), 8),
+    #             ('BACKGROUND', (0, 0), (-1, 0), colors.lightyellow),
+    #             ('TEXTCOLOR', (0, 0), (-1, 0), colors.darkblue),
+    #             ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+    #             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    #             ('FONTNAME', (0, 1), (0, -1), 'DejaVuSerif-Bold'),
+    #             ('FONTSIZE', (0, 1), (0, -1), 8),
+    #             ('BACKGROUND', (0, 1), (0, -1), colors.whitesmoke),
+    #             ('GRID', (0, 0), (-1, -1), 0.4, colors.grey),
+    #             ('BOX', (0, 0), (-1, -1), 1, colors.black),
+    #             ('TOPPADDING', (0, 0), (-1, -1), 3),
+    #             ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+    #             ('LEFTPADDING', (0, 0), (-1, -1), 3),
+    #             ('RIGHTPADDING', (0, 0), (-1, -1), 3),
+    #         ]))
+
+    #         elements.append(tbl)
+    #         if page_idx < len(pages) - 1:
+    #             elements.append(PageBreak())
+
+    #     # 9) Сборка PDF
+    #     doc = SimpleDocTemplate(
+    #         filename, pagesize=landscape(A4),
+    #         rightMargin=1 * cm, leftMargin=1 * cm,
+    #         topMargin=1.5 * cm, bottomMargin=1 * cm,
+    #     )
+    #     doc.build(elements,
+    #             onFirstPage=self.func_zagolovok,
+    #             onLaterPages=self.func_zagolovok)
+
+    #     QMessageBox.information(self, "Успех",
+    #                             f"Шахматка сохранена в:\n{filename}")
+
+    #     reply = QMessageBox.question(self, "Открыть файл",
+    #                                 "Открыть созданный PDF?",
+    #                                 QMessageBox.Yes | QMessageBox.No)
+    #     if reply == QMessageBox.Yes:
+    #         if sys.platform == 'win32':
+    #             os.startfile(filename)
+    #         else:
+    #             os.system(f'open "{filename}"')
+
+    # def _chess_stage_short(self, match):
+    #     """
+    #     Возвращает сокращённое название этапа для ячейки шахматки.
+    #     Например:
+    #     'Квалификация'          -> 'квал. 3 гр.'
+    #     'Квалификация. 1-й полуфинал' -> 'квал. 1-й 1/2'
+    #     '1-й финал'             -> '1-й фин. 2-4'
+    #     """
+    #     stage = (match.system_stage or "").strip()
+    #     group = (match.number_group or "").strip()
+
+    #     # Сокращение этапа
+    #     stage_short = stage
+    #     stage_short = stage_short.replace("Квалификация.", "квал.")
+    #     stage_short = stage_short.replace("Квалификация", "квал.")
+    #     stage_short = stage_short.replace("полуфинал", "1/2")
+    #     stage_short = stage_short.replace("финал", "фин.")
+
+    #     # Сокращение группы
+    #     group_short = ""
+    #     if group:
+    #         # "3 группа" -> "3 гр."
+    #         m = re.match(r"(\d+)\s*группа", group)
+    #         if m:
+    #             group_short = f"{m.group(1)} гр."
+    #         else:
+    #             group_short = group
+
+    #     # Собираем: "квал. 3 гр."
+    #     if group_short:
+    #         return f"{stage_short} {group_short}".strip()
+    #     return stage_short
+    
+    # def _chess_player_line(self, player_str):
+    #     """
+    #     Приводит строку игрока к формату 'Фамилия И./Город'.
+    #     На входе может быть:
+    #     'Иванов Иван'        -> 'Иванов И./'
+    #     'Иванов Иван (Москва)' -> 'Иванов И./Москва'
+    #     'Иванов И. (Москва)' -> 'Иванов И./Москва'
+    #     '' / None            -> ''
+    #     """
+    #     if not player_str:
+    #         return ""
+
+    #     s = str(player_str).strip()
+
+    #     # Город в скобках
+    #     city = ""
+    #     m = re.search(r"\(([^)]+)\)", s)
+    #     if m:
+    #         city = m.group(1).strip()
+    #         s = re.sub(r"\s*\([^)]+\)", "", s).strip()
+
+    #     # Разбиваем на фамилию и имя
+    #     parts = s.split()
+    #     if len(parts) >= 2:
+    #         # 'Иванов Иван' -> 'Иванов И.'
+    #         family = parts[0]
+    #         name_initial = parts[1][0] + "."
+    #         short = f"{family} {name_initial}"
+    #     else:
+    #         short = s
+
+    #     if city:
+    #         return f"{short}/{city}"
+    #     return short    
+
+
 
 def main():  
     # Сначала проверяем БД

@@ -31277,12 +31277,6 @@ class MainWindow(QMainWindow):
         """Шахматка: время × столы. Альбомная A4, растянута на всю страницу."""
         from reportlab.platypus import (SimpleDocTemplate, Table, TableStyle,
                                         Paragraph, PageBreak)
-        from reportlab.lib.pagesizes import A4, landscape
-        from reportlab.lib import colors
-        from reportlab.lib.styles import ParagraphStyle as PS
-        from reportlab.lib.units import cm
-        import os
-        import re
 
         if not self.current_title_id:
             QMessageBox.warning(self, "Ошибка", "Сначала выберите соревнование")
@@ -31364,7 +31358,7 @@ class MainWindow(QMainWindow):
                         fontName="DejaVuSerif-Bold", alignment=1,
                         spaceAfter=4, spaceBefore=0,
                         textColor=colors.darkblue)
-        cell_style = PS("ChessCell", fontSize=6.5,
+        cell_style = PS("ChessCell", fontSize=7,
                         fontName="DejaVuSerif", alignment=0,
                         textColor=colors.black, leading=7.5)
         
@@ -31372,9 +31366,11 @@ class MainWindow(QMainWindow):
                  fontName="DejaVuSerif-Bold", alignment=0,
                  textColor=colors.darkblue, leading=7.5)
         
-        players_style = PS("ChessPlayers", fontSize=6.5,
+        players_style = PS("ChessPlayers", fontSize=8,
                         fontName="DejaVuSerif", alignment=0,
                         textColor=colors.black, leading=7.5)
+        
+        empty_style = PS("ChessEmpty", parent=cell_style, alignment=1)
 #====================
         # --- Геометрия страницы ---
         page_w, page_h = landscape(A4)           # 29.7 × 21 см
@@ -31382,11 +31378,11 @@ class MainWindow(QMainWindow):
         margin_t = 1.2 * cm
         margin_b = 0.8 * cm
 
-        time_col_w = 1.6 * cm
+        time_col_w = 1.2 * cm
         avail_w = page_w - margin_l - margin_r - time_col_w
 
-        ROW_H_HEADER = 1.0 * cm
-        ROW_H_DATA   = 2.5 * cm
+        ROW_H_HEADER = 0.8 * cm
+        ROW_H_DATA   = 2.4 * cm
 
         elements = []
 
@@ -31411,14 +31407,17 @@ class MainWindow(QMainWindow):
                 row = [t.strftime("%H:%M")]
                 for tbl_num in tables_page:
                     m = by_cell.get((t, tbl_num))
+
                     if m is None:
-                        row.append(Paragraph("нет встречи", cell_style))
+                        row.append(Paragraph("нет встречи", empty_style))
                     else:
                         stage_short = self._chess_stage_short(m)
                         p1 = self._chess_player_line(m.player1)
                         p2 = self._chess_player_line(m.player2)
                         row.append(self._make_chess_cell(
-                            stage_short, p1, p2, stage_style, players_style
+                            stage_short, p1, p2,
+                            stage_style, players_style,
+                            total_h=2.4 * cm,   # должно совпадать с ROW_H_DATA
                         ))
                 table_data.append(row)
 
@@ -31443,7 +31442,7 @@ class MainWindow(QMainWindow):
                 ('FONTSIZE', (0, 1), (0, -1), 9),
                 ('BACKGROUND', (0, 1), (0, -1), colors.whitesmoke),
                 ('ALIGN', (0, 1), (0, -1), 'CENTER'),
-                ('GRID', (0, 0), (-1, -1), 0.4, colors.grey),
+                ('GRID', (0, 0), (-1, -1), 0.6, colors.black),
                 ('BOX', (0, 0), (-1, -1), 1, colors.black),
                 ('TOPPADDING', (0, 0), (-1, -1), 1),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
@@ -31523,10 +31522,8 @@ class MainWindow(QMainWindow):
 
         # Фамилия — приводим к «Первая заглавная + остальные строчные»
         family_raw = parts[0]
-        if family_raw.isupper():
-            family = family_raw.capitalize()
-        else:
-            family = family_raw
+
+        family = family_raw
 
         # Инициалы: имя → 'И.', отчество → 'О.'
         initials = ""
@@ -31544,28 +31541,40 @@ class MainWindow(QMainWindow):
         return short
 
     def _make_chess_cell(self, stage_short, player1_line, player2_line,
-                        stage_style, players_style):
+                        stage_style, players_style,
+                        total_h=3.0 * cm):
         """
-        Возвращает вложенную Table: этап/группа сверху, линия, два игрока снизу.
+        Ячейка шахматки: сверху 1/3 — этап, снизу 2/3 — игроки.
+        Между частями — горизонтальная линия.
+        Текст по центру по горизонтали, прижат к верху внутри своей части.
         """
-        from reportlab.platypus import Table, TableStyle
+        from reportlab.platypus import Table, TableStyle, Paragraph
         from reportlab.lib import colors
+        from reportlab.lib.styles import ParagraphStyle as PS
 
-        top = Paragraph(stage_short, stage_style)
-        players = Paragraph(f"{player1_line}<br/>{player2_line}", players_style)
+        # Стили с центрированием по горизонтали
+        stage_center   = PS("ChessStageC",   parent=stage_style,   alignment=1)
+        players_center = PS("ChessPlayersC", parent=players_style, alignment=1)
+
+        top     = Paragraph(stage_short, stage_center)
+        players = Paragraph(f"{player1_line}<br/>{player2_line}", players_center)
 
         inner = Table(
             [[top], [players]],
             colWidths=["100%"],
+            rowHeights=[total_h / 3, total_h * 2 / 3],
         )
         inner.setStyle(TableStyle([
             ('LEFTPADDING',   (0, 0), (-1, -1), 0),
             ('RIGHTPADDING',  (0, 0), (-1, -1), 0),
             ('TOPPADDING',    (0, 0), (-1, -1), 1),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
-            ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
-            # --- ЛИНИЯ между этапом и игроками ---
-            ('LINEBELOW', (0, 0), (0, 0), 0.4, colors.grey),
+            # Внутри каждой части — прижать к верху
+            ('VALIGN',        (0, 0), (-1, -1), 'MIDLE'),
+            # Центрировать по горизонтали
+            ('ALIGN',         (0, 0), (-1, -1), 'CENTER'),
+            # Линия между 1/3 и 2/3
+            ('LINEBELOW',     (0, 0), (0, 0), 0.5, colors.grey),
         ]))
         return inner
 #============

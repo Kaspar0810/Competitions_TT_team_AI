@@ -16974,14 +16974,14 @@ class MainWindow(QMainWindow):
                 player_list = Player.select().where(
                     (Player.title_id == self.current_title_id) &
                     (Player.sex == self.current_sex) &
-                    (Player.player != "X")  # Исключаем "X"
+                    (Player.fio != "X")  # Исключаем "X"
                 ).order_by(Player.player.asc())
                 file_suffix = "alf"
             else:
                 player_list = Player.select().where(
                     (Player.title_id == self.current_title_id) &
                     (Player.sex == self.current_sex) &
-                    (Player.player != "X")  # Исключаем "X"
+                    (Player.fio != "X")  # Исключаем "X"
                 ).order_by(Player.rank.desc())
                 file_suffix = "rating"
             
@@ -17002,17 +17002,18 @@ class MainWindow(QMainWindow):
             for player in player_list:
                 n += 1
                 # Формируем ФИО с отчеством или без
-                if otc == 1:
-                    patronymic_text = ""
-                    if player.patronymic_id:
-                        try:
-                            patronymic = Patronymic.get(Patronymic.id == player.patronymic_id)
-                            patronymic_text = patronymic.patronymic
-                        except:
-                            pass
-                    full_name = f"{player.player} {patronymic_text}".strip()
-                else:
-                    full_name = player.player
+                # if otc == 1:
+                #     patronymic_text = ""
+                #     if player.patronymic_id:
+                #         try:
+                #             patronymic = Patronymic.get(Patronymic.id == player.patronymic_id)
+                #             patronymic_text = patronymic.patronymic
+                #         except:
+                #             pass
+                #     full_name = f"{player.player} {patronymic_text}".strip()
+                # else:
+                #     full_name = player.player
+                full_name = player.fio
                 
                 # Форматируем дату рождения - ИСПРАВЛЕНО
                 birth_date = self.format_birth_date(player.bday)

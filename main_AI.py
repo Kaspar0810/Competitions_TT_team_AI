@@ -17246,52 +17246,53 @@ class MainWindow(QMainWindow):
 
             # Документ
             doc = SimpleDocTemplate(filename, pagesize=A4,
-                                    topMargin=2*cm, bottomMargin=1.5*cm,
-                                    leftMargin=1.5*cm, rightMargin=1.5*cm)
+                                    topMargin=2*cm, bottomMargin=2.0*cm,
+                                    leftMargin=1.0*cm, rightMargin=1.0*cm)
 
             styles = getSampleStyleSheet()
-            title_style = PS("TitleStyle", fontSize=14, fontName="DejaVuSerif-Bold",
-                            alignment=1, spaceAfter=20, textColor=colors.darkblue)
-
+            title_style = PS("TitleStyle", fontSize=10, fontName="DejaVuSerif-Bold",
+                alignment=1, spaceAfter=10, textColor=colors.darkblue)
+            
             elements = []
-
             # Заголовок
             elements.append(Paragraph("Список спортсменов с повторяющимися фамилиями", title_style))
-            elements.append(Paragraph(f"Соревнование: {title.name}", title_style))
-            elements.append(Spacer(1, 0.5*cm))
+            # elements.append(Paragraph(f"Соревнование: {title.name}", title_style))
+            elements.append(Spacer(1, 0.15*cm))   # было 0.5)
 
             # Для каждой фамилии создаём таблицу
             for surname, players_list in sorted(duplicate_groups.items()):
-                # Заголовок фамилии
-                surname_style = PS("SurnameStyle", fontSize=12, fontName="DejaVuSerif-Bold",
-                                textColor=colors.blue, spaceAfter=8, spaceBefore=12)
+                # Заголовок фамилии (более компактный)
+                surname_style = PS("SurnameStyle", fontSize=9, fontName="DejaVuSerif-Bold",
+                                textColor=colors.blue, spaceAfter=3, spaceBefore=6,
+                                leading=11)
                 elements.append(Paragraph(f"Фамилия: {surname} ({len(players_list)} чел.)", surname_style))
 
                 # Таблица с данными
-                table_data = [["№", "ФИО", "Город", "Регион", "Рейтинг"]]
+                table_data = [["№", "ФИО", "Город", "Регион"]]
                 for idx, player in enumerate(players_list, 1):
                     fio = player.fio if player.fio else player.player
                     city = player.city or ""
                     region = player.region or ""
-                    # razryad = player.razryad or ""
-                    rank = str(player.rank) if player.rank else "0"
-                    table_data.append([str(idx), fio, city, region, rank])
+                    table_data.append([str(idx), fio, city, region])
 
-                table = Table(table_data, colWidths=[1*cm, 6*cm, 3*cm, 4*cm, 2*cm], repeatRows=1)
+                table = Table(table_data, colWidths=[1*cm, 7*cm, 3*cm, 4*cm], repeatRows=1)
                 table.setStyle(TableStyle([
                     ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSerif'),
-                    ('FONTSIZE', (0, 0), (-1, -1), 9),
+                    ('FONTSIZE', (0, 0), (-1, -1), 7),          # было 8 → 7
+                    ('LEADING', (0, 0), (-1, -1), 8),           # межстрочный интервал
                     ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
                     ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
                     ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                    ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-                    ('TOPPADDING', (0, 0), (-1, -1), 4),
-                    ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                    ('GRID', (0, 0), (-1, -1), 0.25, colors.black),
+                    ('TOPPADDING', (0, 0), (-1, -1), 1),        # было 4 → 1
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 1),     # было 4 → 1
+                    ('LEFTPADDING', (0, 0), (-1, -1), 2),       # было по умолчанию 6
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 2),
                 ]))
 
                 elements.append(table)
-                elements.append(Spacer(1, 0.3*cm))
+                elements.append(Spacer(1, 0.10*cm))              # было 0.3 → 0.15
 
             # Информация о количестве
             total_players = sum(len(p) for p in duplicate_groups.values())
@@ -17300,7 +17301,7 @@ class MainWindow(QMainWindow):
             elements.append(Paragraph(f"Всего спортсменов с повторяющимися фамилиями: {total_players}", info_style))
 
             # Строим документ
-            doc.build(elements, onFirstPage=self.func_zagolovok, onLaterPages=self.func_zagolovok)
+            doc.build(elements, onFirstPage=self.func_zagolovok)
 
             QMessageBox.information(self, "Успех", f"Список спортсменов с повторяющимися фамилиями сохранён:\n{filename}")
 

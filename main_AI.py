@@ -3482,6 +3482,10 @@ class MainWindow(QMainWindow):
 
     def create_results_tab(self):
         """Вкладка Результаты - ввод результатов матчей (компактная версия)"""
+        # Инициализируем количество партий из системы (если не задано — 5)
+        if not hasattr(self, 'parties_count') or not self.parties_count:
+            self.parties_count = 5
+# =======================================================
         tab_widget = QWidget()
         main_layout = QVBoxLayout(tab_widget)
         main_layout.setSpacing(5)
@@ -3507,6 +3511,22 @@ class MainWindow(QMainWindow):
         self.current_match_label = QLabel("Матч: ")
         self.current_match_label.setStyleSheet("color: gray; font-size: 14px;")
         info_layout.addWidget(self.current_match_label)
+
+    # ===== Комбобокс количества партий =====
+        info_layout.addWidget(QLabel("Партий:"))
+        self.parties_count_combo = QComboBox()
+        self.parties_count_combo.addItems(["3", "5", "7"])
+        self.parties_count_combo.setCurrentText(str(self.parties_count))
+        self.parties_count_combo.setMaximumWidth(60)
+        self.parties_count_combo.setStyleSheet("font-size: 14px;")
+        self.parties_count_combo.setToolTip(
+            "Количество партий во встрече. Изменение влияет на число полей ввода "
+            "и на порог победы: 3→2, 5→3, 7→4 партии."
+        )
+        self.parties_count_combo.currentTextChanged.connect(self.on_parties_count_changed)
+        info_layout.addWidget(self.parties_count_combo)
+        # ========================================
+
         info_layout.addStretch()
         
         main_layout.addWidget(info_frame)
@@ -3573,7 +3593,7 @@ class MainWindow(QMainWindow):
         grid_layout.addWidget(QLabel("Общий счет"), 0, 2)
         
         # Заголовки для партий (уменьшенные)
-        self.parties_count = 5  # по умолчанию
+        # self.parties_count = 5  # по умолчанию
         self.score_edits_p1 = []
         self.score_edits_p2 = []
         self.score_labels = []
@@ -7258,6 +7278,8 @@ class MainWindow(QMainWindow):
 
     def on_tab_changed(self, index):
         """Смена вкладки"""
+        
+
         self.current_tab_index = index
         
         # ОБНОВЛЯЕМ ЛЕВУЮ ПАНЕЛЬ
@@ -7497,7 +7519,8 @@ class MainWindow(QMainWindow):
                 self.right_panel.setVisible(True)
 
             elif index == 7:  # Дополнительно
-
+                import time
+                start = time.perf_counter()
                 # Загружаем даты соревнования
                 self.load_competition_dates()
 
@@ -7532,6 +7555,10 @@ class MainWindow(QMainWindow):
                 # Загружаем матчи, если этап уже выбран
                 if self.schedule_stage_combo.count() > 0:
                     self.on_schedule_stage_changed()
+
+                end = time.perf_counter()
+                
+                print(f"Выполнено за {end - start:.4f} сек")
                 #===================
                 self.table_header.setVisible(False)    # скрываем заголовок
                 self.table_container.setVisible(False) # скрываем контейнер с таблицей
@@ -7549,7 +7576,7 @@ class MainWindow(QMainWindow):
 
         #  Изменяем название кнопок от категории игроков
         self.create_category_buttons()
-
+       
     def update_left_panel_for_rating_tab(self):
         """Обновление левой панели для вкладки Рейтинг"""
         # Очистка панели
@@ -25080,7 +25107,39 @@ class MainWindow(QMainWindow):
                 
         except Exception as e:
             print(f"Ошибка обновления счета: {e}")
+# =====================================
+    def on_parties_count_changed(self, text):
+        """Реакция на смену количества партий: показать/скрыть поля и пересчитать."""
+        try:
+            new_count = int(text)
+        except ValueError:
+            return
 
+        self.parties_count = new_count
+
+        # 1. Скрываем/показываем заголовки партий (П1..П7)
+        for i, label in enumerate(self.score_labels):
+            label.setVisible(i < new_count)
+
+        # 2. Скрываем/показываем поля ввода и очищаем лишние
+        for i in range(7):
+            visible = i < new_count
+            for edit in (self.score_edits_p1[i], self.score_edits_p2[i]):
+                edit.setVisible(visible)
+                if visible:
+                    edit.setEnabled(True)
+                else:
+                    edit.blockSignals(True)
+                    edit.clear()
+                    edit.blockSignals(False)
+
+        # 3. Пересчитываем общий счёт и победителя
+        self.update_total_score()
+
+    def get_win_threshold(self):
+        """Сколько партий нужно выиграть для победы во встрече."""
+        return (self.parties_count // 2) + 1
+# ===============================
     def validate_score(self, score1, score2):
         """
         Проверка корректности счета в партии

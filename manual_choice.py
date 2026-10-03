@@ -535,6 +535,7 @@ class ChoiceGroupManual(QDialog):
         self.btn_edit.setFixedHeight(25)
         self.btn_edit.clicked.connect(self.open_editor)
         self.btn_edit.setStyleSheet("background-color: #FF9800; color: white; font-weight: bold;")
+        self.btn_edit.setEnabled(False)
         btn_layout.addWidget(self.btn_edit, 1, 1, 1, 1)
 # ============ new
         # --- NEW: кнопка полного экрана ---

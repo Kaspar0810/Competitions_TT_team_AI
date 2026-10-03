@@ -7471,7 +7471,7 @@ class MainWindow(QMainWindow):
         # Для остальных вкладок
         else:
             # Показываем таблицу участников (или можно скрыть)
-            self.table_container.setCurrentWidget(self.table_view)
+            # self.table_container.setCurrentWidget(self.table_view)
             if index == 0:  # Титул
                 self.table_header.setText("📋 Информация о соревновании")
                 self.filters_widget.setVisible(True)
@@ -16443,8 +16443,9 @@ class MainWindow(QMainWindow):
             if reply == QMessageBox.No:
                 return
             else:
-                # очищает старую жеребьевку
-                self.clear_table_DB_after_choice(stage_name)
+                pass
+                # # очищает старую жеребьевку
+                # self.clear_table_DB_after_choice(stage_name)
 
         # Запускаем жеребьевку
         self.drawing_for_stage(stage_name)

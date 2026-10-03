@@ -16746,9 +16746,12 @@ class MainWindow(QMainWindow):
                 title.tab_enabled = tab_enabled
                 title.save()
 
+            # QMessageBox.information(self, "Успех", 
+            #                     f"Жеребьевка для этапа '{stage.stage}' сохранена!\n"
+            #                     f"Таблицы Choice и Result обновлены.")
             QMessageBox.information(self, "Успех", 
-                                f"Жеребьевка для этапа '{stage.stage}' сохранена!\n"
-                                f"Таблицы Choice и Result обновлены.")
+                                            f"Жеребьевка для этапа '{stage}' сохранена!\n"
+                                            f"Таблицы Choice и Result обновлены.")
             self.update_stages_info()
 
         

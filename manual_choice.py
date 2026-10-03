@@ -170,7 +170,7 @@ class ChoiceGroupManual(QDialog):
         
         if self.current_athlete_index >= len(self.athletes):
             QMessageBox.information(self, "Информация", "Жеребьевка уже завершена! Все спортсмены распределены.")
-
+# ==== old
         
     def calculate_initial_group(self):
         """Определение начальной группы для посева"""

@@ -384,6 +384,10 @@ def choice_group_auto(self, athletes, num_groups, stage, parent=None):
                     info_text += f"\n⚠️ Внимание! Возникли конфликты при жеребьевке.\n"
                     info_text += f"Подробности в отдельном сообщении."
                 
+                # ставим флаг, что жеребьевка сделана
+                # записываем flag жеребьевки = 1
+                systems = system.update(choice_flag = 1).where(System.id == system.id).execute()
+
                 QMessageBox.information(parent, "Успех", info_text)
                 return results
             else:

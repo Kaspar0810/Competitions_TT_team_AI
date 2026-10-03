@@ -1664,7 +1664,8 @@ class EditStagesDialog(QDialog):
                 continue
             
             # Получаем туры
-            tours = self.get_tours_list(total_players)
+            # tours = self.get_tours_list(total_players)
+            tours = self.parent.tours_list(total_players)
             
             # Создаем матчи
             for tour_idx, matches in enumerate(tours, 1):

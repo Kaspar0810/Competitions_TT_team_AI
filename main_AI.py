@@ -7901,7 +7901,8 @@ class MainWindow(QMainWindow):
             player = Player.get_by_id(player_id)
 
             # Заполняем форму
-            self.fio_edit.setText(player.fio or player.player or "")
+            # self.fio_edit.setText(player.fio or player.player or "")
+            self.fio_edit.setText(player.player or "")
             patronymic_text = ""
             if player.patronymic_id:
                 pat = Patronymic.get_or_none(Patronymic.id == player.patronymic_id)
@@ -7948,8 +7949,12 @@ class MainWindow(QMainWindow):
         if not hasattr(self, 'editing_player_id') or not self.editing_player_id:
             QMessageBox.warning(self, "Ошибка", "Нет выбранного участника для редактирования")
             return
-        
+            # вариант отчество
+        otc = self.patronymic_edit.text().strip()
         fio_input = self.fio_edit.text().strip()
+        fio_input = f"{self.fio_edit.text().strip()} {otc}"
+        # ===========================
+        # fio_input = self.fio_edit.text().strip()
         if not fio_input:
             QMessageBox.warning(self, "Ошибка", "Введите ФИО участника")
             return
@@ -16519,6 +16524,16 @@ class MainWindow(QMainWindow):
 
                 # Заполняем таблицу Result после жеребьевки
                 self.fill_results_after_drawing()
+
+                # # включаем вкладку -Результаты-
+                # title = Title.get_by_id(self.current_title_id)
+                # tab_enabled = title.tab_enabled if title.tab_enabled else "Титул"
+                
+                # # Добавляем вкладку Результаты после жеребьевки, если её нет
+                # if "Результаты" not in tab_enabled:
+                #     tab_enabled += " Результаты"
+                #     title.tab_enabled = tab_enabled
+                #     title.save()
             
                 QMessageBox.information(self, "Автоматическая жеребьевка", 
                                     f"✅ Жеребьевка для этапа '{stage}' успешно проведена!\n\n"
@@ -16539,6 +16554,19 @@ class MainWindow(QMainWindow):
                 else:
                     # жеребьвка финальной сетки
                     self.create_olimpic_final_automatically(stage, source_stage, exit_count)
+
+            # включаем вкладку -Результаты-
+            title = Title.get_by_id(self.current_title_id)
+            tab_enabled = title.tab_enabled if title.tab_enabled else "Титул"
+            
+            # Добавляем вкладку Результаты после жеребьевки, если её нет
+            if "Результаты" not in tab_enabled:
+                tab_enabled += " Результаты"
+                title.tab_enabled = tab_enabled
+                title.save()
+
+            # Обновляем активность вкладок
+            self.update_tabs_enabled()
 
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка при автоматической жеребьевке: {str(e)}")
@@ -16603,15 +16631,15 @@ class MainWindow(QMainWindow):
         num_groups = system.total_group
         #========================
         if stage == "Квалификация":
-            manual_choice.choice_group_manual(self, athletes, num_groups, stage, parent=None)
+            num_id_player = manual_choice.choice_group_manual(self, athletes, num_groups, stage, parent=None)
         elif stage == "Квалификация. 1-й полуфинал":
             # Вызываем функцию выбора жеребьевки полуфиналов
             result = manual_choice.choice_semifinal_manual(self)
         else:
             self.open_manual_net_draw(stage)
 
-        # if num_id_player is not None:  
-        #     self.save_manual_drawing_for_stage(num_id_player, stage)
+        if num_id_player is not None:  
+            self.save_manual_drawing_for_stage(num_id_player, stage)
 
     def fill_choice_table_for_stage(self, stage):
         """Заполнение таблицы Choice для конкретного этапа"""
@@ -16707,7 +16735,17 @@ class MainWindow(QMainWindow):
 
             # Заполняем таблицу Result после жеребьевки
             self.fill_results_after_drawing()
+
+            # включаем вкладку -Результаты-
+            title = Title.get_by_id(self.current_title_id)
+            tab_enabled = title.tab_enabled if title.tab_enabled else "Титул"
             
+            # Добавляем вкладку Результаты после жеребьевки, если её нет
+            if "Результаты" not in tab_enabled:
+                tab_enabled += " Результаты"
+                title.tab_enabled = tab_enabled
+                title.save()
+
             QMessageBox.information(self, "Успех", 
                                 f"Жеребьевка для этапа '{stage.stage}' сохранена!\n"
                                 f"Таблицы Choice и Result обновлены.")

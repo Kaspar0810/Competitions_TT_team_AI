@@ -203,194 +203,194 @@ class ChoiceGroupManual(QDialog):
         direction = "→" if self.current_round % 2 == 1 else "←"
         self.round_label.setText(f"Круг: {self.current_round}\nНаправление: {direction}")
         
-    def _initUI(self):
-        self.setWindowTitle('Ручная жеребьевка спортсменов')
-        self.setGeometry(10, 10, 1700, 800)
+    # def _initUI(self):
+    #     self.setWindowTitle('Ручная жеребьевка спортсменов')
+    #     self.setGeometry(10, 10, 1700, 800)
         
-        main_layout = QVBoxLayout(self)
+    #     main_layout = QVBoxLayout(self)
      
-        title_label = QLabel("Ручная жеребьевка спортсменов")
-        title_label.setStyleSheet("font-size: 14px; font-weight: bold; margin: 10px;")
-        title_label.setAlignment(Qt.AlignCenter)
-        main_layout.addWidget(title_label)
+    #     title_label = QLabel("Ручная жеребьевка спортсменов")
+    #     title_label.setStyleSheet("font-size: 14px; font-weight: bold; margin: 10px;")
+    #     title_label.setAlignment(Qt.AlignCenter)
+    #     main_layout.addWidget(title_label)
         
-        content_layout = QHBoxLayout()
+    #     content_layout = QHBoxLayout()
         
-        # ========== ЛЕВАЯ ПАНЕЛЬ ==========
-        left_panel = QFrame()
-        left_panel.setFrameStyle(QFrame.StyledPanel)
-        left_panel.setMaximumWidth(330)
-        left_layout = QVBoxLayout(left_panel)
+    #     # ========== ЛЕВАЯ ПАНЕЛЬ ==========
+    #     left_panel = QFrame()
+    #     left_panel.setFrameStyle(QFrame.StyledPanel)
+    #     left_panel.setMaximumWidth(330)
+    #     left_layout = QVBoxLayout(left_panel)
         
-        # Горизонтальный layout для информации
-        info_layout = QHBoxLayout()
+    #     # Горизонтальный layout для информации
+    #     info_layout = QHBoxLayout()
         
-        # Информация о текущем спортсмене
-        current_athlete_group = QGroupBox("Текущий спортсмен")
-        current_athlete_group.setStyleSheet("QGroupBox { font-weight: bold; }")
-        current_athlete_layout = QVBoxLayout(current_athlete_group)
+    #     # Информация о текущем спортсмене
+    #     current_athlete_group = QGroupBox("Текущий спортсмен")
+    #     current_athlete_group.setStyleSheet("QGroupBox { font-weight: bold; }")
+    #     current_athlete_layout = QVBoxLayout(current_athlete_group)
         
-        self.current_athlete_label = QLabel("Спортсмен: -\nРейтинг: -\nРегион: -\nТренер: -")
-        self.current_athlete_label.setStyleSheet("background-color: #ffe0b3; padding: 8px; font-size: 12px;")
-        self.current_athlete_label.setWordWrap(True)
-        current_athlete_layout.addWidget(self.current_athlete_label)
+    #     self.current_athlete_label = QLabel("Спортсмен: -\nРейтинг: -\nРегион: -\nТренер: -")
+    #     self.current_athlete_label.setStyleSheet("background-color: #ffe0b3; padding: 8px; font-size: 12px;")
+    #     self.current_athlete_label.setWordWrap(True)
+    #     current_athlete_layout.addWidget(self.current_athlete_label)
         
-        left_layout.addWidget(current_athlete_group)
+    #     left_layout.addWidget(current_athlete_group)
         
-        # Информация о текущей группе
-        current_group_group = QGroupBox("Текущая группа для посева")
-        current_group_group.setStyleSheet("QGroupBox { font-weight: bold; }")
-        current_group_layout = QVBoxLayout(current_group_group)
+    #     # Информация о текущей группе
+    #     current_group_group = QGroupBox("Текущая группа для посева")
+    #     current_group_group.setStyleSheet("QGroupBox { font-weight: bold; }")
+    #     current_group_layout = QVBoxLayout(current_group_group)
         
-        self.current_group_label = QLabel("Группа: -\nИгроков: -")
-        self.current_group_label.setStyleSheet("background-color: #b3d9ff; padding: 8px; font-size: 11px;")
-        current_group_layout.addWidget(self.current_group_label)
+    #     self.current_group_label = QLabel("Группа: -\nИгроков: -")
+    #     self.current_group_label.setStyleSheet("background-color: #b3d9ff; padding: 8px; font-size: 11px;")
+    #     current_group_layout.addWidget(self.current_group_label)
         
-        info_layout.addWidget(current_group_group)
+    #     info_layout.addWidget(current_group_group)
         
-        # Информация о текущем круге
-        round_group = QGroupBox("Текущий круг")
-        round_group.setStyleSheet("QGroupBox { font-weight: bold; }")
-        round_layout = QVBoxLayout(round_group)
+    #     # Информация о текущем круге
+    #     round_group = QGroupBox("Текущий круг")
+    #     round_group.setStyleSheet("QGroupBox { font-weight: bold; }")
+    #     round_layout = QVBoxLayout(round_group)
         
-        self.round_label = QLabel("Круг: 1\nНаправление: →")
-        self.round_label.setStyleSheet("background-color: #d4e6f1; padding: 8px; font-size: 11px;")
-        round_layout.addWidget(self.round_label)
+    #     self.round_label = QLabel("Круг: 1\nНаправление: →")
+    #     self.round_label.setStyleSheet("background-color: #d4e6f1; padding: 8px; font-size: 11px;")
+    #     round_layout.addWidget(self.round_label)
         
-        info_layout.addWidget(round_group)
+    #     info_layout.addWidget(round_group)
         
-        left_layout.addLayout(info_layout)
+    #     left_layout.addLayout(info_layout)
         
-        # Список участников
-        athletes_group = QGroupBox("Список участников (по рейтингу ↓)")
-        athletes_group.setStyleSheet("QGroupBox { font-weight: bold; }")
-        athletes_layout = QVBoxLayout(athletes_group)
+    #     # Список участников
+    #     athletes_group = QGroupBox("Список участников (по рейтингу ↓)")
+    #     athletes_group.setStyleSheet("QGroupBox { font-weight: bold; }")
+    #     athletes_layout = QVBoxLayout(athletes_group)
         
-        self.athletes_table = QTableWidget()
-        self.athletes_table.setColumnCount(4)
-        self.athletes_table.setHorizontalHeaderLabels(["ID", "ФИО", "Рейтинг", "Регион"])
-        self.athletes_table.horizontalHeader().setStretchLastSection(True)
-        self.athletes_table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.athletes_table.setAlternatingRowColors(True)
-        athletes_layout.addWidget(self.athletes_table)
+    #     self.athletes_table = QTableWidget()
+    #     self.athletes_table.setColumnCount(4)
+    #     self.athletes_table.setHorizontalHeaderLabels(["ID", "ФИО", "Рейтинг", "Регион"])
+    #     self.athletes_table.horizontalHeader().setStretchLastSection(True)
+    #     self.athletes_table.setSelectionBehavior(QTableWidget.SelectRows)
+    #     self.athletes_table.setAlternatingRowColors(True)
+    #     athletes_layout.addWidget(self.athletes_table)
         
-        left_layout.addWidget(athletes_group)
+    #     left_layout.addWidget(athletes_group)
         
-        # Статистика и управление
-        control_group = QGroupBox("Управление и статистика")
-        control_group.setStyleSheet("QGroupBox { font-weight: bold; }")
-        control_layout = QVBoxLayout(control_group)
+    #     # Статистика и управление
+    #     control_group = QGroupBox("Управление и статистика")
+    #     control_group.setStyleSheet("QGroupBox { font-weight: bold; }")
+    #     control_layout = QVBoxLayout(control_group)
         
-        # Статистика
-        stats_layout = QGridLayout()
-        stats_layout.addWidget(QLabel("Всего спортсменов:"), 0, 0)
-        self.total_label = QLabel("0")
-        stats_layout.addWidget(self.total_label, 0, 1)
-        stats_layout.addWidget(QLabel("Размещено:"), 1, 0)
-        self.placed_label = QLabel("0")
-        stats_layout.addWidget(self.placed_label, 1, 1)
-        stats_layout.addWidget(QLabel("Осталось:"), 2, 0)
-        self.remaining_label = QLabel("0")
-        stats_layout.addWidget(self.remaining_label, 2, 1)
-        stats_layout.addWidget(QLabel("Макс. в группе:"), 3, 0)
-        self.max_rows_label = QLabel("0")
-        stats_layout.addWidget(self.max_rows_label, 3, 1)
-        stats_layout.addWidget(QLabel("Текущий круг:"), 4, 0)
-        self.round_number_label = QLabel("1")
-        stats_layout.addWidget(self.round_number_label, 4, 1)
-        control_layout.addLayout(stats_layout)
+    #     # Статистика
+    #     stats_layout = QGridLayout()
+    #     stats_layout.addWidget(QLabel("Всего спортсменов:"), 0, 0)
+    #     self.total_label = QLabel("0")
+    #     stats_layout.addWidget(self.total_label, 0, 1)
+    #     stats_layout.addWidget(QLabel("Размещено:"), 1, 0)
+    #     self.placed_label = QLabel("0")
+    #     stats_layout.addWidget(self.placed_label, 1, 1)
+    #     stats_layout.addWidget(QLabel("Осталось:"), 2, 0)
+    #     self.remaining_label = QLabel("0")
+    #     stats_layout.addWidget(self.remaining_label, 2, 1)
+    #     stats_layout.addWidget(QLabel("Макс. в группе:"), 3, 0)
+    #     self.max_rows_label = QLabel("0")
+    #     stats_layout.addWidget(self.max_rows_label, 3, 1)
+    #     stats_layout.addWidget(QLabel("Текущий круг:"), 4, 0)
+    #     self.round_number_label = QLabel("1")
+    #     stats_layout.addWidget(self.round_number_label, 4, 1)
+    #     control_layout.addLayout(stats_layout)
         
-        # Кнопки управления
-        btn_layout = QGridLayout()
+    #     # Кнопки управления
+    #     btn_layout = QGridLayout()
 
-        self.btn_reset = QPushButton("Сбросить жеребьевку")
-        self.btn_reset.clicked.connect(self.reset_draw)
-        btn_layout.addWidget(self.btn_reset, 0, 0, 1, 1)
+    #     self.btn_reset = QPushButton("Сбросить жеребьевку")
+    #     self.btn_reset.clicked.connect(self.reset_draw)
+    #     btn_layout.addWidget(self.btn_reset, 0, 0, 1, 1)
         
-        self.btn_auto = QPushButton("Авто-заполнение (1 номера)")
-        self.btn_auto.clicked.connect(self.auto_fill_first)
-        btn_layout.addWidget(self.btn_auto, 1, 0, 1, 1)
+    #     self.btn_auto = QPushButton("Авто-заполнение (1 номера)")
+    #     self.btn_auto.clicked.connect(self.auto_fill_first)
+    #     btn_layout.addWidget(self.btn_auto, 1, 0, 1, 1)
         
-        self.btn_clear = QPushButton("Очистить все группы")
-        self.btn_clear.clicked.connect(self.clear_all_groups)
-        btn_layout.addWidget(self.btn_clear, 0, 1, 1, 1)
+    #     self.btn_clear = QPushButton("Очистить все группы")
+    #     self.btn_clear.clicked.connect(self.clear_all_groups)
+    #     btn_layout.addWidget(self.btn_clear, 0, 1, 1, 1)
 
         
-        self.btn_edit = QPushButton("Редактировать группы")
-        self.btn_edit.clicked.connect(self.open_editor)
-        self.btn_edit.setStyleSheet("background-color: #FF9800; color: white; font-weight: bold;")
-        btn_layout.addWidget(self.btn_edit, 1, 1, 1, 1)
+    #     self.btn_edit = QPushButton("Редактировать группы")
+    #     self.btn_edit.clicked.connect(self.open_editor)
+    #     self.btn_edit.setStyleSheet("background-color: #FF9800; color: white; font-weight: bold;")
+    #     btn_layout.addWidget(self.btn_edit, 1, 1, 1, 1)
 
-        control_layout.addLayout(btn_layout)
+    #     control_layout.addLayout(btn_layout)
         
-        # Кнопки OK и Cancel
-        dialog_buttons = QHBoxLayout()
+    #     # Кнопки OK и Cancel
+    #     dialog_buttons = QHBoxLayout()
         
-        self.btn_result = QPushButton("Показать результат")
-        self.btn_result.clicked.connect(self.show_results)
-        self.btn_result.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold;")
-        dialog_buttons.addWidget(self.btn_result)
+    #     self.btn_result = QPushButton("Показать результат")
+    #     self.btn_result.clicked.connect(self.show_results)
+    #     self.btn_result.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold;")
+    #     dialog_buttons.addWidget(self.btn_result)
         
-        self.btn_ok = QPushButton("Записать жеребьевку")
-        self.btn_ok.clicked.connect(self.accept)
-        self.btn_ok.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold;")
-        dialog_buttons.addWidget(self.btn_ok)
+    #     self.btn_ok = QPushButton("Записать жеребьевку")
+    #     self.btn_ok.clicked.connect(self.accept)
+    #     self.btn_ok.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold;")
+    #     dialog_buttons.addWidget(self.btn_ok)
         
-        self.btn_cancel = QPushButton("Отмена")
-        self.btn_cancel.clicked.connect(self.reject)
-        dialog_buttons.addWidget(self.btn_cancel)
+    #     self.btn_cancel = QPushButton("Отмена")
+    #     self.btn_cancel.clicked.connect(self.reject)
+    #     dialog_buttons.addWidget(self.btn_cancel)
         
-        control_layout.addLayout(dialog_buttons)
+    #     control_layout.addLayout(dialog_buttons)
         
-        # Инструкция
-        info_text = QTextEdit()
-        info_text.setMaximumHeight(150)
-        info_text.setReadOnly(True)
-        info_text.setPlainText("Правила жеребьевки:\n"
-                              "• Первые номера групп заполняются автоматически\n"
-                              "• Желтая подсветка группы - текущая для посева\n"
-                              "• Клик по ЛЮБОЙ зеленой/желтой ячейке для посева\n"
-                              "• Наведите мышь на игрока для просмотра полной информации\n"
-                              "• Если внести игрока в НЕ выделенную группу,\n"
-                              "  выделение остается на прежней группе\n"
-                              "• Выделение переходит на следующую группу\n"
-                              "  только после внесения игрока в выделенную группу\n"
-                              "• Следующая группа выбирается с наименьшим\n"
-                              "  количеством игроков\n"
-                              "• Зеленые ячейки - можно сеять\n"
-                              "• Желтые - совпадение региона, можно сеять с подтверждением\n"
-                              "• Красные - совпадение региона и тренера\n"
-                              "• Двойной клик - редактирование ячейки")
-        control_layout.addWidget(info_text)
+    #     # Инструкция
+    #     info_text = QTextEdit()
+    #     info_text.setMaximumHeight(150)
+    #     info_text.setReadOnly(True)
+    #     info_text.setPlainText("Правила жеребьевки:\n"
+    #                           "• Первые номера групп заполняются автоматически\n"
+    #                           "• Желтая подсветка группы - текущая для посева\n"
+    #                           "• Клик по ЛЮБОЙ зеленой/желтой ячейке для посева\n"
+    #                           "• Наведите мышь на игрока для просмотра полной информации\n"
+    #                           "• Если внести игрока в НЕ выделенную группу,\n"
+    #                           "  выделение остается на прежней группе\n"
+    #                           "• Выделение переходит на следующую группу\n"
+    #                           "  только после внесения игрока в выделенную группу\n"
+    #                           "• Следующая группа выбирается с наименьшим\n"
+    #                           "  количеством игроков\n"
+    #                           "• Зеленые ячейки - можно сеять\n"
+    #                           "• Желтые - совпадение региона, можно сеять с подтверждением\n"
+    #                           "• Красные - совпадение региона и тренера\n"
+    #                           "• Двойной клик - редактирование ячейки")
+    #     control_layout.addWidget(info_text)
         
-        left_layout.addWidget(control_group)
+    #     left_layout.addWidget(control_group)
         
-        # ========== ЦЕНТРАЛЬНАЯ ПАНЕЛЬ (таблицы групп) ==========
-        center_panel = QFrame()
-        center_panel.setFrameStyle(QFrame.StyledPanel)
-        center_layout = QVBoxLayout(center_panel)
+    #     # ========== ЦЕНТРАЛЬНАЯ ПАНЕЛЬ (таблицы групп) ==========
+    #     center_panel = QFrame()
+    #     center_panel.setFrameStyle(QFrame.StyledPanel)
+    #     center_layout = QVBoxLayout(center_panel)
         
-        lbl_groups = QLabel(f"Жеребьевка групп (всего групп: {self.num_groups}, макс. в группе: {self.max_rows_per_group})")
-        lbl_groups.setStyleSheet("font-weight: bold; font-size: 14px;")
-        center_layout.addWidget(lbl_groups)
+    #     lbl_groups = QLabel(f"Жеребьевка групп (всего групп: {self.num_groups}, макс. в группе: {self.max_rows_per_group})")
+    #     lbl_groups.setStyleSheet("font-weight: bold; font-size: 14px;")
+    #     center_layout.addWidget(lbl_groups)
         
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+    #     scroll_area = QScrollArea()
+    #     scroll_area.setWidgetResizable(True)
+    #     scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+    #     scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         
-        self.groups_widget = QWidget()
-        self.groups_layout = QGridLayout(self.groups_widget)
-        self.groups_layout.setAlignment(Qt.AlignTop)
-        self.groups_layout.setVerticalSpacing(15)
-        self.groups_layout.setHorizontalSpacing(10)
-        scroll_area.setWidget(self.groups_widget)
-        center_layout.addWidget(scroll_area)
+    #     self.groups_widget = QWidget()
+    #     self.groups_layout = QGridLayout(self.groups_widget)
+    #     self.groups_layout.setAlignment(Qt.AlignTop)
+    #     self.groups_layout.setVerticalSpacing(15)
+    #     self.groups_layout.setHorizontalSpacing(10)
+    #     scroll_area.setWidget(self.groups_widget)
+    #     center_layout.addWidget(scroll_area)
         
-        content_layout.addWidget(left_panel)
-        content_layout.addWidget(center_panel, stretch=1)
+    #     content_layout.addWidget(left_panel)
+    #     content_layout.addWidget(center_panel, stretch=1)
         
-        main_layout.addLayout(content_layout)
+    #     main_layout.addLayout(content_layout)
 
 # ========================================
     def initUI(self):
@@ -556,7 +556,7 @@ class ChoiceGroupManual(QDialog):
         self.btn_result.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold;")
         dialog_buttons.addWidget(self.btn_result)
         
-        self.btn_ok = QPushButton("Записать")
+        self.btn_ok = QPushButton("Записать жеребьевку")
         self.btn_ok.setFixedHeight(28)
         self.btn_ok.clicked.connect(self.accept)
         self.btn_ok.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold;")
@@ -1522,7 +1522,26 @@ class ChoiceGroupManual(QDialog):
                         'group': gr
                     })
         return results
-
+# ==== вариант восстановления сохранения ===
+    def save_to_database(self):
+            """Сохранение результатов жеребьевки в базу данных через Peewee"""
+            try:
+                Choice.delete().execute()
+                
+                for group_idx, group in enumerate(self.groups):
+                    for posev_group, athlete in enumerate(group, 1):
+                        if athlete:
+                            Choice.create(
+                                id_player_choice=athlete[0],
+                                group=group_idx + 1,
+                                posev_group=posev_group
+                            )
+                
+                QMessageBox.information(self, "Успех", "Результаты жеребьевки успешно сохранены в базу данных!")
+                
+            except Exception as e:
+                QMessageBox.warning(self, "Ошибка", f"Ошибка при сохранении в базу данных:\n{str(e)}")
+# ========
 # ======== new
     def toggle_fullscreen(self):
         """Переключение между полноэкранным и обычным режимом."""
@@ -1544,7 +1563,6 @@ class ChoiceGroupManual(QDialog):
         # чтобы содержимое заняло всё пространство
         self._refresh_group_view()
 
-
     def _refresh_group_view(self):
         """Перестраивает таблицы групп под текущий размер окна."""
         try:
@@ -1553,7 +1571,6 @@ class ChoiceGroupManual(QDialog):
         except Exception as e:
             print(f"[toggle_fullscreen] refresh failed: {e}")
 # ===========
-
 def load_existing_draw_from_db(id_title, current_sex):
     """Загрузка существующей жеребьевки из базы данных через Peewee"""
     choices = Choice.select().where((Choice.title_id == id_title) & (Choice.sex == current_sex))
@@ -1635,6 +1652,9 @@ def choice_group_manual(self, athletes, num_groups, stage, parent=None):
     
     if result_code == QDialog.Accepted:
         return dialog.get_results()
+
+    
+    
     else:
         return None
 #====================== новый вариант с ручной жеребьевкой полуфиналов ===========

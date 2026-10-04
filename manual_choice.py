@@ -1344,8 +1344,8 @@ class ChoiceGroupManual(QDialog):
                     group_combos[group_idx].setEnabled(False)
                     group_labels[group_idx].setStyleSheet("font-weight: bold; background-color: #FF9800; color: white; padding: 3px;")
         
-        for g_idx, combo in enumerate(group_combos):
-            combo.currentIndexChanged.connect(lambda idx, g=g_idx: on_combo_change(idx, g))
+            for g_idx, combo in enumerate(group_combos):
+                combo.currentIndexChanged.connect(lambda idx, g=g_idx: on_combo_change(idx, g))
         
         def swap_athletes():
             if len(selected_athletes) == 2:

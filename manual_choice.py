@@ -830,7 +830,7 @@ class ChoiceGroupManual(QDialog):
         else:
             self.current_athlete_label.setText("Жеребьевка завершена!\nВсе спортсмены\nраспределены")
             self.current_athlete_label.setStyleSheet("background-color: #90EE90; padding: 8px; font-size: 12px;")
-    
+# ========== old ===========    
     def check_conflicts(self, athlete, group_idx):
         """Проверка конфликтов"""
         if group_idx >= len(self.groups):
@@ -851,9 +851,11 @@ class ChoiceGroupManual(QDialog):
         for table in self.group_tables:
             for row in range(table.rowCount()):
                 num_item = table.item(row, 0)
+                num_item_fam = table.item(row, 1)
                 if num_item:
                     num_item.setBackground(QBrush(QColor(255, 255, 255)))
-                    
+                    num_item_fam.setBackground(QBrush(QColor(255, 255, 255)))
+                                
         if not athlete:
             return
             
@@ -871,6 +873,132 @@ class ChoiceGroupManual(QDialog):
                             num_item.setBackground(QBrush(QColor(255, 255, 150)))
                         else:
                             num_item.setBackground(QBrush(QColor(144, 238, 144)))
+
+        # Подсветить занятые ячейки с тем же регионом
+        for table in self.group_tables:
+            for row in range(table.rowCount()):
+                item = table.item(row, 1)
+                if item and item.text():
+                    # если в item хранится ссылка на спортсмена — сверьтесь с athlete[3]
+                    a = item.data(Qt.UserRole)  # или как у вас хранится
+                    player = Player.get_or_none(Player.id == a)
+                    region = player.region
+                    if a and region == athlete[3]:
+                        item.setBackground(QBrush(QColor(255, 255, 150)))
+#===================
+    
+
+    # # Словарь сокращений → полная форма
+    # REGION_ALIASES = {
+    #     "респ": "республика",
+    #     "респ-ка": "республика",
+    #     "обл": "область",
+    #     "г": "город",
+    #     "г.": "город",
+    #     "край": "край",
+    #     "авт": "автономный",
+    #     "ао": "автономный округ",
+    #     "чр": "чеченская республика",
+    #     # сюда добавляйте всё, что встречается в ваших данных
+    # }
+
+    # # Известные варианты написания → каноничное имя
+    # REGION_CANON = {
+    #     "хакассия": "хакасия",
+    #     "хакасия": "хакасия",
+    #     # "башкирия": "башкортостан",
+    #     # "татария": "татарстан",
+    #     # и т.д.
+    # }
+
+
+    # def normalize_region(self, name: str) -> str:
+    # """Приводит название региона к каноничному виду."""
+    #     if not name:
+    #         return ""
+
+    #     s = name.lower().strip()
+
+    #     # Убираем точки (кроме пробелов) — «респ.» → «респ»
+    #     s = s.replace(".", "")
+
+    #     # Разбиваем на слова и раскрываем сокращения
+    #     words = [REGION_ALIASES.get(w, w) for w in s.split()]
+
+    #     # Убираем шумовые слова, чтобы «республика хакасия» == «хакасия»
+    #     noise = {"республика", "область", "край", "город",
+    #             "автономный", "округ", "автономный округ"}
+    #     core = [w for w in words if w not in noise]
+
+    #     # Если после чистки что-то осталось — берём это, иначе всё слово целиком
+    #     key = " ".join(core) if core else " ".join(words)
+
+    #     # Финальная канонизация (Хакассия → Хакасия и т.п.)
+    #     return REGION_CANON.get(key, key)
+
+    # def check_conflicts(self, athlete):
+    #     if not athlete:
+    #         return False, False
+
+    #     _, _, _, region, coach = athlete
+    #     region_norm = normalize_region(region)
+    #     coach_norm = (coach or "").strip().lower()
+
+    #     region_conflict = False
+    #     coach_conflict = False
+
+    #     for grp in self.groups:
+    #         for a in grp:
+    #             if not a:
+    #                 continue
+    #             if normalize_region(a[3]) == region_norm:
+    #                 region_conflict = True
+    #                 if (a[4] or "").strip().lower() == coach_norm:
+    #                     coach_conflict = True
+    #                     return True, True
+
+    #     return region_conflict, coach_conflict
+
+    # def highlight_available_cells(self, athlete):
+    #     """Подсветка доступных ячеек"""
+    #     # Сброс предыдущей подсветки
+    #     for table in self.group_tables:
+    #         for row in range(table.rowCount()):
+    #             num_item = table.item(row, 0)
+    #             if num_item:
+    #                 num_item.setBackground(QBrush(QColor(255, 255, 255)))
+
+    #     if not athlete:
+    #         return
+
+    #     # Один раз считаем конфликты — они одинаковы для всех групп
+    #     region_conflict, coach_conflict = self.check_conflicts(athlete)
+
+    #     for table in self.group_tables:
+    #         for row in range(table.rowCount()):
+    #             item = table.item(row, 1)
+    #             if not item or not item.text():          # пустая ячейка
+    #                 num_item = table.item(row, 0)
+    #                 if num_item:
+    #                     if coach_conflict:
+    #                         num_item.setBackground(QBrush(QColor(255, 100, 100)))
+    #                     elif region_conflict:
+    #                         num_item.setBackground(QBrush(QColor(255, 255, 150)))
+    #                     else:
+    #                         num_item.setBackground(QBrush(QColor(144, 238, 144)))
+
+    #     # Подсветить занятые ячейки с тем же регионом
+    #     for table in self.group_tables:
+    #         for row in range(table.rowCount()):
+    #             item = table.item(row, 1)
+    #             if item and item.text():
+    #                 # если в item хранится ссылка на спортсмена — сверьтесь с athlete[3]
+    #                 a = item.data(Qt.UserRole)  # или как у вас хранится
+    #                 player = Player.get_or_none(Player.id == a)
+    #                 region = player.region
+    #                 if a and region == athlete[3]:
+    #                     item.setBackground(QBrush(QColor(255, 255, 150)))
+#=======================
     
     def can_place_athlete(self, athlete, group_idx, row):
         """Проверка возможности размещения"""

@@ -9536,7 +9536,12 @@ class MainWindow(QMainWindow):
         edit_action = QAction("Параметры", self)
         edit_action.triggered.connect(lambda: QMessageBox.information(self, "Редактировать", "Параметры"))
         edit_menu.addAction(edit_action)
-                    
+
+        # --- Меню "Сервис" / "Редактировать" ---
+        act_normalize = QAction("Нормализация регионов", self)
+        act_normalize.triggered.connect(self.on_normalize_regions)
+        edit_menu.addAction(act_normalize)    
+        
         edit_stages_action = QAction("Редактирование этапов", self)
         edit_stages_action.triggered.connect(self.open_edit_stages_dialog)
         edit_menu.addAction(edit_stages_action)
@@ -10061,7 +10066,117 @@ class MainWindow(QMainWindow):
                 QMessageBox.information(self, "Фильтр", f"Найдено {len(participants_data)} участников")
             except Exception as e:
                 print(f"Ошибка: {e}")
+#================= проба нормализации регионогв в таблицах Player Player_full
+    def on_normalize_regions(self):
+        # --- 1. Считаем, что вообще изменится ---
+        changes = []
+        player = Player.select().where(Player.title_id == self.current_title_id)
+        for p in player.select(Player.id, Player.region):
+            old = p.region or ""
+            new = self.normalize_region(old)
+            if old != new:
+                changes.append((p.id, old, new))
 
+        #---1a обновляем еще в Players_full---
+        changes_full = []
+        players_full = Players_full.select()
+        for p in players_full.select(Players_full.id, Players_full.region):
+            old = p.region or ""
+            new = self.normalize_region(old)
+            if old != new:
+                changes_full.append((p.id, old, new))
+        
+
+        if not changes and not changes_full:
+            QMessageBox.information(self, "Нормализация регионов",
+                                    "Все регионы уже приведены к единому виду.")
+            return
+        
+        if changes:
+            # --- 2. Подтверждение с примером ---
+            preview = "\n".join(
+                f"  «{old}»  →  «{new}»" for _, old, new in changes[:10]
+            )
+            more = "" if len(changes) <= 10 else f"\n… и ещё {len(changes) - 10}."
+
+            reply = QMessageBox.question(
+                self,
+                "Нормализация регионов",
+                f"Будет изменено записей: {len(changes)}.\n\n"
+                f"Примеры:\n{preview}{more}\n\nПродолжить?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if reply != QMessageBox.Yes:
+                return
+
+            # --- 3. Прогресс ---
+            progress = QProgressDialog("Нормализация регионов…", "Отмена",
+                                    0, len(changes), self)
+            progress.setWindowModality(Qt.WindowModal)
+            progress.setMinimumDuration(0)
+
+            updated = 0
+            with Player._meta.database.atomic():
+                for i, (pid, _old, new) in enumerate(changes):
+                    if progress.wasCanceled():
+                        break
+                    Player.update(region=new).where(Player.id == pid).execute()
+                    updated += 1
+                    progress.setValue(i + 1)
+
+            progress.close()
+        else:
+            QMessageBox.information(self, "Нормализация регионов таблицы Player",
+                                                "Все регионы уже приведены к единому виду.")
+        # ======= Player_full
+        if not changes_full:
+            QMessageBox.information(self, "Нормализация регионов таблицы Player_full",
+                                    "Все регионы уже приведены к единому виду.")
+            return
+        else:
+            # --- 2. Подтверждение с примером ---
+            preview = "\n".join(
+                f"  «{old}»  →  «{new}»" for _, old, new in changes_full[:10]
+            )
+            more = "" if len(changes_full) <= 10 else f"\n… и ещё {len(changes_full) - 10}."
+
+            reply = QMessageBox.question(
+                self,
+                "Нормализация регионов",
+                f"Будет изменено записей: {len(changes_full)}.\n\n"
+                f"Примеры:\n{preview}{more}\n\nПродолжить?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if reply != QMessageBox.Yes:
+                    return
+            progress = QProgressDialog("Нормализация регионов…", "Отмена",
+                                    0, len(changes_full), self)
+            progress.setWindowModality(Qt.WindowModal)
+            progress.setMinimumDuration(0)
+
+            updated = 0
+            with Players_full._meta.database.atomic():
+                for i, (pid, _old, new) in enumerate(changes_full):
+                    if progress.wasCanceled():
+                        break
+                    Players_full.update(region=new).where(Players_full.id == pid).execute()
+                    updated += 1
+                    progress.setValue(i + 1)
+
+            progress.close()
+
+        QMessageBox.information(
+            self, "Нормализация регионов",
+            f"Обновлено записей: {updated}."
+        )
+
+        # # --- 4. Обновить представление таблицы, если оно открыто ---
+        # if hasattr(self, "reload_players"):
+        #     self.reload_players()
+
+#================
     def filter_by_city(self):
         """Фильтр по городам"""
         if not self.current_title_id:

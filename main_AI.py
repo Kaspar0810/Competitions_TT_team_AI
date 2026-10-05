@@ -29131,7 +29131,7 @@ class MainWindow(QMainWindow):
                     player="X",
                     fio="X",
                     fio_city="X",
-                    bday="0000-00-00",  # Невалидная дата, но допустимая для БД
+                    bday="2000-10-10",  # Невалидная дата, но допустимая для БД
                     rank=0,
                     city="",
                     region="",

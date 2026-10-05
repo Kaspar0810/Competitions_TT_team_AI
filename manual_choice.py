@@ -535,7 +535,7 @@ class ChoiceGroupManual(QDialog):
         self.btn_edit.setFixedHeight(25)
         self.btn_edit.clicked.connect(self.open_editor)
         self.btn_edit.setStyleSheet("background-color: #FF9800; color: white; font-weight: bold;")
-        self.btn_edit.setEnabled(False)
+        # self.btn_edit.setEnabled(False)
         btn_layout.addWidget(self.btn_edit, 1, 1, 1, 1)
 # ============ new
         # --- NEW: кнопка полного экрана ---
@@ -886,118 +886,7 @@ class ChoiceGroupManual(QDialog):
                     if a and region == athlete[3]:
                         item.setBackground(QBrush(QColor(255, 255, 150)))
 #===================
-    
 
-    # # Словарь сокращений → полная форма
-    # REGION_ALIASES = {
-    #     "респ": "республика",
-    #     "респ-ка": "республика",
-    #     "обл": "область",
-    #     "г": "город",
-    #     "г.": "город",
-    #     "край": "край",
-    #     "авт": "автономный",
-    #     "ао": "автономный округ",
-    #     "чр": "чеченская республика",
-    #     # сюда добавляйте всё, что встречается в ваших данных
-    # }
-
-    # # Известные варианты написания → каноничное имя
-    # REGION_CANON = {
-    #     "хакассия": "хакасия",
-    #     "хакасия": "хакасия",
-    #     # "башкирия": "башкортостан",
-    #     # "татария": "татарстан",
-    #     # и т.д.
-    # }
-
-
-    # def normalize_region(self, name: str) -> str:
-    # """Приводит название региона к каноничному виду."""
-    #     if not name:
-    #         return ""
-
-    #     s = name.lower().strip()
-
-    #     # Убираем точки (кроме пробелов) — «респ.» → «респ»
-    #     s = s.replace(".", "")
-
-    #     # Разбиваем на слова и раскрываем сокращения
-    #     words = [REGION_ALIASES.get(w, w) for w in s.split()]
-
-    #     # Убираем шумовые слова, чтобы «республика хакасия» == «хакасия»
-    #     noise = {"республика", "область", "край", "город",
-    #             "автономный", "округ", "автономный округ"}
-    #     core = [w for w in words if w not in noise]
-
-    #     # Если после чистки что-то осталось — берём это, иначе всё слово целиком
-    #     key = " ".join(core) if core else " ".join(words)
-
-    #     # Финальная канонизация (Хакассия → Хакасия и т.п.)
-    #     return REGION_CANON.get(key, key)
-
-    # def check_conflicts(self, athlete):
-    #     if not athlete:
-    #         return False, False
-
-    #     _, _, _, region, coach = athlete
-    #     region_norm = normalize_region(region)
-    #     coach_norm = (coach or "").strip().lower()
-
-    #     region_conflict = False
-    #     coach_conflict = False
-
-    #     for grp in self.groups:
-    #         for a in grp:
-    #             if not a:
-    #                 continue
-    #             if normalize_region(a[3]) == region_norm:
-    #                 region_conflict = True
-    #                 if (a[4] or "").strip().lower() == coach_norm:
-    #                     coach_conflict = True
-    #                     return True, True
-
-    #     return region_conflict, coach_conflict
-
-    # def highlight_available_cells(self, athlete):
-    #     """Подсветка доступных ячеек"""
-    #     # Сброс предыдущей подсветки
-    #     for table in self.group_tables:
-    #         for row in range(table.rowCount()):
-    #             num_item = table.item(row, 0)
-    #             if num_item:
-    #                 num_item.setBackground(QBrush(QColor(255, 255, 255)))
-
-    #     if not athlete:
-    #         return
-
-    #     # Один раз считаем конфликты — они одинаковы для всех групп
-    #     region_conflict, coach_conflict = self.check_conflicts(athlete)
-
-    #     for table in self.group_tables:
-    #         for row in range(table.rowCount()):
-    #             item = table.item(row, 1)
-    #             if not item or not item.text():          # пустая ячейка
-    #                 num_item = table.item(row, 0)
-    #                 if num_item:
-    #                     if coach_conflict:
-    #                         num_item.setBackground(QBrush(QColor(255, 100, 100)))
-    #                     elif region_conflict:
-    #                         num_item.setBackground(QBrush(QColor(255, 255, 150)))
-    #                     else:
-    #                         num_item.setBackground(QBrush(QColor(144, 238, 144)))
-
-    #     # Подсветить занятые ячейки с тем же регионом
-    #     for table in self.group_tables:
-    #         for row in range(table.rowCount()):
-    #             item = table.item(row, 1)
-    #             if item and item.text():
-    #                 # если в item хранится ссылка на спортсмена — сверьтесь с athlete[3]
-    #                 a = item.data(Qt.UserRole)  # или как у вас хранится
-    #                 player = Player.get_or_none(Player.id == a)
-    #                 region = player.region
-    #                 if a and region == athlete[3]:
-    #                     item.setBackground(QBrush(QColor(255, 255, 150)))
 #=======================
     
     def can_place_athlete(self, athlete, group_idx, row):
@@ -1087,6 +976,9 @@ class ChoiceGroupManual(QDialog):
                     self.highlight_available_cells(self.sorted_athletes[self.current_athlete_index])
                 
                 self.update_stats()
+                #==== proba
+                self.update_athletes_table()
+                #===========
                 
                 if self.current_athlete_index >= len(self.sorted_athletes):
                     QMessageBox.information(self, "Поздравляем!", "Жеребьевка успешно завершена!")
@@ -1212,7 +1104,7 @@ class ChoiceGroupManual(QDialog):
         buttons.accepted.connect(on_accept)
         buttons.rejected.connect(dialog.reject)
         dialog.exec_()
-    
+# ===== 
     def open_editor(self):
         """Открыть редактор для обмена игроками между группами"""
         dialog = QDialog(self)
@@ -1344,8 +1236,8 @@ class ChoiceGroupManual(QDialog):
                     group_combos[group_idx].setEnabled(False)
                     group_labels[group_idx].setStyleSheet("font-weight: bold; background-color: #FF9800; color: white; padding: 3px;")
         
-            for g_idx, combo in enumerate(group_combos):
-                combo.currentIndexChanged.connect(lambda idx, g=g_idx: on_combo_change(idx, g))
+        for g_idx, combo in enumerate(group_combos):
+            combo.currentIndexChanged.connect(lambda idx, g=g_idx: on_combo_change(idx, g))
         
         def swap_athletes():
             if len(selected_athletes) == 2:
@@ -1529,8 +1421,327 @@ class ChoiceGroupManual(QDialog):
         btn_save.clicked.connect(save_changes)
         btn_cancel.clicked.connect(dialog.reject)
         
-        dialog.exec_()
-    
+        dialog.exec_() 
+# 
+# ====== 0510   
+#     def open_editor(self):
+#         """Открыть редактор для обмена игроками между группами"""
+#         dialog = QDialog(self)
+#         dialog.setWindowTitle("Редактор групп")
+#         dialog.setModal(True)
+#         dialog.setMinimumSize(800, 800)
+#         dialog.setMaximumSize(1000, 1000)
+        
+#         layout = QVBoxLayout(dialog)
+        
+#         group_combos = []
+#         group_labels = []
+        
+#         # Создаем копию текущих данных групп для редактирования
+#         group_data = []
+#         for g_idx in range(self.num_groups):
+#             group_copy = []
+#             for athlete in self.groups[g_idx]:
+#                 group_copy.append(athlete)
+#             group_data.append(group_copy)
+        
+#         scroll_widget = QWidget()
+#         scroll_layout = QGridLayout(scroll_widget)
+        
+#         cols = min(4, self.num_groups)
+#         for g_idx in range(self.num_groups):
+#             group_frame = QFrame()
+#             group_frame.setFrameStyle(QFrame.Box)
+#             group_frame.setMaximumWidth(250)
+#             group_layout = QVBoxLayout(group_frame)
+#             group_layout.setSpacing(5)
+            
+#             label = QLabel(f"Группа {g_idx + 1}")
+#             label.setStyleSheet("font-weight: bold; background-color: #4CAF50; color: white; padding: 3px;")
+#             label.setAlignment(Qt.AlignCenter)
+#             group_layout.addWidget(label)
+            
+#             combo = QComboBox()
+#             combo.setMaximumWidth(230)
+#             combo.setProperty("group_idx", g_idx)
+#             combo.addItem("--- Выберите спортсмена для перемещения ---")
+            
+#             for row, athlete in enumerate(group_data[g_idx]):
+#                 if athlete:
+#                     short_name = athlete[1][:15] + "..." if len(athlete[1]) > 15 else athlete[1]
+#                     # Сохраняем полную информацию о спортсмене
+#                     combo.addItem(f"{row+1}. {short_name} ({athlete[3][:10]}) R:{athlete[2]}", (g_idx, row, athlete))
+            
+#             group_layout.addWidget(combo)
+#             group_combos.append(combo)
+#             group_labels.append(label)
+            
+#             scroll_layout.addWidget(group_frame, g_idx // cols, g_idx % cols)
+        
+#         scroll_area = QScrollArea()
+#         scroll_area.setWidget(scroll_widget)
+#         scroll_area.setWidgetResizable(True)
+#         layout.addWidget(scroll_area)
+        
+#         btn_layout = QHBoxLayout()
+        
+#         btn_swap = QPushButton("Обменять выбранных")
+#         btn_swap.setStyleSheet("background-color: #2196F3; color: white; padding: 8px;")
+#         btn_layout.addWidget(btn_swap)
+        
+#         btn_move = QPushButton("Переместить")
+#         btn_move.setStyleSheet("background-color: #FF9800; color: white; padding: 8px;")
+#         btn_layout.addWidget(btn_move)
+        
+#         btn_save = QPushButton("Сохранить изменения")
+#         btn_save.setStyleSheet("background-color: #4CAF50; color: white; padding: 8px;")
+#         btn_layout.addWidget(btn_save)
+        
+#         btn_cancel = QPushButton("Отмена")
+#         btn_cancel.setStyleSheet("background-color: #f44336; color: white; padding: 8px;")
+#         btn_layout.addWidget(btn_cancel)
+        
+#         layout.addLayout(btn_layout)
+        
+#         selected_athletes = []  # Список выбранных спортсменов (группа, индекс, спортсмен, комбобокс)
+# # проба ===        
+#         def get_current_athlete_position(athlete, group_idx):
+#             """Получить актуальную позицию спортсмена в группе"""
+#             for idx, a in enumerate(group_data[group_idx]):
+#                 if a and a[0] == athlete[0]:  # Сравниваем по ID
+#                     return idx
+#             return -1
+        
+#         def refresh_combos():
+#             """Обновить все комбобоксы после изменений"""
+#             for g_idx in range(self.num_groups):
+#                 current_text = group_combos[g_idx].currentText()
+#                 current_data = group_combos[g_idx].currentData() if group_combos[g_idx].currentIndex() > 0 else None
+                
+#                 group_combos[g_idx].clear()
+#                 group_combos[g_idx].addItem("--- Выберите спортсмена для перемещения ---")
+                
+#                 for row, athlete in enumerate(group_data[g_idx]):
+#                     if athlete:
+#                         short_name = athlete[1][:15] + "..." if len(athlete[1]) > 15 else athlete[1]
+#                         group_combos[g_idx].addItem(f"{row+1}. {short_name} ({athlete[3][:10]}) R:{athlete[2]}", (g_idx, row, athlete))
+                
+#                 group_combos[g_idx].setEnabled(True)
+#                 group_labels[g_idx].setStyleSheet("font-weight: bold; background-color: #4CAF50; color: white; padding: 3px;")
+                
+#                 # Восстанавливаем выбранный элемент если возможно
+#                 if current_data:
+#                     for i in range(group_combos[g_idx].count()):
+#                         data = group_combos[g_idx].itemData(i)
+#                         if data and data[2][0] == current_data[2][0]:  # Сравниваем по ID
+#                             group_combos[g_idx].setCurrentIndex(i)
+#                             break
+            
+#             # Очищаем список выбранных спортсменов
+#             selected_athletes.clear()
+        
+#         def on_combo_change(idx, group_idx):
+#             if idx > 0:
+#                 athlete_data = group_combos[group_idx].itemData(idx)
+#                 if athlete_data:
+#                     # Проверяем, не выбран ли уже этот спортсмен
+#                     for existing in selected_athletes:
+#                         if existing[2][0] == athlete_data[2][0]:  # Сравниваем по ID
+#                             QMessageBox.warning(dialog, "Ошибка", "Этот спортсмен уже выбран!")
+#                             group_combos[group_idx].setCurrentIndex(0)
+#                             return
+                    
+#                     selected_athletes.append((group_idx, athlete_data[1], athlete_data[2], group_combos[group_idx]))
+#                     group_combos[group_idx].setEnabled(False)
+#                     group_labels[group_idx].setStyleSheet("font-weight: bold; background-color: #FF9800; color: white; padding: 3px;")
+        
+#             for g_idx, combo in enumerate(group_combos):
+#                 combo.currentIndexChanged.connect(lambda idx, g=g_idx: on_combo_change(idx, g))
+        
+#         def swap_athletes():
+#             if len(selected_athletes) == 2:
+#                 g1, row1, athlete1, combo1 = selected_athletes[0]
+#                 g2, row2, athlete2, combo2 = selected_athletes[1]
+                
+#                 # Получаем актуальные позиции спортсменов
+#                 actual_row1 = get_current_athlete_position(athlete1, g1)
+#                 actual_row2 = get_current_athlete_position(athlete2, g2)
+                
+#                 if actual_row1 == -1 or actual_row2 == -1:
+#                     QMessageBox.warning(dialog, "Ошибка", "Спортсмен не найден в группе!")
+#                     refresh_combos()
+#                     return
+                
+#                 # Проверяем конфликты при обмене
+#                 conflict1 = False
+#                 conflict2 = False
+                
+#                 # Проверяем для группы 1 с athlete2
+#                 group1_regions = [a[3] for a in group_data[g1] if a and a[0] != athlete1[0]]
+#                 if athlete2[3] in group1_regions:
+#                     group1_coaches = [a[4] for a in group_data[g1] if a and a[0] != athlete1[0]]
+#                     if athlete2[4] in group1_coaches:
+#                         conflict1 = True
+                
+#                 # Проверяем для группы 2 с athlete1
+#                 group2_regions = [a[3] for a in group_data[g2] if a and a[0] != athlete2[0]]
+#                 if athlete1[3] in group2_regions:
+#                     group2_coaches = [a[4] for a in group_data[g2] if a and a[0] != athlete2[0]]
+#                     if athlete1[4] in group2_coaches:
+#                         conflict2 = True
+                
+#                 if conflict1 or conflict2:
+#                     QMessageBox.warning(dialog, "Запрещено!",
+#                         "Обмен невозможен! Будет нарушено правило совпадения региона и тренера.")
+#                     return
+                
+#                 # Выполняем обмен
+#                 group_data[g1][actual_row1], group_data[g2][actual_row2] = athlete2, athlete1
+                
+#                 refresh_combos()
+#                 QMessageBox.information(dialog, "Успех", "Спортсмены успешно обменяны!")
+#             else:
+#                 QMessageBox.warning(dialog, "Ошибка", "Выберите ровно двух спортсменов для обмена!")
+        
+#         def move_athlete():
+#             if len(selected_athletes) == 1:
+#                 g1, row1, athlete1, combo1 = selected_athletes[0]
+                
+#                 # Получаем актуальную позицию спортсмена
+#                 actual_row1 = get_current_athlete_position(athlete1, g1)
+                
+#                 if actual_row1 == -1:
+#                     QMessageBox.warning(dialog, "Ошибка", "Спортсмен не найден в группе!")
+#                     refresh_combos()
+#                     return
+                
+#                 # Создаем диалог выбора цели
+#                 target_dialog = QDialog(dialog)
+#                 target_dialog.setWindowTitle("Выберите цель")
+#                 target_layout = QVBoxLayout(target_dialog)
+#                 target_dialog.setFixedSize(450, 300)
+                
+#                 target_layout.addWidget(QLabel("Выберите группу:"))
+#                 target_combo = QComboBox()
+#                 available_groups = [f"Группа {i+1}" for i in range(self.num_groups) if i != g1]
+#                 target_combo.addItems(available_groups)
+#                 target_layout.addWidget(target_combo)
+                
+#                 target_layout.addWidget(QLabel("Выберите строку (номер посева):"))
+#                 target_row_combo = QComboBox()
+#                 target_layout.addWidget(target_row_combo)
+                
+#                 def update_row_status():
+#                     target_row_combo.clear()
+#                     target_group_name = target_combo.currentText()
+#                     target_group = int(target_group_name.split()[1]) - 1
+                    
+#                     # Определяем максимальное количество строк
+#                     max_rows = max(self.max_rows_per_group, len(group_data[target_group]) + 5)
+                    
+#                     for i in range(max_rows):
+#                         # Проверяем, занято ли место
+#                         is_occupied = False
+#                         if i < len(group_data[target_group]) and group_data[target_group][i] is not None:
+#                             is_occupied = True
+#                         status = " (занято)" if is_occupied else " (свободно)"
+#                         target_row_combo.addItem(f"{i+1}{status}", i)
+                
+#                 update_row_status()
+#                 target_combo.currentIndexChanged.connect(update_row_status)
+                
+#                 buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+#                 target_layout.addWidget(buttons)
+                
+#                 def do_move():
+#                     target_group_name = target_combo.currentText()
+#                     target_group = int(target_group_name.split()[1]) - 1
+#                     target_row = target_row_combo.currentData()
+                    
+#                     # Проверяем, что целевая строка существует и не занята
+#                     if target_group >= len(group_data):
+#                         QMessageBox.warning(self, "Ошибка", "Целевая группа не существует!")
+#                         return
+                    
+#                     # Расширяем список группы если нужно
+#                     while len(group_data[target_group]) <= target_row:
+#                         group_data[target_group].append(None)
+                    
+#                     if group_data[target_group][target_row] is not None:
+#                         QMessageBox.warning(self, "Ошибка", "Это место уже занято!")
+#                         return
+                    
+#                     # Проверяем конфликты при перемещении
+#                     group_target_regions = [a[3] for a in group_data[target_group] if a]
+#                     group_target_coaches = [a[4] for a in group_data[target_group] if a]
+                    
+#                     region_conflict = athlete1[3] in group_target_regions
+#                     coach_conflict = athlete1[4] in group_target_coaches and region_conflict
+                    
+#                     if coach_conflict:
+#                         QMessageBox.warning(self, "Запрещено!",
+#                             f"Нельзя переместить {athlete1[1]} в группу {target_group + 1}!\n"
+#                             f"В группе уже есть спортсмен с таким же регионом и тренером.")
+#                         return
+                    
+#                     if region_conflict:
+#                         reply = QMessageBox.question(target_dialog, 'Конфликт регионов',
+#                             f'В группе {target_group + 1} уже есть спортсмен из региона {athlete1[3]}.\n'
+#                             f'Все равно переместить?',
+#                             QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                        
+#                         if reply == QMessageBox.No:
+#                             return
+                    
+#                     # Выполняем перемещение
+#                     group_data[g1][actual_row1] = None
+#                     group_data[target_group][target_row] = athlete1
+                    
+#                     target_dialog.accept()
+#                     refresh_combos()
+#                     QMessageBox.information(dialog, "Успех", "Спортсмен успешно перемещен!")
+                
+#                 buttons.accepted.connect(do_move)
+#                 buttons.rejected.connect(target_dialog.reject)
+#                 target_dialog.exec_()
+#             else:
+#                 QMessageBox.warning(self, "Ошибка", "Выберите одного спортсмена для перемещения!")
+        
+#         def save_changes():
+#             """Сохранить изменения и обновить основное отображение"""
+#             # Обновляем основные данные групп, удаляя None значения
+#             self.groups = []
+#             for g_idx in range(self.num_groups):
+#                 group = []
+#                 for athlete in group_data[g_idx]:
+#                     if athlete:
+#                         group.append(athlete)
+#                 self.groups.append(group)
+            
+#             # Обновляем индекс текущего спортсмена
+#             placed_count = sum(1 for group in self.groups for athlete in group if athlete)
+#             self.current_athlete_index = placed_count
+            
+#             # Обновляем отображение
+#             self.update_groups_display()
+#             self.update_athletes_table()
+#             self.update_stats()
+#             self.update_current_athlete()
+            
+#             # Пересчитываем текущую группу для посева
+#             self.current_group_for_seed = self.find_next_group_for_seed()
+#             self.highlight_current_group()
+            
+#             dialog.accept()
+#             QMessageBox.information(self, "Успех", "Изменения сохранены!")
+        
+#         btn_swap.clicked.connect(swap_athletes)
+#         btn_move.clicked.connect(move_athlete)
+#         btn_save.clicked.connect(save_changes)
+#         btn_cancel.clicked.connect(dialog.reject)
+        
+#         dialog.exec_()
+# ========================    
     def reset_draw(self):
         """Полный сброс"""
         self.load_athletes()

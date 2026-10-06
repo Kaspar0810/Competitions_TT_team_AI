@@ -12640,7 +12640,7 @@ class MainWindow(QMainWindow):
         filters_layout.addLayout(sort_layout)
         
         # Заголовок фильтров
-        filter_title2 = QLabel("🎯 Фильтры")
+        filter_title2 = QLabel("🎯 Фильтры по")
         filter_title2.setStyleSheet("font-weight: bold; font-size: 12px; margin-top: 5px;")
         filters_layout.addWidget(filter_title2)
         
@@ -12648,7 +12648,7 @@ class MainWindow(QMainWindow):
         filter_layout = QHBoxLayout()
         filter_layout.setSpacing(10)
         
-        btn_filter_region = QPushButton("🗺️ По регионам")
+        btn_filter_region = QPushButton("🗺️ Регион")
         btn_filter_region.setStyleSheet("""
             QPushButton {
                 background-color: #9C27B0;
@@ -12664,7 +12664,7 @@ class MainWindow(QMainWindow):
         btn_filter_region.clicked.connect(self.filter_by_region)
         filter_layout.addWidget(btn_filter_region)
         
-        btn_filter_city = QPushButton("🏙️ По городам")
+        btn_filter_city = QPushButton("🏙️ Город")
         btn_filter_city.setStyleSheet("""
             QPushButton {
                 background-color: #9C27B0;
@@ -12680,7 +12680,7 @@ class MainWindow(QMainWindow):
         btn_filter_city.clicked.connect(self.filter_by_city)
         filter_layout.addWidget(btn_filter_city)
         
-        btn_filter_coach = QPushButton("👨‍🏫 По тренерам")
+        btn_filter_coach = QPushButton("👨‍🏫 Тренер")
         btn_filter_coach.setStyleSheet("""
             QPushButton {
                 background-color: #9C27B0;
@@ -17563,7 +17563,8 @@ class MainWindow(QMainWindow):
             table = Table(table_data, colWidths=[1.5*cm, 12*cm], repeatRows=1)
             table.setStyle(TableStyle([
                 ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSerif'),
-                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('FONTSIZE', (0, 0), (-1, -1), 7),
+                ('LEADING', (0, 0), (-1, -1), 8),           # межстрочный интервал
                 ('BACKGROUND', (0, 0), (-1, 0), colors.yellow),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.blue),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),

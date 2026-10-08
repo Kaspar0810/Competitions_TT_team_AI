@@ -356,8 +356,8 @@ def choice_group_auto(self, athletes, num_groups, stage, parent=None):
             if reply == QMessageBox.No:
                 return None
             
-            # Очищаем старые данные
-            clear_db_before_choice(self.current_title_id)
+            # # Очищаем старые данные
+            # clear_db_before_choice(self.current_title_id)
         
         # Запускаем автоматическую жеребьевку
         auto_draw = ChoiceGroupAuto(athletes, num_groups, self.current_title_id, parent)

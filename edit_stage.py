@@ -392,7 +392,8 @@ class EditStagesDialog(QDialog):
         try:
             self.current_system = System.get_or_none(
                 (System.title_id == self.title_id) &
-                (System.stage == stage_name)
+                (System.stage == stage_name) &
+                (System.sex == self.current_sex)
             )
 
             if self.current_system:
@@ -1160,13 +1161,15 @@ class EditStagesDialog(QDialog):
                     (Game_list.title_id == self.title_id) &
                     (Game_list.system_id == self.current_system.id) &
                     (Game_list.player_group == player1_id) &
-                    (Game_list.number_group == group1)
+                    (Game_list.number_group == group1) &
+                    (Game_list == self.current_sex)
                 )
                 gp2 = Game_list.get_or_none(
                     (Game_list.title_id == self.title_id) &
                     (Game_list.system_id == self.current_system.id) &
                     (Game_list.player_group == player2_id) &
-                    (Game_list.number_group == group2)
+                    (Game_list.number_group == group2) &
+                    (Game_list == self.current_sex)
                 )
 
                 if not gp1 or not gp2:
@@ -1194,11 +1197,13 @@ class EditStagesDialog(QDialog):
                 # Находим Choice для обоих игроков
                 choice1 = Choice.get_or_none(
                     (Choice.title_id == self.title_id) &
-                    (Choice.player_choice == player1_id)
+                    (Choice.player_choice == player1_id) &
+                    (Choice.sex == self.current_sex)
                 )
                 choice2 = Choice.get_or_none(
                     (Choice.title_id == self.title_id) &
-                    (Choice.player_choice == player2_id)
+                    (Choice.player_choice == player2_id) &
+                    (Choice.sex == self.current_sex)
                 )
 
                 if choice1 and choice2:
@@ -1230,41 +1235,49 @@ class EditStagesDialog(QDialog):
                 # Заменяем в player1
                 Result.update(player1=new_fio1).where(
                     (Result.title_id == self.title_id) &
-                    (Result.player1 == old_fio1)
+                    (Result.player1 == old_fio1) &
+                    (Result.sex == self.current_sex)
                 ).execute()
                 Result.update(player1=new_fio2).where(
                     (Result.title_id == self.title_id) &
-                    (Result.player1 == old_fio2)
+                    (Result.player1 == old_fio2) &
+                    (Result.sex == self.current_sex)
                 ).execute()
 
                 # Заменяем в player2
                 Result.update(player2=new_fio1).where(
                     (Result.title_id == self.title_id) &
-                    (Result.player2 == old_fio1)
+                    (Result.player2 == old_fio1) &
+                    (Result.sex == self.current_sex)
                 ).execute()
                 Result.update(player2=new_fio2).where(
                     (Result.title_id == self.title_id) &
-                    (Result.player2 == old_fio2)
+                    (Result.player2 == old_fio2) &
+                    (Result.sex == self.current_sex)
                 ).execute()
 
                 # Заменяем в winner
                 Result.update(winner=new_fio1).where(
                     (Result.title_id == self.title_id) &
-                    (Result.winner == old_fio1)
+                    (Result.winner == old_fio1) &
+                    (Result.sex == self.current_sex)
                 ).execute()
                 Result.update(winner=new_fio2).where(
                     (Result.title_id == self.title_id) &
-                    (Result.winner == old_fio2)
+                    (Result.winner == old_fio2) &
+                    (Result.sex == self.current_sex)
                 ).execute()
 
                 # Заменяем в loser
                 Result.update(loser=new_fio1).where(
                     (Result.title_id == self.title_id) &
-                    (Result.loser == old_fio1)
+                    (Result.loser == old_fio1) &
+                    (Result.sex == self.current_sex)
                 ).execute()
                 Result.update(loser=new_fio2).where(
                     (Result.title_id == self.title_id) &
-                    (Result.loser == old_fio2)
+                    (Result.loser == old_fio2) &
+                    (Result.sex == self.current_sex)
                 ).execute()
 
             # После транзакции можно обновить интерфейс (перезагрузить данные)
@@ -1639,12 +1652,14 @@ class EditStagesDialog(QDialog):
         if system.stage in ["Квалификация", "Квалификация. 1-й полуфинал", "Квалификация. 2-й полуфинал"]:
             Result.delete().where(
                 (Result.title_id == self.title_id) &
-                (Result.system_stage == system.stage)
+                (Result.system_stage == system.stage) &
+                (Result.sex == self.current_sex)
             ).execute()
         else:
             Result.delete().where(
                 (Result.title_id == self.title_id) &
-                (Result.number_group == system.stage)
+                (Result.number_group == system.stage) &
+                (Result.sex == self.current_sex)
             ).execute()
         
         # Создаем новые матчи для каждой группы

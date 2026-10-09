@@ -19198,7 +19198,7 @@ class MainWindow(QMainWindow):
                 return tds
 # ========= вариант AI
 
-    def _write_in_setka(self, data, stage, first_mesto, table, posev_data):
+    def write_in_setka(self, data, stage, first_mesto, table, posev_data):
         """
         Заполняет олимпийскую сетку данными из таблицы Result.
 
@@ -19419,441 +19419,441 @@ class MainWindow(QMainWindow):
         
         return place_list
 # =============== вариант старый =========
-    def write_in_setka(self, data, stage, first_mesto, table, posev_data):
-        """функция заполнения сетки результатами встреч data поступает чистая только номера в сетке, дальше идет заполнение игроками и счетом"""
-        "row_num_win - словарь, ключ - номер игры, значение - список(номер строки 1-ого игрока, номер строки 2-ого игрока) и записвает итоговые места в db"
+    # def write_in_setka(self, data, stage, first_mesto, table, posev_data):
+    #     """функция заполнения сетки результатами встреч data поступает чистая только номера в сетке, дальше идет заполнение игроками и счетом"""
+    #     "row_num_win - словарь, ключ - номер игры, значение - список(номер строки 1-ого игрока, номер строки 2-ого игрока) и записвает итоговые места в db"
 
-        pairs_list = ["Мужские пары", "Женские пары", "Смешанные пары"]
+    #     pairs_list = ["Мужские пары", "Женские пары", "Смешанные пары"]
         
-        if stage in pairs_list:
-            player = Players_double.select().where(Players_double.title_id == self.current_title_id)
-        else:  
-            player = Player.select().where((Player.title_id == self.current_title_id) & (Player.sex == self.current_sex)) 
+    #     if stage in pairs_list:
+    #         player = Players_double.select().where(Players_double.title_id == self.current_title_id)
+    #     else:  
+    #         player = Player.select().where((Player.title_id == self.current_title_id) & (Player.sex == self.current_sex)) 
 
-        row_num_los = {}
-        row_end = 0  # кол-во строк для начальной расстоновки игроков в зависимости от таблицы
-        flag_clear = False
-        # уточнить кол-во столбцов
-        if table == "setka_8_full":
-            row_last = 33
-            column_last = 8
-            row_end = 15
-            row_num_win = {1: [1], 2: [5], 3: [9], 4: [13], 5: [3], 6: [11], 7: [7], 8: [16], 9: [20], 10: [24],
-                            11: [22], 12: [28]}
-                    # ======= list mest
-            mesta_dict = {7: 7, 8: 16, 11: 22, 12: 28}
-        elif table == "setka_8_2":
-            # это вариант при сетке минус 2
-            # если встреча верху четная, то на встречу куда идет победитель ( список наоборот) 12: [20, 16]
-            row_last = 39
-            column_last = 9
-            row_end = 15
-            row_num_win = {1: [1], 2: [5], 3: [9], 4: [13], 5: [3], 6: [11], 7: [7], 8: [17], 9: [21],
-                            10: [16], 11: [20], 12: [18], 13: [25], 14: [31]}
-                    # ======= list mest
-            mesta_dict = {7: 7, 12: 18, 13: 25, 14: 31}
-        elif table == "setka_8":
-            # это вариант при сетке с розыгрышем 1-3 место
-            # если встреча верху четная, то на встречу куда идет победитель ( список наоборот) 12: [20, 16]
-            row_last = 39
-            column_last = 9
-            row_end = 15
-            row_num_win = {1: [1], 2: [5], 3: [9], 4: [13], 5: [3], 6: [11], 7: [7], 8: [17]}
-                    # ======= list mest
-            # mesta_dict = {7: 7, 12: 18, 13: 25, 14: 31}
-            mesta_dict = {7: 7, 12: 18}
-        elif table == "setka_16_full":
-            # это вариант при сетке прогрессивная
-            row_last = 69
-            column_last = 11
-            row_end = 31
-            row_num_win = {1: [1], 2: [5], 3: [9], 4: [13], 5: [17], 6: [21], 7: [25], 8: [29], 9: [3], 10: [11], 11: [19], 12: [27], 13: [7], 14: [23], 
-                        15: [15], 16: [29], 17: [32], 18: [36], 19: [34], 20: [39], 21: [41], 22: [45], 23: [49], 24: [53], 25: [43], 26: [51], 27: [47],
-                        28: [55], 29: [58], 30: [62], 31: [60], 32: [65]}
-                    # ======= list mest
-            mesta_dict = {15: 15, 16: 29, 19: 34, 20: 39, 27: 47, 28: 55, 31: 60, 32: 65}
-        elif table == "setka_16":
-            # это вариант при сетке 1-3 места
-            row_last = 69
-            column_last = 11
-            row_end = 31
-            row_num_win = {1: [1], 2: [5], 3: [9], 4: [13], 5: [17], 6: [21], 7: [25], 8: [29], 9: [3], 10: [11], 11: [19], 12: [27], 13: [7], 14: [23], 
-                        15: [15], 16: [29], 17: [32], 18: [36], 19: [34], 20: [39], 21: [41], 22: [45], 23: [49], 24: [53], 25: [43], 26: [51], 27: [47],
-                        28: [55], 29: [58], 30: [62], 31: [60], 32: [65]}
-                    # ======= list mest
-            mesta_dict = {15: 15, 16: 29, 19: 34, 20: 39, 27: 47, 28: 55, 31: 60, 32: 65}
-        elif table == "setka_16_2": # встречи, где играют победители и проигравший из основного тура  например 22: [54, 54] в списке одинаковые строки
-            row_last = 85
-            column_last = 10
-            row_end = 33
-            row_num_win = {1: [3], 2: [7], 3: [11], 4: [15], 5: [19], 6: [23], 7: [27], 8: [31], 9: [5], 10: [13], 11: [21], 12: [29], 13: [9], 14: [25], 15: [17], 
-                        16: [46], 17: [50], 18: [54], 19: [58], 20: [45], 21: [49], 22: [53], 23: [57], 24: [47], 25: [55], 26: [45], 27: [53], 28: [49], 29: [61],
-                            30: [67],  31: [62], 32: [66], 33: [64], 34: [73], 35: [74], 36: [78], 37: [76], 38: [79]} 
-                    # ======= list mest
-            mesta_dict = {15: 17, 28: 49, 29: 61, 33: 64, 30: 67, 34: 73, 37: 76, 38: 79} # номер встречи - номер строки
-        elif table == "setka_32":
+    #     row_num_los = {}
+    #     row_end = 0  # кол-во строк для начальной расстоновки игроков в зависимости от таблицы
+    #     flag_clear = False
+    #     # уточнить кол-во столбцов
+    #     if table == "setka_8_full":
+    #         row_last = 33
+    #         column_last = 8
+    #         row_end = 15
+    #         row_num_win = {1: [1], 2: [5], 3: [9], 4: [13], 5: [3], 6: [11], 7: [7], 8: [16], 9: [20], 10: [24],
+    #                         11: [22], 12: [28]}
+    #                 # ======= list mest
+    #         mesta_dict = {7: 7, 8: 16, 11: 22, 12: 28}
+    #     elif table == "setka_8_2":
+    #         # это вариант при сетке минус 2
+    #         # если встреча верху четная, то на встречу куда идет победитель ( список наоборот) 12: [20, 16]
+    #         row_last = 39
+    #         column_last = 9
+    #         row_end = 15
+    #         row_num_win = {1: [1], 2: [5], 3: [9], 4: [13], 5: [3], 6: [11], 7: [7], 8: [17], 9: [21],
+    #                         10: [16], 11: [20], 12: [18], 13: [25], 14: [31]}
+    #                 # ======= list mest
+    #         mesta_dict = {7: 7, 12: 18, 13: 25, 14: 31}
+    #     elif table == "setka_8":
+    #         # это вариант при сетке с розыгрышем 1-3 место
+    #         # если встреча верху четная, то на встречу куда идет победитель ( список наоборот) 12: [20, 16]
+    #         row_last = 39
+    #         column_last = 9
+    #         row_end = 15
+    #         row_num_win = {1: [1], 2: [5], 3: [9], 4: [13], 5: [3], 6: [11], 7: [7], 8: [17]}
+    #                 # ======= list mest
+    #         # mesta_dict = {7: 7, 12: 18, 13: 25, 14: 31}
+    #         mesta_dict = {7: 7, 12: 18}
+    #     elif table == "setka_16_full":
+    #         # это вариант при сетке прогрессивная
+    #         row_last = 69
+    #         column_last = 11
+    #         row_end = 31
+    #         row_num_win = {1: [1], 2: [5], 3: [9], 4: [13], 5: [17], 6: [21], 7: [25], 8: [29], 9: [3], 10: [11], 11: [19], 12: [27], 13: [7], 14: [23], 
+    #                     15: [15], 16: [29], 17: [32], 18: [36], 19: [34], 20: [39], 21: [41], 22: [45], 23: [49], 24: [53], 25: [43], 26: [51], 27: [47],
+    #                     28: [55], 29: [58], 30: [62], 31: [60], 32: [65]}
+    #                 # ======= list mest
+    #         mesta_dict = {15: 15, 16: 29, 19: 34, 20: 39, 27: 47, 28: 55, 31: 60, 32: 65}
+    #     elif table == "setka_16":
+    #         # это вариант при сетке 1-3 места
+    #         row_last = 69
+    #         column_last = 11
+    #         row_end = 31
+    #         row_num_win = {1: [1], 2: [5], 3: [9], 4: [13], 5: [17], 6: [21], 7: [25], 8: [29], 9: [3], 10: [11], 11: [19], 12: [27], 13: [7], 14: [23], 
+    #                     15: [15], 16: [29], 17: [32], 18: [36], 19: [34], 20: [39], 21: [41], 22: [45], 23: [49], 24: [53], 25: [43], 26: [51], 27: [47],
+    #                     28: [55], 29: [58], 30: [62], 31: [60], 32: [65]}
+    #                 # ======= list mest
+    #         mesta_dict = {15: 15, 16: 29, 19: 34, 20: 39, 27: 47, 28: 55, 31: 60, 32: 65}
+    #     elif table == "setka_16_2": # встречи, где играют победители и проигравший из основного тура  например 22: [54, 54] в списке одинаковые строки
+    #         row_last = 85
+    #         column_last = 10
+    #         row_end = 33
+    #         row_num_win = {1: [3], 2: [7], 3: [11], 4: [15], 5: [19], 6: [23], 7: [27], 8: [31], 9: [5], 10: [13], 11: [21], 12: [29], 13: [9], 14: [25], 15: [17], 
+    #                     16: [46], 17: [50], 18: [54], 19: [58], 20: [45], 21: [49], 22: [53], 23: [57], 24: [47], 25: [55], 26: [45], 27: [53], 28: [49], 29: [61],
+    #                         30: [67],  31: [62], 32: [66], 33: [64], 34: [73], 35: [74], 36: [78], 37: [76], 38: [79]} 
+    #                 # ======= list mest
+    #         mesta_dict = {15: 17, 28: 49, 29: 61, 33: 64, 30: 67, 34: 73, 37: 76, 38: 79} # номер встречи - номер строки
+    #     elif table == "setka_32":
 
-            row_last = 69
-            column_last = 11
-            row_end = 65
-            row_num_win = {1: [3], 2: [7], 3: [11], 4: [15], 5: [19], 6: [23], 7: [27], 8: [31], 9: [35], 10: [39], 11: [43], 12: [47],
-            13: [51], 14: [55], 15: [59], 16: [63], 17: [5], 18: [13], 19: [21], 20: [29], 21: [37], 22: [45], 23: [53], 24: [61],
-            25: [9], 26: [25], 27: [41], 28: [57], 29: [17], 30:[49], 31: [33], 32: [61]}
-            mesta_dict = {31: 33, 32: 61}
-        elif table == "setka_32_2":
-            # встреч, которые попадают на сноски (в сетке за 3 место) должно быть в row_num_win а список состоит из одного номера встречи куда идет победитель
-            row_last = 207
-            # column_last = 15
-            column_last = 14
-            row_end = 65
-            row_num_win = {1: [3], 2: [7], 3: [11], 4: [15], 5: [19], 6: [23], 7: [27], 8: [31], 9: [35], 10: [39], 11: [43], 12: [47],
-            13: [51], 14: [55], 15: [59], 16: [63], 17: [5], 18: [13], 19: [21], 20: [29], 21: [37], 22: [45], 23: [53], 24: [61],
-            25: [9], 26: [25], 27: [41], 28: [57], 29: [17], 30:[49], 31: [33], 32: [74], 33: [78], 34: [82], 35: [86], 36: [90],
-            37: [94], 38: [98], 39: [102], 40: [73], 41: [77], 42: [81], 43: [85], 44:[89], 45: [93], 46: [97], 47: [101], 
-            48: [75], 49: [83], 50: [91],  51: [99], 52: [73], 53: [81], 54: [89], 55: [97], 56: [77], 57: [93], 58: [74], 59: [90], 
-            60: [81], 63: [112], 64: [116],  67: [124], 68: [128], 71: [141], 72: [145], 73: [149], 74: [153], 75: [143], 76: [151], 
-            79: [160], 80: [164], 83: [171], 84: [175], 85: [179], 86: [183], 87: [173], 88: [181], 91: [192], 92: [196]}
-                    # ======= dict mest
-            mesta_dict = {31: 33, 60: 82, 61: 102, 62: 110, 65: 114, 66: 120, 69: 126, 70: 128, 77: 147,
-                            78: 156, 81: 162, 82: 171, 89: 177, 90: 186, 93: 194, 94: 201}
-        elif table == "setka_32_full":
-            # это вариант при сетке прогрессивная
-            row_last = 207
-            column_last = 11
-            row_first = 0
-            row_end = 65
-            row_num_win = {1: [3], 2: [7], 3: [11], 4: [15], 5: [19], 6: [23], 7: [27], 8: [31], 9: [35], 10: [39], 11: [43], 12: [47],
-            13: [51], 14: [55], 15: [59], 16: [63], 17: [5], 18: [13], 19: [21], 20: [29], 21: [37], 22: [45], 23: [53], 24: [61],
-            25: [9], 26: [25], 27: [41], 28: [57], 29: [17], 30:[49], 31: [33], 32: [61], 33: [72], 34: [76], 35: [74], 36: [84], 37: [89],
-            38: [93], 39: [97], 40: [101], 41: [91], 42: [99], 43: [95], 44: [106], 45: [114], 46: [118], 47: [116], 48: [126],  49: [140],
-            50: [144], 51: [148], 52: [152], 53: [156], 54: [160], 55: [164], 56: [168], 57: [142], 58: [150], 59: [158], 60: [166], 61: [146],
-            62: [162], 63: [154], 64: [168], 65: [172], 66: [176], 67: [174], 68: [182], 69: [179], 70: [183], 71: [187], 72: [191], 73: [181],
-            74: [189], 75: [185], 76: [194], 77: [197], 78: [201], 79: [199]}
-                    # ======= dict mest (номер встречи: номер ряда)
-            mesta_dict = {31: 33, 32: 61, 35: 74, 36: 84, 43: 95, 44: 106, 47: 116, 48: 126, 63: 154,
-                            64: 168, 67: 174, 68: 182, 75: 185, 76: 194, 79: 199, 80: 201}
+    #         row_last = 69
+    #         column_last = 11
+    #         row_end = 65
+    #         row_num_win = {1: [3], 2: [7], 3: [11], 4: [15], 5: [19], 6: [23], 7: [27], 8: [31], 9: [35], 10: [39], 11: [43], 12: [47],
+    #         13: [51], 14: [55], 15: [59], 16: [63], 17: [5], 18: [13], 19: [21], 20: [29], 21: [37], 22: [45], 23: [53], 24: [61],
+    #         25: [9], 26: [25], 27: [41], 28: [57], 29: [17], 30:[49], 31: [33], 32: [61]}
+    #         mesta_dict = {31: 33, 32: 61}
+    #     elif table == "setka_32_2":
+    #         # встреч, которые попадают на сноски (в сетке за 3 место) должно быть в row_num_win а список состоит из одного номера встречи куда идет победитель
+    #         row_last = 207
+    #         # column_last = 15
+    #         column_last = 14
+    #         row_end = 65
+    #         row_num_win = {1: [3], 2: [7], 3: [11], 4: [15], 5: [19], 6: [23], 7: [27], 8: [31], 9: [35], 10: [39], 11: [43], 12: [47],
+    #         13: [51], 14: [55], 15: [59], 16: [63], 17: [5], 18: [13], 19: [21], 20: [29], 21: [37], 22: [45], 23: [53], 24: [61],
+    #         25: [9], 26: [25], 27: [41], 28: [57], 29: [17], 30:[49], 31: [33], 32: [74], 33: [78], 34: [82], 35: [86], 36: [90],
+    #         37: [94], 38: [98], 39: [102], 40: [73], 41: [77], 42: [81], 43: [85], 44:[89], 45: [93], 46: [97], 47: [101], 
+    #         48: [75], 49: [83], 50: [91],  51: [99], 52: [73], 53: [81], 54: [89], 55: [97], 56: [77], 57: [93], 58: [74], 59: [90], 
+    #         60: [81], 63: [112], 64: [116],  67: [124], 68: [128], 71: [141], 72: [145], 73: [149], 74: [153], 75: [143], 76: [151], 
+    #         79: [160], 80: [164], 83: [171], 84: [175], 85: [179], 86: [183], 87: [173], 88: [181], 91: [192], 92: [196]}
+    #                 # ======= dict mest
+    #         mesta_dict = {31: 33, 60: 82, 61: 102, 62: 110, 65: 114, 66: 120, 69: 126, 70: 128, 77: 147,
+    #                         78: 156, 81: 162, 82: 171, 89: 177, 90: 186, 93: 194, 94: 201}
+    #     elif table == "setka_32_full":
+    #         # это вариант при сетке прогрессивная
+    #         row_last = 207
+    #         column_last = 11
+    #         row_first = 0
+    #         row_end = 65
+    #         row_num_win = {1: [3], 2: [7], 3: [11], 4: [15], 5: [19], 6: [23], 7: [27], 8: [31], 9: [35], 10: [39], 11: [43], 12: [47],
+    #         13: [51], 14: [55], 15: [59], 16: [63], 17: [5], 18: [13], 19: [21], 20: [29], 21: [37], 22: [45], 23: [53], 24: [61],
+    #         25: [9], 26: [25], 27: [41], 28: [57], 29: [17], 30:[49], 31: [33], 32: [61], 33: [72], 34: [76], 35: [74], 36: [84], 37: [89],
+    #         38: [93], 39: [97], 40: [101], 41: [91], 42: [99], 43: [95], 44: [106], 45: [114], 46: [118], 47: [116], 48: [126],  49: [140],
+    #         50: [144], 51: [148], 52: [152], 53: [156], 54: [160], 55: [164], 56: [168], 57: [142], 58: [150], 59: [158], 60: [166], 61: [146],
+    #         62: [162], 63: [154], 64: [168], 65: [172], 66: [176], 67: [174], 68: [182], 69: [179], 70: [183], 71: [187], 72: [191], 73: [181],
+    #         74: [189], 75: [185], 76: [194], 77: [197], 78: [201], 79: [199]}
+    #                 # ======= dict mest (номер встречи: номер ряда)
+    #         mesta_dict = {31: 33, 32: 61, 35: 74, 36: 84, 43: 95, 44: 106, 47: 116, 48: 126, 63: 154,
+    #                         64: 168, 67: 174, 68: 182, 75: 185, 76: 194, 79: 199, 80: 201}
         
-        # if sender == my_win.clear_s32_Action or sender == my_win.clear_s32_full_Action or sender == my_win.clear_s32_2_Action:
-        #     all_list = setka_data_clear(stage, table)  # печать чистой сетки
-        #     col_first = 0
-        #     row_first = 2
-        #     flag_clear = True
-        # elif sender == my_win.clear_s16_Action or sender == my_win.clear_s16_full_Action:
-        #     all_list = setka_data_clear(stage, table)  # печать чистой сетки
-        #     col_first = 2
-        #     row_first = 0
-        #     flag_clear = True
-        # elif sender == my_win.clear_s16_2_Action:
-        #     all_list = setka_data_clear(stage, table)  # печать чистой сетки
-        #     col_first = 2
-        #     row_first = 2
-        #     flag_clear = True
-        # elif sender == my_win.clear_s8_full_Action or sender == my_win.clear_s8_Action :
-        #     all_list = setka_data_clear(stage, table)  # печать чистой сетки
-        #     col_first = 2
-        #     row_first = 2
-        #     flag_clear = True
-        # elif sender == my_win.clear_s8_2_Action:
-        #     all_list = setka_data_clear(stage, table)  # печать чистой сетки
-        #     col_first = 2
-        #     row_first = 2
-        #     flag_clear = True
-        # else:
-        system = System.select().where(
-            (System.title_id == self.current_title_id) &
-            (System.sex == self.current_sex) &
-            (System.stage == stage)).get()
-        type_table = system.type_table
-        max_pl = system.max_player
-        # setka_string = system.label_string
+    #     # if sender == my_win.clear_s32_Action or sender == my_win.clear_s32_full_Action or sender == my_win.clear_s32_2_Action:
+    #     #     all_list = setka_data_clear(stage, table)  # печать чистой сетки
+    #     #     col_first = 0
+    #     #     row_first = 2
+    #     #     flag_clear = True
+    #     # elif sender == my_win.clear_s16_Action or sender == my_win.clear_s16_full_Action:
+    #     #     all_list = setka_data_clear(stage, table)  # печать чистой сетки
+    #     #     col_first = 2
+    #     #     row_first = 0
+    #     #     flag_clear = True
+    #     # elif sender == my_win.clear_s16_2_Action:
+    #     #     all_list = setka_data_clear(stage, table)  # печать чистой сетки
+    #     #     col_first = 2
+    #     #     row_first = 2
+    #     #     flag_clear = True
+    #     # elif sender == my_win.clear_s8_full_Action or sender == my_win.clear_s8_Action :
+    #     #     all_list = setka_data_clear(stage, table)  # печать чистой сетки
+    #     #     col_first = 2
+    #     #     row_first = 2
+    #     #     flag_clear = True
+    #     # elif sender == my_win.clear_s8_2_Action:
+    #     #     all_list = setka_data_clear(stage, table)  # печать чистой сетки
+    #     #     col_first = 2
+    #     #     row_first = 2
+    #     #     flag_clear = True
+    #     # else:
+    #     system = System.select().where(
+    #         (System.title_id == self.current_title_id) &
+    #         (System.sex == self.current_sex) &
+    #         (System.stage == stage)).get()
+    #     type_table = system.type_table
+    #     max_pl = system.max_player
+    #     # setka_string = system.label_string
 
-        s_2 = 0
-        # if type_table == "Олимпийская (с розыгрышем всех мест)" or type_table == "Сетка (1-3 место) на 8 пар(ы)":
-        if type_table == "Олимпийская (с розыгрышем всех мест)" or type_table == "Олимпийская (за 1-3 место)":
-            if max_pl == 8:
-                col_first = 0
-                row_first = 0
-                place_3rd = 8
-            elif max_pl == 16:
-                col_first = 2
-                row_first = 0
-                place_3rd = 16
-            elif max_pl == 32:
-                col_first = 0
-                row_first = 2
-                place_3rd = 32
-        elif type_table == "Сетка (минус 2) на 8 участников":
-            col_first = 0
-            row_first = 0
-            place_3rd = 12
-        elif type_table == "Сетка (минус 2) на 16 участников":
-            col_first = 0
-            row_first = 2
-            place_3rd = 28
-            s_2  = 16
-        elif type_table == "Сетка (минус 2) на 32 участников":
-            col_first = 0
-            row_first = 2
-            place_3rd = 60
-            s_2  = 32
+    #     s_2 = 0
+    #     # if type_table == "Олимпийская (с розыгрышем всех мест)" or type_table == "Сетка (1-3 место) на 8 пар(ы)":
+    #     if type_table == "Олимпийская (с розыгрышем всех мест)" or type_table == "Олимпийская (за 1-3 место)":
+    #         if max_pl == 8:
+    #             col_first = 0
+    #             row_first = 0
+    #             place_3rd = 8
+    #         elif max_pl == 16:
+    #             col_first = 2
+    #             row_first = 0
+    #             place_3rd = 16
+    #         elif max_pl == 32:
+    #             col_first = 0
+    #             row_first = 2
+    #             place_3rd = 32
+    #     elif type_table == "Сетка (минус 2) на 8 участников":
+    #         col_first = 0
+    #         row_first = 0
+    #         place_3rd = 12
+    #     elif type_table == "Сетка (минус 2) на 16 участников":
+    #         col_first = 0
+    #         row_first = 2
+    #         place_3rd = 28
+    #         s_2  = 16
+    #     elif type_table == "Сетка (минус 2) на 32 участников":
+    #         col_first = 0
+    #         row_first = 2
+    #         place_3rd = 60
+    #         s_2  = 32
 
-        all_list = self.setka_data(stage, posev_data)
-        id_sh_name = all_list[2][0] # словарь {Фамилия Имя: id}    
+    #     all_list = self.setka_data(stage, posev_data)
+    #     id_sh_name = all_list[2][0] # словарь {Фамилия Имя: id}    
 
-        tds = []
-        tds.append(all_list[0]) # список фамилия/ город 1-ого посева
-    # создает словарь: ключ - номер сноски знаение номер сторки
-        for d in range(col_first, column_last, 2):
-            for r in range(row_first, row_last):
-                key = data[r][d]
-                if key != "":
-                    k = int(key)
-                if key != "" and k < 0:
-                    row_num_los[key] = r # словарь номер игры, сноски - номер строки
+    #     tds = []
+    #     tds.append(all_list[0]) # список фамилия/ город 1-ого посева
+    # # создает словарь: ключ - номер сноски знаение номер сторки
+    #     for d in range(col_first, column_last, 2):
+    #         for r in range(row_first, row_last):
+    #             key = data[r][d]
+    #             if key != "":
+    #                 k = int(key)
+    #             if key != "" and k < 0:
+    #                 row_num_los[key] = r # словарь номер игры, сноски - номер строки
 
-        n = 0
-        for t in range(row_first, row_end, 2):  # цикл расстановки игроков по своим номерам в 1-ом посеве (фамилия инциалы имени/ город)
-            data[t][1] = tds[0][n]
-            n += 1
-        # ==============
-        if flag_clear is False:
-            # функция расстановки счетов и сносок игроков
-            dict_setka = self.score_in_setka(stage, place_3rd) # список (номер, игрок, счет в партии, номер куда сносится проигравший, его фамилия)
-            key_list = []
-            mesta_list = []
-            for k in dict_setka.keys():
-                key_list.append(k) # список всех номеров встреч, которые сыграны
-            for v in mesta_dict.keys():
-                mesta_list.append(v) # список номеров встреч за места
+    #     n = 0
+    #     for t in range(row_first, row_end, 2):  # цикл расстановки игроков по своим номерам в 1-ом посеве (фамилия инциалы имени/ город)
+    #         data[t][1] = tds[0][n]
+    #         n += 1
+    #     # ==============
+    #     if flag_clear is False:
+    #         # функция расстановки счетов и сносок игроков
+    #         dict_setka = self.score_in_setka(stage, place_3rd) # список (номер, игрок, счет в партии, номер куда сносится проигравший, его фамилия)
+    #         key_list = []
+    #         mesta_list = []
+    #         for k in dict_setka.keys():
+    #             key_list.append(k) # список всех номеров встреч, которые сыграны
+    #         for v in mesta_dict.keys():
+    #             mesta_list.append(v) # список номеров встреч за места
 
-            key_list.sort()
-            # ============
-            for i in key_list: # спиисок встреч которые сыграны
-                match = dict_setka[i]
-                pl_win = match[1]
-                pl_los = match[4]
-                if pl_win != "X":
-                    id_win = id_sh_name[pl_win]
-                if pl_los != "X":
-                    id_los = id_sh_name[pl_los]
-                else:
-                    id_los = ""
-                # вариант с двумя крестами ===
-                if pl_win == "X" and pl_los == "X":
-                    id_win = ""
-                    id_los = ""
-                r = str(match[3]) # сноска проигравшего
-                # ===== определение итоговых мест и запись в db
-                if i in mesta_list: # i - номер данной встречи
-                    index = mesta_list.index(i)
-                    mesto = first_mesto + (index * 2)
-                    # # записывает места в таблицу -Player-
-                    # if my_win.checkBox_no_play_3.isChecked() and i == place_3rd:
-                    #     for n in [id_win, id_los]: # записывает место в сетке в таблицу -choice- и итоговое место игроку в -player-
-                    #         choice_pl = Choice.get(Choice.player_choice_id == n)
-                    #         choice_pl.mesto_final = mesto
-                    #         choice_pl.save()
-                    #         player = Player.get(Player.id == n)
-                    #         player.mesto = mesto
-                    #         player.save()
-                    # else:
-                    m = 0
-                    for n in [id_win, id_los]: # записывает место в сетке в таблицу -choice-
-                        if n != "":
-                            choice_pl = Choice.get(Choice.player_choice_id == n)
-                            player = Player.get(Player.id == n)
-                            if stage == "Суперфинал":
-                                pl = Player.update(mesto=mesto+m).where(Player.id == n).execute()
-                            else:
-                                choice_pl.mesto_final = mesto + m
-                                choice_pl.save()
-                                player.mesto = mesto + m
-                                player.save()
+    #         key_list.sort()
+    #         # ============
+    #         for i in key_list: # спиисок встреч которые сыграны
+    #             match = dict_setka[i]
+    #             pl_win = match[1]
+    #             pl_los = match[4]
+    #             if pl_win != "X":
+    #                 id_win = id_sh_name[pl_win]
+    #             if pl_los != "X":
+    #                 id_los = id_sh_name[pl_los]
+    #             else:
+    #                 id_los = ""
+    #             # вариант с двумя крестами ===
+    #             if pl_win == "X" and pl_los == "X":
+    #                 id_win = ""
+    #                 id_los = ""
+    #             r = str(match[3]) # сноска проигравшего
+    #             # ===== определение итоговых мест и запись в db
+    #             if i in mesta_list: # i - номер данной встречи
+    #                 index = mesta_list.index(i)
+    #                 mesto = first_mesto + (index * 2)
+    #                 # # записывает места в таблицу -Player-
+    #                 # if my_win.checkBox_no_play_3.isChecked() and i == place_3rd:
+    #                 #     for n in [id_win, id_los]: # записывает место в сетке в таблицу -choice- и итоговое место игроку в -player-
+    #                 #         choice_pl = Choice.get(Choice.player_choice_id == n)
+    #                 #         choice_pl.mesto_final = mesto
+    #                 #         choice_pl.save()
+    #                 #         player = Player.get(Player.id == n)
+    #                 #         player.mesto = mesto
+    #                 #         player.save()
+    #                 # else:
+    #                 m = 0
+    #                 for n in [id_win, id_los]: # записывает место в сетке в таблицу -choice-
+    #                     if n != "":
+    #                         choice_pl = Choice.get(Choice.player_choice_id == n)
+    #                         player = Player.get(Player.id == n)
+    #                         if stage == "Суперфинал":
+    #                             pl = Player.update(mesto=mesto+m).where(Player.id == n).execute()
+    #                         else:
+    #                             choice_pl.mesto_final = mesto + m
+    #                             choice_pl.save()
+    #                             player.mesto = mesto + m
+    #                             player.save()
                             
-                            if n == id_win:
-                                win = f"{player.player}/{player.city}" 
-                            else:
-                                los = f"{player.player}/{player.city}"
+    #                         if n == id_win:
+    #                             win = f"{player.player}/{player.city}" 
+    #                         else:
+    #                             los = f"{player.player}/{player.city}"
 
-                            m += 1
-                    if id_los == "":
-                        los = "X"
-                    # вариант с двумя крестами
-                    if id_win == "":
-                        win = "X"
-                c = match[0] # номер встречи, куда попадают победитель данной встречи (i)
-                # ========== расстановка для сетки на 16
-                if c != 0: #  номер встречи в сетке куда попадает победитель (кроме встреч за места)
-                    row_win = row_num_win[i][0] # номера строк данной встречи в сетке
-                    c1 = []
-                    c1_tmp = []
-                    win = match[1]
-                    los = match[4]
-                elif c == 0:  # встречи за места
-                    row_win = mesta_dict[i]
-                    win = match[1]
-                    los = match[4]
-                c = str(i)
-            # цикл создания списков номеров встреч по столбцам новый
-                column_dict = {}
+    #                         m += 1
+    #                 if id_los == "":
+    #                     los = "X"
+    #                 # вариант с двумя крестами
+    #                 if id_win == "":
+    #                     win = "X"
+    #             c = match[0] # номер встречи, куда попадают победитель данной встречи (i)
+    #             # ========== расстановка для сетки на 16
+    #             if c != 0: #  номер встречи в сетке куда попадает победитель (кроме встреч за места)
+    #                 row_win = row_num_win[i][0] # номера строк данной встречи в сетке
+    #                 c1 = []
+    #                 c1_tmp = []
+    #                 win = match[1]
+    #                 los = match[4]
+    #             elif c == 0:  # встречи за места
+    #                 row_win = mesta_dict[i]
+    #                 win = match[1]
+    #                 los = match[4]
+    #             c = str(i)
+    #         # цикл создания списков номеров встреч по столбцам новый
+    #             column_dict = {}
     
-                for cd in range(2, column_last, 2):
-                    c1_tmp.clear()
-                    for rd in range(0, row_last):
-                        d1 = data[rd][cd]
-                        if d1 != "" and type(d1) == str and int(d1) > 0:
-                            c1_tmp.append(d1)
-                            c1 = c1_tmp.copy()
-                    column_dict[cd] = c1    # ключ -номер столбца, значение - список номеров встреч   
-                                # =======
-                for k in column_dict.keys():
-                    num_game_list = column_dict[k]  
-                    if str(i) in num_game_list:
-                        if (i == place_3rd and s_2 == 16) or (i == place_3rd and s_2 == 32): # вариант у таблицы 16-2 или 32-2 встреча за 3 место номер столбца
-                            col_win = k
-                        else: 
-                            col_win = k + 1
-                        break   
+    #             for cd in range(2, column_last, 2):
+    #                 c1_tmp.clear()
+    #                 for rd in range(0, row_last):
+    #                     d1 = data[rd][cd]
+    #                     if d1 != "" and type(d1) == str and int(d1) > 0:
+    #                         c1_tmp.append(d1)
+    #                         c1 = c1_tmp.copy()
+    #                 column_dict[cd] = c1    # ключ -номер столбца, значение - список номеров встреч   
+    #                             # =======
+    #             for k in column_dict.keys():
+    #                 num_game_list = column_dict[k]  
+    #                 if str(i) in num_game_list:
+    #                     if (i == place_3rd and s_2 == 16) or (i == place_3rd and s_2 == 32): # вариант у таблицы 16-2 или 32-2 встреча за 3 место номер столбца
+    #                         col_win = k
+    #                     else: 
+    #                         col_win = k + 1
+    #                     break   
 
-                row_los = row_num_los[r]  # строка проигравшего
-                score = match[2]  # счет во встречи
-                row_list_los = data[row_los]  # получаем список строки, где ищет номер куда сносится проигравший
-                col_los = row_list_los.index(r) # номер столбца проигравшего            
-                data[row_win][col_win] = win
-                data[row_win + 1][col_win] = score
-                data[row_los][col_los + 1] = los
-            return tds
+    #             row_los = row_num_los[r]  # строка проигравшего
+    #             score = match[2]  # счет во встречи
+    #             row_list_los = data[row_los]  # получаем список строки, где ищет номер куда сносится проигравший
+    #             col_los = row_list_los.index(r) # номер столбца проигравшего            
+    #             data[row_win][col_win] = win
+    #             data[row_win + 1][col_win] = score
+    #             data[row_los][col_los + 1] = los
+    #         return tds
 
-    def score_in_setka(self, stage, place_3rd):
-        """ выставляет счет победителя и сносит на свои места в сетке"""
-        dict_setka = {}
-        match = []
-        tmp_match = []
-        pairs_list = ["Мужские пары", "Женские пары", "Смешанные пары"]
+    # def score_in_setka(self, stage, place_3rd):
+    #     """ выставляет счет победителя и сносит на свои места в сетке"""
+    #     dict_setka = {}
+    #     match = []
+    #     tmp_match = []
+    #     pairs_list = ["Мужские пары", "Женские пары", "Смешанные пары"]
 
-        titles = Title.select().where(Title.id == self.current_title_id).get()
-        vid_turnira = titles.vid_turnira
-        system = System.select().where(
-            (System.title_id == self.current_title_id) &
-            (System.stage == stage) &
-            (System.sex == self.current_sex)
-            ).get()
-        max_pl = system.max_player
-        vid_setki = system.type_table
-        # получение id последнего соревнования
-        if stage in pairs_list:
-            player = Players_double.select().where(Players_double.title_id == self.current_title_id)
-        else:
-            if vid_turnira == "Личные":
-                player = Player.select().where((Player.title_id == self.current_title_id) & (Player.sex == self.current_sex))
-            else:
-                teams = Team.select().where((Team.title_id == self.current_title_id) & (Team.team_sex == self.current_sex))
-        result = Result.select().where((Result.title_id == self.current_title_id) & (Result.number_group == stage) & (Result.sex == self.current_sex))
-        for res in result:
-            num_game = int(res.tours)
+    #     titles = Title.select().where(Title.id == self.current_title_id).get()
+    #     vid_turnira = titles.vid_turnira
+    #     system = System.select().where(
+    #         (System.title_id == self.current_title_id) &
+    #         (System.stage == stage) &
+    #         (System.sex == self.current_sex)
+    #         ).get()
+    #     max_pl = system.max_player
+    #     vid_setki = system.type_table
+    #     # получение id последнего соревнования
+    #     if stage in pairs_list:
+    #         player = Players_double.select().where(Players_double.title_id == self.current_title_id)
+    #     else:
+    #         if vid_turnira == "Личные":
+    #             player = Player.select().where((Player.title_id == self.current_title_id) & (Player.sex == self.current_sex))
+    #         else:
+    #             teams = Team.select().where((Team.title_id == self.current_title_id) & (Team.team_sex == self.current_sex))
+    #     result = Result.select().where((Result.title_id == self.current_title_id) & (Result.number_group == stage) & (Result.sex == self.current_sex))
+    #     for res in result:
+    #         num_game = int(res.tours)
             
-            if res.winner is not None and res.winner != "": # значит встреча сыграна
-                if num_game == place_3rd: # если два 3-х места
-                    if res.player1 != "" and res.player2 != "":
-                        res = result.select().where(Result.tours == place_3rd).get()
-                        id_pl1 = player.select().where(Player.fio_city == res.player1).get()
-                        id_pl2 = player.select().where(Player.fio_city == res.player2).get()
-                        short_name_win = id_pl1.fio
-                        short_name_los = id_pl2.fio
-                        match = [0, short_name_win, '', '', short_name_los]
-                        dict_setka[num_game] = match
-                elif res.winner != "X":
-                    if stage in pairs_list:
-                        id_pl_win = player.select().where(Players_double.para_full == res.winner).get()
-                        short_name_win = id_pl_win.para_shot
-                    else:
-                        if vid_turnira == "Личные":
-                            id_pl_win = player.select().where(Player.fio_city == res.winner).get()
-                            short_name_win = id_pl_win.player if id_pl_win.fio is None else id_pl_win.fio
-                        else:
-                            id_pl_win = teams.select().where(Team.team_full == res.winner).get()
-                            short_name_win = id_pl_win.team_name
-                        # временный вариант со старой базой
+    #         if res.winner is not None and res.winner != "": # значит встреча сыграна
+    #             if num_game == place_3rd: # если два 3-х места
+    #                 if res.player1 != "" and res.player2 != "":
+    #                     res = result.select().where(Result.tours == place_3rd).get()
+    #                     id_pl1 = player.select().where(Player.fio_city == res.player1).get()
+    #                     id_pl2 = player.select().where(Player.fio_city == res.player2).get()
+    #                     short_name_win = id_pl1.fio
+    #                     short_name_los = id_pl2.fio
+    #                     match = [0, short_name_win, '', '', short_name_los]
+    #                     dict_setka[num_game] = match
+    #             elif res.winner != "X":
+    #                 if stage in pairs_list:
+    #                     id_pl_win = player.select().where(Players_double.para_full == res.winner).get()
+    #                     short_name_win = id_pl_win.para_shot
+    #                 else:
+    #                     if vid_turnira == "Личные":
+    #                         id_pl_win = player.select().where(Player.fio_city == res.winner).get()
+    #                         short_name_win = id_pl_win.player if id_pl_win.fio is None else id_pl_win.fio
+    #                     else:
+    #                         id_pl_win = teams.select().where(Team.team_full == res.winner).get()
+    #                         short_name_win = id_pl_win.team_name
+    #                     # временный вариант со старой базой
                     
-                    if res.loser == "X":
-                        short_name_los = "X"
-                    else: 
-                        if stage in pairs_list:
-                            id_pl_los = player.select().where(Players_double.para_full == res.loser).get()
-                            short_name_los = id_pl_los.para_shot
-                        else:
-                            if vid_turnira == "Личные":
-                                id_pl_los = player.select().where(Player.fio_city == res.loser).get()
-                                short_name_los = id_pl_los.player if id_pl_los.fio is None else id_pl_los.fio
-                            else:
-                                id_pl_los = teams.select().where(Team.team_full == res.loser).get()
-                                short_name_los = id_pl_los.team_name
-                            # временный вариант со старой базой
+    #                 if res.loser == "X":
+    #                     short_name_los = "X"
+    #                 else: 
+    #                     if stage in pairs_list:
+    #                         id_pl_los = player.select().where(Players_double.para_full == res.loser).get()
+    #                         short_name_los = id_pl_los.para_shot
+    #                     else:
+    #                         if vid_turnira == "Личные":
+    #                             id_pl_los = player.select().where(Player.fio_city == res.loser).get()
+    #                             short_name_los = id_pl_los.player if id_pl_los.fio is None else id_pl_los.fio
+    #                         else:
+    #                             id_pl_los = teams.select().where(Team.team_full == res.loser).get()
+    #                             short_name_los = id_pl_los.team_name
+    #                         # временный вариант со старой базой
                         
-                else:
-                    short_name_win = "X"
-                    short_name_los = "X"
+    #             else:
+    #                 short_name_win = "X"
+    #                 short_name_los = "X"
 
-                snoska = self.number_of_game(num_game, vid_setki, max_pl) # список (номер встречи победителя, номер встречи проигравшего и минус куда идет проигравший в сетке)
-                tmp_match.append(snoska[0]) # номер на сетке куда идет победитель
-                tmp_match.append(short_name_win)
-                if res.score_win == "В : П": # если счет в партиии
-                    tmp_match.append(f'{res.score_in_game}')
-                else:
-                    tmp_match.append(f'{res.score_in_game} {res.score_win}')
-                # ======= вариант с 1-3 местом ===
-                if snoska[0] == 0 and snoska[1] == 0: # значит сетка полная матч за места
-                    tmp_match.append(snoska[2])
-                    tmp_match.append(short_name_los)
-                elif snoska[0] != 0 and snoska[1] == 0: # значит сетка за 1-3 места
-                    tmp_match.append("")
-                    tmp_match.append("")      
-                else:
-                    tmp_match.append(snoska[2])
-                    tmp_match.append(short_name_los)
-                match = tmp_match.copy() # список [номер куда идет победитель, ФИО побед, счет, номер куда идет проигравший, ФИО проигр]
-                tmp_match.clear()
-                dict_setka[num_game] = match
+    #             snoska = self.number_of_game(num_game, vid_setki, max_pl) # список (номер встречи победителя, номер встречи проигравшего и минус куда идет проигравший в сетке)
+    #             tmp_match.append(snoska[0]) # номер на сетке куда идет победитель
+    #             tmp_match.append(short_name_win)
+    #             if res.score_win == "В : П": # если счет в партиии
+    #                 tmp_match.append(f'{res.score_in_game}')
+    #             else:
+    #                 tmp_match.append(f'{res.score_in_game} {res.score_win}')
+    #             # ======= вариант с 1-3 местом ===
+    #             if snoska[0] == 0 and snoska[1] == 0: # значит сетка полная матч за места
+    #                 tmp_match.append(snoska[2])
+    #                 tmp_match.append(short_name_los)
+    #             elif snoska[0] != 0 and snoska[1] == 0: # значит сетка за 1-3 места
+    #                 tmp_match.append("")
+    #                 tmp_match.append("")      
+    #             else:
+    #                 tmp_match.append(snoska[2])
+    #                 tmp_match.append(short_name_los)
+    #             match = tmp_match.copy() # список [номер куда идет победитель, ФИО побед, счет, номер куда идет проигравший, ФИО проигр]
+    #             tmp_match.clear()
+    #             dict_setka[num_game] = match
 
-        return dict_setka
+    #     return dict_setka
 
-    def setka_data(self, fin, posev_data):
-        """данные сетки"""
-        tds = []
-        fam_name_city = []
-        fam_name = []
-        fam_name_shot = {}
+    # def setka_data(self, fin, posev_data):
+    #     """данные сетки"""
+    #     tds = []
+    #     fam_name_city = []
+    #     fam_name = []
+    #     fam_name_shot = {}
     
-        stage =  fin
-        system = System.select().where((System.title_id == self.current_title_id) & (System.stage == stage)).get()  # находит system id последнего
+    #     stage =  fin
+    #     system = System.select().where((System.title_id == self.current_title_id) & (System.stage == stage)).get()  # находит system id последнего
 
-        # ==== командный вариант ===
-        titles = Title.select().where(Title.id == self.current_title_id).get()
-        vid_turnira = titles.vid_turnira
-        # ==============================
-        mp = system.max_player
-        mp = self.full_net_player(mp)
-        # ======= мой вариант ==============
-        for i in range(1, mp * 2 + 1, 2):
-            player_data = posev_data[((i + 1) // 2)]            
-            pl_id = player_data['player_id']
-            family_city = player_data['name_city']
-            fam_name_shot[player_data['name']] = pl_id
+    #     # ==== командный вариант ===
+    #     titles = Title.select().where(Title.id == self.current_title_id).get()
+    #     vid_turnira = titles.vid_turnira
+    #     # ==============================
+    #     mp = system.max_player
+    #     mp = self.full_net_player(mp)
+    #     # ======= мой вариант ==============
+    #     for i in range(1, mp * 2 + 1, 2):
+    #         player_data = posev_data[((i + 1) // 2)]            
+    #         pl_id = player_data['player_id']
+    #         family_city = player_data['name_city']
+    #         fam_name_shot[player_data['name']] = pl_id
             
-            # на верху фамилия, внизу город
-            if family_city != 'X':
-                znak = family_city.find("/")
-                f = family_city[:znak]
-                c = family_city[znak + 1:]
-                family = f"{f}\n{c}" # фио и на другой строке город
-            else:
-                family = 'X' 
-            tds.append(family)
-            fam_name_city.append(family_city)
-            fam_name.append(fam_name_shot)
-        all_list = [tds, fam_name_city, fam_name]
+    #         # на верху фамилия, внизу город
+    #         if family_city != 'X':
+    #             znak = family_city.find("/")
+    #             f = family_city[:znak]
+    #             c = family_city[znak + 1:]
+    #             family = f"{f}\n{c}" # фио и на другой строке город
+    #         else:
+    #             family = 'X' 
+    #         tds.append(family)
+    #         fam_name_city.append(family_city)
+    #         fam_name.append(fam_name_shot)
+    #     all_list = [tds, fam_name_city, fam_name]
         
-        return all_list
+    #     return all_list
 # ==========================================================
     def setka_player_after_choice(self, stage):
         """список игроков сетки после жеребьевки"""

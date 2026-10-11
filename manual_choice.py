@@ -4234,10 +4234,15 @@ class ManualNetDrawDialog(QDialog):
 
     def save_drawing(self):
         """Сохранение жеребьёвки в БД"""
-        total = len(self.net_positions) + (1 if self.current_player else 0)
+        total = len(self.net_positions) + (1 if self.current_player else 0) 
         if total != self.max_players:
-            QMessageBox.warning(self, "Ошибка", f"Не все позиции заполнены. Осталось {self.max_players - total}")
-            return
+            player = Player.get_or_none((Player.title_id == self.title_id) &
+                                              (Player.player == "X") &
+                                              (Player.sex == self.sex)
+                                              )
+            free_num_id = player.id
+            # QMessageBox.warning(self, "Ошибка", f"Не все позиции заполнены. Осталось {self.max_players - total}")
+            # return
 
         reply = QMessageBox.question(
             self,
@@ -4255,12 +4260,14 @@ class ManualNetDrawDialog(QDialog):
                 # Сохраняем новые
                 # Собираем все позиции (уже размещённые + текущий, если он есть)
                 positions_to_save = dict(self.net_positions)
-                if self.current_player and len(positions_to_save) < self.max_players:
+                # if self.current_player and len(positions_to_save) < self.max_players:
+                if self.current_player is None or len(positions_to_save) == self.max_players:
                     # Находим первую свободную позицию для текущего игрока
                     for pos in range(1, self.max_players + 1):
                         if pos not in positions_to_save:
-                            positions_to_save[pos] = self.current_player
-                            break
+                            positions_to_save[pos] = {'player_id': free_num_id, 'name': 'X'}
+                            # positions_to_save[pos] = self.current_player
+                            # break
 
                 for pos, data in positions_to_save.items():
                     if is_pairs:
@@ -4297,7 +4304,7 @@ class ManualNetDrawDialog(QDialog):
                         )
                         Choice.update(posev_final=pos).where(
                             (Choice.title_id == self.title_id) &
-                            (Choice.player_choice == data['player_id'])
+                            (Choice.player_choice_id == data['player_id'])
                         ).execute()
 
                 if is_pairs:

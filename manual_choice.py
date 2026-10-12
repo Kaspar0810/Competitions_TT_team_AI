@@ -4111,7 +4111,8 @@ class ManualNetDrawDialog(QDialog):
     # Сохранение
     # ----------------------------------------------
     def save_drawing(self):
-        if len(self.net_positions) != self.max_players:
+        # if len(self.net_positions) != self.max_players:
+        if len(self.net_positions) != len(self.all_players):
             QMessageBox.warning(self, "Ошибка", f"Не все позиции заполнены. Осталось {self.max_players - len(self.net_positions)}")
             return
 
@@ -4129,20 +4130,21 @@ class ManualNetDrawDialog(QDialog):
                 (Game_list.title_id == self.title_id) &
                 (Game_list.system_id == self.current_system.id)
             ).execute()
+            
             Result.delete().where(
                 (Result.title_id == self.title_id) &
                 (Result.system_id == self.current_system.id)
             ).execute()
 
-            for pos, data in self.net_positions.items():
-                Game_list.create(
-                    number_group=self.stage_name,
-                    rank_num_player=pos,
-                    player_group_id=data['player_id'],
-                    system_id=self.current_system.id,
-                    title_id=self.title_id,
-                    sex=self.sex if self.sex else "man"
-                )
+            # for pos, data in self.net_positions.items():
+            #     Game_list.create(
+            #         number_group=self.stage_name,
+            #         rank_num_player=pos,
+            #         player_group_id=data['player_id'],
+            #         system_id=self.current_system.id,
+            #         title_id=self.title_id,
+            #         sex=self.sex if self.sex else "man"
+            #     )
 
             Choice.update(posev_final=0, final="").where(
                 (Choice.title_id == self.title_id) &
@@ -4154,21 +4156,25 @@ class ManualNetDrawDialog(QDialog):
                 Choice.update(posev_final=pos, final=self.stage_name).where(
                     (Choice.title_id == self.title_id) &
                     (Choice.sex == self.sex) & 
-                    (Choice.player_choice == data['player_id'])
+                    (Choice.player_choice_id == data['player_id'])
                 ).execute()
 
             choices = Choice.select().where((Choice.title_id == self.title_id) &
                                             (Choice.final == self.stage_name) &
                                             (Choice.sex == self.sex)
                                             )
-            
+            # ===== если не полная сетка записываем Х на свободные места
+            self.free_place_in_setka()
+
             posev_data = {} # окончательные посев номер в сетке - игрок/ город
 
             for i in self.net_positions.keys():
                 id = self.net_positions[i]['player_id']
-                if id == "X":
+                name_x = self.net_positions[i]['name']
+                if name_x == "X":
                     # Получаем ID игрока X
-                    x_player_id = self.get_x_player_id()
+                    # x_player_id = self.get_x_player_id()
+                    x_player_id = id
                     posev_data[i] = {
                     'player_id':x_player_id,
                         'name_city':'X',
@@ -4184,6 +4190,19 @@ class ManualNetDrawDialog(QDialog):
                         'name_city':family_city,
                         'name':family_shot
                     }
+            # # заполняем Game_list Choice
+           
+
+            for pos, data in self.net_positions.items():
+                Game_list.create(
+                    number_group=self.stage_name,
+                    rank_num_player=pos,
+                    player_group_id=data['player_id'],
+                    system_id=self.current_system.id,
+                    title_id=self.title_id,
+                    sex=self.sex if self.sex else "man"
+                )
+
             # # 7. Создаём туры и матчи заполняем Results
             max_pl = self.max_players
             # число игр в сетке

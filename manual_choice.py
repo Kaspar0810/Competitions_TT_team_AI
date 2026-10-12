@@ -4110,139 +4110,10 @@ class ManualNetDrawDialog(QDialog):
     # ----------------------------------------------
     # Сохранение
     # ----------------------------------------------
-    # def save_drawing(self):
-    #     if len(self.net_positions) != self.max_players:
-    #         QMessageBox.warning(self, "Ошибка", f"Не все позиции заполнены. Осталось {self.max_players - len(self.net_positions)}")
-    #         return
-
-    #     reply = QMessageBox.question(
-    #         self,
-    #         "Подтверждение",
-    #         f"Сохранить жеребьёвку для {self.stage_name}?",
-    #         QMessageBox.Yes | QMessageBox.No
-    #     )
-    #     if reply != QMessageBox.Yes:
-    #         return
-
-    #     try:
-    #         Game_list.delete().where(
-    #             (Game_list.title_id == self.title_id) &
-    #             (Game_list.system_id == self.current_system.id)
-    #         ).execute()
-    #         Result.delete().where(
-    #             (Result.title_id == self.title_id) &
-    #             (Result.system_id == self.current_system.id)
-    #         ).execute()
-
-    #         for pos, data in self.net_positions.items():
-    #             Game_list.create(
-    #                 number_group=self.stage_name,
-    #                 rank_num_player=pos,
-    #                 player_group_id=data['player_id'],
-    #                 system_id=self.current_system.id,
-    #                 title_id=self.title_id,
-    #                 sex=self.sex if self.sex else "man"
-    #             )
-
-    #         Choice.update(posev_final=0, final="").where(
-    #             (Choice.title_id == self.title_id) &
-    #             (Choice.sex == self.sex) &
-    #             (Choice.final == self.stage_name)
-    #         ).execute()
-
-    #         for pos, data in self.net_positions.items():
-    #             Choice.update(posev_final=pos, final=self.stage_name).where(
-    #                 (Choice.title_id == self.title_id) &
-    #                 (Choice.sex == self.sex) & 
-    #                 (Choice.player_choice == data['player_id'])
-    #             ).execute()
-
-    #         choices = Choice.select().where((Choice.title_id == self.title_id) &
-    #                                         (Choice.final == self.stage_name) &
-    #                                         (Choice.sex == self.sex)
-    #                                         )
-            
-    #         posev_data = {} # окончательные посев номер в сетке - игрок/ город
-
-    #         for i in self.net_positions.keys():
-    #             id = self.net_positions[i]['player_id']
-    #             if id == "X":
-    #                 # Получаем ID игрока X
-    #                 x_player_id = self.get_x_player_id()
-    #                 posev_data[i] = {
-    #                 'player_id':x_player_id,
-    #                     'name_city':'X',
-    #                     'name':'X'
-    #                 }
-    #             else:
-    #                 # id = tmp_list[0]
-    #                 pl_id = Player.get(Player.id == id)
-    #                 family_city = pl_id.fio_city
-    #                 family_shot = pl_id.fio
-    #                 posev_data[i] = {
-    #                 'player_id':id,
-    #                     'name_city':family_city,
-    #                     'name':family_shot
-    #                 }
-    #         # # 7. Создаём туры и матчи заполняем Results
-    #         max_pl = self.max_players
-    #         # число игр в сетке
-    #         total_game = self.parent.number_game_of_net(self.stage_name)
-    #         # =========== проба записи стадии ====
-    #         # наивысшее место 
-    #         highest_place = self.parent.get_final_start_place(self.stage_name)
-    #         # определяет количество игр в сетке
-    #         game = self.parent.number_game_of_net(self.stage_name)
-
-    #         self.parent.get_match_title(i, game, highest_place, max_pl)
-    #         # =======================
-    #         # присваивает встречи 1-ого тура и записывает в тбл Results
-    #         for i in range(1, max_pl // 2 + 1):   
-    #             pl1 = posev_data[i * 2 - 1]['name_city']
-    #             pl2 = posev_data[i * 2]['name_city']
-    #             if pl1 is not None and pl2 is not None:
-    #                 with db:
-    #                     results = Result(number_group=self.stage_name, system_stage='финальный', player1=pl1, player2=pl2,
-    #                                     tours=i, title_id=self.title_id,
-    #                                     system_id=self.current_system.id, sex=self.sex).save()
-    #         # дополняет номера будущих встреч            
-    #         for i in range(max_pl // 2 + 1, total_game + 1): 
-    #             with db:
-    #                 results = Result(number_group=self.stage_name, system_stage="Финальный", player1="", player2="",
-    #                                 tours=i, title_id=self.title_id,
-    #                                 system_id=self.current_system.id, sex=self.sex).save()
-
-    #         # записывает стадии сетки в Result
-    #         stadia = self.parent.whrite_stadia_on_net(game, highest_place, max_pl)
-
-    #         results_stadia = Result.select().where(
-    #             (Result.title_id == self.title_id) &
-    #             (Result.system_id == self.current_system.id))
-
-    #         for k in results_stadia:
-    #             num_game = int(k.tours)
-    #             stadia_str = stadia[num_game]
-    #             Result.update(stage_net=stadia_str).where(Result.id == k).execute()
-
-    #         System.update(choice_flag=1).where(System.id == self.current_system.id).execute()
-
-    #         QMessageBox.information(self, "Успех", f"Жеребьёвка для {self.stage_name} сохранена")
-    #         self.accept()
-
-    #     except Exception as e:
-    #         QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить жеребьёвку: {str(e)}")
-
     def save_drawing(self):
-        """Сохранение жеребьёвки в БД"""
-        total = len(self.net_positions) + (1 if self.current_player else 0) 
-        if total != self.max_players:
-            player = Player.get_or_none((Player.title_id == self.title_id) &
-                                              (Player.player == "X") &
-                                              (Player.sex == self.sex)
-                                              )
-            free_num_id = player.id
-            # QMessageBox.warning(self, "Ошибка", f"Не все позиции заполнены. Осталось {self.max_players - total}")
-            # return
+        if len(self.net_positions) != self.max_players:
+            QMessageBox.warning(self, "Ошибка", f"Не все позиции заполнены. Осталось {self.max_players - len(self.net_positions)}")
+            return
 
         reply = QMessageBox.question(
             self,
@@ -4254,79 +4125,213 @@ class ManualNetDrawDialog(QDialog):
             return
 
         try:
-            is_pairs = "пары" in self.stage_name.lower()
+            Game_list.delete().where(
+                (Game_list.title_id == self.title_id) &
+                (Game_list.system_id == self.current_system.id)
+            ).execute()
+            Result.delete().where(
+                (Result.title_id == self.title_id) &
+                (Result.system_id == self.current_system.id)
+            ).execute()
 
-            with db.atomic():
-                # Сохраняем новые
-                # Собираем все позиции (уже размещённые + текущий, если он есть)
-                positions_to_save = dict(self.net_positions)
-                # if self.current_player and len(positions_to_save) < self.max_players:
-                if self.current_player is None or len(positions_to_save) == self.max_players:
-                    # Находим первую свободную позицию для текущего игрока
-                    for pos in range(1, self.max_players + 1):
-                        if pos not in positions_to_save:
-                            positions_to_save[pos] = {'player_id': free_num_id, 'name': 'X'}
-                            # positions_to_save[pos] = self.current_player
-                            # break
+            for pos, data in self.net_positions.items():
+                Game_list.create(
+                    number_group=self.stage_name,
+                    rank_num_player=pos,
+                    player_group_id=data['player_id'],
+                    system_id=self.current_system.id,
+                    title_id=self.title_id,
+                    sex=self.sex if self.sex else "man"
+                )
 
-                for pos, data in positions_to_save.items():
-                    if is_pairs:
-                        # Для пар сохраняем в Game_list с player_double_id
-                        pair_id = data.get('pair_id') or data.get('player_id')
-                        Game_list.create(
-                            number_group=self.stage_name,
-                            rank_num_player=pos,
-                            player_double_id=pair_id,
-                            system_id=self.current_system.id,
-                            title_id=self.title_id,
-                            sex=self.sex if self.sex else "man"
-                        )
-                        # Обновляем posev в Players_double
-                        Players_double.update(posev=pos).where(
-                            (Players_double.id == pair_id) &
-                            (Players_double.title_id == self.title_id)
-                        ).execute()
-                        # Обновляем posev в Choice_double_player
-                        if 'Choice_double_player' in globals():
-                            Choice_double_player.update(posev=pos).where(
-                                (Choice_double_player.title_id == self.title_id) &
-                                (Choice_double_player.player_double_id == pair_id)
-                            ).execute()
-                    else:
-                        # Для личных соревнований (старая логика)
-                        Game_list.create(
-                            number_group=self.stage_name,
-                            rank_num_player=pos,
-                            player_group_id=data['player_id'],
-                            system_id=self.current_system.id,
-                            title_id=self.title_id,
-                            sex=self.sex if self.sex else "man"
-                        )
-                        Choice.update(posev_final=pos).where(
-                            (Choice.title_id == self.title_id) &
-                            (Choice.player_choice_id == data['player_id'])
-                        ).execute()
+            Choice.update(posev_final=0, final="").where(
+                (Choice.title_id == self.title_id) &
+                (Choice.sex == self.sex) &
+                (Choice.final == self.stage_name)
+            ).execute()
 
-                if is_pairs:
-                    # Создаём записи в Result для пар
-                    self.create_results_for_pairs()
+            for pos, data in self.net_positions.items():
+                Choice.update(posev_final=pos, final=self.stage_name).where(
+                    (Choice.title_id == self.title_id) &
+                    (Choice.sex == self.sex) & 
+                    (Choice.player_choice == data['player_id'])
+                ).execute()
 
-                # Устанавливаем флаг choice_flag для системы
-                System.update(choice_flag=1).where(System.id == self.current_system.id).execute()
+            choices = Choice.select().where((Choice.title_id == self.title_id) &
+                                            (Choice.final == self.stage_name) &
+                                            (Choice.sex == self.sex)
+                                            )
+            
+            posev_data = {} # окончательные посев номер в сетке - игрок/ город
+
+            for i in self.net_positions.keys():
+                id = self.net_positions[i]['player_id']
+                if id == "X":
+                    # Получаем ID игрока X
+                    x_player_id = self.get_x_player_id()
+                    posev_data[i] = {
+                    'player_id':x_player_id,
+                        'name_city':'X',
+                        'name':'X'
+                    }
+                else:
+                    # id = tmp_list[0]
+                    pl_id = Player.get(Player.id == id)
+                    family_city = pl_id.fio_city
+                    family_shot = pl_id.fio
+                    posev_data[i] = {
+                    'player_id':id,
+                        'name_city':family_city,
+                        'name':family_shot
+                    }
+            # # 7. Создаём туры и матчи заполняем Results
+            max_pl = self.max_players
+            # число игр в сетке
+            total_game = self.parent.number_game_of_net(self.stage_name)
+            # =========== проба записи стадии ====
+            # наивысшее место 
+            highest_place = self.parent.get_final_start_place(self.stage_name)
+            # определяет количество игр в сетке
+            game = self.parent.number_game_of_net(self.stage_name)
+
+            self.parent.get_match_title(i, game, highest_place, max_pl)
+            # =======================
+            # присваивает встречи 1-ого тура и записывает в тбл Results
+            for i in range(1, max_pl // 2 + 1):   
+                pl1 = posev_data[i * 2 - 1]['name_city']
+                pl2 = posev_data[i * 2]['name_city']
+                if pl1 is not None and pl2 is not None:
+                    with db:
+                        results = Result(number_group=self.stage_name, system_stage='финальный', player1=pl1, player2=pl2,
+                                        tours=i, title_id=self.title_id,
+                                        system_id=self.current_system.id, sex=self.sex).save()
+            # дополняет номера будущих встреч            
+            for i in range(max_pl // 2 + 1, total_game + 1): 
+                with db:
+                    results = Result(number_group=self.stage_name, system_stage="Финальный", player1="", player2="",
+                                    tours=i, title_id=self.title_id,
+                                    system_id=self.current_system.id, sex=self.sex).save()
+
+            # записывает стадии сетки в Result
+            stadia = self.parent.whrite_stadia_on_net(game, highest_place, max_pl)
+
+            results_stadia = Result.select().where(
+                (Result.title_id == self.title_id) &
+                (Result.system_id == self.current_system.id))
+
+            for k in results_stadia:
+                num_game = int(k.tours)
+                stadia_str = stadia[num_game]
+                Result.update(stage_net=stadia_str).where(Result.id == k).execute()
+
+            System.update(choice_flag=1).where(System.id == self.current_system.id).execute()
 
             QMessageBox.information(self, "Успех", f"Жеребьёвка для {self.stage_name} сохранена")
             self.accept()
 
-            # Переключаем режим на "Результаты" (если это парный этап)
-            if is_pairs and hasattr(self.parent, 'radio_results_mode'):
-                self.parent.radio_results_mode.setChecked(True)
-                self.parent.on_doubles_mode_changed(self.parent.radio_results_mode)
-                self.parent.load_doubles_results()
-
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить жеребьёвку: {str(e)}")
-            import traceback
-            traceback.print_exc()
+
+    # def save_drawing(self):
+    #     """Сохранение жеребьёвки в БД"""
+    #     total = len(self.net_positions) + (1 if self.current_player else 0) 
+    #     if total != self.max_players:
+    #         player = Player.get_or_none((Player.title_id == self.title_id) &
+    #                                           (Player.player == "X") &
+    #                                           (Player.sex == self.sex)
+    #                                           )
+    #         # free_num_id = player.id
+    #         # QMessageBox.warning(self, "Ошибка", f"Не все позиции заполнены. Осталось {self.max_players - total}")
+    #         # return
+
+    #     reply = QMessageBox.question(
+    #         self,
+    #         "Подтверждение",
+    #         f"Сохранить жеребьёвку для {self.stage_name}?",
+    #         QMessageBox.Yes | QMessageBox.No
+    #     )
+    #     if reply != QMessageBox.Yes:
+    #         return
+
+    #     try:
+    #         is_pairs = "пары" in self.stage_name.lower()
+
+    #         with db.atomic():
+    #             # Сохраняем новые
+    #             # Собираем все позиции (уже размещённые + текущий, если он есть)
+    #             positions_to_save = dict(self.net_positions)
+    #             if self.current_player and len(positions_to_save) < self.max_players:
+    #             # if self.current_player is None or len(positions_to_save) == self.max_players:
+    #                 # Находим первую свободную позицию для текущего игрока
+    #                 for pos in range(1, self.max_players + 1):
+    #                     if pos not in positions_to_save:
+    #                         # positions_to_save[pos] = {'player_id': free_num_id, 'name': 'X'}
+    #                         positions_to_save[pos] = self.current_player
+    #                         break
+
+    #             for pos, data in positions_to_save.items():
+    #                 if is_pairs:
+    #                     # Для пар сохраняем в Game_list с player_double_id
+    #                     pair_id = data.get('pair_id') or data.get('player_id')
+    #                     Game_list.create(
+    #                         number_group=self.stage_name,
+    #                         rank_num_player=pos,
+    #                         player_double_id=pair_id,
+    #                         system_id=self.current_system.id,
+    #                         title_id=self.title_id,
+    #                         sex=self.sex if self.sex else "man"
+    #                     )
+    #                     # Обновляем posev в Players_double
+    #                     Players_double.update(posev=pos).where(
+    #                         (Players_double.id == pair_id) &
+    #                         (Players_double.title_id == self.title_id)
+    #                     ).execute()
+    #                     # Обновляем posev в Choice_double_player
+    #                     if 'Choice_double_player' in globals():
+    #                         Choice_double_player.update(posev=pos).where(
+    #                             (Choice_double_player.title_id == self.title_id) &
+    #                             (Choice_double_player.player_double_id == pair_id)
+    #                         ).execute()
+    #                 else:
+    #                     # Для личных соревнований (старая логика)
+    #                     Game_list.create(
+    #                         number_group=self.stage_name,
+    #                         rank_num_player=pos,
+    #                         player_group_id=data['player_id'],
+    #                         system_id=self.current_system.id,
+    #                         title_id=self.title_id,
+    #                         sex=self.sex if self.sex else "man"
+    #                     )
+    #                     Choice.update(posev_final=pos, final=self.stage_name).where(
+    #                         (Choice.title_id == self.title_id) &
+    #                         (Choice.player_choice_id == data['player_id'])
+    #                     ).execute()
+    #             # ======= проба свободные номера
+    #             self.free_place_in_setka()
+    #             #---------------------
+    #             if is_pairs:
+    #                 # Создаём записи в Result для пар
+    #                 self.create_results_for_pairs()
+    #             else:
+    #                 # Создаём записи в Result для личных встреч
+
+
+    #             # Устанавливаем флаг choice_flag для системы
+    #             System.update(choice_flag=1).where(System.id == self.current_system.id).execute()
+
+    #         QMessageBox.information(self, "Успех", f"Жеребьёвка для {self.stage_name} сохранена")
+    #         self.accept()
+
+    #         # Переключаем режим на "Результаты" (если это парный этап)
+    #         if is_pairs and hasattr(self.parent, 'radio_results_mode'):
+    #             self.parent.radio_results_mode.setChecked(True)
+    #             self.parent.on_doubles_mode_changed(self.parent.radio_results_mode)
+    #             self.parent.load_doubles_results()
+
+    #     except Exception as e:
+    #         QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить жеребьёвку: {str(e)}")
+    #         import traceback
+    #         traceback.print_exc()
     # ----------------------------------------------
     # Закрытие окна
     # ----------------------------------------------

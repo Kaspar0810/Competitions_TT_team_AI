@@ -16774,15 +16774,16 @@ class MainWindow(QMainWindow):
         num_groups = system.total_group
         #========================
         if stage == "Квалификация":
-            num_id_player = manual_choice.choice_group_manual(self, athletes, num_groups, stage, parent=None)
+            # num_id_player = manual_choice.choice_group_manual(self, athletes, num_groups, stage, parent=None)
+            manual_choice.choice_group_manual(self, athletes, num_groups, stage, parent=None)
         elif stage == "Квалификация. 1-й полуфинал":
             # Вызываем функцию выбора жеребьевки полуфиналов
-            result = manual_choice.choice_semifinal_manual(self)
+            manual_choice.choice_semifinal_manual(self)
         else:
             self.open_manual_net_draw(stage)
 
-        if num_id_player is not None:  
-            self.save_manual_drawing_for_stage(num_id_player, stage)
+        # if num_id_player is not None:  
+        #     self.save_manual_drawing_for_stage(num_id_player, stage)
 
     def fill_choice_table_for_stage(self, stage):
         """Заполнение таблицы Choice для конкретного этапа"""
